@@ -1,0 +1,55 @@
+script = "finetune-ldm.py" # not used for now
+
+[wandb]
+offline = "offline"
+entity = "acme"
+project = "test-ldm-training"
+
+[models]
+lda = {checkpoint="/path/to/stable-diffusion-1-5/lda.safetensors", train=false}
+text_encoder = {checkpoint="/path/to/stable-diffusion-1-5/text_encoder.safetensors", train=true}
+unet = {checkpoint="/path/to/stable-diffusion-1-5/unet.safetensors", train=true}
+
+[latent_diffusion]
+unconditional_sampling_probability = 0.2
+offset_noise = 0.1
+
+[training]
+duration = "1:epoch"
+seed = 0
+gpu_index = 0
+num_epochs = 1
+batch_size = 1
+gradient_accumulation = "1:step"
+clip_grad_norm = 2.0
+clip_grad_value = 1.0
+evaluation_interval = "1:epoch"
+evaluation_seed = 0
+
+
+[optimizer]
+optimizer = "AdamW" # "AdamW", "AdamW8bit", "Lion8bit", "Prodigy", "SGD", "Adam"
+learning_rate = 1e-5
+betas = [0.9, 0.999]
+eps = 1e-8
+weight_decay = 1e-2
+
+
+[scheduler]
+
+
+[dropout]
+dropout_probability = 0.2
+
+[dataset]
+hf_repo = "acme/images"
+revision = "main"
+
+[checkpointing]
+# save_folder = "/path/to/ckpts"
+save_interval = "1:epoch"
+
+[test_diffusion]
+prompts = [
+    "A cute cat",
+]

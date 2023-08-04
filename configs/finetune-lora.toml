@@ -1,0 +1,70 @@
+script = "finetune-ldm-lora.py" # not used for now
+
+[wandb]
+mode = "offline" # "online", "offline", "disabled"
+entity = "acme"
+project = "test-lora-training"
+
+[models]
+unet = {checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors"}
+text_encoder = {checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
+lda = {checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors"}
+
+[latent_diffusion]
+unconditional_sampling_probability = 0.05
+offset_noise = 0.1
+
+[lora]
+rank = 16
+trigger_phrase = "a spsh photo,"
+use_only_trigger_probability = 1.0
+unet_targets = ["CrossAttentionBlock2d"]
+text_encoder_targets = ["TransformerLayer"]
+lda_targets = []
+
+[training]
+duration = "1000:epoch"
+seed = 0
+gpu_index = 0
+batch_size = 4
+gradient_accumulation = "4:step"
+clip_grad_norm = 1.0
+# clip_grad_value = 1.0
+evaluation_interval = "5:epoch"
+evaluation_seed = 1
+
+
+[optimizer]
+optimizer = "Prodigy" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
+learning_rate = 1
+betas = [0.9, 0.999]
+eps = 1e-8
+weight_decay = 1e-2
+
+[scheduler]
+scheduler_type = "ConstantLR"
+update_interval = "1:step"
+warmup = "500:step"
+
+
+[dropout]
+dropout_probability = 0.2
+use_gyro_dropout = false
+
+[dataset]
+hf_repo = "acme/images"
+revision = "main"
+
+[checkpointing]
+# save_folder = "/path/to/ckpts"
+save_interval = "1:step"
+
+[test_diffusion]
+num_inference_steps = 30
+use_short_prompts = false
+prompts = [
+        "a cute cat",
+        "a cute dog",
+        "a cute bird",
+        "a cute horse",
+]

@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "refiners"
+version = "0.1.0"
+description = "The simplest way to train and run adapters on top of foundational models"
+authors = [
+    "The Finegrain Team <bonjour@lagon.tech>",
+]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "refiners", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+jaxtyping = "^0.2.14"
+torch = "^2.0.0"
+safetensors = "^0.3.0"
+numpy = "^1.24.2"
+pillow = "^9.5.0"
+datasets = {version = "^2.14.0", optional = true}
+tomli = {version = "^2.0.1", optional = true}
+wandb = {version = "^0.15.7", optional = true}
+loguru = {version = "^0.7.0", optional = true}
+bitsandbytes = {version = "^0.41.0", optional = true}
+prodigyopt = {version = "^1.0", optional = true}
+pydantic = {git = "https://github.com/pydantic/pydantic.git", rev = "v2.0b3", optional = true}
+scipy = {version = "^1.11.1", optional = true}
+
+
+[tool.poetry.extras]
+training = ["datasets", "tomli", "wandb", "loguru", "bitsandbytes", "prodigyopt", "pydantic", "scipy"]
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.1.0"
+pytest = "^7.2.2"
+isort = "^5.12.0"
+ipykernel = "^6.22.0"
+pyright = "^1.1.318"
+ruff = "^0.0.281"
+
+
+[tool.poetry.group.test.dependencies]
+diffusers = "^0.18.0"
+transformers = "^4.27.4"
+piq = "^0.7.1"
+invisible-watermark = "^0.2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+preview = true
+
+[tool.ruff]
+ignore = [
+    "F722",  # forward-annotation-syntax-error, because of Jaxtyping
+    "E731",  # do-not-assign-lambda
+    "E501",  # line-too-long, because Black (https://beta.ruff.rs/docs/faq/#is-ruff-compatible-with-black)
+]
+line-length = 120
+
+[tool.pyright]
+include = ["src/refiners", "tests", "scripts/training"]
+exclude = ["**/__pycache__"]
+reportMissingTypeStubs = "warning"

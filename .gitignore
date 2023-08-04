@@ -1,0 +1,28 @@
+# compilation and distribution
+__pycache__/
+*.py[cod]
+dist/
+
+# virtual environments
+venv/
+
+# unit tests
+.pytest_cache/
+
+# tests' model weights
+tests/weights/
+
+# ruff
+.ruff_cache
+
+# vscode
+.vscode
+
+# Weights & Biases (offline trainings)
+wandb/
+
+# macos
+.DS_Store
+
+# model weights
+*.safetensors
