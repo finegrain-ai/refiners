@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="assets/logo_light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/logo_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/logo_light.png">
   <img alt="Finegrain Refiners Library" width="352" height="128" style="max-width: 100%;">
 </picture>
 
@@ -270,7 +270,7 @@ with torch.no_grad():
 
 You should get:
 
-![pokemon cat output](assets/pokemon_cat.png)
+![pokemon cat output](https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/pokemon_cat.png)
 
 ## Training
 
