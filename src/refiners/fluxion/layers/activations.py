@@ -46,6 +46,14 @@ class ApproximateGeLU(Activation):
         return x * sigmoid(1.702 * x)
 
 
+class Sigmoid(Activation):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.sigmoid()
+
+
 class GLU(Activation):
     """
     Gated Linear Unit activation layer.
