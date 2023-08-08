@@ -9,14 +9,13 @@ class LayerNorm(_LayerNorm, WeightedModule):
         self,
         normalized_shape: int | list[int],
         eps: float = 0.00001,
-        elementwise_affine: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
         super().__init__(  # type: ignore
             normalized_shape=normalized_shape,
             eps=eps,
-            elementwise_affine=elementwise_affine,
+            elementwise_affine=True,  # otherwise not a WeightedModule
             device=device,
             dtype=dtype,
         )
@@ -28,7 +27,6 @@ class GroupNorm(_GroupNorm, WeightedModule):
         channels: int,
         num_groups: int,
         eps: float = 1e-5,
-        affine: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -36,14 +34,13 @@ class GroupNorm(_GroupNorm, WeightedModule):
             num_groups=num_groups,
             num_channels=channels,
             eps=eps,
-            affine=affine,
+            affine=True,  # otherwise not a WeightedModule
             device=device,
             dtype=dtype,
         )
         self.channels = channels
         self.num_groups = num_groups
         self.eps = eps
-        self.affine = affine
 
 
 class LayerNorm2d(WeightedModule):

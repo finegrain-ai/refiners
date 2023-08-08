@@ -143,14 +143,14 @@ class CrossAttentionBlock2d(Sum):
 
         in_block = (
             Chain(
-                GroupNorm(channels=channels, num_groups=num_groups, eps=1e-6, affine=True, device=device, dtype=dtype),
+                GroupNorm(channels=channels, num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
                 StatefulFlatten(context="flatten", key="sizes", start_dim=2),
                 Transpose(1, 2),
                 Linear(in_features=channels, out_features=channels, device=device, dtype=dtype),
             )
             if use_linear_projection
             else Chain(
-                GroupNorm(channels=channels, num_groups=num_groups, eps=1e-6, affine=True, device=device, dtype=dtype),
+                GroupNorm(channels=channels, num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
                 Conv2d(in_channels=channels, out_channels=channels, kernel_size=1, device=device, dtype=dtype),
                 StatefulFlatten(context="flatten", key="sizes", start_dim=2),
                 Transpose(1, 2),
