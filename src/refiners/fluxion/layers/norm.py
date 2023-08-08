@@ -1,10 +1,9 @@
-from torch import ones, zeros, Tensor, sqrt, device as Device, dtype as DType
-from torch.nn import GroupNorm as _GroupNorm, Parameter, LayerNorm as _LayerNorm
+from torch import nn, ones, zeros, Tensor, sqrt, device as Device, dtype as DType
 from jaxtyping import Float
-from refiners.fluxion.layers.module import WeightedModule
+from refiners.fluxion.layers.module import Module, WeightedModule
 
 
-class LayerNorm(_LayerNorm, WeightedModule):
+class LayerNorm(nn.LayerNorm, WeightedModule):
     def __init__(
         self,
         normalized_shape: int | list[int],
@@ -21,7 +20,7 @@ class LayerNorm(_LayerNorm, WeightedModule):
         )
 
 
-class GroupNorm(_GroupNorm, WeightedModule):
+class GroupNorm(nn.GroupNorm, WeightedModule):
     def __init__(
         self,
         channels: int,
@@ -60,8 +59,8 @@ class LayerNorm2d(WeightedModule):
         dtype: DType | None = None,
     ) -> None:
         super().__init__()
-        self.weight = Parameter(ones(channels, device=device, dtype=dtype))
-        self.bias = Parameter(zeros(channels, device=device, dtype=dtype))
+        self.weight = nn.Parameter(ones(channels, device=device, dtype=dtype))
+        self.bias = nn.Parameter(zeros(channels, device=device, dtype=dtype))
         self.eps = eps
 
     def forward(self, x: Float[Tensor, "batch channels height width"]) -> Float[Tensor, "batch channels height width"]:
@@ -70,3 +69,19 @@ class LayerNorm2d(WeightedModule):
         x_norm = (x - x_mean) / sqrt(x_var + self.eps)
         x_out = self.weight.unsqueeze(-1).unsqueeze(-1) * x_norm + self.bias.unsqueeze(-1).unsqueeze(-1)
         return x_out
+
+
+class InstanceNorm2d(nn.InstanceNorm2d, Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-05,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(  # type: ignore
+            num_features=num_features,
+            eps=eps,
+            device=device,
+            dtype=dtype,
+        )

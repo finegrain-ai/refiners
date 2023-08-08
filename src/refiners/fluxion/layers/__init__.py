@@ -1,5 +1,5 @@
 from refiners.fluxion.layers.activations import GLU, SiLU, ReLU, ApproximateGeLU, GeLU, Sigmoid
-from refiners.fluxion.layers.norm import LayerNorm, GroupNorm, LayerNorm2d
+from refiners.fluxion.layers.norm import LayerNorm, GroupNorm, LayerNorm2d, InstanceNorm2d
 from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
 from refiners.fluxion.layers.basics import (
     Identity,
@@ -28,9 +28,10 @@ from refiners.fluxion.layers.chain import (
     Breakpoint,
     Concatenate,
 )
-from refiners.fluxion.layers.conv import Conv2d
+from refiners.fluxion.layers.conv import Conv2d, ConvTranspose2d
 from refiners.fluxion.layers.linear import Linear, MultiLinear
 from refiners.fluxion.layers.module import Module, WeightedModule, ContextModule
+from refiners.fluxion.layers.padding import ReflectionPad2d
 from refiners.fluxion.layers.sampling import Downsample, Upsample, Interpolate
 from refiners.fluxion.layers.embedding import Embedding
 
@@ -39,6 +40,7 @@ __all__ = [
     "LayerNorm",
     "GroupNorm",
     "LayerNorm2d",
+    "InstanceNorm2d",
     "GeLU",
     "GLU",
     "SiLU",
@@ -72,6 +74,7 @@ __all__ = [
     "Breakpoint",
     "Concatenate",
     "Conv2d",
+    "ConvTranspose2d",
     "Linear",
     "MultiLinear",
     "Downsample",
@@ -80,4 +83,5 @@ __all__ = [
     "WeightedModule",
     "ContextModule",
     "Interpolate",
+    "ReflectionPad2d",
 ]
