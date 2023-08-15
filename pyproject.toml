@@ -63,6 +63,6 @@ ignore = [
 line-length = 120
 
 [tool.pyright]
-include = ["src/refiners", "tests", "scripts/training"]
+include = ["src/refiners", "tests", "scripts/"]
 exclude = ["**/__pycache__"]
 reportMissingTypeStubs = "warning"
