@@ -1,4 +1,8 @@
-from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors, save_to_safetensors
+from refiners.fluxion.utils import (
+    load_from_safetensors,
+    load_metadata_from_safetensors,
+    save_to_safetensors,
+)
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.unet import UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget
@@ -8,33 +12,33 @@ from refiners.fluxion.utils import create_state_dict_mapping
 
 import torch
 
-from diffusers import DiffusionPipeline
-from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from transformers.models.clip.modeling_clip import CLIPTextModel
+from diffusers import DiffusionPipeline  # type: ignore
+from diffusers.models.unet_2d_condition import UNet2DConditionModel  # type: ignore
+from transformers.models.clip.modeling_clip import CLIPTextModel  # type: ignore
 
 
 @torch.no_grad()
 def create_unet_mapping(src_model: UNet2DConditionModel, dst_model: UNet) -> dict[str, str] | None:
     x = torch.randn(1, 4, 32, 32)
-    timestep = torch.tensor([0])
+    timestep = torch.tensor(data=[0])
     clip_text_embeddings = torch.randn(1, 77, 768)
 
     src_args = (x, timestep, clip_text_embeddings)
-    dst_model.set_timestep(timestep)
-    dst_model.set_clip_text_embedding(clip_text_embeddings)
+    dst_model.set_timestep(timestep=timestep)
+    dst_model.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
     dst_args = (x,)
 
-    return create_state_dict_mapping(src_model, dst_model, src_args, dst_args)  # type: ignore
+    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=src_args, target_args=dst_args)  # type: ignore
 
 
 @torch.no_grad()
 def create_text_encoder_mapping(src_model: CLIPTextModel, dst_model: CLIPTextEncoderL) -> dict[str, str] | None:
     x = dst_model.tokenizer("Nice cat", sequence_length=77)
 
-    return create_state_dict_mapping(src_model, dst_model, [x])  # type: ignore
+    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[x])  # type: ignore
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -61,11 +65,11 @@ def main():
     )
     args = parser.parse_args()
 
-    metadata = load_metadata_from_safetensors(args.input_file)
+    metadata = load_metadata_from_safetensors(path=args.input_file)
     assert metadata is not None
-    tensors = load_from_safetensors(args.input_file)
+    tensors = load_from_safetensors(path=args.input_file)
 
-    diffusers_sd = DiffusionPipeline.from_pretrained(args.sd15)  # type: ignore
+    diffusers_sd = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.sd15)  # type: ignore
 
     state_dict: dict[str, torch.Tensor] = {}
 
@@ -110,16 +114,16 @@ def main():
         # Compute the corresponding diffusers' keys where LoRA layers must be applied
         lora_injection_points: list[str] = [
             refiners_to_diffusers[submodule_to_key[linear]]
-            for target in [LoraTarget(t) for t in meta_value.split(",")]
+            for target in [LoraTarget(t) for t in meta_value.split(sep=",")]
             for layer in dst_model.layers(layer_type=target.get_class())
-            for linear in layer.layers(fl.Linear)
+            for linear in layer.layers(layer_type=fl.Linear)
         ]
 
         lora_weights = [w for w in [tensors[k] for k in sorted(tensors) if k.startswith(key_prefix)]]
         assert len(lora_injection_points) == len(lora_weights) // 2
 
         # Map LoRA weights to each key using SD-WebUI conventions (proper prefix and suffix, underscores)
-        for i, diffusers_key in enumerate(lora_injection_points):
+        for i, diffusers_key in enumerate(iterable=lora_injection_points):
             lora_key = lora_prefix + diffusers_key.replace(".", "_")
             # Note: no ".alpha" weights (those are used to scale the LoRA by alpha/rank). Refiners uses a scale = 1.0
             # by default (see `lora_calc_updown` in SD-WebUI for more details)
@@ -127,7 +131,7 @@ def main():
             state_dict[lora_key + ".lora_down.weight"] = lora_weights[2 * i + 1]
 
     assert state_dict
-    save_to_safetensors(args.output_file, state_dict)
+    save_to_safetensors(path=args.output_file, tensors=state_dict)
 
 
 if __name__ == "__main__":

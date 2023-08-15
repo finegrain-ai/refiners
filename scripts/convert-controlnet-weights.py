@@ -1,10 +1,10 @@
 import torch
-from diffusers import ControlNetModel
-from safetensors.torch import save_file
+from diffusers import ControlNetModel  # type: ignore
 from refiners.fluxion.utils import (
     forward_order_of_execution,
     verify_shape_match,
     convert_state_dict,
+    save_to_safetensors,
 )
 from refiners.foundationals.latent_diffusion.controlnet import Controlnet
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
@@ -16,16 +16,16 @@ def convert(controlnet_src: ControlNetModel) -> dict[str, torch.Tensor]:
     controlnet = Controlnet(name="mycn")
 
     condition = torch.randn(1, 3, 512, 512)
-    controlnet.set_controlnet_condition(condition)
+    controlnet.set_controlnet_condition(condition=condition)
 
-    unet = UNet(4, clip_embedding_dim=768)
-    unet.insert(0, controlnet)
+    unet = UNet(in_channels=4, clip_embedding_dim=768)
+    unet.insert(index=0, module=controlnet)
     clip_text_embedding = torch.rand(1, 77, 768)
-    unet.set_clip_text_embedding(clip_text_embedding)
+    unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
     scheduler = DPMSolver(num_inference_steps=10)
-    timestep = scheduler.timesteps[0].unsqueeze(0)
-    unet.set_timestep(timestep.unsqueeze(0))
+    timestep = scheduler.timesteps[0].unsqueeze(dim=0)
+    unet.set_timestep(timestep=timestep.unsqueeze(dim=0))
 
     x = torch.randn(1, 4, 64, 64)
 
@@ -33,8 +33,8 @@ def convert(controlnet_src: ControlNetModel) -> dict[str, torch.Tensor]:
     # to diffusers in order, since we compute the residuals inline instead of
     # in a separate step.
 
-    source_order = forward_order_of_execution(controlnet_src, (x, timestep, clip_text_embedding, condition))
-    target_order = forward_order_of_execution(controlnet, (x,))
+    source_order = forward_order_of_execution(module=controlnet_src, example_args=(x, timestep, clip_text_embedding, condition))  # type: ignore
+    target_order = forward_order_of_execution(module=controlnet, example_args=(x,))
 
     broken_k = ("Conv2d", (torch.Size([320, 320, 1, 1]), torch.Size([320])))
 
@@ -162,7 +162,7 @@ def convert(controlnet_src: ControlNetModel) -> dict[str, torch.Tensor]:
     assert target_order[broken_k] == expected_target_order
     source_order[broken_k] = fixed_source_order
 
-    assert verify_shape_match(source_order, target_order)
+    assert verify_shape_match(source_order=source_order, target_order=target_order)
 
     mapping: dict[str, str] = {}
     for model_type_shape in source_order:
@@ -170,12 +170,16 @@ def convert(controlnet_src: ControlNetModel) -> dict[str, torch.Tensor]:
         target_keys = target_order[model_type_shape]
         mapping.update(zip(target_keys, source_keys))
 
-    state_dict = convert_state_dict(controlnet_src.state_dict(), controlnet.state_dict(), state_dict_mapping=mapping)
+    state_dict = convert_state_dict(
+        source_state_dict=controlnet_src.state_dict(),
+        target_state_dict=controlnet.state_dict(),
+        state_dict_mapping=mapping,
+    )
 
     return {k: v.half() for k, v in state_dict.items()}
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -194,9 +198,9 @@ def main():
         help="Path for the output file",
     )
     args = parser.parse_args()
-    controlnet_src = ControlNetModel.from_pretrained(args.source)
-    tensors = convert(controlnet_src)
-    save_file(tensors, args.output_file)
+    controlnet_src = ControlNetModel.from_pretrained(pretrained_model_name_or_path=args.source)  # type: ignore
+    tensors = convert(controlnet_src=controlnet_src)  # type: ignore
+    save_to_safetensors(path=args.output_file, tensors=tensors)
 
 
 if __name__ == "__main__":
