@@ -57,7 +57,7 @@ def process(source: str, base_model: str, output_file: str) -> None:
     diffusers_to_refiners = create_state_dict_mapping(
         source_model=refiners_model, target_model=diffusers_model, source_args=refiners_args, target_args=diffusers_args
     )
-    assert diffusers_to_refiners is not None
+    assert diffusers_to_refiners is not None, "Model conversion failed"
 
     apply_loras_to_target(module=refiners_model, target=LoraTarget(target), rank=rank, scale=1.0)
     for layer in refiners_model.layers(layer_type=Lora):
