@@ -1,10 +1,7 @@
 import torch
 
 from safetensors.torch import save_file  # type: ignore
-from refiners.fluxion.utils import (
-    create_state_dict_mapping,
-    convert_state_dict,
-)
+from refiners.fluxion.utils import create_state_dict_mapping, convert_state_dict
 
 from diffusers import DiffusionPipeline  # type: ignore
 from diffusers.models.unet_2d_condition import UNet2DConditionModel  # type: ignore
@@ -17,7 +14,7 @@ def convert(src_model: UNet2DConditionModel) -> dict[str, torch.Tensor]:
     dst_model = SDXLUNet(in_channels=4)
 
     x = torch.randn(1, 4, 32, 32)
-    timestep = torch.tensor([0])
+    timestep = torch.tensor(data=[0])
     clip_text_embeddings = torch.randn(1, 77, 2048)
 
     added_cond_kwargs = {"text_embeds": torch.randn(1, 1280), "time_ids": torch.randn(1, 6)}
@@ -60,8 +57,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     src_model = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.source).unet  # type: ignore
-    tensors = convert(src_model)
-    save_file(tensors, args.output_file)
+    tensors = convert(src_model=src_model)  # type: ignore
+    save_file(tensors=tensors, filename=args.output_file)
 
 
 if __name__ == "__main__":

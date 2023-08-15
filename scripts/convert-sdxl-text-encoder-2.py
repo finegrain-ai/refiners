@@ -1,10 +1,7 @@
 import torch
 
 from safetensors.torch import save_file  # type: ignore
-from refiners.fluxion.utils import (
-    create_state_dict_mapping,
-    convert_state_dict,
-)
+from refiners.fluxion.utils import create_state_dict_mapping, convert_state_dict
 
 from diffusers import DiffusionPipeline  # type: ignore
 from transformers.models.clip.modeling_clip import CLIPTextModel  # type: ignore
@@ -28,7 +25,7 @@ def convert(src_model: CLIPTextModel) -> dict[str, torch.Tensor]:
     return {k: v.half() for k, v in state_dict.items()}
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -49,7 +46,7 @@ def main():
     )
     args = parser.parse_args()
     src_model = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.source).text_encoder_2  # type: ignore
-    tensors = convert(src_model=src_model)
+    tensors = convert(src_model=src_model)  # type: ignore
     save_file(tensors=tensors, filename=args.output_file)
 
 

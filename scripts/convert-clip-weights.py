@@ -1,13 +1,9 @@
 import torch
 
-from safetensors.torch import save_file
-from refiners.fluxion.utils import (
-    create_state_dict_mapping,
-    convert_state_dict,
-)
+from refiners.fluxion.utils import create_state_dict_mapping, convert_state_dict, save_to_safetensors
 
-from diffusers import DiffusionPipeline
-from transformers.models.clip.modeling_clip import CLIPTextModel
+from diffusers import DiffusionPipeline  # type: ignore
+from transformers.models.clip.modeling_clip import CLIPTextModel  # type: ignore
 
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 
@@ -16,12 +12,15 @@ from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 def convert(src_model: CLIPTextModel) -> dict[str, torch.Tensor]:
     dst_model = CLIPTextEncoderL()
     x = dst_model.tokenizer("Nice cat", sequence_length=77)
-    mapping = create_state_dict_mapping(src_model, dst_model, [x])
-    state_dict = convert_state_dict(src_model.state_dict(), dst_model.state_dict(), mapping)
+    mapping = create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[x])  # type: ignore
+    assert mapping is not None, "Model conversion failed"
+    state_dict = convert_state_dict(
+        source_state_dict=src_model.state_dict(), target_state_dict=dst_model.state_dict(), state_dict_mapping=mapping
+    )
     return {k: v.half() for k, v in state_dict.items()}
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -41,9 +40,9 @@ def main():
         help="Path for the output file",
     )
     args = parser.parse_args()
-    src_model = DiffusionPipeline.from_pretrained(args.source).text_encoder
-    tensors = convert(src_model)
-    save_file(tensors, args.output_file)
+    src_model = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.source).text_encoder  # type: ignore
+    tensors = convert(src_model=src_model)  # type: ignore
+    save_to_safetensors(path=args.output_file, tensors=tensors)
 
 
 if __name__ == "__main__":

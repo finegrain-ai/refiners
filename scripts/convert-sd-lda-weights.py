@@ -1,13 +1,13 @@
 import torch
 
-from safetensors.torch import save_file
 from refiners.fluxion.utils import (
     create_state_dict_mapping,
     convert_state_dict,
+    save_to_safetensors,
 )
 
-from diffusers import DiffusionPipeline
-from diffusers.models.autoencoder_kl import AutoencoderKL
+from diffusers import DiffusionPipeline  # type: ignore
+from diffusers.models.autoencoder_kl import AutoencoderKL  # type: ignore
 
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 
@@ -16,12 +16,15 @@ from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusion
 def convert(src_model: AutoencoderKL) -> dict[str, torch.Tensor]:
     dst_model = LatentDiffusionAutoencoder()
     x = torch.randn(1, 3, 512, 512)
-    mapping = create_state_dict_mapping(src_model, dst_model, [x])
-    state_dict = convert_state_dict(src_model.state_dict(), dst_model.state_dict(), mapping)
+    mapping = create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[x])  # type: ignore
+    assert mapping is not None, "Model conversion failed"
+    state_dict = convert_state_dict(
+        source_state_dict=src_model.state_dict(), target_state_dict=dst_model.state_dict(), state_dict_mapping=mapping
+    )
     return {k: v.half() for k, v in state_dict.items()}
 
 
-def main():
+def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -41,9 +44,9 @@ def main():
         help="Path for the output file",
     )
     args = parser.parse_args()
-    src_model = DiffusionPipeline.from_pretrained(args.source).vae
-    tensors = convert(src_model)
-    save_file(tensors, args.output_file)
+    src_model = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.source).vae  # type: ignore
+    tensors = convert(src_model=src_model)  # type: ignore
+    save_to_safetensors(path=args.output_file, tensors=tensors)
 
 
 if __name__ == "__main__":
