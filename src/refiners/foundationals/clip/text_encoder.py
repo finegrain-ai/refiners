@@ -25,7 +25,7 @@ class PositionalTokenEncoder(Sum):
         positional_embedding_dim: int,
         device: Device | str | None = None,
         dtype: DType | None = None,
-    ):
+    ) -> None:
         self.vocabulary_size = vocabulary_size
         self.positional_embedding_dim = positional_embedding_dim
         super().__init__(
@@ -36,7 +36,7 @@ class PositionalTokenEncoder(Sum):
                 dtype=dtype,
             ),
             Chain(
-                Lambda(self.get_position_ids),
+                Lambda(func=self.get_position_ids),
                 Embedding(
                     num_embeddings=positional_embedding_dim,
                     embedding_dim=embedding_dim,
@@ -48,7 +48,7 @@ class PositionalTokenEncoder(Sum):
 
     @property
     def position_ids(self) -> Tensor:
-        return arange(self.positional_embedding_dim, device=self.device).reshape(1, -1)
+        return arange(end=self.positional_embedding_dim, device=self.device).reshape(1, -1)
 
     def get_position_ids(self, x: Tensor) -> Tensor:
         return self.position_ids[:, : x.shape[1]]
@@ -145,7 +145,7 @@ class CLIPTextEncoder(Chain):
         layer_norm_eps: float = 1e-5,
         device: Device | str | None = None,
         dtype: DType | None = None,
-    ):
+    ) -> None:
         self.embedding_dim = embedding_dim
         self.positional_embedding_dim = positional_embedding_dim
         self.vocabulary_size = vocabulary_size
@@ -177,12 +177,12 @@ class CLIPTextEncoder(Chain):
         )
 
     def encode(self, text: str) -> Tensor:
-        tokens = self.tokenizer(text, sequence_length=self.positional_embedding_dim).to(self.device)
+        tokens = self.tokenizer(text, sequence_length=self.positional_embedding_dim).to(device=self.device)
         return self(tokens)
 
     @property
     def unconditional_text_embedding(self) -> Tensor:
-        return self.encode("")
+        return self.encode(text="")
 
 
 class CLIPTextEncoderL(CLIPTextEncoder):
@@ -206,7 +206,7 @@ class CLIPTextEncoderL(CLIPTextEncoder):
             device=device,
             dtype=dtype,
         )
-        for gelu, parent in self.walk(lambda m, _: isinstance(m, GeLU)):
+        for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, GeLU)):
             parent.replace(old_module=gelu, new_module=ApproximateGeLU())
 
 
