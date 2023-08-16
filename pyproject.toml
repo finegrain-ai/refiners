@@ -64,5 +64,6 @@ line-length = 120
 
 [tool.pyright]
 include = ["src/refiners", "tests", "scripts"]
+strict = ["*"]
 exclude = ["**/__pycache__"]
 reportMissingTypeStubs = "warning"
