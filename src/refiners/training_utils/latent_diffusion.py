@@ -89,7 +89,7 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
         processed_image: Image.Image = self.process_image(resized_image)
         latents = self.lda.encode_image(image=processed_image).to(device=self.device)
         processed_caption = self.process_caption(caption=caption)
-        clip_text_embedding = self.text_encoder.encode(text=processed_caption).to(device=self.device)
+        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.device)
         return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
 
     def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:

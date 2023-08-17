@@ -5,17 +5,21 @@ from itertools import islice
 import re
 from torch import Tensor, tensor
 from refiners.fluxion import pad
+import refiners.fluxion.layers as fl
 
 
-class CLIPTokenizer:
+class CLIPTokenizer(fl.Module):
     def __init__(
         self,
         vocabulary_path: str | Path = Path(__file__).resolve().parent / "bpe_simple_vocab_16e6.txt.gz",
+        sequence_length: int = 77,
         start_of_text_token_id: int = 49406,
         end_of_text_token_id: int = 49407,
         pad_token_id: int = 49407,
     ) -> None:
+        super().__init__()
         self.vocabulary_path = vocabulary_path
+        self.sequence_length = sequence_length
         self.byte_to_unicode_mapping = self.get_bytes_to_unicode_mapping()
         self.byte_decoder = {v: k for k, v in self.byte_to_unicode_mapping.items()}
         merge_tuples = [
@@ -45,12 +49,12 @@ class CLIPTokenizer:
         self.end_of_text_token_id: int = end_of_text_token_id
         self.pad_token_id: int = pad_token_id
 
-    def __call__(self, text: str, sequence_length: int) -> Tensor:
-        tokens = self.encode(text=text, max_length=sequence_length).unsqueeze(dim=0)
+    def forward(self, text: str) -> Tensor:
+        tokens = self.encode(text=text, max_length=self.sequence_length).unsqueeze(dim=0)
         assert (
-            tokens.shape[1] <= sequence_length
-        ), f"Text is too long: tokens.shape[1] > sequence_length: {tokens.shape[1]} > {sequence_length}"
-        return pad(x=tokens, pad=(0, sequence_length - tokens.shape[1]), value=self.pad_token_id)
+            tokens.shape[1] <= self.sequence_length
+        ), f"Text is too long: tokens.shape[1] > sequence_length: {tokens.shape[1]} > {self.sequence_length}"
+        return pad(x=tokens, pad=(0, self.sequence_length - tokens.shape[1]), value=self.pad_token_id)
 
     @lru_cache()
     def get_bytes_to_unicode_mapping(self) -> dict[int, str]:

@@ -4,6 +4,7 @@ from refiners.fluxion.utils import (
     save_to_safetensors,
 )
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 from refiners.foundationals.latent_diffusion.unet import UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget
 from refiners.fluxion.layers.module import Module
@@ -33,9 +34,10 @@ def create_unet_mapping(src_model: UNet2DConditionModel, dst_model: UNet) -> dic
 
 @torch.no_grad()
 def create_text_encoder_mapping(src_model: CLIPTextModel, dst_model: CLIPTextEncoderL) -> dict[str, str] | None:
-    x = dst_model.tokenizer("Nice cat", sequence_length=77)
-
-    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[x])  # type: ignore
+    tokenizer = dst_model.find(layer_type=CLIPTokenizer)
+    assert tokenizer is not None, "Could not find tokenizer"
+    tokens = tokenizer("Nice cat")
+    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[tokens], target_args=["Nice cat"])  # type: ignore
 
 
 def main() -> None:
