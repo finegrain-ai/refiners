@@ -88,7 +88,7 @@ class LatentDiffusionModel(Module):
         return self.clip_text_encoder.unconditional_text_embedding
 
     def compute_text_embedding(self, text: str) -> Tensor:
-        return self.clip_text_encoder.encode(text)
+        return self.clip_text_encoder(text)
 
     def forward(
         self,

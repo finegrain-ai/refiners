@@ -131,7 +131,6 @@ class CLIPTextEncoder(fl.Chain):
         "feedforward_dim",
         "layer_norm_eps",
         "use_quick_gelu",
-        "tokenizer",
     ]
 
     def __init__(
@@ -156,8 +155,9 @@ class CLIPTextEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
-        self.tokenizer = tokenizer or CLIPTokenizer()
         super().__init__(
+            tokenizer or CLIPTokenizer(sequence_length=max_sequence_length),
+            fl.Converter(set_dtype=False),
             fl.Sum(
                 TokenEncoder(
                     vocabulary_size=vocabulary_size,
@@ -189,13 +189,9 @@ class CLIPTextEncoder(fl.Chain):
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
 
-    def encode(self, text: str) -> Tensor:
-        tokens = self.tokenizer(text, sequence_length=self.max_sequence_length).to(device=self.device)
-        return self(tokens)
-
     @property
     def unconditional_text_embedding(self) -> Tensor:
-        return self.encode(text="")
+        return self("")
 
 
 class CLIPTextEncoderL(CLIPTextEncoder):

@@ -7,7 +7,8 @@ from pathlib import Path
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.fluxion.utils import load_from_safetensors
 
-import transformers  # type: ignore
+import transformers # type: ignore
+from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
 
 long_prompt = """
@@ -86,12 +87,14 @@ def test_encoder(
         return_tensors="pt",
     ).input_ids
     assert isinstance(ref_tokens, torch.Tensor)
-    our_tokens = our_encoder.tokenizer(prompt, sequence_length=our_encoder.max_sequence_length)
+    tokenizer = our_encoder.find(layer_type=CLIPTokenizer)
+    assert tokenizer is not None
+    our_tokens = tokenizer(prompt)
     assert torch.equal(our_tokens, ref_tokens)
 
     with torch.no_grad():
         ref_embeddings = ref_encoder(ref_tokens.to(test_device))[0]
-        our_embeddings = our_encoder(our_tokens.to(test_device))
+        our_embeddings = our_encoder(prompt)
 
     assert ref_embeddings.shape == (1, 77, 768)
     assert our_embeddings.shape == (1, 77, 768)
