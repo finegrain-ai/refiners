@@ -255,7 +255,6 @@ class CLIPTextEncoderG(CLIPTextEncoder):
             num_layers=32,
             num_attention_heads=20,
             feedforward_dim=5120,
-            use_quick_gelu=True,
             tokenizer=tokenizer,
             device=device,
             dtype=dtype,
