@@ -7,7 +7,7 @@ from pathlib import Path
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.fluxion.utils import load_from_safetensors
 
-import transformers # type: ignore
+import transformers  # type: ignore
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
 
