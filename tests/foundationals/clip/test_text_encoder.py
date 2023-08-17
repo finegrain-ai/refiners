@@ -63,7 +63,7 @@ def ref_encoder(runwayml_weights_path: Path, test_device: torch.device) -> trans
 
 def test_basics(ref_tokenizer: transformers.CLIPTokenizer, our_encoder: CLIPTextEncoderL):
     assert ref_tokenizer.model_max_length == 77  # type: ignore
-    assert our_encoder.positional_embedding_dim == 77
+    assert our_encoder.max_sequence_length == 77
 
 
 @pytest.fixture(params=PROMPTS)
@@ -86,7 +86,7 @@ def test_encoder(
         return_tensors="pt",
     ).input_ids
     assert isinstance(ref_tokens, torch.Tensor)
-    our_tokens = our_encoder.tokenizer(prompt, sequence_length=our_encoder.positional_embedding_dim)
+    our_tokens = our_encoder.tokenizer(prompt, sequence_length=our_encoder.max_sequence_length)
     assert torch.equal(our_tokens, ref_tokens)
 
     with torch.no_grad():
