@@ -25,6 +25,7 @@ class TextTimeEmbedding(fl.Chain):
                 ),
                 dim=1,
             ),
+            fl.Converter(set_device=False, set_dtype=True),
             fl.Linear(
                 in_features=self.text_time_embedding_dim,
                 out_features=self.timestep_embedding_dim,
@@ -41,7 +42,7 @@ class TextTimeEmbedding(fl.Chain):
         )
 
     def compute_sinuosoidal_embedding(self, x: Tensor) -> Tensor:
-        return compute_sinusoidal_embedding(x=x, embedding_dim=self.time_ids_embedding_dim).to(dtype=self.dtype)
+        return compute_sinusoidal_embedding(x=x, embedding_dim=self.time_ids_embedding_dim)
 
 
 class TimestepEncoder(fl.Passthrough):
