@@ -210,9 +210,23 @@ class Chain(ContextModule):
             other = Chain(*other)
         return Chain(*self, *other)
 
+    @overload
+    def __getitem__(self, key: int) -> Module:
+        ...
+
+    @overload
+    def __getitem__(self, key: str) -> Module:
+        ...
+
+    @overload
+    def __getitem__(self, key: slice) -> "Chain":
+        ...
+
     def __getitem__(self, key: int | str | slice) -> Module:
         if isinstance(key, slice):
-            return Chain(*list(self)[key])
+            copy = self.structural_copy()
+            copy._regenerate_keys(modules=list(copy)[key])
+            return copy
         elif isinstance(key, str):
             return self._modules[key]
         else:
