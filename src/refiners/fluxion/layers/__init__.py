@@ -34,6 +34,7 @@ from refiners.fluxion.layers.module import Module, WeightedModule, ContextModule
 from refiners.fluxion.layers.padding import ReflectionPad2d
 from refiners.fluxion.layers.sampling import Downsample, Upsample, Interpolate
 from refiners.fluxion.layers.embedding import Embedding
+from refiners.fluxion.layers.converter import Converter
 
 __all__ = [
     "Embedding",
@@ -84,4 +85,5 @@ __all__ = [
     "ContextModule",
     "Interpolate",
     "ReflectionPad2d",
+    "Converter",
 ]
