@@ -17,6 +17,8 @@ class Converter(ContextModule):
         Ensure the parent module has `device` and `dtype` attributes if `set_device` or `set_dtype` are set to True.
     """
 
+    structural_attrs = ["set_device", "set_dtype"]
+
     def __init__(self, set_device: bool = True, set_dtype: bool = True) -> None:
         super().__init__()
         self.set_device = set_device
