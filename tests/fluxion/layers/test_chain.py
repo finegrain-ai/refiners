@@ -64,3 +64,23 @@ def test_chain_find():
 
     assert isinstance(chain.find(fl.Linear), fl.Linear)
     assert chain.find(fl.Conv2d) is None
+
+
+def test_chain_slice() -> None:
+    chain = fl.Chain(
+        fl.Linear(in_features=1, out_features=1),
+        fl.Linear(in_features=1, out_features=1),
+        fl.Linear(in_features=1, out_features=1),
+        fl.Chain(
+            fl.Linear(in_features=1, out_features=1),
+            fl.Linear(in_features=1, out_features=1),
+        ),
+        fl.Linear(in_features=1, out_features=1),
+    )
+
+    x = torch.randn(1, 1)
+    sliced_chain = chain[1:4]
+
+    assert len(chain) == 5
+    assert len(sliced_chain) == 3
+    assert chain[:-1](x).shape == (1, 1)
