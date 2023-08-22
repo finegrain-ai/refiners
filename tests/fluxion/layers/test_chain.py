@@ -84,3 +84,14 @@ def test_chain_slice() -> None:
     assert len(chain) == 5
     assert len(sliced_chain) == 3
     assert chain[:-1](x).shape == (1, 1)
+
+
+def test_chain_layers() -> None:
+    chain = fl.Chain(
+        fl.Chain(fl.Chain(fl.Chain())),
+        fl.Chain(),
+        fl.Linear(in_features=1, out_features=1),
+    )
+
+    assert len(list(chain.layers(fl.Chain))) == 2
+    assert len(list(chain.layers(fl.Chain, recurse=True))) == 4
