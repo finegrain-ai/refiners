@@ -3,7 +3,12 @@ from torch import Tensor, device as Device, dtype as DType
 from refiners.fluxion.context import Contexts
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.foundationals.latent_diffusion.unet import ResidualAccumulator, ResidualBlock, ResidualConcatenator
+from refiners.foundationals.latent_diffusion.model import UNetInterface
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
+    ResidualAccumulator,
+    ResidualBlock,
+    ResidualConcatenator,
+)
 from refiners.adapters.range_adapter import RangeAdapter2d, RangeEncoder, compute_sinusoidal_embedding
 
 
@@ -242,7 +247,7 @@ class OutputBlock(fl.Chain):
         )
 
 
-class SDXLUNet(fl.Chain):
+class SDXLUNet(fl.Chain, UNetInterface):
     structural_attrs = ["in_channels"]
 
     def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:

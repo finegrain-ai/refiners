@@ -8,7 +8,7 @@ from torch import Tensor
 from refiners.fluxion.utils import manual_seed
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderG, CLIPTextEncoderL
-from refiners.foundationals.latent_diffusion.sdxl_text_encoder import DoubleTextEncoder
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 
 
 class DiffusersSDXL(Protocol):

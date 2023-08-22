@@ -9,7 +9,7 @@ from refiners.adapters.lora import LoraAdapter, load_lora_weights
 from refiners.foundationals.clip.text_encoder import FeedForward, TransformerLayer
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion import StableDiffusion_1
-from refiners.foundationals.latent_diffusion.controlnet import Controlnet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import SD1Controlnet
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors
 
@@ -74,7 +74,7 @@ class LoraWeights:
             match meta_key:
                 case "unet_targets":
                     # TODO: support this transparently
-                    if any([isinstance(module, Controlnet) for module in sd.unet]):
+                    if any([isinstance(module, SD1Controlnet) for module in sd.unet]):
                         raise NotImplementedError("Cannot patch a UNet which already contains a Controlnet adapter")
                     model = sd.unet
                     key_prefix = "unet."

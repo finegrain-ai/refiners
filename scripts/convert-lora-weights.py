@@ -9,7 +9,7 @@ from torch.nn import Parameter as TorchParameter
 import refiners.fluxion.layers as fl
 
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.latent_diffusion.unet import UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget, apply_loras_to_target
 from refiners.adapters.lora import Lora
 from refiners.fluxion.utils import create_state_dict_mapping
@@ -37,7 +37,7 @@ def process(source: str, base_model: str, output_file: str) -> None:
     diffusers_sd = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=base_model)  # type: ignore
     diffusers_model = cast(fl.Module, diffusers_sd.unet)  # type: ignore
 
-    refiners_model = UNet(in_channels=4, clip_embedding_dim=768)
+    refiners_model = SD1UNet(in_channels=4, clip_embedding_dim=768)
     target = LoraTarget.CrossAttention
     metadata = {"unet_targets": "CrossAttentionBlock2d"}
     rank = diffusers_state_dict[
