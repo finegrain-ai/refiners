@@ -49,8 +49,6 @@ class LoraAdapter(fl.Sum, Adapter[fl.Linear]):
         target: fl.Linear,
         rank: int = 16,
         scale: float = 1.0,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
     ) -> None:
         self.in_features = target.in_features
         self.out_features = target.out_features
@@ -63,8 +61,8 @@ class LoraAdapter(fl.Sum, Adapter[fl.Linear]):
                     in_features=target.in_features,
                     out_features=target.out_features,
                     rank=rank,
-                    device=device,
-                    dtype=dtype,
+                    device=target.device,
+                    dtype=target.dtype,
                 ),
             )
         self.Lora.set_scale(scale=scale)

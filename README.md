@@ -183,7 +183,7 @@ from refiners.adapters.lora import LoraAdapter
 
 for layer in vit.layers(fl.Attention):
     for linear, parent in layer.walk(fl.Linear):
-        adapter = LoraAdapter(target=linear, rank=64, device=vit.device, dtype=vit.dtype)
+        adapter = LoraAdapter(target=linear, rank=64)
         adapter.inject(parent)
 
 # ... and load existing weights if the LoRAs are pretrained ...

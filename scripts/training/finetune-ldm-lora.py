@@ -33,8 +33,6 @@ class LoraConfig(BaseModel):
                 adapter = LoraAdapter(
                     target=linear,
                     rank=self.rank,
-                    device=module.device,
-                    dtype=module.dtype,
                 )
                 adapter.inject(parent)
                 for linear in adapter.Lora.layers(fl.Linear):

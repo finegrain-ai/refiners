@@ -49,8 +49,6 @@ def apply_loras_to_target(module: fl.Chain, target: LoraTarget, rank: int, scale
                 target=linear,
                 rank=rank,
                 scale=scale,
-                device=module.device,
-                dtype=module.dtype,
             )
             adapter.inject(parent)
 
