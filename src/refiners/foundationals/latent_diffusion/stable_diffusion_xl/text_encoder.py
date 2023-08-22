@@ -7,6 +7,7 @@ from refiners.foundationals.clip.text_encoder import CLIPTextEncoderG, CLIPTextE
 from jaxtyping import Float
 
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
+from refiners.foundationals.latent_diffusion.model import TextEncoderInterface
 
 
 class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
@@ -59,7 +60,7 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
         return x[:, end_of_text_index[0], :]
 
 
-class DoubleTextEncoder(fl.Chain):
+class DoubleTextEncoder(fl.Chain, TextEncoderInterface):
     def __init__(
         self,
         text_encoder_l: CLIPTextEncoderL | None = None,

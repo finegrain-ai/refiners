@@ -9,8 +9,8 @@ from pathlib import Path
 
 from refiners.fluxion.utils import load_from_safetensors, image_to_tensor, manual_seed
 from refiners.foundationals.latent_diffusion import StableDiffusion_1, StableDiffusion_1_Inpainting
-from refiners.foundationals.latent_diffusion.unet import UNet
-from refiners.foundationals.latent_diffusion.controlnet import Controlnet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import SD1Controlnet
 from refiners.foundationals.latent_diffusion.lora import LoraWeights
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.self_attention_injection import SelfAttentionInjection
@@ -196,7 +196,7 @@ def sd15_inpainting(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    unet = UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
@@ -214,7 +214,7 @@ def sd15_inpainting_float16(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    unet = UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device, dtype=torch.float16)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
@@ -253,8 +253,7 @@ def test_diffusion_std_random_init(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -267,7 +266,6 @@ def test_diffusion_std_random_init(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -286,11 +284,9 @@ def test_diffusion_std_random_init_float16(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     assert clip_text_embedding.dtype == torch.float16
-    assert negative_clip_text_embedding.dtype == torch.float16
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -303,7 +299,6 @@ def test_diffusion_std_random_init_float16(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -325,8 +320,7 @@ def test_diffusion_std_init_image(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -339,7 +333,6 @@ def test_diffusion_std_init_image(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -362,8 +355,7 @@ def test_diffusion_inpainting(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
     sd15.set_inpainting_conditions(kitchen_dog, kitchen_dog_mask)
@@ -377,7 +369,6 @@ def test_diffusion_inpainting(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -401,11 +392,9 @@ def test_diffusion_inpainting_float16(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     assert clip_text_embedding.dtype == torch.float16
-    assert negative_clip_text_embedding.dtype == torch.float16
 
     sd15.set_num_inference_steps(n_steps)
     sd15.set_inpainting_conditions(kitchen_dog, kitchen_dog_mask)
@@ -419,7 +408,6 @@ def test_diffusion_inpainting_float16(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -447,13 +435,12 @@ def test_diffusion_controlnet(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
     controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = Controlnet(name=cn_name, device=test_device)
+    controlnet = SD1Controlnet(name=cn_name, device=test_device)
     controlnet.load_state_dict(controlnet_state_dict)
     controlnet.set_scale(0.5)
     sd15.unet.insert(0, controlnet)
@@ -470,7 +457,6 @@ def test_diffusion_controlnet(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -498,13 +484,12 @@ def test_diffusion_controlnet_structural_copy(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
     controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = Controlnet(name=cn_name, device=test_device)
+    controlnet = SD1Controlnet(name=cn_name, device=test_device)
     controlnet.load_state_dict(controlnet_state_dict)
     controlnet.set_scale(0.5)
     sd15.unet.insert(0, controlnet)
@@ -521,7 +506,6 @@ def test_diffusion_controlnet_structural_copy(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -548,13 +532,12 @@ def test_diffusion_controlnet_float16(
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
-        negative_clip_text_embedding = sd15.compute_text_embedding(negative_prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
     controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = Controlnet(name=cn_name, device=test_device, dtype=torch.float16)
+    controlnet = SD1Controlnet(name=cn_name, device=test_device, dtype=torch.float16)
     controlnet.load_state_dict(controlnet_state_dict)
     controlnet.set_scale(0.5)
     sd15.unet.insert(0, controlnet)
@@ -571,7 +554,6 @@ def test_diffusion_controlnet_float16(
                 x,
                 step=step,
                 clip_text_embedding=clip_text_embedding,
-                negative_clip_text_embedding=negative_clip_text_embedding,
                 condition_scale=7.5,
             )
         predicted_image = sd15.lda.decode_latents(x)
@@ -597,7 +579,7 @@ def test_diffusion_lora(
     prompt = "a cute cat"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -631,7 +613,7 @@ def test_diffusion_refonly(
     prompt = "Chicken"
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
     sai = SelfAttentionInjection(sd15.unet)
     sai.inject()
@@ -673,7 +655,7 @@ def test_diffusion_inpainting_refonly(
     prompt = ""  # unconditional
 
     with torch.no_grad():
-        clip_text_embedding = sd15.compute_text_embedding(prompt)
+        clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
     sai = SelfAttentionInjection(sd15.unet)
     sai.inject()

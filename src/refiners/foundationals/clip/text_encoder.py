@@ -1,6 +1,7 @@
 from torch import Tensor, arange, device as Device, dtype as DType
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
+import refiners.foundationals.latent_diffusion.model as ldm
 
 
 class TokenEncoder(fl.Embedding):
@@ -121,7 +122,7 @@ class TransformerLayer(fl.Chain):
         )
 
 
-class CLIPTextEncoder(fl.Chain):
+class CLIPTextEncoder(fl.Chain, ldm.TextEncoderInterface):
     structural_attrs = [
         "embedding_dim",
         "max_sequence_length",
@@ -188,10 +189,6 @@ class CLIPTextEncoder(fl.Chain):
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
-
-    @property
-    def unconditional_text_embedding(self) -> Tensor:
-        return self("")
 
 
 class CLIPTextEncoderL(CLIPTextEncoder):

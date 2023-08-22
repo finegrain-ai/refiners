@@ -10,7 +10,7 @@ from refiners.fluxion.layers import (
     Parallel,
 )
 from refiners.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.unet import UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock
 from torch import Tensor
 
@@ -58,7 +58,7 @@ class ReferenceOnlyControlAdapter(Chain, Adapter[SelfAttention]):
 class SelfAttentionInjection(Passthrough):
     # TODO: Does not support batching yet. Assumes concatenated inputs for classifier-free guidance
 
-    def __init__(self, unet: UNet, style_cfg: float = 0.5) -> None:
+    def __init__(self, unet: SD1UNet, style_cfg: float = 0.5) -> None:
         # the style_cfg is the weight of the guide in unconditionned diffusion.
         # This value is recommended to be 0.5 on the sdwebui repo.
         self.style_cfg = style_cfg

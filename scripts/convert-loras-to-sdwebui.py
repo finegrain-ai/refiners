@@ -5,7 +5,7 @@ from refiners.fluxion.utils import (
 )
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.foundationals.latent_diffusion.unet import UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget
 from refiners.fluxion.layers.module import Module
 import refiners.fluxion.layers as fl
@@ -19,7 +19,7 @@ from transformers.models.clip.modeling_clip import CLIPTextModel  # type: ignore
 
 
 @torch.no_grad()
-def create_unet_mapping(src_model: UNet2DConditionModel, dst_model: UNet) -> dict[str, str] | None:
+def create_unet_mapping(src_model: UNet2DConditionModel, dst_model: SD1UNet) -> dict[str, str] | None:
     x = torch.randn(1, 4, 32, 32)
     timestep = torch.tensor(data=[0])
     clip_text_embeddings = torch.randn(1, 77, 768)
@@ -79,7 +79,7 @@ def main() -> None:
         match meta_key:
             case "unet_targets":
                 src_model = diffusers_sd.unet  # type: ignore
-                dst_model = UNet(in_channels=4, clip_embedding_dim=768)
+                dst_model = SD1UNet(in_channels=4, clip_embedding_dim=768)
                 create_mapping = create_unet_mapping
                 key_prefix = "unet."
                 lora_prefix = "lora_unet_"

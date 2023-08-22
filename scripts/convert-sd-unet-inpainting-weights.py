@@ -5,12 +5,12 @@ from refiners.fluxion.utils import create_state_dict_mapping, convert_state_dict
 from diffusers import StableDiffusionInpaintPipeline  # type: ignore
 from diffusers.models.unet_2d_condition import UNet2DConditionModel  # type: ignore
 
-from refiners.foundationals.latent_diffusion.unet import UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
 
 @torch.no_grad()
 def convert(src_model: UNet2DConditionModel) -> dict[str, torch.Tensor]:
-    dst_model = UNet(in_channels=9, clip_embedding_dim=768)
+    dst_model = SD1UNet(in_channels=9, clip_embedding_dim=768)
 
     x = torch.randn(1, 9, 32, 32)
     timestep = torch.tensor(data=[0])

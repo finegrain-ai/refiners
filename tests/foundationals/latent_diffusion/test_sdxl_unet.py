@@ -4,7 +4,7 @@ from warnings import warn
 import pytest
 import torch
 
-from refiners.foundationals.latent_diffusion.sdxl_unet import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 from refiners.fluxion.utils import compare_models
 
 

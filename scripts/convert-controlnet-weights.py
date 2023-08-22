@@ -6,19 +6,19 @@ from refiners.fluxion.utils import (
     convert_state_dict,
     save_to_safetensors,
 )
-from refiners.foundationals.latent_diffusion.controlnet import Controlnet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import SD1Controlnet
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
-from refiners.foundationals.latent_diffusion import UNet
+from refiners.foundationals.latent_diffusion import SD1UNet
 
 
 @torch.no_grad()
 def convert(controlnet_src: ControlNetModel) -> dict[str, torch.Tensor]:
-    controlnet = Controlnet(name="mycn")
+    controlnet = SD1Controlnet(name="mycn")
 
     condition = torch.randn(1, 3, 512, 512)
     controlnet.set_controlnet_condition(condition=condition)
 
-    unet = UNet(in_channels=4, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=4, clip_embedding_dim=768)
     unet.insert(index=0, module=controlnet)
     clip_text_embedding = torch.rand(1, 77, 768)
     unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)

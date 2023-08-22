@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
 from torch import device as Device, Tensor, randn, dtype as DType, Generator, cat
 from loguru import logger
 from torch.utils.data import Dataset
-from refiners.foundationals.latent_diffusion.unet import UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from torchvision.transforms import RandomCrop  # type: ignore
@@ -103,9 +103,9 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
 
 class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
-    def unet(self) -> UNet:
+    def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
-        return UNet(in_channels=4, clip_embedding_dim=768, device=self.device).to(device=self.device)
+        return SD1UNet(in_channels=4, clip_embedding_dim=768, device=self.device).to(device=self.device)
 
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:
@@ -171,14 +171,12 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
             for i in range(num_images_per_prompt):
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device)
-                clip_text_embedding = sd.compute_text_embedding(text=prompt).to(device=self.device)
-                negative_clip_text_embedding = sd.compute_text_embedding(text="").to(device=self.device)
+                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
                 for step in sd.steps:
                     x = sd(
                         x,
                         step=step,
                         clip_text_embedding=clip_text_embedding,
-                        negative_clip_text_embedding=negative_clip_text_embedding,
                     )
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image

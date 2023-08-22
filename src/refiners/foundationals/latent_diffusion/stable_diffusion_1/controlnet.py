@@ -1,6 +1,11 @@
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import Chain, Conv2d, SiLU, Lambda, Passthrough, UseContext, Sum, Identity
-from refiners.foundationals.latent_diffusion.unet import DownBlocks, MiddleBlock, ResidualBlock, TimestepEncoder
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
+    DownBlocks,
+    MiddleBlock,
+    ResidualBlock,
+    TimestepEncoder,
+)
 from refiners.adapters.range_adapter import RangeAdapter2d
 from typing import cast, Iterable
 from torch import Tensor, device as Device, dtype as DType
@@ -64,7 +69,7 @@ class ConditionEncoder(Chain):
         )
 
 
-class Controlnet(Passthrough):
+class SD1Controlnet(Passthrough):
     structural_attrs = ["name", "scale"]
 
     def __init__(self, name: str, device: Device | str | None = None, dtype: DType | None = None) -> None:

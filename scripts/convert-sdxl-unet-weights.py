@@ -6,7 +6,7 @@ from refiners.fluxion.utils import create_state_dict_mapping, convert_state_dict
 from diffusers import DiffusionPipeline  # type: ignore
 from diffusers.models.unet_2d_condition import UNet2DConditionModel  # type: ignore
 
-from refiners.foundationals.latent_diffusion.sdxl_unet import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 
 @torch.no_grad()

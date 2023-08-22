@@ -249,7 +249,7 @@ lora_weights.patch(sd15, scale=1.0)
 prompt = "a cute cat"
 
 with torch.no_grad():
-    clip_text_embedding = sd15.compute_text_embedding(prompt)
+    clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
 sd15.set_num_inference_steps(30)
 
