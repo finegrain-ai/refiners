@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from loguru import logger
 from refiners.adapters.lora import LoraAdapter, Lora
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.latent_diffusion.lora import LoraTarget
+from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
 import refiners.fluxion.layers as fl
 from torch import Tensor
 from torch.utils.data import Dataset
@@ -28,15 +28,11 @@ class LoraConfig(BaseModel):
     lda_targets: list[LoraTarget]
 
     def apply_loras_to_target(self, module: fl.Chain, target: LoraTarget) -> None:
-        for layer in module.layers(layer_type=target.get_class()):
-            for linear, parent in layer.walk(fl.Linear):
-                adapter = LoraAdapter(
-                    target=linear,
-                    rank=self.rank,
-                )
-                adapter.inject(parent)
-                for linear in adapter.Lora.layers(fl.Linear):
-                    linear.requires_grad_(requires_grad=True)
+        for linear, parent in lora_targets(module, target):
+            adapter = LoraAdapter(target=linear, rank=self.rank)
+            adapter.inject(parent)
+            for linear in adapter.Lora.layers(fl.Linear):
+                linear.requires_grad_(requires_grad=True)
 
 
 class TriggerPhraseDataset(TextEmbeddingLatentsDataset):

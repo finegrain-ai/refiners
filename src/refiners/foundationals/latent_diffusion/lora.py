@@ -1,5 +1,7 @@
 from enum import Enum
 from pathlib import Path
+from typing import Iterator
+
 
 from torch import Tensor, device as Device
 from torch.nn import Parameter as TorchParameter
@@ -42,15 +44,17 @@ def get_lora_rank(weights: list[Tensor]) -> int:
     return ranks.pop()
 
 
+def lora_targets(module: fl.Chain, target: LoraTarget) -> Iterator[tuple[fl.Linear, fl.Chain]]:
+    it = [module] if target == LoraTarget.Self else module.layers(layer_type=target.get_class())
+    for layer in it:
+        for t in layer.walk(fl.Linear):
+            yield t
+
+
 def apply_loras_to_target(module: fl.Chain, target: LoraTarget, rank: int, scale: float) -> None:
-    for layer in module.layers(layer_type=target.get_class()):
-        for linear, parent in layer.walk(fl.Linear):
-            adapter = LoraAdapter(
-                target=linear,
-                rank=rank,
-                scale=scale,
-            )
-            adapter.inject(parent)
+    for linear, parent in lora_targets(module, target):
+        adapter = LoraAdapter(target=linear, rank=rank, scale=scale)
+        adapter.inject(parent)
 
 
 class LoraWeights:
