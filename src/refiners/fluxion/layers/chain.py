@@ -319,7 +319,7 @@ class Chain(ContextModule):
             return parent
         return None
 
-    def insert(self, index: int, module: Module) -> None:  # type: ignore
+    def insert(self, index: int, module: Module) -> None:
         if index < 0:
             index = max(0, len(self._modules) + index + 1)
         modules = list(self)
@@ -336,7 +336,7 @@ class Chain(ContextModule):
                 return
         raise ValueError(f"No module of type {module_type.__name__} found in the chain.")
 
-    def append(self, module: Module) -> None:  # type: ignore
+    def append(self, module: Module) -> None:
         modules = list(self)
         modules.append(module)
         self._regenerate_keys(modules)
@@ -344,7 +344,7 @@ class Chain(ContextModule):
             module._set_parent(self)
         self._register_provider()
 
-    def pop(self, index: int = -1) -> Module | tuple[Module]:  # type: ignore
+    def pop(self, index: int = -1) -> Module | tuple[Module]:
         modules = list(self)
         if index < 0:
             index = len(modules) + index
