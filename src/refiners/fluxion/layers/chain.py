@@ -337,12 +337,7 @@ class Chain(ContextModule):
         raise ValueError(f"No module of type {module_type.__name__} found in the chain.")
 
     def append(self, module: Module) -> None:
-        modules = list(self)
-        modules.append(module)
-        self._regenerate_keys(modules)
-        if isinstance(module, ContextModule):
-            module._set_parent(self)
-        self._register_provider()
+        self.insert(-1, module)
 
     def pop(self, index: int = -1) -> Module | tuple[Module]:
         modules = list(self)
