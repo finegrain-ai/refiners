@@ -26,3 +26,6 @@ wandb/
 
 # model weights
 *.safetensors
+
+# env variable definitions file
+.env
