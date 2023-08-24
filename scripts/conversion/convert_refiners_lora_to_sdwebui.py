@@ -1,49 +1,36 @@
+import argparse
+from functools import partial
+from torch import Tensor
 from refiners.fluxion.utils import (
     load_from_safetensors,
     load_metadata_from_safetensors,
     save_to_safetensors,
 )
+from convert_diffusers_unet import setup_converter as convert_unet, Args as UnetConversionArgs
+from convert_transformers_clip_text_model import (
+    setup_converter as convert_text_encoder,
+    Args as TextEncoderConversionArgs,
+)
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
-from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget
-from refiners.fluxion.layers.module import Module
+from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1UNet
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import create_state_dict_mapping
-
-import torch
-
-from diffusers import DiffusionPipeline  # type: ignore
-from diffusers.models.unet_2d_condition import UNet2DConditionModel  # type: ignore
-from transformers.models.clip.modeling_clip import CLIPTextModel  # type: ignore
 
 
-@torch.no_grad()
-def create_unet_mapping(src_model: UNet2DConditionModel, dst_model: SD1UNet) -> dict[str, str] | None:
-    x = torch.randn(1, 4, 32, 32)
-    timestep = torch.tensor(data=[0])
-    clip_text_embeddings = torch.randn(1, 77, 768)
-
-    src_args = (x, timestep, clip_text_embeddings)
-    dst_model.set_timestep(timestep=timestep)
-    dst_model.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
-    dst_args = (x,)
-
-    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=src_args, target_args=dst_args)  # type: ignore
+def get_unet_mapping(source_path: str) -> dict[str, str]:
+    args = UnetConversionArgs(source_path=source_path, verbose=False)
+    return convert_unet(args=args).get_mapping()
 
 
-@torch.no_grad()
-def create_text_encoder_mapping(src_model: CLIPTextModel, dst_model: CLIPTextEncoderL) -> dict[str, str] | None:
-    tokenizer = dst_model.find(layer_type=CLIPTokenizer)
-    assert tokenizer is not None, "Could not find tokenizer"
-    tokens = tokenizer("Nice cat")
-    return create_state_dict_mapping(source_model=src_model, target_model=dst_model, source_args=[tokens], target_args=["Nice cat"])  # type: ignore
+def get_text_encoder_mapping(source_path: str) -> dict[str, str]:
+    args = TextEncoderConversionArgs(source_path=source_path, subfolder="text_encoder", verbose=False)
+    return convert_text_encoder(
+        args=args,
+    ).get_mapping()
 
 
 def main() -> None:
-    import argparse
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Converts a refiner's LoRA weights to SD-WebUI's LoRA weights")
     parser.add_argument(
         "-i",
         "--input-file",
@@ -55,7 +42,7 @@ def main() -> None:
         "-o",
         "--output-file",
         type=str,
-        required=True,
+        default="sdwebui_loras.safetensors",
         help="Path to the output file with sd-webui's LoRA weights (safetensors format)",
     )
     parser.add_argument(
@@ -66,27 +53,22 @@ def main() -> None:
         help="Path (preferred) or repository ID of Stable Diffusion 1.5 model (Hugging Face diffusers format)",
     )
     args = parser.parse_args()
-
     metadata = load_metadata_from_safetensors(path=args.input_file)
-    assert metadata is not None
+    assert metadata is not None, f"Could not load metadata from {args.input_file}"
     tensors = load_from_safetensors(path=args.input_file)
 
-    diffusers_sd = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.sd15)  # type: ignore
-
-    state_dict: dict[str, torch.Tensor] = {}
+    state_dict: dict[str, Tensor] = {}
 
     for meta_key, meta_value in metadata.items():
         match meta_key:
             case "unet_targets":
-                src_model = diffusers_sd.unet  # type: ignore
-                dst_model = SD1UNet(in_channels=4, clip_embedding_dim=768)
-                create_mapping = create_unet_mapping
+                model = SD1UNet(in_channels=4, clip_embedding_dim=768)
+                create_mapping = partial(get_unet_mapping, source_path=args.sd15)
                 key_prefix = "unet."
                 lora_prefix = "lora_unet_"
             case "text_encoder_targets":
-                src_model = diffusers_sd.text_encoder  # type: ignore
-                dst_model = CLIPTextEncoderL()
-                create_mapping = create_text_encoder_mapping
+                model = CLIPTextEncoderL()
+                create_mapping = partial(get_text_encoder_mapping, source_path=args.sd15)
                 key_prefix = "text_encoder."
                 lora_prefix = "lora_te_"
             case "lda_targets":
@@ -94,8 +76,8 @@ def main() -> None:
             case _:
                 raise ValueError(f"Unexpected key in checkpoint metadata: {meta_key}")
 
-        submodule_to_key: dict[Module, str] = {}
-        for name, submodule in dst_model.named_modules():
+        submodule_to_key: dict[fl.Module, str] = {}
+        for name, submodule in model.named_modules():
             submodule_to_key[submodule] = name
 
         # SD-WebUI expects LoRA state dicts with keys derived from the diffusers format, e.g.:
@@ -110,14 +92,14 @@ def main() -> None:
         #
         # [1]: https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/394ffa7/extensions-builtin/Lora/lora.py#L158-L225
 
-        refiners_to_diffusers = create_mapping(src_model, dst_model)  # type: ignore
+        refiners_to_diffusers = create_mapping()
         assert refiners_to_diffusers is not None
 
         # Compute the corresponding diffusers' keys where LoRA layers must be applied
         lora_injection_points: list[str] = [
             refiners_to_diffusers[submodule_to_key[linear]]
             for target in [LoraTarget(t) for t in meta_value.split(sep=",")]
-            for layer in dst_model.layers(layer_type=target.get_class())
+            for layer in model.layers(layer_type=target.get_class())
             for linear in layer.layers(layer_type=fl.Linear)
         ]
 
