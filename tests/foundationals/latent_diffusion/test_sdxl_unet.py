@@ -3,9 +3,10 @@ from pathlib import Path
 from warnings import warn
 import pytest
 import torch
+from refiners.fluxion.utils import manual_seed
 
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from refiners.fluxion.utils import compare_models
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
+from refiners.fluxion.model_converter import ModelConverter
 
 
 @pytest.fixture(scope="module")
@@ -47,23 +48,28 @@ def refiners_sdxl_unet(sdxl_unet_weights_std: Path) -> SDXLUNet:
 
 @torch.no_grad()
 def test_sdxl_unet(diffusers_sdxl_unet: Any, refiners_sdxl_unet: SDXLUNet) -> None:
-    torch.manual_seed(seed=0)  # type: ignore
+    source = diffusers_sdxl_unet
+    target = refiners_sdxl_unet
+
+    manual_seed(seed=0)
     x = torch.randn(1, 4, 32, 32)
     timestep = torch.tensor(data=[0])
     clip_text_embeddings = torch.randn(1, 77, 2048)
     added_cond_kwargs = {"text_embeds": torch.randn(1, 1280), "time_ids": torch.randn(1, 6)}
-    source_args = (x, timestep, clip_text_embeddings, None, None, None, None, added_cond_kwargs)
 
-    refiners_sdxl_unet.set_timestep(timestep=timestep)
-    refiners_sdxl_unet.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
-    refiners_sdxl_unet.set_time_ids(time_ids=added_cond_kwargs["time_ids"])
-    refiners_sdxl_unet.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])
+    target.set_timestep(timestep=timestep)
+    target.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
+    target.set_time_ids(time_ids=added_cond_kwargs["time_ids"])
+    target.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])
     target_args = (x,)
+    source_args = {
+        "positional": (x, timestep, clip_text_embeddings),
+        "keyword": {"added_cond_kwargs": added_cond_kwargs},
+    }
 
-    assert compare_models(
-        source_model=diffusers_sdxl_unet,
-        target_model=refiners_sdxl_unet,
+    converter = ModelConverter(source_model=source, target_model=target, verbose=False, threshold=1e-2)
+
+    assert converter.run(
         source_args=source_args,
         target_args=target_args,
-        threshold=1e-2,
     )

@@ -212,9 +212,9 @@ Here is how to perform a text-to-image inference using the Stable Diffusion 1.5 
 Step 1: prepare the model weights in refiners' format:
 
 ```bash
-python scripts/convert-clip-weights.py --output-file CLIPTextEncoderL.safetensors
-python scripts/convert-sd-lda-weights.py --output-file lda.safetensors
-python scripts/convert-sd-unet-weights.py --output-file unet.safetensors
+python scripts/conversion/convert_transformers_clip_text_model.py --to clip.safetensors
+python scripts/conversion/convert_diffusers_autoencoder_kl.py --to lda.safetensors
+python scripts/conversion/convert_diffusers_unet.py --to unet.safetensors
 ```
 
 > Note: this will download the original weights from https://huggingface.co/runwayml/stable-diffusion-v1-5 which takes some time. If you already have this repo cloned locally, use the `--from /path/to/stable-diffusion-v1-5` option instead.
@@ -223,9 +223,9 @@ Step 2: download and convert a community Pokemon LoRA, e.g. [this one](https://h
 
 ```bash
 curl -LO https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin
-python scripts/convert-lora-weights.py \
+python scripts/conversion/convert_diffusers_lora.py \
   --from pytorch_lora_weights.bin \
-  --output-file pokemon_lora.safetensors
+  --to pokemon_lora.safetensors
 ```
 
 Step 3: run inference using the GPU:
@@ -238,7 +238,7 @@ import torch
 
 
 sd15 = StableDiffusion_1(device="cuda")
-sd15.clip_text_encoder.load_state_dict(load_from_safetensors("CLIPTextEncoderL.safetensors"))
+sd15.clip_text_encoder.load_state_dict(load_from_safetensors("clip.safetensors"))
 sd15.lda.load_state_dict(load_from_safetensors("lda.safetensors"))
 sd15.unet.load_state_dict(load_from_safetensors("unet.safetensors"))
 
