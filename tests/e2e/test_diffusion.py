@@ -14,6 +14,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet impor
 from refiners.foundationals.latent_diffusion.lora import LoraWeights
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.self_attention_injection import SelfAttentionInjection
+from refiners.foundationals.clip.concepts import ConceptExtender
 
 from tests.utils import ensure_similar_images
 
@@ -116,6 +117,16 @@ def expected_image_refonly(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def condition_image_refonly(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "cyberpunk_guide.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_image_textual_inversion_random_init(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_textual_inversion_random_init.png").convert("RGB")
+
+
+@pytest.fixture
+def text_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
+    return torch.load(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]  # type: ignore
 
 
 @pytest.fixture(scope="module")
@@ -689,3 +700,41 @@ def test_diffusion_inpainting_refonly(
         predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_inpainting_refonly, min_psnr=35, min_ssim=0.99)
+
+
+@torch.no_grad()
+def test_diffusion_textual_inversion_random_init(
+    sd15_std: StableDiffusion_1,
+    expected_image_textual_inversion_random_init: Image.Image,
+    text_embedding_textual_inversion: torch.Tensor,
+    test_device: torch.device,
+):
+    sd15 = sd15_std
+
+    conceptExtender = ConceptExtender(sd15.clip_text_encoder)
+    conceptExtender.add_concept("<gta5-artwork>", text_embedding_textual_inversion)
+    conceptExtender.inject()
+
+    n_steps = 30
+
+    prompt = "a cute cat on a <gta5-artwork>"
+
+    with torch.no_grad():
+        clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    with torch.no_grad():
+        for step in sd15.steps:
+            x = sd15(
+                x,
+                step=step,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale=7.5,
+            )
+        predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
