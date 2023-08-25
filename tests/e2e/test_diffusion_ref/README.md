@@ -15,7 +15,7 @@ from diffusers import StableDiffusionPipeline
 pipe = StableDiffusionPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
     torch_dtype=torch.float32,
-).to("cuda)
+).to("cuda")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
 prompt = "a cute cat, detailed high-quality professional image"
@@ -79,4 +79,35 @@ Special cases:
 +        init_latents = torch.cat(init_latents, dim=0)
 
          init_latents = self.vae.config.scaling_factor * init_latents
+```
+
+## Textual Inversion
+
+- `expected_textual_inversion_random_init.png` has been generated with StableDiffusionPipeline, e.g.:
+
+```py
+import torch
+
+from diffusers import DPMSolverMultistepScheduler
+from diffusers import StableDiffusionPipeline
+
+pipe = StableDiffusionPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5",
+    torch_dtype=torch.float32,
+).to("cuda")
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+pipe.load_textual_inversion("sd-concepts-library/gta5-artwork")
+
+prompt = "a cute cat on a <gta5-artwork>"
+negative_prompt = ""
+
+torch.manual_seed(2)
+output = pipe(
+    prompt=prompt,
+    negative_prompt=negative_prompt,
+    num_inference_steps=30,
+    guidance_scale=7.5,
+)
+
+output.images[0].save("expected_textual_inversion_random_init.png")
 ```
