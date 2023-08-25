@@ -1,7 +1,6 @@
 from torch import Tensor, arange, device as Device, dtype as DType
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-import refiners.foundationals.latent_diffusion.model as ldm
 
 
 class TokenEncoder(fl.Embedding):
@@ -122,7 +121,7 @@ class TransformerLayer(fl.Chain):
         )
 
 
-class CLIPTextEncoder(fl.Chain, ldm.TextEncoderInterface):
+class CLIPTextEncoder(fl.Chain):
     structural_attrs = [
         "embedding_dim",
         "max_sequence_length",

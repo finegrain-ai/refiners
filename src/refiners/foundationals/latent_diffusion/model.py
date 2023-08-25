@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Protocol, TypeVar
+from typing import TypeVar
 from torch import Tensor, device as Device, dtype as DType
 from PIL import Image
 import torch
@@ -11,31 +11,15 @@ from refiners.foundationals.latent_diffusion.schedulers.scheduler import Schedul
 T = TypeVar("T", bound="fl.Module")
 
 
-class UNetInterface(Protocol):
-    def set_timestep(self, timestep: Tensor) -> None:
-        ...
-
-    def set_clip_text_embedding(self, clip_text_embedding: Tensor) -> None:
-        ...
-
-    def __call__(self, x: Tensor) -> Tensor:
-        ...
-
-
-class TextEncoderInterface(Protocol):
-    def __call__(self, text: str) -> Tensor | tuple[Tensor, Tensor]:
-        ...
-
-
 TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionModel")
 
 
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
         self,
-        unet: UNetInterface,
+        unet: fl.Module,
         lda: LatentDiffusionAutoencoder,
-        clip_text_encoder: TextEncoderInterface,
+        clip_text_encoder: fl.Module,
         scheduler: Scheduler,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
@@ -43,10 +27,8 @@ class LatentDiffusionModel(fl.Module, ABC):
         super().__init__()
         self.device: Device = device if isinstance(device, Device) else Device(device=device)
         self.dtype = dtype
-        assert isinstance(unet, fl.Module)
         self.unet = unet.to(device=self.device, dtype=self.dtype)
         self.lda = lda.to(device=self.device, dtype=self.dtype)
-        assert isinstance(clip_text_encoder, fl.Module)
         self.clip_text_encoder = clip_text_encoder.to(device=self.device, dtype=self.dtype)
         self.scheduler = scheduler.to(device=self.device, dtype=self.dtype)
 
