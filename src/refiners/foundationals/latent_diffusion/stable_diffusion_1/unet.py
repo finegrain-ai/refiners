@@ -7,7 +7,6 @@ import refiners.fluxion.layers as fl
 
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.adapters.range_adapter import RangeEncoder, RangeAdapter2d
-import refiners.foundationals.latent_diffusion.model as ldm
 
 
 class TimestepEncoder(fl.Passthrough):
@@ -243,7 +242,7 @@ class ResidualConcatenator(fl.Chain):
         )
 
 
-class SD1UNet(fl.Chain, ldm.UNetInterface):
+class SD1UNet(fl.Chain):
     structural_attrs = ["in_channels", "clip_embedding_dim"]
 
     def __init__(
