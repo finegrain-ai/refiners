@@ -1,4 +1,4 @@
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.fluxion import manual_seed
 import torch
 
