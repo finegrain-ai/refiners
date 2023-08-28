@@ -5,20 +5,14 @@ from refiners.foundationals.clip.text_encoder import (
     CLIPTextEncoderL,
 )
 from refiners.foundationals.latent_diffusion.schedulers import Scheduler, DPMSolver
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import (
+from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     StableDiffusion_1,
     StableDiffusion_1_Inpainting,
-)
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
     SD1UNet,
-)
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import (
     SD1Controlnet,
 )
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import (
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLUNet,
-)
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import (
     DoubleTextEncoder,
 )
 

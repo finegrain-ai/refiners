@@ -12,8 +12,8 @@ from convert_transformers_clip_text_model import (
     Args as TextEncoderConversionArgs,
 )
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget
-from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1UNet
 import refiners.fluxion.layers as fl
 
 

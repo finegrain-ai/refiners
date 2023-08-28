@@ -6,9 +6,11 @@ from torch import nn
 from diffusers import ControlNetModel  # type: ignore
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1Controlnet
-from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
-from refiners.foundationals.latent_diffusion import SD1UNet
+from refiners.foundationals.latent_diffusion import (
+    SD1UNet,
+    SD1Controlnet,
+    DPMSolver,
+)
 
 
 class Args(argparse.Namespace):

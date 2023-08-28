@@ -1,20 +1,22 @@
 from dataclasses import dataclass
 from typing import Any, TypeVar, TypedDict, cast
 from pydantic import BaseModel
-from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
 from torch import device as Device, Tensor, randn, dtype as DType, Generator, cat
 from loguru import logger
 from torch.utils.data import Dataset
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
-from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from torchvision.transforms import RandomCrop  # type: ignore
 import refiners.fluxion.layers as fl
 from PIL import Image
 from functools import cached_property
 from refiners.training_utils.config import BaseConfig
-from refiners.foundationals.latent_diffusion import StableDiffusion_1
-from refiners.foundationals.latent_diffusion.schedulers import DPMSolver
+from refiners.foundationals.latent_diffusion import (
+    StableDiffusion_1,
+    DPMSolver,
+    SD1UNet,
+    LatentDiffusionAutoencoder,
+)
+from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from torch.nn.functional import mse_loss
 import random
 from refiners.training_utils.wandb import WandbLoggable

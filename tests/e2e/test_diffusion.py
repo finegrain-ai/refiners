@@ -8,9 +8,12 @@ from PIL import Image
 from pathlib import Path
 
 from refiners.fluxion.utils import load_from_safetensors, image_to_tensor, manual_seed
-from refiners.foundationals.latent_diffusion import StableDiffusion_1, StableDiffusion_1_Inpainting
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import SD1Controlnet
+from refiners.foundationals.latent_diffusion import (
+    StableDiffusion_1,
+    StableDiffusion_1_Inpainting,
+    SD1UNet,
+    SD1Controlnet,
+)
 from refiners.foundationals.latent_diffusion.lora import LoraWeights
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.self_attention_injection import SelfAttentionInjection
