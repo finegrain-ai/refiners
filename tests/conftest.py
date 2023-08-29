@@ -24,6 +24,7 @@ def test_weights_path() -> Path:
 def test_e2e_path() -> Path:
     return PARENT_PATH / "e2e"
 
+
 @fixture(scope="session")
 def test_textual_inversion_path() -> Path:
     return PARENT_PATH / "foundationals" / "clip" / "test_concepts_ref"
