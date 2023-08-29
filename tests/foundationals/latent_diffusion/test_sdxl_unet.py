@@ -6,7 +6,7 @@ import torch
 from refiners.fluxion.utils import manual_seed
 
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
-from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.model_converter import ConversionStage, ModelConverter
 
 
 @pytest.fixture(scope="module")
@@ -31,18 +31,8 @@ def diffusers_sdxl_unet(diffusers_sdxl: Any) -> Any:
 
 
 @pytest.fixture(scope="module")
-def sdxl_unet_weights_std(test_weights_path: Path) -> Path:
-    unet_weights_std = test_weights_path / "sdxl-unet.safetensors"
-    if not unet_weights_std.is_file():
-        warn(message=f"could not find weights at {unet_weights_std}, skipping")
-        pytest.skip(allow_module_level=True)
-    return unet_weights_std
-
-
-@pytest.fixture(scope="module")
-def refiners_sdxl_unet(sdxl_unet_weights_std: Path) -> SDXLUNet:
+def refiners_sdxl_unet() -> SDXLUNet:
     unet = SDXLUNet(in_channels=4)
-    unet.load_from_safetensors(tensors_path=sdxl_unet_weights_std)
     return unet
 
 
@@ -57,19 +47,27 @@ def test_sdxl_unet(diffusers_sdxl_unet: Any, refiners_sdxl_unet: SDXLUNet) -> No
     clip_text_embeddings = torch.randn(1, 77, 2048)
     added_cond_kwargs = {"text_embeds": torch.randn(1, 1280), "time_ids": torch.randn(1, 6)}
 
-    target.set_timestep(timestep=timestep)
-    target.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
-    target.set_time_ids(time_ids=added_cond_kwargs["time_ids"])
-    target.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])
     target_args = (x,)
     source_args = {
         "positional": (x, timestep, clip_text_embeddings),
         "keyword": {"added_cond_kwargs": added_cond_kwargs},
     }
 
-    converter = ModelConverter(source_model=source, target_model=target, verbose=False, threshold=1e-2)
+    old_forward = target.forward
+
+    def forward_with_context(self: Any, *args: Any, **kwargs: Any) -> Any:
+        target.set_timestep(timestep=timestep)
+        target.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
+        target.set_time_ids(time_ids=added_cond_kwargs["time_ids"])
+        target.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])
+        return old_forward(self, *args, **kwargs)
+
+    target.forward = forward_with_context
+
+    converter = ModelConverter(source_model=source, target_model=target, verbose=True, threshold=1e-2)
 
     assert converter.run(
         source_args=source_args,
         target_args=target_args,
     )
+    assert converter.stage == ConversionStage.MODELS_OUTPUT_AGREE

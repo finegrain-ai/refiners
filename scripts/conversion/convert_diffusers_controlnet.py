@@ -50,7 +50,7 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     )
     target_order = converter._trace_module_execution_order(module=controlnet, args=(x,), keys_to_skip=[])
 
-    broken_k = (str(object=nn.Conv2d), (torch.Size([320, 320, 1, 1]), torch.Size([320])))
+    broken_k = (nn.Conv2d, (torch.Size([320, 320, 1, 1]), torch.Size([320])))
 
     expected_source_order = [
         "down_blocks.0.attentions.0.proj_in",
@@ -89,7 +89,7 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     assert target_order[broken_k] == expected_target_order
     source_order[broken_k] = fixed_source_order
 
-    broken_k = (str(object=nn.Conv2d), (torch.Size([640, 640, 1, 1]), torch.Size([640])))
+    broken_k = (nn.Conv2d, (torch.Size([640, 640, 1, 1]), torch.Size([640])))
 
     expected_source_order = [
         "down_blocks.1.attentions.0.proj_in",
@@ -125,7 +125,7 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     assert target_order[broken_k] == expected_target_order
     source_order[broken_k] = fixed_source_order
 
-    broken_k = (str(object=nn.Conv2d), (torch.Size([1280, 1280, 1, 1]), torch.Size([1280])))
+    broken_k = (nn.Conv2d, (torch.Size([1280, 1280, 1, 1]), torch.Size([1280])))
 
     expected_source_order = [
         "down_blocks.2.attentions.0.proj_in",
