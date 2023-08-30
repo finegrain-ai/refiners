@@ -98,7 +98,11 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
     def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
         item = self.dataset[index]
         caption, image = item["caption"], item["image"]
-        resized_image = self.resize_image(image=image)
+        resized_image = self.resize_image(
+            image=image,
+            min_size=self.config.dataset.resize_image_min_size,
+            max_size=self.config.dataset.resize_image_max_size,
+        )
         processed_image = self.process_image(resized_image)
         latents = self.lda.encode_image(image=processed_image).to(device=self.device)
         processed_caption = self.process_caption(caption=caption)

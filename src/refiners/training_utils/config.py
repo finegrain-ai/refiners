@@ -211,6 +211,8 @@ class HuggingfaceDatasetConfig(BaseModel):
     horizontal_flip: bool = False
     random_crop: bool = True
     use_verification: bool = False
+    resize_image_min_size: int = 512
+    resize_image_max_size: int = 576
 
 
 class CheckpointingConfig(BaseModel):
