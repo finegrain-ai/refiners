@@ -208,6 +208,8 @@ class HuggingfaceDatasetConfig(BaseModel):
     hf_repo: str = "finegrain/unsplash-dummy"
     revision: str = "main"
     split: str = "train"
+    horizontal_flip: bool = False
+    random_crop: bool = True
     use_verification: bool = False
 
 
