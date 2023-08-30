@@ -12,7 +12,7 @@ class Args(argparse.Namespace):
     source_path: str
     subfolder: str
     output_path: str | None
-    use_half: bool
+    half: bool
     verbose: bool
 
 
