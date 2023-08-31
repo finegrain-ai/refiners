@@ -160,7 +160,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         self.current_step = random_step
         return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
 
-    def sample_noise(self, size: tuple[int, int, int, int], dtype: DType | None = None) -> Tensor:
+    def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
             size=size, offset_noise=self.config.latent_diffusion.offset_noise, device=self.device, dtype=dtype
         )
@@ -207,7 +207,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
 
 def sample_noise(
-    size: tuple[int, int, int, int],
+    size: tuple[int, ...],
     offset_noise: float = 0.1,
     device: Device | str = "cpu",
     dtype: DType | None = None,
