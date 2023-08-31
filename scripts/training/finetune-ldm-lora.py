@@ -2,9 +2,8 @@ import random
 from typing import Any
 from pydantic import BaseModel
 from loguru import logger
-from refiners.adapters.lora import LoraAdapter, Lora
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
+from refiners.foundationals.latent_diffusion.lora import LoraTarget, LoraAdapter, MODELS
 import refiners.fluxion.layers as fl
 from torch import Tensor
 from torch.utils.data import Dataset
@@ -26,13 +25,6 @@ class LoraConfig(BaseModel):
     unet_targets: list[LoraTarget]
     text_encoder_targets: list[LoraTarget]
     lda_targets: list[LoraTarget]
-
-    def apply_loras_to_target(self, module: fl.Chain, target: LoraTarget) -> None:
-        for linear, parent in lora_targets(module, target):
-            adapter = LoraAdapter(target=linear, rank=self.rank)
-            adapter.inject(parent)
-            for linear in adapter.Lora.layers(fl.Linear):
-                linear.requires_grad_(requires_grad=True)
 
 
 class TriggerPhraseDataset(TextEmbeddingLatentsDataset):
@@ -84,45 +76,30 @@ class LoraLatentDiffusionTrainer(LatentDiffusionTrainer[LoraLatentDiffusionConfi
 class LoadLoras(Callback[LoraLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: LoraLatentDiffusionTrainer) -> None:
         lora_config = trainer.config.lora
-        for target in lora_config.unet_targets:
-            lora_config.apply_loras_to_target(module=trainer.unet, target=target)
-        for target in lora_config.text_encoder_targets:
-            lora_config.apply_loras_to_target(module=trainer.text_encoder, target=target)
-        for target in lora_config.lda_targets:
-            lora_config.apply_loras_to_target(module=trainer.lda, target=target)
+
+        for model_name in MODELS:
+            model = getattr(trainer, model_name)
+            adapter = LoraAdapter[type(model)](
+                model,
+                sub_targets=getattr(lora_config, f"{model_name}_targets"),
+                rank=lora_config.rank,
+            )
+            for sub_adapter, _ in adapter.sub_adapters:
+                for linear in sub_adapter.Lora.layers(fl.Linear):
+                    linear.requires_grad_(requires_grad=True)
+            adapter.inject()
 
 
 class SaveLoras(Callback[LoraLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: LoraLatentDiffusionTrainer) -> None:
-        lora_config = trainer.config.lora
-
-        def get_weight(linear: fl.Linear) -> Tensor:
-            assert linear.bias is None
-            return linear.state_dict()["weight"]
-
-        def build_loras_safetensors(module: fl.Chain, key_prefix: str) -> dict[str, Tensor]:
-            weights: list[Tensor] = []
-            for lora in module.layers(layer_type=Lora):
-                linears = list(lora.layers(fl.Linear))
-                assert len(linears) == 2
-                # See `load_lora_weights` in refiners.adapters.lora
-                weights.extend((get_weight(linears[1]), get_weight(linears[0])))  # aka (up_weight, down_weight)
-            return {f"{key_prefix}{i:03d}": w for i, w in enumerate(weights)}
-
         tensors: dict[str, Tensor] = {}
         metadata: dict[str, str] = {}
 
-        if lora_config.unet_targets:
-            tensors |= build_loras_safetensors(trainer.unet, key_prefix="unet.")
-            metadata |= {"unet_targets": ",".join(lora_config.unet_targets)}
-
-        if lora_config.text_encoder_targets:
-            tensors |= build_loras_safetensors(trainer.text_encoder, key_prefix="text_encoder.")
-            metadata |= {"text_encoder_targets": ",".join(lora_config.text_encoder_targets)}
-
-        if lora_config.lda_targets:
-            tensors |= build_loras_safetensors(trainer.lda, key_prefix="lda.")
-            metadata |= {"lda_targets": ",".join(lora_config.lda_targets)}
+        for model_name in MODELS:
+            model = getattr(trainer, model_name)
+            adapter = model.parent
+            tensors |= {f"{model_name}.{i:03d}": w for i, w in enumerate(adapter.weights)}
+            metadata |= {f"{model_name}_targets": ",".join(adapter.sub_targets)}
 
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",

@@ -1,17 +1,20 @@
 import argparse
 from pathlib import Path
 from typing import cast
+
 import torch
 from torch import Tensor
 from torch.nn.init import zeros_
 from torch.nn import Parameter as TorchParameter
+
 from diffusers import DiffusionPipeline  # type: ignore
+
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import save_to_safetensors
+from refiners.adapters.lora import Lora, LoraAdapter
 from refiners.foundationals.latent_diffusion import SD1UNet
-from refiners.foundationals.latent_diffusion.lora import LoraTarget, apply_loras_to_target
-from refiners.adapters.lora import Lora
+from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
 
 
 def get_weight(linear: fl.Linear) -> torch.Tensor:
@@ -69,7 +72,8 @@ def process(args: Args) -> None:
 
     diffusers_to_refiners = converter.get_mapping()
 
-    apply_loras_to_target(module=refiners_model, target=LoraTarget(target), rank=rank, scale=1.0)
+    LoraAdapter[SD1UNet](refiners_model, sub_targets=lora_targets(refiners_model, target), rank=rank).inject()
+
     for layer in refiners_model.layers(layer_type=Lora):
         zeros_(tensor=layer.Linear_1.weight)
 
@@ -85,7 +89,9 @@ def process(args: Args) -> None:
             p = p[seg]
             assert isinstance(p, fl.Chain)
         last_seg = (
-            "LoraAdapter" if orig_path[-1] == "Linear" else f"LoraAdapter_{orig_path[-1].removeprefix('Linear_')}"
+            "SingleLoraAdapter"
+            if orig_path[-1] == "Linear"
+            else f"SingleLoraAdapter_{orig_path[-1].removeprefix('Linear_')}"
         )
         p_down = TorchParameter(data=diffusers_state_dict[f"{target_k}_lora.down.weight"])
         p_up = TorchParameter(data=diffusers_state_dict[f"{target_k}_lora.up.weight"])

@@ -1,8 +1,14 @@
+from typing import Iterable, Generic, TypeVar, Any
+
 import refiners.fluxion.layers as fl
 from refiners.adapters.adapter import Adapter
 
-from torch.nn.init import zeros_, normal_
 from torch import Tensor, device as Device, dtype as DType
+from torch.nn import Parameter as TorchParameter
+from torch.nn.init import zeros_, normal_
+
+T = TypeVar("T", bound=fl.Chain)
+TLoraAdapter = TypeVar("TLoraAdapter", bound="LoraAdapter[Any]")  # Self (see PEP 673)
 
 
 class Lora(fl.Chain):
@@ -37,11 +43,19 @@ class Lora(fl.Chain):
         self.scale = scale
 
     def load_weights(self, down_weight: Tensor, up_weight: Tensor) -> None:
-        self.Linear_1.weight = down_weight
-        self.Linear_2.weight = up_weight
+        self.Linear_1.weight = TorchParameter(down_weight)
+        self.Linear_2.weight = TorchParameter(up_weight)
+
+    @property
+    def up_weight(self) -> Tensor:
+        return self.Linear_2.weight.data
+
+    @property
+    def down_weight(self) -> Tensor:
+        return self.Linear_1.weight.data
 
 
-class LoraAdapter(fl.Sum, Adapter[fl.Linear]):
+class SingleLoraAdapter(fl.Sum, Adapter[fl.Linear]):
     structural_attrs = ["in_features", "out_features", "rank", "scale"]
 
     def __init__(
@@ -67,20 +81,54 @@ class LoraAdapter(fl.Sum, Adapter[fl.Linear]):
             )
         self.Lora.set_scale(scale=scale)
 
-    def add_lora(self, lora: Lora) -> None:
-        self.append(module=lora)
 
-    def load_lora_weights(self, up_weight: Tensor, down_weight: Tensor, index: int = 0) -> None:
-        self[index + 1].load_weights(up_weight=up_weight, down_weight=down_weight)
+class LoraAdapter(Generic[T], fl.Chain, Adapter[T]):
+    def __init__(
+        self,
+        target: T,
+        sub_targets: Iterable[tuple[fl.Linear, fl.Chain]],
+        rank: int | None = None,
+        scale: float = 1.0,
+        weights: list[Tensor] | None = None,
+    ) -> None:
+        with self.setup_adapter(target):
+            super().__init__(target)
 
+        if weights is not None:
+            assert len(weights) % 2 == 0
+            weights_rank = weights[0].shape[1]
+            if rank is None:
+                rank = weights_rank
+            else:
+                assert rank == weights_rank
 
-def load_lora_weights(model: fl.Chain, weights: list[Tensor]) -> None:
-    assert len(weights) % 2 == 0, "Number of weights must be even"
-    assert (
-        len(list(model.layers(layer_type=Lora))) == len(weights) // 2
-    ), "Number of Lora layers must match number of weights"
-    for i, lora in enumerate(iterable=model.layers(layer_type=Lora)):
-        assert (
-            lora.rank == weights[i * 2].shape[1]
-        ), f"Rank of Lora layer {lora.rank} must match shape of weights {weights[i*2].shape[1]}"
-        lora.load_weights(up_weight=weights[i * 2], down_weight=weights[i * 2 + 1])
+        assert rank is not None, "either pass a rank or weights"
+
+        self.sub_targets = sub_targets
+        self.sub_adapters: list[tuple[SingleLoraAdapter, fl.Chain]] = []
+
+        for linear, parent in self.sub_targets:
+            self.sub_adapters.append((SingleLoraAdapter(target=linear, rank=rank, scale=scale), parent))
+
+        if weights is not None:
+            assert len(self.sub_adapters) == (len(weights) // 2)
+            for i, (adapter, _) in enumerate(self.sub_adapters):
+                lora = adapter.Lora
+                assert (
+                    lora.rank == weights[i * 2].shape[1]
+                ), f"Rank of Lora layer {lora.rank} must match shape of weights {weights[i*2].shape[1]}"
+                adapter.Lora.load_weights(up_weight=weights[i * 2], down_weight=weights[i * 2 + 1])
+
+    def inject(self: TLoraAdapter, parent: fl.Chain | None = None) -> TLoraAdapter:
+        for adapter, adapter_parent in self.sub_adapters:
+            adapter.inject(adapter_parent)
+        return super().inject(parent)
+
+    def eject(self) -> None:
+        for adapter, _ in self.sub_adapters:
+            adapter.eject()
+        super().eject()
+
+    @property
+    def weights(self) -> list[Tensor]:
+        return [w for adapter, _ in self.sub_adapters for w in [adapter.Lora.up_weight, adapter.Lora.down_weight]]

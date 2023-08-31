@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar, Iterator
 
 
 T = TypeVar("T", bound=fl.Module)
-TAdapter = TypeVar("TAdapter", bound="Adapter[fl.Module]")
+TAdapter = TypeVar("TAdapter", bound="Adapter[Any]")  # Self (see PEP 673)
 
 
 class Adapter(Generic[T]):
@@ -36,27 +36,61 @@ class Adapter(Generic[T]):
         yield
         target._can_refresh_parent = _old_can_refresh_parent
 
-    def inject(self, parent: fl.Chain | None = None) -> None:
+    def lookup_actual_target(self) -> fl.Module:
+        # In general, the "actual target" is the target.
+        # This method deals with the edge case where the target
+        # is part of the replacement block and has been adapted by
+        # another adapter after this one. For instance, this is the
+        # case when stacking Controlnets.
         assert isinstance(self, fl.Chain)
+
+        target_parent = self.find_parent(self.target)
+        if (target_parent is None) or (target_parent == self):
+            return self.target
+
+        # Lookup and return last adapter in parents tree (or target if none).
+        r, p = self.target, target_parent
+        while p != self:
+            if isinstance(p, Adapter):
+                r = p
+            assert p.parent, f"parent tree of {self} is broken"
+            p = p.parent
+        return r
+
+    def inject(self: TAdapter, parent: fl.Chain | None = None) -> TAdapter:
+        assert isinstance(self, fl.Chain)
+
+        if (parent is None) and isinstance(self.target, fl.ContextModule):
+            parent = self.target.parent
+            if parent is not None:
+                assert isinstance(parent, fl.Chain), f"{self.target} has invalid parent {parent}"
+
+        target_parent = self.find_parent(self.target)
 
         if parent is None:
             if isinstance(self.target, fl.ContextModule):
-                parent = self.target.parent
-            else:
-                raise ValueError(f"parent of {self.target} is mandatory")
-        assert isinstance(parent, fl.Chain), f"{self.target} has invalid parent {parent}"
+                self.target._set_parent(target_parent)  # type: ignore[reportPrivateUsage]
+            return self
+
         if self.target not in iter(parent):
             raise ValueError(f"{self.target} is not in {parent}")
 
         parent.replace(
             old_module=self.target,
             new_module=self,
-            old_module_parent=self.find_parent(self.target),
+            old_module_parent=target_parent,
         )
+        return self
 
     def eject(self) -> None:
         assert isinstance(self, fl.Chain)
-        self.ensure_parent.replace(old_module=self, new_module=self.target)
+        actual_target = self.lookup_actual_target()
+
+        if (parent := self.parent) is None:
+            if isinstance(actual_target, fl.ContextModule):
+                actual_target._set_parent(None)  # type: ignore[reportPrivateUsage]
+        else:
+            parent.replace(old_module=self, new_module=actual_target)
 
     def _pre_structural_copy(self) -> None:
         if isinstance(self.target, fl.Chain):

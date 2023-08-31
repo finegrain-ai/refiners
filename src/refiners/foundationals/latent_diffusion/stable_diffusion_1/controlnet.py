@@ -1,11 +1,13 @@
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import Chain, Conv2d, SiLU, Lambda, Passthrough, UseContext, Sum, Identity
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
+    SD1UNet,
     DownBlocks,
     MiddleBlock,
     ResidualBlock,
     TimestepEncoder,
 )
+from refiners.adapters.adapter import Adapter
 from refiners.adapters.range_adapter import RangeAdapter2d
 from typing import cast, Iterable
 from torch import Tensor, device as Device, dtype as DType
@@ -69,10 +71,12 @@ class ConditionEncoder(Chain):
         )
 
 
-class SD1Controlnet(Passthrough):
-    structural_attrs = ["name", "scale"]
+class Controlnet(Passthrough):
+    structural_attrs = ["scale"]
 
-    def __init__(self, name: str, device: Device | str | None = None, dtype: DType | None = None) -> None:
+    def __init__(
+        self, name: str, scale: float = 1.0, device: Device | str | None = None, dtype: DType | None = None
+    ) -> None:
         """Controlnet is a Half-UNet that collects residuals from the UNet and uses them to condition the UNet.
 
         Input is a `batch 3 width height` tensor, output is a `batch 1280 width//8 height//8` tensor with residuals
@@ -80,8 +84,7 @@ class SD1Controlnet(Passthrough):
 
         It has to use the same context as the UNet: `unet` and `sampling`.
         """
-        self.name = name
-        self.scale: float = 1.0
+        self.scale = scale
         super().__init__(
             TimestepEncoder(context_key=f"timestep_embedding_{name}", device=device, dtype=dtype),
             Lambda(lambda x: x.narrow(dim=1, start=0, length=4)),  # support inpainting
@@ -102,15 +105,14 @@ class SD1Controlnet(Passthrough):
         )
         for residual_block in self.layers(ResidualBlock):
             chain = residual_block.Chain
-            range_adapter = RangeAdapter2d(
+            RangeAdapter2d(
                 target=chain.Conv2d_1,
                 channels=residual_block.out_channels,
                 embedding_dim=1280,
-                context_key=f"timestep_embedding_{self.name}",
+                context_key=f"timestep_embedding_{name}",
                 device=device,
                 dtype=dtype,
-            )
-            range_adapter.inject(chain)
+            ).inject(chain)
         for n, block in enumerate(cast(Iterable[Chain], self.DownBlocks)):
             assert hasattr(block[0], "out_channels"), (
                 "The first block of every subchain in DownBlocks is expected to respond to `out_channels`,"
@@ -132,14 +134,6 @@ class SD1Controlnet(Passthrough):
             )
         )
 
-    def init_context(self) -> Contexts:
-        return {
-            "unet": {"residuals": [0.0] * 13},
-            "sampling": {"shapes": []},
-            "controlnet": {f"condition_{self.name}": None},
-            "range_adapter": {f"timestep_embedding_{self.name}": None},
-        }
-
     def _store_nth_residual(self, n: int):
         def _store_residual(x: Tensor):
             residuals = self.use_context("unet")["residuals"]
@@ -148,8 +142,39 @@ class SD1Controlnet(Passthrough):
 
         return _store_residual
 
+
+class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
+    def __init__(
+        self, target: SD1UNet, name: str, scale: float = 1.0, weights: dict[str, Tensor] | None = None
+    ) -> None:
+        self.name = name
+
+        controlnet = Controlnet(name=name, scale=scale, device=target.device, dtype=target.dtype)
+        if weights is not None:
+            controlnet.load_state_dict(weights)
+        self._controlnet: list[Controlnet] = [controlnet]  # not registered by PyTorch
+
+        with self.setup_adapter(target):
+            super().__init__(target)
+
+    def inject(self: "SD1ControlnetAdapter", parent: Chain | None = None) -> "SD1ControlnetAdapter":
+        controlnet = self._controlnet[0]
+        assert controlnet not in self.target, f"{controlnet} is already injected"
+        self.target.insert(0, controlnet)
+        return super().inject(parent)
+
+    def eject(self) -> None:
+        self.target.remove(self._controlnet[0])
+        super().eject()
+
+    def init_context(self) -> Contexts:
+        return {"controlnet": {f"condition_{self.name}": None}}
+
+    def set_scale(self, scale: float) -> None:
+        self._controlnet[0].scale = scale
+
     def set_controlnet_condition(self, condition: Tensor) -> None:
         self.set_context("controlnet", {f"condition_{self.name}": condition})
 
-    def set_scale(self, scale: float) -> None:
-        self.scale = scale
+    def structural_copy(self: "SD1ControlnetAdapter") -> "SD1ControlnetAdapter":
+        raise RuntimeError("Controlnet cannot be copied, eject it first.")

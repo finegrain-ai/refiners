@@ -179,12 +179,11 @@ The `Adapter` API lets you **easily patch models** by injecting parameters in ta
 E.g. to inject LoRA layers in all attention's linear layers:
 
 ```python
-from refiners.adapters.lora import LoraAdapter
+from refiners.adapters.lora import SingleLoraAdapter
 
 for layer in vit.layers(fl.Attention):
     for linear, parent in layer.walk(fl.Linear):
-        adapter = LoraAdapter(target=linear, rank=64)
-        adapter.inject(parent)
+        SingleLoraAdapter(target=linear, rank=64).inject(parent)
 
 # ... and load existing weights if the LoRAs are pretrained ...
 ```
@@ -232,7 +231,7 @@ Step 3: run inference using the GPU:
 
 ```python
 from refiners.foundationals.latent_diffusion import StableDiffusion_1
-from refiners.foundationals.latent_diffusion.lora import LoraWeights
+from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.fluxion.utils import load_from_safetensors, manual_seed
 import torch
 
@@ -242,9 +241,7 @@ sd15.clip_text_encoder.load_state_dict(load_from_safetensors("clip.safetensors")
 sd15.lda.load_state_dict(load_from_safetensors("lda.safetensors"))
 sd15.unet.load_state_dict(load_from_safetensors("unet.safetensors"))
 
-# This uses the LoraAdapter internally and takes care to inject it where it should
-lora_weights = LoraWeights("pokemon_lora.safetensors", device=sd15.device)
-lora_weights.patch(sd15, scale=1.0)
+SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path="pokemon_lora.safetensors", scale=1.0).inject()
 
 prompt = "a cute cat"
 

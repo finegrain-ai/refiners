@@ -12,9 +12,9 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
     StableDiffusion_1_Inpainting,
     SD1UNet,
-    SD1Controlnet,
+    SD1ControlnetAdapter,
 )
-from refiners.foundationals.latent_diffusion.lora import LoraWeights
+from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.self_attention_injection import SelfAttentionInjection
 from refiners.foundationals.clip.concepts import ConceptExtender
@@ -57,6 +57,11 @@ def expected_image_std_inpainting(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_std_inpainting.png").convert("RGB")
 
 
+@pytest.fixture
+def expected_image_controlnet_stack(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_controlnet_stack.png").convert("RGB")
+
+
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
 def controlnet_data(
     ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
@@ -82,6 +87,15 @@ def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str,
     condition_image = Image.open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
     expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
     weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11p_sd15_canny.safetensors"
+    return cn_name, condition_image, expected_image, weights_path
+
+
+@pytest.fixture(scope="module")
+def controlnet_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+    cn_name = "depth"
+    condition_image = Image.open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
+    expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
+    weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1p_sd15_depth.safetensors"
     return cn_name, condition_image, expected_image, weights_path
 
 
@@ -453,11 +467,9 @@ def test_diffusion_controlnet(
 
     sd15.set_num_inference_steps(n_steps)
 
-    controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = SD1Controlnet(name=cn_name, device=test_device)
-    controlnet.load_state_dict(controlnet_state_dict)
-    controlnet.set_scale(0.5)
-    sd15.unet.insert(0, controlnet)
+    controlnet = SD1ControlnetAdapter(
+        sd15.unet, name=cn_name, scale=0.5, weights=load_from_safetensors(cn_weights_path)
+    ).inject()
 
     cn_condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
 
@@ -502,11 +514,9 @@ def test_diffusion_controlnet_structural_copy(
 
     sd15.set_num_inference_steps(n_steps)
 
-    controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = SD1Controlnet(name=cn_name, device=test_device)
-    controlnet.load_state_dict(controlnet_state_dict)
-    controlnet.set_scale(0.5)
-    sd15.unet.insert(0, controlnet)
+    controlnet = SD1ControlnetAdapter(
+        sd15.unet, name=cn_name, scale=0.5, weights=load_from_safetensors(cn_weights_path)
+    ).inject()
 
     cn_condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
 
@@ -550,11 +560,9 @@ def test_diffusion_controlnet_float16(
 
     sd15.set_num_inference_steps(n_steps)
 
-    controlnet_state_dict = load_from_safetensors(cn_weights_path)
-    controlnet = SD1Controlnet(name=cn_name, device=test_device, dtype=torch.float16)
-    controlnet.load_state_dict(controlnet_state_dict)
-    controlnet.set_scale(0.5)
-    sd15.unet.insert(0, controlnet)
+    controlnet = SD1ControlnetAdapter(
+        sd15.unet, name=cn_name, scale=0.5, weights=load_from_safetensors(cn_weights_path)
+    ).inject()
 
     cn_condition = image_to_tensor(condition_image.convert("RGB"), device=test_device, dtype=torch.float16)
 
@@ -573,6 +581,64 @@ def test_diffusion_controlnet_float16(
         predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_diffusion_controlnet_stack(
+    sd15_std: StableDiffusion_1,
+    controlnet_data_depth: tuple[str, Image.Image, Image.Image, Path],
+    controlnet_data_canny: tuple[str, Image.Image, Image.Image, Path],
+    expected_image_controlnet_stack: Image.Image,
+    test_device: torch.device,
+):
+    sd15 = sd15_std
+    n_steps = 30
+
+    _, depth_condition_image, _, depth_cn_weights_path = controlnet_data_depth
+    _, canny_condition_image, _, canny_cn_weights_path = controlnet_data_canny
+
+    if not canny_cn_weights_path.is_file():
+        warn(f"could not find weights at {canny_cn_weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    if not depth_cn_weights_path.is_file():
+        warn(f"could not find weights at {depth_cn_weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    with torch.no_grad():
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    depth_controlnet = SD1ControlnetAdapter(
+        sd15.unet, name="depth", scale=0.3, weights=load_from_safetensors(depth_cn_weights_path)
+    ).inject()
+    canny_controlnet = SD1ControlnetAdapter(
+        sd15.unet, name="canny", scale=0.7, weights=load_from_safetensors(canny_cn_weights_path)
+    ).inject()
+
+    depth_cn_condition = image_to_tensor(depth_condition_image.convert("RGB"), device=test_device)
+    canny_cn_condition = image_to_tensor(canny_condition_image.convert("RGB"), device=test_device)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    with torch.no_grad():
+        for step in sd15.steps:
+            depth_controlnet.set_controlnet_condition(depth_cn_condition)
+            canny_controlnet.set_controlnet_condition(canny_cn_condition)
+            x = sd15(
+                x,
+                step=step,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale=7.5,
+            )
+        predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_controlnet_stack, min_psnr=35, min_ssim=0.98)
 
 
 @torch.no_grad()
@@ -597,8 +663,7 @@ def test_diffusion_lora(
 
     sd15.set_num_inference_steps(n_steps)
 
-    lora_weights = LoraWeights(lora_weights_path, device=test_device)
-    lora_weights.patch(sd15, scale=1.0)
+    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=1.0).inject()
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
@@ -629,8 +694,7 @@ def test_diffusion_refonly(
     with torch.no_grad():
         clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = SelfAttentionInjection(sd15.unet)
-    sai.inject()
+    sai = SelfAttentionInjection(sd15.unet).inject()
 
     guide = sd15.lda.encode_image(condition_image_refonly)
     guide = torch.cat((guide, guide))
@@ -671,29 +735,26 @@ def test_diffusion_inpainting_refonly(
     with torch.no_grad():
         clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = SelfAttentionInjection(sd15.unet)
-    sai.inject()
+    sai = SelfAttentionInjection(sd15.unet).inject()
 
     sd15.set_num_inference_steps(n_steps)
     sd15.set_inpainting_conditions(target_image_inpainting_refonly, mask_image_inpainting_refonly)
 
-    refonly_guide = sd15.lda.encode_image(scene_image_inpainting_refonly)
-    refonly_guide = torch.cat((refonly_guide, refonly_guide))
+    guide = sd15.lda.encode_image(scene_image_inpainting_refonly)
+    guide = torch.cat((guide, guide))
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
 
     with torch.no_grad():
         for step in sd15.steps:
-            refonly_noise = torch.randn_like(refonly_guide)
-            refonly_noised_guide = sd15.scheduler.add_noise(refonly_guide, refonly_noise, step)
+            noise = torch.randn_like(guide)
+            noised_guide = sd15.scheduler.add_noise(guide, noise, step)
             # See https://github.com/Mikubill/sd-webui-controlnet/pull/1275 ("1.1.170 reference-only begin to support
             # inpaint variation models")
-            refonly_noised_guide = torch.cat(
-                [refonly_noised_guide, torch.zeros_like(refonly_noised_guide)[:, 0:1, :, :], refonly_guide], dim=1
-            )
+            noised_guide = torch.cat([noised_guide, torch.zeros_like(noised_guide)[:, 0:1, :, :], guide], dim=1)
 
-            sai.set_controlnet_condition(refonly_noised_guide)
+            sai.set_controlnet_condition(noised_guide)
             x = sd15(
                 x,
                 step=step,

@@ -70,12 +70,11 @@ class DoubleTextEncoder(fl.Chain):
     ) -> None:
         text_encoder_l = text_encoder_l or CLIPTextEncoderL(device=device, dtype=dtype)
         text_encoder_g = text_encoder_g or CLIPTextEncoderG(device=device, dtype=dtype)
-        text_encoder_with_pooling = TextEncoderWithPooling(target=text_encoder_g, projection=projection)
         super().__init__(
             fl.Parallel(text_encoder_l[:-2], text_encoder_g),
             fl.Lambda(func=self.concatenate_embeddings),
         )
-        text_encoder_with_pooling.inject(parent=self.Parallel)
+        TextEncoderWithPooling(target=text_encoder_g, projection=projection).inject(parent=self.Parallel)
 
     def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 2048"], Float[Tensor, "1 1280"]]:
         return super().__call__(text)

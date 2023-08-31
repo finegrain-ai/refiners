@@ -164,8 +164,7 @@ def apply_dropout(module: fl.Chain, probability: float = 0.5) -> None:
         assert not (
             isinstance(parent, Dropout) or isinstance(parent, GyroDropout)
         ), f"{linear} already has a dropout layer"
-        adapter = DropoutAdapter(target=linear, probability=probability)
-        adapter.inject(parent)
+        DropoutAdapter(target=linear, probability=probability).inject(parent)
 
 
 def apply_gyro_dropout(
@@ -181,14 +180,13 @@ def apply_gyro_dropout(
         assert not (
             isinstance(parent, Dropout) or isinstance(parent, GyroDropout)
         ), f"{linear} already has a dropout layer"
-        adapter = GyroDropoutAdapter(
+        GyroDropoutAdapter(
             target=linear,
             probability=probability,
             total_subnetworks=total_subnetworks,
             concurrent_subnetworks=concurrent_subnetworks,
             iters_per_epoch=iters_per_epoch,
-        )
-        adapter.inject(parent)
+        ).inject(parent)
 
 
 ConfigType = TypeVar("ConfigType", bound="BaseConfig")
