@@ -137,6 +137,7 @@ class CrossAttentionBlock2d(Sum):
         self.num_attention_heads = num_attention_heads
         self.num_attention_layers = num_attention_layers
         self.num_groups = num_groups
+        self.use_bias = use_bias
         self.context_key = context_key
         self.use_linear_projection = use_linear_projection
         self.projection_type = "Linear" if use_linear_projection else "Conv2d"
