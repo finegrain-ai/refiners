@@ -1,0 +1,63 @@
+script = "finetune-ldm-textual_inversion.py" # not used for now
+
+[wandb]
+mode = "offline" # "online", "offline", "disabled"
+entity = "acme"
+project = "test-textual-inversion"
+
+[models]
+unet = {checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors"}
+text_encoder = {checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
+lda = {checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors"}
+
+[latent_diffusion]
+unconditional_sampling_probability = 0.05
+offset_noise = 0.1
+
+[textual_inversion]
+placeholder_token = "<cat-toy>"
+initializer_token = "toy"
+# style_mode = true
+
+[training]
+duration = "2000:step"
+seed = 0
+gpu_index = 0
+batch_size = 4
+gradient_accumulation = "1:step"
+evaluation_interval = "250:step"
+evaluation_seed = 1
+
+[optimizer]
+optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
+learning_rate = 5e-4
+betas = [0.9, 0.999]
+eps = 1e-8
+weight_decay = 1e-2
+
+[scheduler]
+scheduler_type = "ConstantLR"
+update_interval = "1:step"
+
+[dropout]
+dropout_probability = 0
+use_gyro_dropout = false
+
+[dataset]
+hf_repo = "acme/cat-toy"
+revision = "main"
+horizontal_flip = true
+random_crop = true
+resize_image_max_size = 512
+
+[checkpointing]
+# save_folder = "/path/to/ckpts"
+save_interval = "250:step"
+
+[test_diffusion]
+num_inference_steps = 30
+use_short_prompts = false
+prompts = [
+    "<cat-toy>",
+    # "green grass, <cat-toy>"
+]
