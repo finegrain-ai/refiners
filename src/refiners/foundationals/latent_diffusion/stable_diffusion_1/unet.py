@@ -243,17 +243,10 @@ class ResidualConcatenator(fl.Chain):
 
 
 class SD1UNet(fl.Chain):
-    structural_attrs = ["in_channels", "clip_embedding_dim"]
+    structural_attrs = ["in_channels"]
 
-    def __init__(
-        self,
-        in_channels: int,
-        clip_embedding_dim: int,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
-    ):
+    def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.in_channels = in_channels
-        self.clip_embedding_dim = clip_embedding_dim
         super().__init__(
             TimestepEncoder(device=device, dtype=dtype),
             DownBlocks(in_channels=in_channels, device=device, dtype=dtype),

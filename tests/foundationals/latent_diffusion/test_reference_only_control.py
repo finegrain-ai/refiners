@@ -14,7 +14,7 @@ from refiners.foundationals.latent_diffusion.cross_attention import CrossAttenti
 
 @torch.no_grad()
 def test_sai_inject_eject() -> None:
-    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9)
     sai = ReferenceOnlyControlAdapter(unet)
 
     nb_cross_attention_blocks = len(list(unet.walk(CrossAttentionBlock)))

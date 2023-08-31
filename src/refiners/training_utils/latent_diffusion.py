@@ -128,7 +128,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
-        return SD1UNet(in_channels=4, clip_embedding_dim=768, device=self.device).to(device=self.device)
+        return SD1UNet(in_channels=4, device=self.device).to(device=self.device)
 
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:

@@ -22,9 +22,7 @@ def setup_converter(args: Args) -> ModelConverter:
     source_clip_embedding_dim: int = source.config.cross_attention_dim  # type: ignore
     source_has_time_ids: bool = source.config.addition_embed_type == "text_time"  # type: ignore
     target = (
-        SDXLUNet(in_channels=source_in_channels)
-        if source_has_time_ids
-        else SD1UNet(in_channels=source_in_channels, clip_embedding_dim=source_clip_embedding_dim)
+        SDXLUNet(in_channels=source_in_channels) if source_has_time_ids else SD1UNet(in_channels=source_in_channels)
     )
 
     x = torch.randn(1, source_in_channels, 32, 32)

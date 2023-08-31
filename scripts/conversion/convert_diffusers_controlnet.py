@@ -21,7 +21,7 @@ class Args(argparse.Namespace):
 @torch.no_grad()
 def convert(args: Args) -> dict[str, torch.Tensor]:
     controlnet_src: nn.Module = ControlNetModel.from_pretrained(pretrained_model_name_or_path=args.source_path)  # type: ignore
-    unet = SD1UNet(in_channels=4, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=4)
     adapter = SD1ControlnetAdapter(unet, name="mycn").inject()
     controlnet = unet.Controlnet
 
