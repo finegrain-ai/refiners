@@ -44,7 +44,7 @@ def process(args: Args) -> None:
     diffusers_sd = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.base_model)  # type: ignore
     diffusers_model = cast(fl.Module, diffusers_sd.unet)  # type: ignore
 
-    refiners_model = SD1UNet(in_channels=4, clip_embedding_dim=768)
+    refiners_model = SD1UNet(in_channels=4)
     target = LoraTarget.CrossAttention
     metadata = {"unet_targets": "CrossAttentionBlock2d"}
     rank = diffusers_state_dict[

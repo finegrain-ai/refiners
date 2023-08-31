@@ -11,7 +11,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet impor
 @pytest.fixture(scope="module", params=[True, False])
 def unet(request: pytest.FixtureRequest) -> Iterator[SD1UNet]:
     with_parent: bool = request.param
-    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9)
     if with_parent:
         fl.Chain(unet)
     yield unet

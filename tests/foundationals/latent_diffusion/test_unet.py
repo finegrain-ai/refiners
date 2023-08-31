@@ -9,7 +9,7 @@ def test_unet_context_flush():
     timestep = torch.randint(0, 999, size=(1, 1))
     x = torch.randn(1, 4, 32, 32)
 
-    unet = SD1UNet(in_channels=4, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=4)
     unet.set_clip_text_embedding(clip_text_embedding=text_embedding)  # not flushed between forward-s
 
     with torch.no_grad():

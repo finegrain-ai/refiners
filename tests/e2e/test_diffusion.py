@@ -224,7 +224,7 @@ def sd15_inpainting(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
@@ -242,7 +242,7 @@ def sd15_inpainting_float16(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    unet = SD1UNet(in_channels=9, clip_embedding_dim=768)
+    unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device, dtype=torch.float16)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))

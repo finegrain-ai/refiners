@@ -62,7 +62,7 @@ def main() -> None:
     for meta_key, meta_value in metadata.items():
         match meta_key:
             case "unet_targets":
-                model = SD1UNet(in_channels=4, clip_embedding_dim=768)
+                model = SD1UNet(in_channels=4)
                 create_mapping = partial(get_unet_mapping, source_path=args.sd15)
                 key_prefix = "unet."
                 lora_prefix = "lora_unet_"

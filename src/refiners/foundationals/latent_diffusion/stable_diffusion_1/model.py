@@ -24,7 +24,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
-        unet = unet or SD1UNet(in_channels=4, clip_embedding_dim=768)
+        unet = unet or SD1UNet(in_channels=4)
         lda = lda or LatentDiffusionAutoencoder()
         clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
         scheduler = scheduler or DPMSolver(num_inference_steps=30)
