@@ -76,8 +76,6 @@ class TimestepEncoder(fl.Passthrough):
 
 
 class SDXLCrossAttention(CrossAttentionBlock2d):
-    structural_attrs = ["channels", "num_attention_layers", "num_attention_heads"]
-
     def __init__(
         self,
         channels: int,
