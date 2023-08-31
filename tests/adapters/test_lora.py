@@ -1,9 +1,9 @@
-from refiners.adapters.lora import Lora, LoraAdapter
+from refiners.adapters.lora import Lora, SingleLoraAdapter, LoraAdapter
 from torch import randn, allclose
 import refiners.fluxion.layers as fl
 
 
-def test_lora() -> None:
+def test_single_lora_adapter() -> None:
     chain = fl.Chain(
         fl.Chain(
             fl.Linear(in_features=1, out_features=1),
@@ -14,8 +14,7 @@ def test_lora() -> None:
     x = randn(1, 1)
     y = chain(x)
 
-    lora_adapter = LoraAdapter(chain.Chain.Linear_1)
-    lora_adapter.inject(chain.Chain)
+    lora_adapter = SingleLoraAdapter(chain.Chain.Linear_1).inject(chain.Chain)
 
     assert isinstance(lora_adapter[1], Lora)
     assert allclose(input=chain(x), other=y)
@@ -26,4 +25,18 @@ def test_lora() -> None:
     assert len(chain) == 2
 
     lora_adapter.inject(chain.Chain)
-    assert isinstance(chain.Chain[0], LoraAdapter)
+    assert isinstance(chain.Chain[0], SingleLoraAdapter)
+
+
+def test_lora_adapter() -> None:
+    chain = fl.Chain(
+        fl.Chain(
+            fl.Linear(in_features=1, out_features=1),
+            fl.Linear(in_features=1, out_features=1),
+        ),
+        fl.Linear(in_features=1, out_features=2),
+    )
+
+    LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0).inject()
+
+    assert len(list(chain.layers(Lora))) == 3

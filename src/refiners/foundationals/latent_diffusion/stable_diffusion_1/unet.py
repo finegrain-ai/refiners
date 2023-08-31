@@ -278,15 +278,14 @@ class SD1UNet(fl.Chain):
         )
         for residual_block in self.layers(ResidualBlock):
             chain = residual_block.Chain
-            range_adapter = RangeAdapter2d(
+            RangeAdapter2d(
                 target=chain.Conv2d_1,
                 channels=residual_block.out_channels,
                 embedding_dim=1280,
                 context_key="timestep_embedding",
                 device=device,
                 dtype=dtype,
-            )
-            range_adapter.inject(chain)
+            ).inject(chain)
         for n, block in enumerate(cast(Iterable[fl.Chain], self.DownBlocks)):
             block.append(ResidualAccumulator(n))
         for n, block in enumerate(cast(Iterable[fl.Chain], self.UpBlocks)):

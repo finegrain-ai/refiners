@@ -10,7 +10,7 @@ from torch.nn import Parameter
 import re
 
 
-class ConceptExtender:
+class ConceptExtender(fl.Chain, Adapter[CLIPTextEncoder]):
     """
     Extends the vocabulary of a CLIPTextEncoder with one or multiple new concepts, e.g. obtained via the Textual Inversion technique.
 
@@ -37,6 +37,9 @@ class ConceptExtender:
     """
 
     def __init__(self, target: CLIPTextEncoder) -> None:
+        with self.setup_adapter(target):
+            super().__init__(target)
+
         try:
             token_encoder, self.token_encoder_parent = next(target.walk(TokenEncoder))
         except StopIteration:
@@ -54,13 +57,15 @@ class ConceptExtender:
         self.embedding_extender.add_embedding(embedding)
         self.token_extender.add_token(token, self.embedding_extender.num_embeddings - 1)
 
-    def inject(self) -> None:
+    def inject(self: "ConceptExtender", parent: fl.Chain | None = None) -> "ConceptExtender":
         self.embedding_extender.inject(self.token_encoder_parent)
         self.token_extender.inject(self.clip_tokenizer_parent)
+        return super().inject(parent)
 
     def eject(self) -> None:
         self.embedding_extender.eject()
         self.token_extender.eject()
+        super().eject()
 
 
 class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):

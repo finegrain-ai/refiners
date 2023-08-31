@@ -8,7 +8,7 @@ from refiners.fluxion.utils import save_to_safetensors
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.foundationals.latent_diffusion import (
     SD1UNet,
-    SD1Controlnet,
+    SD1ControlnetAdapter,
     DPMSolver,
 )
 
@@ -21,13 +21,13 @@ class Args(argparse.Namespace):
 @torch.no_grad()
 def convert(args: Args) -> dict[str, torch.Tensor]:
     controlnet_src: nn.Module = ControlNetModel.from_pretrained(pretrained_model_name_or_path=args.source_path)  # type: ignore
-    controlnet = SD1Controlnet(name="mycn")
+    unet = SD1UNet(in_channels=4, clip_embedding_dim=768)
+    adapter = SD1ControlnetAdapter(unet, name="mycn").inject()
+    controlnet = unet.Controlnet
 
     condition = torch.randn(1, 3, 512, 512)
-    controlnet.set_controlnet_condition(condition=condition)
+    adapter.set_controlnet_condition(condition=condition)
 
-    unet = SD1UNet(in_channels=4, clip_embedding_dim=768)
-    unet.insert(index=0, module=controlnet)
     clip_text_embedding = torch.rand(1, 77, 768)
     unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
