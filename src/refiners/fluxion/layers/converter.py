@@ -24,7 +24,7 @@ class Converter(ContextModule):
         self.set_device = set_device
         self.set_dtype = set_dtype
 
-    def forward(self, *inputs: Tensor) -> tuple[Tensor]:
+    def forward(self, *inputs: Tensor) -> tuple[Tensor, ...]:
         parent = self.ensure_parent
         converted_tensors: list[Tensor] = []
 
