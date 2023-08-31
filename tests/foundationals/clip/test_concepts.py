@@ -4,10 +4,11 @@ import pytest
 from warnings import warn
 from pathlib import Path
 
-from refiners.foundationals.clip.concepts import ConceptExtender
+from refiners.foundationals.clip.concepts import ConceptExtender, TokenExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 from refiners.fluxion.utils import load_from_safetensors
+import refiners.fluxion.layers as fl
 
 from diffusers import StableDiffusionPipeline  # type: ignore
 import transformers  # type: ignore
@@ -82,6 +83,28 @@ def gta5_artwork_embedding_textual_inversion(test_textual_inversion_path: Path) 
 @pytest.fixture(scope="module")
 def cat_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
     return torch.load(test_textual_inversion_path / "cat-toy" / "learned_embeds.bin")["<cat-toy>"]  # type: ignore
+
+
+def test_tokenizer_with_special_character():
+    clip_tokenizer = fl.Chain(CLIPTokenizer())
+    token_extender = TokenExtender(clip_tokenizer.CLIPTokenizer)
+    new_token_id = max(clip_tokenizer.CLIPTokenizer.token_to_id_mapping.values()) + 42
+    token_extender.add_token("*", new_token_id)
+    token_extender.inject(clip_tokenizer)
+
+    adapted_clip_tokenizer = clip_tokenizer.find(layer_type=CLIPTokenizer)
+    assert adapted_clip_tokenizer is not None
+
+    assert torch.allclose(
+        adapted_clip_tokenizer.encode("*"),
+        torch.Tensor(
+            [
+                adapted_clip_tokenizer.start_of_text_token_id,
+                new_token_id,
+                adapted_clip_tokenizer.end_of_text_token_id,
+            ]
+        ).to(torch.int64),
+    )
 
 
 def test_encoder(

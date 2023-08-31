@@ -95,9 +95,15 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
     def process_caption(self, caption: str) -> str:
         return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
 
+    def get_caption(self, index: int) -> str:
+        return self.dataset[index]["caption"]
+
+    def get_image(self, index: int) -> Image.Image:
+        return self.dataset[index]["image"]
+
     def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
-        item = self.dataset[index]
-        caption, image = item["caption"], item["image"]
+        caption = self.get_caption(index=index)
+        image = self.get_image(index=index)
         resized_image = self.resize_image(
             image=image,
             min_size=self.config.dataset.resize_image_min_size,

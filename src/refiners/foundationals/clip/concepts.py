@@ -71,7 +71,6 @@ class ConceptExtender(fl.Chain, Adapter[CLIPTextEncoder]):
 class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
     old_weight: Parameter
     new_weight: Parameter
-    weight: Tensor
 
     def __init__(
         self,
@@ -83,22 +82,21 @@ class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
         self.new_weight = Parameter(
             zeros([0, target.embedding_dim], device=target.device, dtype=target.dtype)
         )  # requires_grad=True by default
-        self.weight = cat([self.old_weight, self.new_weight])
 
     # Use F.embedding instead of nn.Embedding to make sure that gradients can only be computed for the new embeddings
     def lookup(self, x: Tensor) -> Tensor:
-        return F.embedding(x, self.weight)
+        # Concatenate old and new weights for dynamic embedding updates during training
+        return F.embedding(x, cat([self.old_weight, self.new_weight]))
 
     def add_embedding(self, embedding: Tensor) -> None:
         assert embedding.shape == (self.old_weight.shape[1],)
         self.new_weight = Parameter(
             cat([self.new_weight, embedding.unsqueeze(0).to(self.new_weight.device, self.new_weight.dtype)])
         )
-        self.weight = cat([self.old_weight, self.new_weight])
 
     @property
     def num_embeddings(self) -> int:
-        return self.weight.shape[0]
+        return self.old_weight.shape[0] + self.new_weight.shape[0]
 
 
 class TokenExtender(fl.Chain, Adapter[CLIPTokenizer]):
@@ -115,12 +113,13 @@ class TokenExtender(fl.Chain, Adapter[CLIPTokenizer]):
             )
 
     def add_token(self, token: str, token_id: int) -> None:
+        token = token.lower()
         tokenizer = self.find(layer_type=CLIPTokenizer)
         assert tokenizer is not None, "Tokenizer not found."
         assert token_id not in tokenizer.token_to_id_mapping.values()
         tokenizer.token_to_id_mapping[token] = token_id
         current_pattern = tokenizer.token_pattern.pattern
-        new_pattern = token + "|" + current_pattern
+        new_pattern = re.escape(token) + "|" + current_pattern
         tokenizer.token_pattern = re.compile(new_pattern, re.IGNORECASE)
         # Define the keyword as its own smallest subtoken
         tokenizer.byte_pair_encoding_cache[token] = token
