@@ -452,7 +452,7 @@ class Residual(Sum):
         super().__init__(Identity(), Chain(*modules))
 
 
-class Breakpoint(Module):
+class Breakpoint(ContextModule):
     def __init__(self, vscode: bool = True):
         super().__init__()
         self.vscode = vscode
