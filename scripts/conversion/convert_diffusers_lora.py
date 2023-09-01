@@ -12,7 +12,7 @@ from diffusers import DiffusionPipeline  # type: ignore
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.adapters.lora import Lora, LoraAdapter
+from refiners.fluxion.adapters.lora import Lora, LoraAdapter
 from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
 

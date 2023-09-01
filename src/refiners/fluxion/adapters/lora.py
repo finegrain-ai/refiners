@@ -1,7 +1,7 @@
 from typing import Iterable, Generic, TypeVar, Any
 
 import refiners.fluxion.layers as fl
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn import Parameter as TorchParameter

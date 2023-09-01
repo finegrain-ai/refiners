@@ -1,4 +1,4 @@
-from refiners.adapters.lora import Lora, SingleLoraAdapter, LoraAdapter
+from refiners.fluxion.adapters.lora import Lora, SingleLoraAdapter, LoraAdapter
 from torch import randn, allclose
 import refiners.fluxion.layers as fl
 

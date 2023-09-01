@@ -179,7 +179,7 @@ The `Adapter` API lets you **easily patch models** by injecting parameters in ta
 E.g. to inject LoRA layers in all attention's linear layers:
 
 ```python
-from refiners.adapters.lora import SingleLoraAdapter
+from refiners.fluxion.adapters.lora import SingleLoraAdapter
 
 for layer in vit.layers(fl.Attention):
     for linear, parent in layer.walk(fl.Linear):

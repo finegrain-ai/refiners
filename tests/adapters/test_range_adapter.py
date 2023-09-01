@@ -1,5 +1,5 @@
 import torch
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder
 from refiners.fluxion.layers import Chain, Linear
 

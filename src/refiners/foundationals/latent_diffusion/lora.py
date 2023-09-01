@@ -7,8 +7,8 @@ from torch import Tensor
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors
 
-from refiners.adapters.adapter import Adapter
-from refiners.adapters.lora import SingleLoraAdapter, LoraAdapter
+from refiners.fluxion.adapters.adapter import Adapter
+from refiners.fluxion.adapters.lora import SingleLoraAdapter, LoraAdapter
 
 from refiners.foundationals.clip.text_encoder import FeedForward, TransformerLayer
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
