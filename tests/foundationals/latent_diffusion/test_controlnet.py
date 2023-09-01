@@ -83,3 +83,13 @@ def test_two_controlnets_eject_top_down(unet: SD1UNet) -> None:
     cn2.eject()
     assert unet.parent == original_parent
     assert len(list(unet.walk(Controlnet))) == 0
+
+
+@torch.no_grad()
+def test_two_controlnets_same_name(unet: SD1UNet) -> None:
+    SD1ControlnetAdapter(unet, name="cnx").inject()
+    cn2 = SD1ControlnetAdapter(unet, name="cnx")
+
+    with pytest.raises(AssertionError) as exc:
+        cn2.inject()
+    assert "Controlnet named cnx is already injected" in str(exc.value)

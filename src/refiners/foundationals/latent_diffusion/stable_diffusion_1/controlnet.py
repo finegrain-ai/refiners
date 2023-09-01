@@ -72,7 +72,7 @@ class ConditionEncoder(Chain):
 
 
 class Controlnet(Passthrough):
-    structural_attrs = ["scale"]
+    structural_attrs = ["scale", "name"]
 
     def __init__(
         self, name: str, scale: float = 1.0, device: Device | str | None = None, dtype: DType | None = None
@@ -84,6 +84,7 @@ class Controlnet(Passthrough):
 
         It has to use the same context as the UNet: `unet` and `sampling`.
         """
+        self.name = name
         self.scale = scale
         super().__init__(
             TimestepEncoder(context_key=f"timestep_embedding_{name}", device=device, dtype=dtype),
@@ -159,7 +160,10 @@ class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
 
     def inject(self: "SD1ControlnetAdapter", parent: Chain | None = None) -> "SD1ControlnetAdapter":
         controlnet = self._controlnet[0]
-        assert controlnet not in self.target, f"{controlnet} is already injected"
+        target_controlnets = [x for x in self.target if isinstance(x, Controlnet)]
+        assert controlnet not in target_controlnets, f"{controlnet} is already injected"
+        for cn in target_controlnets:
+            assert cn.name != self.name, f"Controlnet named {self.name} is already injected"
         self.target.insert(0, controlnet)
         return super().inject(parent)
 
