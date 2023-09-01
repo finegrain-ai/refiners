@@ -142,7 +142,7 @@ class Chain(ContextModule):
         self._reset_context()
 
         for module in self:
-            if isinstance(module, ContextModule) and module._can_refresh_parent and module.parent != self:
+            if isinstance(module, ContextModule) and module.parent != self:
                 module._set_parent(self)
 
     @property

@@ -62,6 +62,8 @@ class ContextModule(Module):
         return self._parent[0]
 
     def _set_parent(self, parent: "Chain | None") -> None:
+        if not self._can_refresh_parent:
+            return
         if parent is None:
             self._parent = []
             return
