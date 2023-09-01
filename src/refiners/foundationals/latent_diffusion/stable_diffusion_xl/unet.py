@@ -8,7 +8,11 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
     ResidualBlock,
     ResidualConcatenator,
 )
-from refiners.adapters.range_adapter import RangeAdapter2d, RangeEncoder, compute_sinusoidal_embedding
+from refiners.foundationals.latent_diffusion.range_adapter import (
+    RangeAdapter2d,
+    RangeEncoder,
+    compute_sinusoidal_embedding,
+)
 
 
 class TextTimeEmbedding(fl.Chain):

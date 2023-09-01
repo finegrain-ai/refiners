@@ -6,7 +6,7 @@ from refiners.fluxion.context import Contexts
 import refiners.fluxion.layers as fl
 
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.adapters.range_adapter import RangeEncoder, RangeAdapter2d
+from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder, RangeAdapter2d
 
 
 class TimestepEncoder(fl.Passthrough):
