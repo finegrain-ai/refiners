@@ -1,4 +1,4 @@
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, TokenEncoder
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 import refiners.fluxion.layers as fl

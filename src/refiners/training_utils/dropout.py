@@ -5,7 +5,7 @@ from torch.nn import Dropout as TorchDropout
 
 import refiners.fluxion.layers as fl
 from refiners.training_utils.callback import Callback
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig

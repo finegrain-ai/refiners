@@ -2,7 +2,7 @@ import math
 from torch import Tensor, arange, float32, exp, sin, cat, cos, device as Device, dtype as DType
 from jaxtyping import Float, Int
 
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 import refiners.fluxion.layers as fl
 
 

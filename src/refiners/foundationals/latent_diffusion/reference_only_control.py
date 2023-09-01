@@ -9,7 +9,7 @@ from refiners.fluxion.layers import (
     Identity,
     Parallel,
 )
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock
 from torch import Tensor

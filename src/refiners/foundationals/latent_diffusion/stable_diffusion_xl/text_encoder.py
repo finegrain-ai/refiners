@@ -1,6 +1,6 @@
 from typing import cast
 from torch import device as Device, dtype as DType, Tensor, cat
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderG, CLIPTextEncoderL

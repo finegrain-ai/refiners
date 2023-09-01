@@ -7,7 +7,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
     ResidualBlock,
     TimestepEncoder,
 )
-from refiners.adapters.adapter import Adapter
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.range_adapter import RangeAdapter2d
 from typing import cast, Iterable
 from torch import Tensor, device as Device, dtype as DType
