@@ -22,7 +22,7 @@ class SaveLayerNormAdapter(Chain, Adapter[SelfAttention]):
             super().__init__(SetContext(self.context, "norm"), target)
 
 
-class ReferenceOnlyControlAdapter(Chain, Adapter[SelfAttention]):
+class SelfAttentionInjectionAdapter(Chain, Adapter[SelfAttention]):
     def __init__(
         self,
         target: SelfAttention,
@@ -64,7 +64,7 @@ class SelfAttentionInjectionPassthrough(Passthrough):
 
         super().__init__(
             Lambda(self._copy_diffusion_context),
-            UseContext("self_attention_injection", "guide"),
+            UseContext("reference_only_control", "guide"),
             guide_unet,
             Lambda(self._restore_diffusion_context),
         )
@@ -91,14 +91,14 @@ class SelfAttentionInjectionPassthrough(Passthrough):
         return x
 
 
-class SelfAttentionInjection(Chain, Adapter[SD1UNet]):
+class ReferenceOnlyControlAdapter(Chain, Adapter[SD1UNet]):
     # TODO: Does not support batching yet. Assumes concatenated inputs for classifier-free guidance
 
     def __init__(self, target: SD1UNet, style_cfg: float = 0.5) -> None:
         # the style_cfg is the weight of the guide in unconditionned diffusion.
         # This value is recommended to be 0.5 on the sdwebui repo.
 
-        self.sub_adapters: list[ReferenceOnlyControlAdapter] = []
+        self.sub_adapters: list[SelfAttentionInjectionAdapter] = []
         self._passthrough: list[SelfAttentionInjectionPassthrough] = [
             SelfAttentionInjectionPassthrough(target)
         ]  # not registered by PyTorch
@@ -113,10 +113,10 @@ class SelfAttentionInjection(Chain, Adapter[SD1UNet]):
             assert sa is not None and sa.parent is not None
 
             self.sub_adapters.append(
-                ReferenceOnlyControlAdapter(sa, context=f"self_attention_context_{i}", style_cfg=style_cfg)
+                SelfAttentionInjectionAdapter(sa, context=f"self_attention_context_{i}", style_cfg=style_cfg)
             )
 
-    def inject(self: "SelfAttentionInjection", parent: Chain | None = None) -> "SelfAttentionInjection":
+    def inject(self: "ReferenceOnlyControlAdapter", parent: Chain | None = None) -> "ReferenceOnlyControlAdapter":
         passthrough = self._passthrough[0]
         assert passthrough not in self.target, f"{passthrough} is already injected"
         for adapter in self.sub_adapters:
@@ -133,7 +133,7 @@ class SelfAttentionInjection(Chain, Adapter[SD1UNet]):
         super().eject()
 
     def set_controlnet_condition(self, condition: Tensor) -> None:
-        self.set_context("self_attention_injection", {"guide": condition})
+        self.set_context("reference_only_control", {"guide": condition})
 
-    def structural_copy(self: "SelfAttentionInjection") -> "SelfAttentionInjection":
-        raise RuntimeError("SelfAttentionInjection cannot be copied, eject it first.")
+    def structural_copy(self: "ReferenceOnlyControlAdapter") -> "ReferenceOnlyControlAdapter":
+        raise RuntimeError("ReferenceOnlyControlAdapter cannot be copied, eject it first.")
