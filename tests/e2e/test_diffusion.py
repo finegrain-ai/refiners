@@ -16,7 +16,7 @@ from refiners.foundationals.latent_diffusion import (
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
-from refiners.foundationals.latent_diffusion.self_attention_injection import SelfAttentionInjection
+from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.clip.concepts import ConceptExtender
 
 from tests.utils import ensure_similar_images
@@ -694,7 +694,7 @@ def test_diffusion_refonly(
     with torch.no_grad():
         clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = SelfAttentionInjection(sd15.unet).inject()
+    sai = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
     guide = sd15.lda.encode_image(condition_image_refonly)
     guide = torch.cat((guide, guide))
@@ -735,7 +735,7 @@ def test_diffusion_inpainting_refonly(
     with torch.no_grad():
         clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = SelfAttentionInjection(sd15.unet).inject()
+    sai = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
     sd15.set_num_inference_steps(n_steps)
     sd15.set_inpainting_conditions(target_image_inpainting_refonly, mask_image_inpainting_refonly)
