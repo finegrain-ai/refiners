@@ -82,7 +82,7 @@ class LoadLoras(Callback[LoraLatentDiffusionTrainer]):
             model_targets: list[LoraTarget] = getattr(lora_config, f"{model_name}_targets")
             adapter = LoraAdapter[type(model)](
                 model,
-                sub_targets=[x for target in model_targets for x in lora_targets(model, target)],
+                sub_targets=lora_targets(model, model_targets),
                 rank=lora_config.rank,
             )
             for sub_adapter, _ in adapter.sub_adapters:
