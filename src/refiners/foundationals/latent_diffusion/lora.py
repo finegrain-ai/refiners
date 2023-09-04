@@ -100,7 +100,7 @@ class SD1LoraAdapter(fl.Chain, Adapter[StableDiffusion_1]):
         for model_name in MODELS:
             if not (model_targets := sub_targets.get(model_name, [])):
                 continue
-            model = getattr(target, model_name)
+            model = getattr(target, "clip_text_encoder" if model_name == "text_encoder" else model_name)
             if model.find(SingleLoraAdapter):
                 raise NotImplementedError(f"{model} already contains LoRA layers")
 
