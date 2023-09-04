@@ -1,6 +1,6 @@
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Callable
 
 from torch import Tensor
 
@@ -8,7 +8,7 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors
 
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.fluxion.adapters.lora import SingleLoraAdapter, LoraAdapter
+from refiners.fluxion.adapters.lora import LoraAdapter, Lora
 
 from refiners.foundationals.clip.text_encoder import FeedForward, TransformerLayer
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
@@ -47,6 +47,23 @@ class LoraTarget(str, Enum):
                 return TransformerLayer
 
 
+def _predicate(k: type[fl.Module]) -> Callable[[fl.Module, fl.Chain], bool]:
+    def f(m: fl.Module, _: fl.Chain) -> bool:
+        if isinstance(m, Lora):  # do not adapt other LoRAs
+            raise StopIteration
+        if isinstance(m, Controlnet):  # do not adapt Controlnet linears
+            raise StopIteration
+        return isinstance(m, k)
+
+    return f
+
+
+def _iter_linears(module: fl.Chain) -> Iterator[tuple[fl.Linear, fl.Chain]]:
+    for m, p in module.walk(_predicate(fl.Linear)):
+        assert isinstance(m, fl.Linear)
+        yield (m, p)
+
+
 def lora_targets(
     module: fl.Chain,
     target: LoraTarget | list[LoraTarget],
@@ -56,29 +73,13 @@ def lora_targets(
             yield from lora_targets(module, t)
         return
 
-    lookup_class = fl.Linear if target == LoraTarget.Self else target.get_class()
-
-    if isinstance(module, SD1UNet):
-
-        def predicate(m: fl.Module, p: fl.Chain) -> bool:
-            if isinstance(m, Controlnet):  # do not adapt Controlnet linears
-                raise StopIteration
-            return isinstance(m, lookup_class)
-
-    else:
-
-        def predicate(m: fl.Module, p: fl.Chain) -> bool:
-            return isinstance(m, lookup_class)
-
     if target == LoraTarget.Self:
-        for m, p in module.walk(predicate):
-            assert isinstance(m, fl.Linear)
-            yield (m, p)
+        yield from _iter_linears(module)
         return
 
-    for layer, _ in module.walk(predicate):
-        for t in layer.walk(fl.Linear):
-            yield t
+    for layer, _ in module.walk(_predicate(target.get_class())):
+        assert isinstance(layer, fl.Chain)
+        yield from _iter_linears(layer)
 
 
 class SD1LoraAdapter(fl.Chain, Adapter[StableDiffusion_1]):
@@ -101,8 +102,6 @@ class SD1LoraAdapter(fl.Chain, Adapter[StableDiffusion_1]):
             if not (model_targets := sub_targets.get(model_name, [])):
                 continue
             model = getattr(target, "clip_text_encoder" if model_name == "text_encoder" else model_name)
-            if model.find(SingleLoraAdapter):
-                raise NotImplementedError(f"{model} already contains LoRA layers")
 
             lora_weights = [weights[k] for k in sorted(weights) if k.startswith(model_name)] if weights else None
             self.sub_adapters.append(

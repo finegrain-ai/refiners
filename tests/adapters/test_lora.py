@@ -37,6 +37,32 @@ def test_lora_adapter() -> None:
         fl.Linear(in_features=1, out_features=2),
     )
 
-    LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0).inject()
+    # create and inject twice
 
+    a1 = LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0).inject()
     assert len(list(chain.layers(Lora))) == 3
+
+    a2 = LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0).inject()
+    assert len(list(chain.layers(Lora))) == 6
+
+    # ejection in forward order
+
+    a1.eject()
+    assert len(list(chain.layers(Lora))) == 3
+    a2.eject()
+    assert len(list(chain.layers(Lora))) == 0
+
+    # create twice then inject twice
+
+    a1 = LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0)
+    a2 = LoraAdapter[fl.Chain](chain, sub_targets=chain.walk(fl.Linear), rank=1, scale=1.0)
+    a1.inject()
+    a2.inject()
+    assert len(list(chain.layers(Lora))) == 6
+
+    # ejection in reverse order
+
+    a2.eject()
+    assert len(list(chain.layers(Lora))) == 3
+    a1.eject()
+    assert len(list(chain.layers(Lora))) == 0
