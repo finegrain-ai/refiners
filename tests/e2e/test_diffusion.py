@@ -703,6 +703,7 @@ def test_diffusion_lora_twice(
 
     sd15.set_num_inference_steps(n_steps)
 
+    # The same LoRA is used twice which is not a common use case: this is purely for testing purpose
     SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=0.4).inject()
     SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=0.6).inject()
 
