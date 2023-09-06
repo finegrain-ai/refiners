@@ -11,7 +11,7 @@ from refiners.fluxion.model_converter import ConversionStage, ModelConverter
 
 @pytest.fixture(scope="module")
 def stabilityai_sdxl_base_path(test_weights_path: Path) -> Path:
-    r = test_weights_path / "stabilityai" / "stable-diffusion-xl-base-0.9"
+    r = test_weights_path / "stabilityai" / "stable-diffusion-xl-base-1.0"
     if not r.is_dir():
         warn(f"could not find Stability SDXL base weights at {r}, skipping")
         pytest.skip(allow_module_level=True)
