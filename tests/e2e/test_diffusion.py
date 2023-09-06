@@ -192,9 +192,9 @@ def sd15_std(
 
     sd15 = StableDiffusion_1(device=test_device)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_std)
 
     return sd15
 
@@ -209,9 +209,9 @@ def sd15_std_float16(
 
     sd15 = StableDiffusion_1(device=test_device, dtype=torch.float16)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_std)
 
     return sd15
 
@@ -227,9 +227,9 @@ def sd15_inpainting(
     unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_inpainting))
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_inpainting)
 
     return sd15
 
@@ -245,9 +245,9 @@ def sd15_inpainting_float16(
     unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device, dtype=torch.float16)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_inpainting))
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_inpainting)
 
     return sd15
 
@@ -263,9 +263,9 @@ def sd15_ddim(
     ddim_scheduler = DDIM(num_inference_steps=20)
     sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_std)
 
     return sd15
 

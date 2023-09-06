@@ -5,7 +5,7 @@ from warnings import warn
 from PIL import Image
 from pathlib import Path
 
-from refiners.fluxion.utils import load_from_safetensors, image_to_tensor, tensor_to_image
+from refiners.fluxion.utils import image_to_tensor, tensor_to_image
 from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings import InformativeDrawings
 
 from tests.utils import ensure_similar_images
@@ -38,7 +38,7 @@ def informative_drawings_weights(test_weights_path: Path) -> Path:
 @pytest.fixture
 def informative_drawings_model(informative_drawings_weights: Path, test_device: torch.device) -> InformativeDrawings:
     model = InformativeDrawings(device=test_device)
-    model.load_state_dict(load_from_safetensors(informative_drawings_weights))
+    model.load_from_safetensors(informative_drawings_weights)
     return model
 
 
