@@ -66,19 +66,14 @@ class LatentDiffusionModel(fl.Module, ABC):
         return self.scheduler.steps
 
     @abstractmethod
-    def set_unet_context(self, timestep: Tensor, clip_text_embedding: Tensor, *args: Tensor) -> None:
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         ...
 
     def forward(
-        self,
-        x: Tensor,
-        step: int,
-        clip_text_embedding: Tensor,
-        *args: Tensor,
-        condition_scale: float = 7.5,
+        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
     ) -> Tensor:
         timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
-        self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, *args)
+        self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
 
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)

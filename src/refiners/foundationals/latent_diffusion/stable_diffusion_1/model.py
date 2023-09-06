@@ -11,6 +11,10 @@ import numpy as np
 from torch import device as Device, dtype as DType, Tensor
 
 
+class SD1Autoencoder(LatentDiffusionAutoencoder):
+    encoder_scale: float = 0.18215
+
+
 class StableDiffusion_1(LatentDiffusionModel):
     unet: SD1UNet
     clip_text_encoder: CLIPTextEncoderL
@@ -18,14 +22,14 @@ class StableDiffusion_1(LatentDiffusionModel):
     def __init__(
         self,
         unet: SD1UNet | None = None,
-        lda: LatentDiffusionAutoencoder | None = None,
+        lda: SD1Autoencoder | None = None,
         clip_text_encoder: CLIPTextEncoderL | None = None,
         scheduler: Scheduler | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
         unet = unet or SD1UNet(in_channels=4)
-        lda = lda or LatentDiffusionAutoencoder()
+        lda = lda or SD1Autoencoder()
         clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
         scheduler = scheduler or DPMSolver(num_inference_steps=30)
 
@@ -46,7 +50,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         negative_embedding = self.clip_text_encoder(negative_text or "")
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
-    def set_unet_context(self, timestep: Tensor, clip_text_embedding: Tensor, *_: Tensor) -> None:
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
@@ -55,7 +59,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
     def __init__(
         self,
         unet: SD1UNet | None = None,
-        lda: LatentDiffusionAutoencoder | None = None,
+        lda: SD1Autoencoder | None = None,
         clip_text_encoder: CLIPTextEncoderL | None = None,
         scheduler: Scheduler | None = None,
         device: Device | str = "cpu",
@@ -68,12 +72,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         )
 
     def forward(
-        self,
-        x: Tensor,
-        step: int,
-        clip_text_embedding: Tensor,
-        *_: Tensor,
-        condition_scale: float = 7.5,
+        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **_: Tensor
     ) -> Tensor:
         assert self.mask_latents is not None
         assert self.target_image_latents is not None

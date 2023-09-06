@@ -197,13 +197,13 @@ class Decoder(Chain):
 
 class LatentDiffusionAutoencoder(Chain):
     structural_attrs = ["encoder_scale"]
+    encoder_scale = 0.18125
 
     def __init__(
         self,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
-        self.encoder_scale: float = 0.18215
         super().__init__(
             Encoder(device=device, dtype=dtype),
             Decoder(device=device, dtype=dtype),
