@@ -19,6 +19,7 @@ from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.clip.concepts import ConceptExtender
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 
 from tests.utils import ensure_similar_images
 
@@ -71,6 +72,11 @@ def expected_image_controlnet_stack(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_ip_adapter_woman(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_image_ip_adapter_woman.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_sdxl_ddim_random_init(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert(mode="RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -324,6 +330,51 @@ def sd15_ddim_lda_ft_mse(
     sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
 
     return sd15
+
+
+@pytest.fixture
+def sdxl_lda_weights(test_weights_path: Path) -> Path:
+    sdxl_lda_weights = test_weights_path / "sdxl-lda.safetensors"
+    if not sdxl_lda_weights.is_file():
+        warn(message=f"could not find weights at {sdxl_lda_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return sdxl_lda_weights
+
+
+@pytest.fixture
+def sdxl_unet_weights(test_weights_path: Path) -> Path:
+    sdxl_unet_weights = test_weights_path / "sdxl-unet.safetensors"
+    if not sdxl_unet_weights.is_file():
+        warn(message=f"could not find weights at {sdxl_unet_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return sdxl_unet_weights
+
+
+@pytest.fixture
+def sdxl_text_encoder_weights(test_weights_path: Path) -> Path:
+    sdxl_double_text_encoder_weights = test_weights_path / "DoubleCLIPTextEncoder.safetensors"
+    if not sdxl_double_text_encoder_weights.is_file():
+        warn(message=f"could not find weights at {sdxl_double_text_encoder_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return sdxl_double_text_encoder_weights
+
+
+@pytest.fixture
+def sdxl_ddim(
+    sdxl_text_encoder_weights: Path, sdxl_lda_weights: Path, sdxl_unet_weights: Path, test_device: torch.device
+) -> StableDiffusion_XL:
+    if test_device.type == "cpu":
+        warn(message="not running on CPU, skipping")
+        pytest.skip()
+
+    scheduler = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+
+    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
+    sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_weights)
+    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
+
+    return sdxl
 
 
 @torch.no_grad()
@@ -957,3 +1008,37 @@ def test_diffusion_ip_adapter(
         predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
+
+
+def test_sdxl_random_init(
+    sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image, test_device: torch.device
+) -> None:
+    sdxl = sdxl_ddim
+    expected_image = expected_sdxl_ddim_random_init
+    n_steps = 30
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+
+    sdxl.set_num_inference_steps(num_inference_steps=n_steps)
+
+    manual_seed(seed=2)
+    x = torch.randn(1, 4, 128, 128, device=test_device)
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+    predicted_image = sdxl.lda.decode_latents(x=x)
+
+    ensure_similar_images(img_1=predicted_image, img_2=expected_image, min_psnr=35, min_ssim=0.98)
