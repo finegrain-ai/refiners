@@ -10,6 +10,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     StableDiffusion_1_Inpainting,
     SD1UNet,
     SD1ControlnetAdapter,
+    SD1IPAdapter,
 )
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLUNet,
@@ -22,6 +23,7 @@ __all__ = [
     "StableDiffusion_1_Inpainting",
     "SD1UNet",
     "SD1ControlnetAdapter",
+    "SD1IPAdapter",
     "SDXLUNet",
     "DoubleTextEncoder",
     "DPMSolver",
