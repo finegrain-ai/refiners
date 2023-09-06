@@ -237,9 +237,9 @@ import torch
 
 
 sd15 = StableDiffusion_1(device="cuda")
-sd15.clip_text_encoder.load_state_dict(load_from_safetensors("clip.safetensors"))
-sd15.lda.load_state_dict(load_from_safetensors("lda.safetensors"))
-sd15.unet.load_state_dict(load_from_safetensors("unet.safetensors"))
+sd15.clip_text_encoder.load_from_safetensors("clip.safetensors")
+sd15.lda.load_from_safetensors("lda.safetensors")
+sd15.unet.load_from_safetensors("unet.safetensors")
 
 SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path="pokemon_lora.safetensors", scale=1.0).inject()
 
