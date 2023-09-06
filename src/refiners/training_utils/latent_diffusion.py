@@ -9,12 +9,12 @@ from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # 
 import refiners.fluxion.layers as fl
 from PIL import Image
 from functools import cached_property
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.config import BaseConfig
 from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
     DPMSolver,
     SD1UNet,
-    LatentDiffusionAutoencoder,
 )
 from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from torch.nn.functional import mse_loss
@@ -136,9 +136,9 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         return CLIPTextEncoderL(device=self.device).to(device=self.device)
 
     @cached_property
-    def lda(self) -> LatentDiffusionAutoencoder:
+    def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
-        return LatentDiffusionAutoencoder(device=self.device).to(device=self.device)
+        return SD1Autoencoder(device=self.device).to(device=self.device)
 
     def load_models(self) -> dict[str, fl.Module]:
         return {"unet": self.unet, "text_encoder": self.text_encoder, "lda": self.lda}
