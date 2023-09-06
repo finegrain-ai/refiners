@@ -13,6 +13,7 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1_Inpainting,
     SD1UNet,
     SD1ControlnetAdapter,
+    SD1IPAdapter,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
@@ -42,6 +43,11 @@ def kitchen_dog_mask(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "kitchen_dog_mask.png").convert("RGB")
 
 
+@pytest.fixture(scope="module")
+def woman_image(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "woman.png").convert("RGB")
+
+
 @pytest.fixture
 def expected_image_std_random_init(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_std_random_init.png").convert("RGB")
@@ -60,6 +66,11 @@ def expected_image_std_inpainting(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_controlnet_stack(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_controlnet_stack.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_image_ip_adapter_woman(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_image_ip_adapter_woman.png").convert("RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -182,6 +193,33 @@ def unet_weights_inpainting(test_weights_path: Path) -> Path:
     return unet_weights_inpainting
 
 
+@pytest.fixture(scope="module")
+def lda_ft_mse_weights(test_weights_path: Path) -> Path:
+    lda_weights = test_weights_path / "lda_ft_mse.safetensors"
+    if not lda_weights.is_file():
+        warn(f"could not find weights at {lda_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return lda_weights
+
+
+@pytest.fixture(scope="module")
+def ip_adapter_weights(test_weights_path: Path) -> Path:
+    ip_adapter_weights = test_weights_path / "ip-adapter_sd15.safetensors"
+    if not ip_adapter_weights.is_file():
+        warn(f"could not find weights at {ip_adapter_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return ip_adapter_weights
+
+
+@pytest.fixture(scope="module")
+def image_encoder_weights(test_weights_path: Path) -> Path:
+    image_encoder_weights = test_weights_path / "CLIPImageEncoderH.safetensors"
+    if not image_encoder_weights.is_file():
+        warn(f"could not find weights at {image_encoder_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return image_encoder_weights
+
+
 @pytest.fixture
 def sd15_std(
     text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
@@ -266,6 +304,24 @@ def sd15_ddim(
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
     sd15.unet.load_from_safetensors(unet_weights_std)
+
+    return sd15
+
+
+@pytest.fixture
+def sd15_ddim_lda_ft_mse(
+    text_encoder_weights: Path, lda_ft_mse_weights: Path, unet_weights_std: Path, test_device: torch.device
+) -> StableDiffusion_1:
+    if test_device.type == "cpu":
+        warn("not running on CPU, skipping")
+        pytest.skip()
+
+    ddim_scheduler = DDIM(num_inference_steps=20)
+    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+
+    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
+    sd15.lda.load_state_dict(load_from_safetensors(lda_ft_mse_weights))
+    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
 
     return sd15
 
@@ -844,3 +900,60 @@ def test_diffusion_textual_inversion_random_init(
         predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_diffusion_ip_adapter(
+    sd15_ddim_lda_ft_mse: StableDiffusion_1,
+    ip_adapter_weights: Path,
+    image_encoder_weights: Path,
+    woman_image: Image.Image,
+    expected_image_ip_adapter_woman: Image.Image,
+    test_device: torch.device,
+):
+    sd15 = sd15_ddim_lda_ft_mse.to(dtype=torch.float16)
+    n_steps = 50
+
+    # See tencent-ailab/IP-Adapter best practices section:
+    #
+    #     If you only use the image prompt, you can set the scale=1.0 and text_prompt="" (or some generic text
+    #     prompts, e.g. "best quality", you can also use any negative text prompt).
+    #
+    # The prompts below are the ones used by default by IPAdapter's generate method if none are specified
+    prompt = "best quality, high quality"
+    negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
+
+    ip_adapter = SD1IPAdapter.from_safetensors(target=sd15.unet, checkpoint_path=ip_adapter_weights)
+    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.inject()
+
+    with torch.no_grad():
+        clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+        clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+
+        negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
+        negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
+
+        clip_text_embedding = torch.cat(
+            (
+                torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
+                torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
+            )
+        )
+
+    sd15.set_num_inference_steps(n_steps)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
+
+    with torch.no_grad():
+        for step in sd15.steps:
+            x = sd15(
+                x,
+                step=step,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale=7.5,
+            )
+        predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
