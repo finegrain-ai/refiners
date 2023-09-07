@@ -180,3 +180,17 @@ class CLIPImageEncoderH(CLIPImageEncoder):
             device=device,
             dtype=dtype,
         )
+
+
+class CLIPImageEncoderG(CLIPImageEncoder):
+    def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
+        super().__init__(
+            embedding_dim=1664,
+            output_dim=1280,
+            patch_size=14,
+            num_layers=48,
+            num_attention_heads=16,
+            feedforward_dim=8192,
+            device=device,
+            dtype=dtype,
+        )
