@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Literal, TypeVar
+from typing import Iterable, Literal, TypeVar
 from PIL import Image
 from numpy import array, float32
 from pathlib import Path
@@ -32,10 +32,6 @@ def interpolate(x: Tensor, factor: float | torch.Size, mode: str = "nearest") ->
         if isinstance(factor, float | int)
         else _interpolate(x, size=factor, mode=mode)
     )  # type: ignore
-
-
-def bidirectional_mapping(mapping: Dict[str, str]) -> Dict[str, str]:
-    return {**mapping, **{value: key for key, value in mapping.items()}}
 
 
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
