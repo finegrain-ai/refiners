@@ -55,10 +55,18 @@ def double_text_encoder(test_weights_path: Path) -> DoubleTextEncoder:
     text_encoder_g_with_projection.append(module=fl.Linear(in_features=1280, out_features=1280, bias=False))
 
     text_encoder_l_path = test_weights_path / "CLIPTextEncoderL.safetensors"
-    text_encdoer_g_path = test_weights_path / "CLIPTextEncoderGWithProjection.safetensors"
+    text_encoder_g_path = test_weights_path / "CLIPTextEncoderGWithProjection.safetensors"
+
+    if not text_encoder_l_path.is_file():
+        warn(f"could not find weights at {text_encoder_l_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    if not text_encoder_g_path.is_file():
+        warn(f"could not find weights at {text_encoder_g_path}, skipping")
+        pytest.skip(allow_module_level=True)
 
     text_encoder_l.load_from_safetensors(tensors_path=text_encoder_l_path)
-    text_encoder_g_with_projection.load_from_safetensors(tensors_path=text_encdoer_g_path)
+    text_encoder_g_with_projection.load_from_safetensors(tensors_path=text_encoder_g_path)
 
     linear = text_encoder_g_with_projection.pop(index=-1)
     assert isinstance(linear, fl.Linear)
