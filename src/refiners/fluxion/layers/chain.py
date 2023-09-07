@@ -20,7 +20,7 @@ class Lambda(Module):
     def forward(self, *args: Any) -> Any:
         return self.func(*args)
 
-    def __repr__(self):
+    def __str__(self) -> str:
         func_name = getattr(self.func, "__name__", "partial_function")
         return f"Lambda({func_name}{str(inspect.signature(self.func))})"
 
@@ -115,6 +115,7 @@ def structural_copy(m: T) -> T:
 class Chain(ContextModule):
     _modules: dict[str, Module]
     _provider: ContextProvider
+    _tag = "CHAIN"
 
     def __init__(self, *args: Module | Iterable[Module]) -> None:
         super().__init__()
@@ -234,28 +235,6 @@ class Chain(ContextModule):
 
     def __iter__(self) -> Iterator[Module]:
         return iter(self._modules.values())
-
-    def _pretty_print(self, num_tab: int = 0, layer_name: str | None = None) -> str:
-        layer_name = self.__class__.__name__ if layer_name is None else layer_name
-        pretty_print = f"{layer_name}:\n"
-        tab = " " * (num_tab + 4)
-        module_strings: list[str] = []
-        for i, (name, module) in enumerate(self._modules.items()):
-            ident = ("└+" if isinstance(self, Sum) else "└─") if i == 0 else "  "
-            module_str = (
-                module
-                if not isinstance(module, Chain)
-                else (module._pretty_print(len(tab), name) if num_tab < 12 else f"{name}(...)")
-            )
-            module_strings.append(f"{tab}{ident} {module_str}")
-        pretty_print += "\n".join(module_strings)
-        return pretty_print
-
-    def __repr__(self) -> str:
-        return self._pretty_print()
-
-    def __str__(self) -> str:
-        return f"<{self.__class__.__name__} at {hex(id(self))}>"
 
     def __len__(self) -> int:
         return len(self._modules)
@@ -418,25 +397,45 @@ class Chain(ContextModule):
 
         return clone
 
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Chain
+
 
 class Parallel(Chain):
+    _tag = "PAR"
+
     def forward(self, *args: Any) -> tuple[Tensor, ...]:
         return tuple([self.call_layer(module, name, *args) for name, module in self._modules.items()])
 
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Parallel
+
 
 class Distribute(Chain):
+    _tag = "DISTR"
+
     def forward(self, *args: Any) -> tuple[Tensor, ...]:
         assert len(args) == len(self._modules), "Number of positional arguments must match number of sub-modules."
         return tuple([self.call_layer(module, name, arg) for arg, (name, module) in zip(args, self._modules.items())])
 
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Distribute
+
 
 class Passthrough(Chain):
+    _tag = "PASS"
+
     def forward(self, *inputs: Any) -> Any:
         super().forward(*inputs)
         return inputs
 
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Passthrough
+
 
 class Sum(Chain):
+    _tag = "SUM"
+
     def forward(self, *inputs: Any) -> Any:
         output = None
         for layer in self:
@@ -445,6 +444,9 @@ class Sum(Chain):
                 layer_output = sum(layer_output)  # type: ignore
             output = layer_output if output is None else output + layer_output
         return output
+
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Sum
 
 
 class Residual(Sum):
@@ -468,6 +470,7 @@ class Breakpoint(ContextModule):
 
 
 class Concatenate(Chain):
+    _tag = "CAT"
     structural_attrs = ["dim"]
 
     def __init__(self, *modules: Module, dim: int = 0) -> None:
@@ -477,3 +480,6 @@ class Concatenate(Chain):
     def forward(self, *args: Any) -> Tensor:
         outputs = [module(*args) for module in self]
         return cat([output for output in outputs if output is not None], dim=self.dim)
+
+    def _show_only_tag(self) -> bool:
+        return self.__class__ == Concatenate

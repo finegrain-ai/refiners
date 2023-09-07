@@ -19,10 +19,6 @@ class View(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.view(*self.shape)
 
-    def __repr__(self):
-        shape_repr = ", ".join([repr(s) for s in self.shape])
-        return f"{self.__class__.__name__}({shape_repr})"
-
 
 class Flatten(Module):
     def __init__(self, start_dim: int = 0, end_dim: int = -1) -> None:
@@ -33,9 +29,6 @@ class Flatten(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.flatten(self.start_dim, self.end_dim)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(start_dim={repr(self.start_dim)}, end_dim={repr(self.end_dim)})"
-
 
 class Unflatten(Module):
     def __init__(self, dim: int) -> None:
@@ -44,9 +37,6 @@ class Unflatten(Module):
 
     def forward(self, x: Tensor, sizes: Size) -> Tensor:
         return x.unflatten(self.dim, sizes)  # type: ignore
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(dim={repr(self.dim)})"
 
 
 class Reshape(Module):
@@ -62,10 +52,6 @@ class Reshape(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.reshape(x.shape[0], *self.shape)
 
-    def __repr__(self):
-        shape_repr = ", ".join([repr(s) for s in self.shape])
-        return f"{self.__class__.__name__}({shape_repr})"
-
 
 class Transpose(Module):
     def __init__(self, dim0: int, dim1: int) -> None:
@@ -76,9 +62,6 @@ class Transpose(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.transpose(self.dim0, self.dim1)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(dim0={repr(self.dim0)}, dim1={repr(self.dim1)})"
-
 
 class Permute(Module):
     def __init__(self, *dims: int) -> None:
@@ -87,10 +70,6 @@ class Permute(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.permute(*self.dims)
-
-    def __repr__(self):
-        dims_repr = ", ".join([repr(d) for d in self.dims])
-        return f"{self.__class__.__name__}({dims_repr})"
 
 
 class Slicing(Module):
@@ -103,9 +82,6 @@ class Slicing(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.narrow(self.dim, self.start, self.length)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(dim={repr(self.dim)}, start={repr(self.start)}, length={repr(self.length)})"
-
 
 class Squeeze(Module):
     def __init__(self, dim: int) -> None:
@@ -114,9 +90,6 @@ class Squeeze(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.squeeze(self.dim)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(dim={repr(self.dim)})"
 
 
 class Unsqueeze(Module):
@@ -127,9 +100,6 @@ class Unsqueeze(Module):
     def forward(self, x: Tensor) -> Tensor:
         return x.unsqueeze(self.dim)
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(dim={repr(self.dim)})"
-
 
 class Parameter(WeightedModule):
     """
@@ -138,6 +108,7 @@ class Parameter(WeightedModule):
 
     def __init__(self, *dims: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__()
+        self.dims = dims
         self.register_parameter("parameter", TorchParameter(randn(*dims, device=device, dtype=dtype)))
 
     @property
@@ -151,10 +122,6 @@ class Parameter(WeightedModule):
     def forward(self, _: Tensor) -> Tensor:
         return self.parameter
 
-    def __repr__(self):
-        dims_repr = ", ".join([repr(d) for d in list(self.parameter.shape)])
-        return f"{self.__class__.__name__}({dims_repr}, device={repr(self.device)})"
-
 
 class Buffer(WeightedModule):
     """
@@ -165,6 +132,7 @@ class Buffer(WeightedModule):
 
     def __init__(self, *dims: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__()
+        self.dims = dims
         self.register_buffer("buffer", randn(*dims, device=device, dtype=dtype))
 
     @property
@@ -177,7 +145,3 @@ class Buffer(WeightedModule):
 
     def forward(self, _: Tensor) -> Tensor:
         return self.buffer
-
-    def __repr__(self):
-        dims_repr = ", ".join([repr(d) for d in list(self.buffer.shape)])
-        return f"{self.__class__.__name__}({dims_repr}, device={repr(self.device)})"
