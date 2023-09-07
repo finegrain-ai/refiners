@@ -8,11 +8,11 @@ class Conv2d(nn.Conv2d, WeightedModule):
         in_channels: int,
         out_channels: int,
         kernel_size: int | tuple[int, int],
-        stride: int | tuple[int, int] = 1,
-        padding: int | tuple[int, int] | str = 0,
+        stride: int | tuple[int, int] = (1, 1),
+        padding: int | tuple[int, int] | str = (0, 0),
         groups: int = 1,
         use_bias: bool = True,
-        dilation: int | tuple[int, int] = 1,
+        dilation: int | tuple[int, int] = (1, 1),
         padding_mode: str = "zeros",
         device: Device | str | None = None,
         dtype: DType | None = None,
@@ -30,6 +30,7 @@ class Conv2d(nn.Conv2d, WeightedModule):
             device,
             dtype,
         )
+        self.use_bias = use_bias
 
 
 class Conv1d(nn.Conv1d, WeightedModule):

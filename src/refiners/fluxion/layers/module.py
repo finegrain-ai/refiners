@@ -1,5 +1,6 @@
+from inspect import signature, Parameter
 from pathlib import Path
-from typing import Any, Generator, TypeVar
+from typing import Any, Generator, TypeVar, TypedDict, cast
 
 from torch import device as Device, dtype as DType
 from torch.nn.modules.module import Module as TorchModule
@@ -7,18 +8,20 @@ from torch.nn.modules.module import Module as TorchModule
 from refiners.fluxion.utils import load_from_safetensors
 from refiners.fluxion.context import Context, ContextProvider
 
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from refiners.fluxion.layers.chain import Chain
 
 T = TypeVar("T", bound="Module")
 TContextModule = TypeVar("TContextModule", bound="ContextModule")
+BasicType = str | float | int | bool
 
 
 class Module(TorchModule):
     _parameters: dict[str, Any]
     _buffers: dict[str, Any]
+    _tag: str = ""
 
     __getattr__: Callable[["Module", str], Any]  # type: ignore
     __setattr__: Callable[["Module", str, Any], None]  # type: ignore
@@ -36,6 +39,56 @@ class Module(TorchModule):
 
     def to(self: T, device: Device | str | None = None, dtype: DType | None = None) -> T:  # type: ignore
         return super().to(device=device, dtype=dtype)  # type: ignore
+
+    def __str__(self) -> str:
+        basic_attributes_str = ", ".join(
+            f"{key}={value}" for key, value in self.basic_attributes(init_attrs_only=True).items()
+        )
+        result = f"{self.__class__.__name__}({basic_attributes_str})"
+        return result
+
+    def __repr__(self) -> str:
+        tree = ModuleTree(module=self)
+        return repr(tree)
+
+    def pretty_print(self, depth: int = -1) -> None:
+        tree = ModuleTree(module=self)
+        print(tree.generate_tree_repr(tree.root, is_root=True, depth=depth))
+
+    def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType]:
+        """Return a dictionary of basic attributes of the module.
+
+        Basic attributes are public attributes made of basic types (int, float, str, bool) or a sequence of basic types.
+        """
+        sig = signature(obj=self.__init__)
+        init_params = set(sig.parameters.keys()) - {"self"}
+        default_values = {k: v.default for k, v in sig.parameters.items() if v.default is not Parameter.empty}
+
+        def is_basic_attribute(key: str, value: Any) -> bool:
+            if key.startswith("_"):
+                return False
+
+            if isinstance(value, BasicType):
+                return True
+
+            if isinstance(value, Sequence) and all(isinstance(y, BasicType) for y in cast(Sequence[Any], value)):
+                return True
+
+            return False
+
+        return {
+            key: str(object=value)
+            for key, value in self.__dict__.items()
+            if is_basic_attribute(key=key, value=value)
+            and (not init_attrs_only or (key in init_params and value != default_values.get(key)))
+        }
+
+    def _show_only_tag(self) -> bool:
+        """Whether to show only the tag when printing the module.
+
+        This is useful to distinguish between Chain subclasses that override their forward from one another.
+        """
+        return False
 
 
 class ContextModule(Module):
@@ -100,3 +153,73 @@ class WeightedModule(Module):
     @property
     def dtype(self) -> DType:
         return self.weight.dtype
+
+
+class TreeNode(TypedDict):
+    value: str
+    children: list["TreeNode"]
+
+
+class ModuleTree:
+    def __init__(self, module: Module) -> None:
+        self.root: TreeNode = self._module_to_tree(module=module)
+        self._fold_successive_identical(node=self.root)
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(root={self.root['value']})"
+
+    def __repr__(self) -> str:
+        return self.generate_tree_repr(node=self.root, is_root=True, depth=7)
+
+    def generate_tree_repr(
+        self, node: TreeNode, prefix: str = "", is_last: bool = True, is_root: bool = True, depth: int = -1
+    ) -> str:
+        if depth == 0:
+            return ""
+
+        if depth > 0:
+            depth -= 1
+
+        tree_icon: str = "" if is_root else ("└── " if is_last else "├── ")
+        lines = [f"{prefix}{tree_icon}{node['value']}"]
+        new_prefix: str = "    " if is_last else "│   "
+
+        for i, child in enumerate(iterable=node["children"]):
+            lines.append(
+                self.generate_tree_repr(
+                    node=child,
+                    prefix=prefix + new_prefix,
+                    is_last=i == len(node["children"]) - 1,
+                    is_root=False,
+                    depth=depth,
+                )
+            )
+
+        return "\n".join(filter(bool, lines))
+
+    def _module_to_tree(self, module: Module) -> TreeNode:
+        match (module._tag, module._show_only_tag()):  # pyright: ignore[reportPrivateUsage]
+            case ("", False):
+                value = str(object=module)
+            case (_, True):
+                value = f"({module._tag})"  # pyright: ignore[reportPrivateUsage]
+            case (_, False):
+                value = f"({module._tag}) {module}"  # pyright: ignore[reportPrivateUsage]
+
+        node: TreeNode = {"value": value, "children": []}
+        for child in module.children():
+            node["children"].append(self._module_to_tree(module=child))  # type: ignore
+        return node
+
+    def _fold_successive_identical(self, node: TreeNode) -> None:
+        i = 0
+        while i < len(node["children"]):
+            j = i
+            while j < len(node["children"]) and node["children"][i] == node["children"][j]:
+                j += 1
+            count = j - i
+            if count > 1:
+                node["children"][i]["value"] += f" (x{count})"
+                del node["children"][i + 1 : j]
+            self._fold_successive_identical(node=node["children"][i])
+            i += 1
