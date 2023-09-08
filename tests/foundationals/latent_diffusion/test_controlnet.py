@@ -4,6 +4,7 @@ import torch
 import pytest
 
 import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.adapter import lookup_top_adapter
 from refiners.foundationals.latent_diffusion import SD1UNet, SD1ControlnetAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import Controlnet
 
@@ -56,7 +57,7 @@ def test_two_controlnets_eject_bottom_up(unet: SD1UNet) -> None:
     assert cn1.parent == original_parent
     assert len(list(unet.walk(Controlnet))) == 2
     assert cn1.target == unet
-    assert cn1.lookup_actual_target() == cn2
+    assert lookup_top_adapter(cn1, cn1.target) == cn2
 
     cn2.eject()
     assert unet.parent == cn1

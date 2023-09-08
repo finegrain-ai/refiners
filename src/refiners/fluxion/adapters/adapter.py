@@ -36,27 +36,6 @@ class Adapter(Generic[T]):
         yield
         target._can_refresh_parent = _old_can_refresh_parent
 
-    def lookup_actual_target(self) -> fl.Module:
-        # In general, the "actual target" is the target.
-        # This method deals with the edge case where the target
-        # is part of the replacement block and has been adapted by
-        # another adapter after this one. For instance, this is the
-        # case when stacking Controlnets.
-        assert isinstance(self, fl.Chain)
-
-        target_parent = self.find_parent(self.target)
-        if (target_parent is None) or (target_parent == self):
-            return self.target
-
-        # Lookup and return last adapter in parents tree (or target if none).
-        r, p = self.target, target_parent
-        while p != self:
-            if isinstance(p, Adapter):
-                r = p
-            assert p.parent, f"parent tree of {self} is broken"
-            p = p.parent
-        return r
-
     def inject(self: TAdapter, parent: fl.Chain | None = None) -> TAdapter:
         assert isinstance(self, fl.Chain)
 
@@ -87,7 +66,13 @@ class Adapter(Generic[T]):
 
     def eject(self) -> None:
         assert isinstance(self, fl.Chain)
-        actual_target = self.lookup_actual_target()
+
+        # In general, the "actual target" is the target.
+        # Here we deal with the edge case where the target
+        # is part of the replacement block and has been adapted by
+        # another adapter after this one. For instance, this is the
+        # case when stacking Controlnets.
+        actual_target = lookup_top_adapter(self, self.target)
 
         if (parent := self.parent) is None:
             if isinstance(actual_target, fl.ContextModule):
@@ -101,3 +86,19 @@ class Adapter(Generic[T]):
 
     def _post_structural_copy(self: TAdapter, source: TAdapter) -> None:
         self._target = [source.target]
+
+
+def lookup_top_adapter(top: fl.Chain, target: fl.Module) -> fl.Module:
+    """Lookup and return last adapter in parents tree (or target if none)."""
+
+    target_parent = top.find_parent(target)
+    if (target_parent is None) or (target_parent == top):
+        return target
+
+    r, p = target, target_parent
+    while p != top:
+        if isinstance(p, Adapter):
+            r = p
+        assert p.parent, f"parent tree of {top} is broken"
+        p = p.parent
+    return r
