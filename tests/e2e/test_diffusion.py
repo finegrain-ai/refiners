@@ -974,7 +974,7 @@ def test_diffusion_ip_adapter(
     prompt = "best quality, high quality"
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
-    ip_adapter = SD1IPAdapter.from_safetensors(target=sd15.unet, checkpoint_path=ip_adapter_weights)
+    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_weights))
     ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
     ip_adapter.inject()
 

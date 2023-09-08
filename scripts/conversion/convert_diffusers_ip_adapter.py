@@ -4,8 +4,7 @@ import argparse
 
 import torch
 
-from refiners.foundationals.latent_diffusion import SD1UNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1IPAdapter
+from refiners.foundationals.latent_diffusion import SD1UNet, SD1IPAdapter
 from refiners.fluxion.utils import save_to_safetensors
 
 
