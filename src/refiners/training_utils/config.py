@@ -165,6 +165,7 @@ class OptimizerConfig(BaseModel):
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
                     safeguard_warmup=True,
+                    use_bias_correction=True,  # recommended for diffusion models
                 )
 
 
