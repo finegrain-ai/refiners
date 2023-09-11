@@ -1050,6 +1050,7 @@ def test_diffusion_ip_adapter(
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
 
 
+@torch.no_grad()
 def test_sdxl_random_init(
     sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image, test_device: torch.device
 ) -> None:
