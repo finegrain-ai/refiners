@@ -789,6 +789,46 @@ def test_diffusion_lora(
 
 
 @torch.no_grad()
+def test_diffusion_lora_float16(
+    sd15_std_float16: StableDiffusion_1,
+    lora_data_pokemon: tuple[Image.Image, Path],
+    test_device: torch.device,
+):
+    sd15 = sd15_std_float16
+    n_steps = 30
+
+    expected_image, lora_weights_path = lora_data_pokemon
+
+    if not lora_weights_path.is_file():
+        warn(f"could not find weights at {lora_weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    prompt = "a cute cat"
+
+    with torch.no_grad():
+        clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=1.0).inject()
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
+
+    with torch.no_grad():
+        for step in sd15.steps:
+            x = sd15(
+                x,
+                step=step,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale=7.5,
+            )
+        predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image, min_psnr=33, min_ssim=0.98)
+
+
+@torch.no_grad()
 def test_diffusion_lora_twice(
     sd15_std: StableDiffusion_1,
     lora_data_pokemon: tuple[Image.Image, Path],
