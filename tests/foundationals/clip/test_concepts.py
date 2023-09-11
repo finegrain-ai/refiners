@@ -45,7 +45,7 @@ def our_encoder_with_new_concepts(
 def ref_sd15_with_new_concepts(
     runwayml_weights_path: Path, test_textual_inversion_path: Path, test_device: torch.device
 ):
-    pipe = StableDiffusionPipeline.from_pretrained(runwayml_weights_path, torch_dtype=torch.float16).to(test_device)  # type: ignore
+    pipe = StableDiffusionPipeline.from_pretrained(runwayml_weights_path).to(test_device)  # type: ignore
     pipe.load_textual_inversion(test_textual_inversion_path / "cat-toy")  # type: ignore
     pipe.load_textual_inversion(test_textual_inversion_path / "gta5-artwork")  # type: ignore
     return pipe
