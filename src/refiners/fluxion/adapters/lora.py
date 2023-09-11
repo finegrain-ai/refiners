@@ -43,8 +43,8 @@ class Lora(fl.Chain):
         self.scale = scale
 
     def load_weights(self, down_weight: Tensor, up_weight: Tensor) -> None:
-        self.Linear_1.weight = TorchParameter(down_weight)
-        self.Linear_2.weight = TorchParameter(up_weight)
+        self.Linear_1.weight = TorchParameter(down_weight.to(device=self.device, dtype=self.dtype))
+        self.Linear_2.weight = TorchParameter(up_weight.to(device=self.device, dtype=self.dtype))
 
     @property
     def up_weight(self) -> Tensor:
