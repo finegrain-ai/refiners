@@ -116,7 +116,7 @@ def main() -> None:
             " source path."
         ),
     )
-    parser.add_argument("--half", action="store_true", default=True, help="Convert to half precision. Default: True")
+    parser.add_argument("--half", action="store_true", help="Convert to half precision. Default: True")
     parser.add_argument(
         "--verbose",
         action="store_true",
