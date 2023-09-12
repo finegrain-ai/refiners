@@ -15,6 +15,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLUNet,
     DoubleTextEncoder,
+    SDXLIPAdapter,
 )
 
 
@@ -26,6 +27,7 @@ __all__ = [
     "SD1IPAdapter",
     "SDXLUNet",
     "DoubleTextEncoder",
+    "SDXLIPAdapter",
     "DPMSolver",
     "Scheduler",
     "CLIPTextEncoderL",

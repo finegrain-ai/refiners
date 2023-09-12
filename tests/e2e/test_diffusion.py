@@ -14,6 +14,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1UNet,
     SD1ControlnetAdapter,
     SD1IPAdapter,
+    SDXLIPAdapter,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
@@ -72,6 +73,11 @@ def expected_image_controlnet_stack(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_ip_adapter_woman(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_image_ip_adapter_woman.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_image_sdxl_ip_adapter_woman(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_image_sdxl_ip_adapter_woman.png").convert("RGB")
 
 
 @pytest.fixture
@@ -211,6 +217,15 @@ def lda_ft_mse_weights(test_weights_path: Path) -> Path:
 @pytest.fixture(scope="module")
 def ip_adapter_weights(test_weights_path: Path) -> Path:
     ip_adapter_weights = test_weights_path / "ip-adapter_sd15.safetensors"
+    if not ip_adapter_weights.is_file():
+        warn(f"could not find weights at {ip_adapter_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return ip_adapter_weights
+
+
+@pytest.fixture(scope="module")
+def sdxl_ip_adapter_weights(test_weights_path: Path) -> Path:
+    ip_adapter_weights = test_weights_path / "ip-adapter_sdxl_vit-h.safetensors"
     if not ip_adapter_weights.is_file():
         warn(f"could not find weights at {ip_adapter_weights}, skipping")
         pytest.skip(allow_module_level=True)
@@ -1048,6 +1063,64 @@ def test_diffusion_ip_adapter(
         predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
+
+
+@torch.no_grad()
+def test_diffusion_sdxl_ip_adapter(
+    sdxl_ddim: StableDiffusion_XL,
+    sdxl_ip_adapter_weights: Path,
+    image_encoder_weights: Path,
+    woman_image: Image.Image,
+    expected_image_sdxl_ip_adapter_woman: Image.Image,
+    test_device: torch.device,
+):
+    sdxl = sdxl_ddim.to(dtype=torch.float16)
+    n_steps = 30
+
+    prompt = "best quality, high quality"
+    negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
+
+    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(sdxl_ip_adapter_weights))
+    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.inject()
+
+    with torch.no_grad():
+        clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+            text=prompt, negative_text=negative_prompt
+        )
+        clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+
+        negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
+        negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
+
+        clip_text_embedding = torch.cat(
+            (
+                torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
+                torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
+            )
+        )
+    time_ids = sdxl.default_time_ids
+    sdxl.set_num_inference_steps(n_steps)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 128, 128, device=test_device, dtype=torch.float16)
+
+    with torch.no_grad():
+        for step in sdxl.steps:
+            x = sdxl(
+                x,
+                step=step,
+                clip_text_embedding=clip_text_embedding,
+                pooled_text_embedding=pooled_text_embedding,
+                time_ids=time_ids,
+                condition_scale=5,
+            )
+        # See https://huggingface.co/madebyollin/sdxl-vae-fp16-fix: "SDXL-VAE generates NaNs in fp16 because the
+        # internal activation values are too big"
+        sdxl.lda.to(dtype=torch.float32)
+        predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
+
+    ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_woman)
 
 
 @torch.no_grad()
