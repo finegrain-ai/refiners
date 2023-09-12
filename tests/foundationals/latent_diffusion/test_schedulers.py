@@ -5,7 +5,14 @@ from torch import linspace, float32, randn, Tensor, allclose
 
 
 def test_scheduler_utils():
-    scheduler = Scheduler(10, 20, 0.1, 0.2, "cpu")
+    class DummyScheduler(Scheduler):
+        def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
+            return Tensor()
+
+        def _generate_timesteps(self) -> Tensor:
+            return Tensor()
+
+    scheduler = DummyScheduler(10, 20, 0.1, 0.2, "cpu")
     scale_factors = (
         1.0
         - linspace(
