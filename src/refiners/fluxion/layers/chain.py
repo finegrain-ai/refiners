@@ -292,12 +292,22 @@ class Chain(ContextModule):
     def find(self, layer_type: type[T]) -> T | None:
         return next(self.layers(layer_type=layer_type), None)
 
+    def ensure_find(self, layer_type: type[T]) -> T:
+        r = self.find(layer_type)
+        assert r is not None, f"could not find {layer_type} in {self}"
+        return r
+
     def find_parent(self, module: Module) -> "Chain | None":
         if module in self:  # avoid DFS-crawling the whole tree
             return self
         for _, parent in self.walk(lambda m, _: m == module):
             return parent
         return None
+
+    def ensure_find_parent(self, module: Module) -> "Chain":
+        r = self.find_parent(module)
+        assert r is not None, f"could not find {module} in {self}"
+        return r
 
     def insert(self, index: int, module: Module) -> None:
         if index < 0:

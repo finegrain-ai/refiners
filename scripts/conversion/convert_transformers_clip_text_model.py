@@ -46,8 +46,7 @@ def setup_converter(args: Args) -> ModelConverter:
         case _:
             raise RuntimeError(f"Unsupported architecture: {architecture}")
     text = "What a nice cat you have there!"
-    tokenizer = target.find(layer_type=CLIPTokenizer)
-    assert tokenizer is not None, "Could not find tokenizer"
+    tokenizer = target.ensure_find(CLIPTokenizer)
     tokens = tokenizer(text)
     converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
     if not converter.run(source_args=(tokens,), target_args=(text,)):
