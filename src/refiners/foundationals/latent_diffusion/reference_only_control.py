@@ -58,8 +58,8 @@ class SelfAttentionInjectionPassthrough(Passthrough):
     def __init__(self, target: SD1UNet) -> None:
         guide_unet = target.structural_copy()
         for i, attention_block in enumerate(guide_unet.layers(CrossAttentionBlock)):
-            sa = attention_block.find(SelfAttention)
-            assert sa is not None and sa.parent is not None
+            sa = attention_block.ensure_find(SelfAttention)
+            assert sa.parent is not None
             SaveLayerNormAdapter(sa, context=f"self_attention_context_{i}").inject()
 
         super().__init__(
@@ -109,8 +109,8 @@ class ReferenceOnlyControlAdapter(Chain, Adapter[SD1UNet]):
         for i, attention_block in enumerate(target.layers(CrossAttentionBlock)):
             self.set_context(f"self_attention_context_{i}", {"norm": None})
 
-            sa = attention_block.find(SelfAttention)
-            assert sa is not None and sa.parent is not None
+            sa = attention_block.ensure_find(SelfAttention)
+            assert sa.parent is not None
 
             self.sub_adapters.append(
                 SelfAttentionInjectionAdapter(sa, context=f"self_attention_context_{i}", style_cfg=style_cfg)

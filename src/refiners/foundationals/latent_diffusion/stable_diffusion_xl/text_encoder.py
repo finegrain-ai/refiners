@@ -16,8 +16,7 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
         projection: fl.Linear | None = None,
     ) -> None:
         with self.setup_adapter(target=target):
-            tokenizer = target.find(layer_type=CLIPTokenizer)
-            assert tokenizer is not None, "Tokenizer not found."
+            tokenizer = target.ensure_find(CLIPTokenizer)
             super().__init__(
                 tokenizer,
                 fl.SetContext(
@@ -45,9 +44,7 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
 
     @property
     def tokenizer(self) -> CLIPTokenizer:
-        tokenizer = self.find(layer_type=CLIPTokenizer)
-        assert tokenizer is not None, "Tokenizer not found."
-        return tokenizer
+        return self.ensure_find(CLIPTokenizer)
 
     def set_end_of_text_index(self, end_of_text_index: list[int], tokens: Tensor) -> None:
         position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()

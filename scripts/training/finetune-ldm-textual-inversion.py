@@ -97,18 +97,15 @@ class TextualInversionConfig(BaseModel):
 
     def apply_textual_inversion_to_target(self, text_encoder: CLIPTextEncoder) -> None:
         adapter = ConceptExtender(target=text_encoder)
-        tokenizer = text_encoder.find(layer_type=CLIPTokenizer)
-        assert tokenizer is not None, "Tokenizer not found in text encoder."
-        token_encoder = text_encoder.find(layer_type=TokenEncoder)
-        assert token_encoder is not None, "Token encoder not found in text encoder."
+        tokenizer = text_encoder.ensure_find(CLIPTokenizer)
+        token_encoder = text_encoder.ensure_find(TokenEncoder)
         if self.initializer_token is not None:
             bpe = tokenizer.byte_pair_encoding(token=self.initializer_token)
             assert " " not in bpe, "This initializer_token is not a single token."
             token = Tensor([tokenizer.token_to_id_mapping[bpe]]).int().to(text_encoder.device)
             init_embedding = token_encoder(token).squeeze(0)
         else:
-            token_encoder = text_encoder.find(layer_type=TokenEncoder)
-            assert token_encoder is not None, "Token encoder not found in text encoder."
+            token_encoder = text_encoder.ensure_find(TokenEncoder)
             init_embedding = randn(token_encoder.embedding_dim)
         adapter.add_concept(self.placeholder_token, init_embedding)
         adapter.inject()
@@ -146,8 +143,7 @@ class LoadTextualInversion(Callback[TextualInversionLatentDiffusionTrainer]):
 
 class SaveTextualInversion(Callback[TextualInversionLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: TextualInversionLatentDiffusionTrainer) -> None:
-        embedding_extender = trainer.text_encoder.find(layer_type=EmbeddingExtender)
-        assert embedding_extender is not None, "Embedding extender not found in text encoder."
+        embedding_extender = trainer.text_encoder.ensure_find(EmbeddingExtender)
         tensors = {trainer.config.textual_inversion.placeholder_token: embedding_extender.new_weight.squeeze(0)}
 
         save_to_safetensors(

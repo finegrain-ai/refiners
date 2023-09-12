@@ -53,10 +53,7 @@ class Adapter(Generic[T]):
 
         # In general, `true_parent` is `parent`. We do this to support multiple adaptation,
         # i.e. initializing two adapters before injecting them.
-        true_parent = parent.find_parent(self.target)
-        if true_parent is None:
-            raise ValueError(f"{self.target} is not in {parent}")
-
+        true_parent = parent.ensure_find_parent(self.target)
         true_parent.replace(
             old_module=self.target,
             new_module=self,

@@ -63,8 +63,7 @@ def setup_converter(args: Args) -> ModelConverter:
     target_state_dict = target.state_dict()
 
     # Remove the class embedding from state dict since it was not mapped by the model converter
-    class_embedding = target.find(fl.Parameter)
-    assert class_embedding is not None
+    class_embedding = target.ensure_find(fl.Parameter)
     class_embedding_key = next(
         (n for n, p in target.named_parameters() if id(p) == id(class_embedding.parameter)), None
     )

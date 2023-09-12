@@ -114,8 +114,7 @@ class TokenExtender(fl.Chain, Adapter[CLIPTokenizer]):
 
     def add_token(self, token: str, token_id: int) -> None:
         token = token.lower()
-        tokenizer = self.find(layer_type=CLIPTokenizer)
-        assert tokenizer is not None, "Tokenizer not found."
+        tokenizer = self.ensure_find(CLIPTokenizer)
         assert token_id not in tokenizer.token_to_id_mapping.values()
         tokenizer.token_to_id_mapping[token] = token_id
         current_pattern = tokenizer.token_pattern.pattern

@@ -92,8 +92,7 @@ def test_tokenizer_with_special_character():
     token_extender.add_token("*", new_token_id)
     token_extender.inject(clip_tokenizer)
 
-    adapted_clip_tokenizer = clip_tokenizer.find(layer_type=CLIPTokenizer)
-    assert adapted_clip_tokenizer is not None
+    adapted_clip_tokenizer = clip_tokenizer.ensure_find(CLIPTokenizer)
 
     assert torch.allclose(
         adapted_clip_tokenizer.encode("*"),
@@ -122,8 +121,7 @@ def test_encoder(
         return_tensors="pt",
     ).input_ids
     assert isinstance(ref_tokens, torch.Tensor)
-    tokenizer = our_encoder_with_new_concepts.find(layer_type=CLIPTokenizer)
-    assert tokenizer is not None
+    tokenizer = our_encoder_with_new_concepts.ensure_find(CLIPTokenizer)
     our_tokens = tokenizer(prompt)
     assert torch.equal(our_tokens, ref_tokens)
 

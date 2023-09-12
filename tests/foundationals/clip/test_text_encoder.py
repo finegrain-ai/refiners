@@ -87,8 +87,7 @@ def test_encoder(
         return_tensors="pt",
     ).input_ids
     assert isinstance(ref_tokens, torch.Tensor)
-    tokenizer = our_encoder.find(layer_type=CLIPTokenizer)
-    assert tokenizer is not None
+    tokenizer = our_encoder.ensure_find(CLIPTokenizer)
     our_tokens = tokenizer(prompt)
     assert torch.equal(our_tokens, ref_tokens)
 
