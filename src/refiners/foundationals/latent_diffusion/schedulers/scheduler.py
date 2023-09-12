@@ -1,11 +1,11 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from torch import Tensor, device as Device, dtype as DType, linspace, float32, sqrt, log
 from typing import TypeVar
 
 T = TypeVar("T", bound="Scheduler")
 
 
-class Scheduler:
+class Scheduler(ABC):
     """
     A base class for creating a diffusion model scheduler.
 
