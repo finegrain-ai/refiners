@@ -1,5 +1,6 @@
 import inspect
 from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
+import torch
 from torch import Tensor, cat, device as Device, dtype as DType
 from refiners.fluxion.layers.basics import Identity
 from refiners.fluxion.layers.module import Module, ContextModule, WeightedModule
@@ -483,3 +484,16 @@ class Concatenate(Chain):
 
     def _show_only_tag(self) -> bool:
         return self.__class__ == Concatenate
+
+
+class Matmul(Chain):
+    _tag = "MATMUL"
+
+    def __init__(self, input: Module, other: Module) -> None:
+        super().__init__(
+            input,
+            other,
+        )
+
+    def forward(self, *args: Tensor) -> Tensor:
+        return torch.matmul(input=self[0](*args), other=self[1](*args))

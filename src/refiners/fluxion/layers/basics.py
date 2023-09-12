@@ -1,4 +1,5 @@
 from refiners.fluxion.layers.module import Module, WeightedModule
+import torch
 from torch import randn, Tensor, Size, device as Device, dtype as DType
 from torch.nn import Parameter as TorchParameter
 
@@ -18,6 +19,15 @@ class View(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.view(*self.shape)
+
+
+class GetArg(Module):
+    def __init__(self, index: int) -> None:
+        super().__init__()
+        self.index = index
+
+    def forward(self, *args: Tensor) -> Tensor:
+        return args[self.index]
 
 
 class Flatten(Module):
@@ -99,6 +109,45 @@ class Unsqueeze(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.unsqueeze(self.dim)
+
+
+class Unbind(Module):
+    def __init__(self, dim: int = 0) -> None:
+        self.dim = dim
+        super().__init__()
+
+    def forward(self, x: Tensor) -> tuple[Tensor, ...]:
+        return x.unbind(dim=self.dim)  # type: ignore
+
+
+class Chunk(Module):
+    def __init__(self, chunks: int, dim: int = 0) -> None:
+        self.chunks = chunks
+        self.dim = dim
+        super().__init__()
+
+    def forward(self, x: Tensor) -> tuple[Tensor, ...]:
+        return x.chunk(chunks=self.chunks, dim=self.dim)  # type: ignore
+
+
+class Sin(Module):
+    def forward(self, x: Tensor) -> Tensor:
+        return torch.sin(input=x)
+
+
+class Cos(Module):
+    def forward(self, x: Tensor) -> Tensor:
+        return torch.cos(input=x)
+
+
+class Multiply(Module):
+    def __init__(self, scale: float = 1.0, bias: float = 0.0) -> None:
+        super().__init__()
+        self.scale = scale
+        self.bias = bias
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.scale * x + self.bias
 
 
 class Parameter(WeightedModule):
