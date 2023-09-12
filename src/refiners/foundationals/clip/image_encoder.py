@@ -121,6 +121,7 @@ class CLIPImageEncoder(fl.Chain):
     structural_attrs = [
         "image_size",
         "embedding_dim",
+        "output_dim",
         "patch_size",
         "num_layers",
         "num_attention_heads",
@@ -142,6 +143,7 @@ class CLIPImageEncoder(fl.Chain):
     ) -> None:
         self.image_size = image_size
         self.embedding_dim = embedding_dim
+        self.output_dim = output_dim
         self.patch_size = patch_size
         self.num_layers = num_layers
         self.num_attention_heads = num_attention_heads

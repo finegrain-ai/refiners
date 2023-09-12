@@ -1,21 +1,23 @@
 from enum import IntEnum
 from functools import partial
-from typing import Generic, TypeVar, Any, Callable
+from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING
 
 from torch import Tensor, as_tensor, cat, zeros_like, device as Device, dtype as DType
 from PIL import Image
 
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.adapters.lora import Lora
-from refiners.foundationals.clip.image_encoder import CLIPImageEncoder
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from refiners.fluxion.layers.module import Module
+from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
+from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor
 import refiners.fluxion.layers as fl
 
-T = TypeVar("T", bound=SD1UNet | SDXLUNet)
+if TYPE_CHECKING:
+    from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+    from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+
+T = TypeVar("T", bound="SD1UNet | SDXLUNet")
 TIPAdapter = TypeVar("TIPAdapter", bound="IPAdapter[Any]")  # Self (see PEP 673)
 
 
@@ -128,7 +130,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def scale_outputs(self, x: Tensor) -> Tensor:
         return x * self.scale
 
-    def _predicate(self, k: type[Module]) -> Callable[[fl.Module, fl.Chain], bool]:
+    def _predicate(self, k: type[fl.Module]) -> Callable[[fl.Module, fl.Chain], bool]:
         def f(m: fl.Module, _: fl.Chain) -> bool:
             if isinstance(m, Lora):  # do not adapt LoRAs
                 raise StopIteration
@@ -167,15 +169,22 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def __init__(
         self,
         target: T,
-        clip_image_encoder: CLIPImageEncoder,
+        clip_image_encoder: CLIPImageEncoderH | None = None,
         scale: float = 1.0,
         weights: dict[str, Tensor] | None = None,
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
 
-        self.clip_image_encoder = clip_image_encoder
-        self.image_proj = ImageProjection(device=target.device, dtype=target.dtype)
+        cross_attn_2d = target.ensure_find(CrossAttentionBlock2d)
+
+        self.clip_image_encoder = clip_image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
+        self.image_proj = ImageProjection(
+            clip_image_embedding_dim=self.clip_image_encoder.output_dim,
+            clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
+            device=target.device,
+            dtype=target.dtype,
+        )
 
         self.sub_adapters = [
             CrossAttentionAdapter(target=cross_attn, scale=scale)
