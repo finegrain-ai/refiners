@@ -35,7 +35,7 @@ output.images[0].save("std_random_init_expected.png")
 Special cases:
 
 - `expected_refonly.png` has been generated [with Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui).
-- `expected_inpainting_refonly.png`, `expected_image_ip_adapter_woman.png`, `expected_image_sdxl_ip_adapter_woman.png` have been generated with refiners itself (and inspected so that they look reasonable).
+- `expected_inpainting_refonly.png`, `expected_image_ip_adapter_woman.png`, `expected_image_sdxl_ip_adapter_woman.png` and `expected_ip_adapter_controlnet.png` have been generated with refiners itself (and inspected so that they look reasonable).
 
 ## Other images
 
