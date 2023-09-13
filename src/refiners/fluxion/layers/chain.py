@@ -213,16 +213,13 @@ class Chain(ContextModule):
         return Chain(*self, *other)
 
     @overload
-    def __getitem__(self, key: int) -> Module:
-        ...
+    def __getitem__(self, key: int) -> Module: ...
 
     @overload
-    def __getitem__(self, key: str) -> Module:
-        ...
+    def __getitem__(self, key: str) -> Module: ...
 
     @overload
-    def __getitem__(self, key: slice) -> "Chain":
-        ...
+    def __getitem__(self, key: slice) -> "Chain": ...
 
     def __getitem__(self, key: int | str | slice) -> Module:
         if isinstance(key, slice):
@@ -270,12 +267,10 @@ class Chain(ContextModule):
     @overload
     def walk(
         self, predicate: Callable[[Module, "Chain"], bool] | None = None, recurse: bool = False
-    ) -> Iterator[tuple[Module, "Chain"]]:
-        ...
+    ) -> Iterator[tuple[Module, "Chain"]]: ...
 
     @overload
-    def walk(self, predicate: type[T], recurse: bool = False) -> Iterator[tuple[T, "Chain"]]:
-        ...
+    def walk(self, predicate: type[T], recurse: bool = False) -> Iterator[tuple[T, "Chain"]]: ...
 
     def walk(
         self, predicate: type[T] | Callable[[Module, "Chain"], bool] | None = None, recurse: bool = False
