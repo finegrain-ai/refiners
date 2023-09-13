@@ -22,7 +22,7 @@ jobs:
           installer-parallel: true
 
       - name: poetry install
-        run: poetry install --no-interaction --extras=training
+        run: poetry install --no-interaction --all-extras
 
       - name: black
         run: poetry run black --check .
