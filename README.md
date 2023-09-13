@@ -192,16 +192,24 @@ for layer in vit.layers(fl.Attention):
 
 ### Install
 
+Refiners is still an early stage project so we recommend using the `main` branch directly with [Poetry](https://python-poetry.org).
+
+If you just want to use Refiners directly, clone the repository and run:
+
 ```bash
-# inference only
-pip install refiners
+poetry install --all-extras
 ```
 
-Or:
+There is currently [a bug with PyTorch 2.0.1 and Poetry](https://github.com/pytorch/pytorch/issues/100974), to work around it run:
 
 ```bash
-# inference + training
-pip install 'refiners[training]'
+poetry run pip install --upgrade torch torchvision
+```
+
+If you want to depend on Refiners in your project which uses Poetry, you can do so:
+
+```bash
+poetry add git+ssh://git@github.com:finegrain-ai/refiners.git#main
 ```
 
 ### Hello World
