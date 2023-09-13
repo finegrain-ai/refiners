@@ -18,8 +18,7 @@ class DiffusersSDXL(Protocol):
     tokenizer_2: fl.Module
     vae: fl.Module
 
-    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any:
-        ...
+    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any: ...
 
     def encode_prompt(
         self,
@@ -27,8 +26,7 @@ class DiffusersSDXL(Protocol):
         prompt_2: str | None = None,
         negative_prompt: str | None = None,
         negative_prompt_2: str | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        ...
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: ...
 
 
 @pytest.fixture(scope="module")

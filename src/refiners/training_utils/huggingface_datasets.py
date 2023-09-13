@@ -8,11 +8,9 @@ T = TypeVar("T", covariant=True)
 
 
 class HuggingfaceDataset(Generic[T], Protocol):
-    def __getitem__(self, index: int) -> T:
-        ...
+    def __getitem__(self, index: int) -> T: ...
 
-    def __len__(self) -> int:
-        ...
+    def __len__(self) -> int: ...
 
 
 def load_hf_dataset(

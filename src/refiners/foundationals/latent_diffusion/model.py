@@ -66,8 +66,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         return self.scheduler.steps
 
     @abstractmethod
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
-        ...
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None: ...
 
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
