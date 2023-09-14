@@ -23,8 +23,6 @@ from refiners.fluxion.layers import (
 
 
 class CrossAttentionBlock(Chain):
-    structural_attrs = ["embedding_dim", "context_embedding_dim", "context", "context_key", "num_heads", "use_bias"]
-
     def __init__(
         self,
         embedding_dim: int,
@@ -85,8 +83,6 @@ class CrossAttentionBlock(Chain):
 
 
 class StatefulFlatten(Chain):
-    structural_attrs = ["start_dim", "end_dim"]
-
     def __init__(self, context: str, key: str, start_dim: int = 0, end_dim: int = -1) -> None:
         self.start_dim = start_dim
         self.end_dim = end_dim
@@ -103,19 +99,6 @@ class StatefulFlatten(Chain):
 
 
 class CrossAttentionBlock2d(Sum):
-    structural_attrs = [
-        "channels",
-        "in_channels",
-        "out_channels",
-        "context_embedding_dim",
-        "num_attention_heads",
-        "num_attention_layers",
-        "num_groups",
-        "context_key",
-        "use_linear_projection",
-        "projection_type",
-    ]
-
     def __init__(
         self,
         channels: int,

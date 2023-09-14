@@ -24,8 +24,6 @@ class TimestepEncoder(fl.Passthrough):
 
 
 class ResidualBlock(fl.Sum):
-    structural_attrs = ["in_channels", "out_channels", "num_groups", "eps"]
-
     def __init__(
         self,
         in_channels: int,
@@ -92,8 +90,6 @@ class CLIPLCrossAttention(CrossAttentionBlock2d):
 
 
 class DownBlocks(fl.Chain):
-    structural_attrs = ["in_channels"]
-
     def __init__(
         self,
         in_channels: int,
@@ -211,8 +207,6 @@ class MiddleBlock(fl.Chain):
 
 
 class ResidualAccumulator(fl.Passthrough):
-    structural_attrs = ["n"]
-
     def __init__(self, n: int) -> None:
         self.n = n
 
@@ -228,8 +222,6 @@ class ResidualAccumulator(fl.Passthrough):
 
 
 class ResidualConcatenator(fl.Chain):
-    structural_attrs = ["n"]
-
     def __init__(self, n: int) -> None:
         self.n = n
 
@@ -243,8 +235,6 @@ class ResidualConcatenator(fl.Chain):
 
 
 class SD1UNet(fl.Chain):
-    structural_attrs = ["in_channels"]
-
     def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.in_channels = in_channels
         super().__init__(

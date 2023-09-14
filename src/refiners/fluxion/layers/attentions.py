@@ -82,18 +82,6 @@ class ScaledDotProductAttention(Module):
 
 
 class Attention(Chain):
-    structural_attrs = [
-        "embedding_dim",
-        "num_heads",
-        "heads_dim",
-        "key_embedding_dim",
-        "value_embedding_dim",
-        "inner_dim",
-        "use_bias",
-        "is_causal",
-        "is_optimized",
-    ]
-
     def __init__(
         self,
         embedding_dim: int,
@@ -180,8 +168,6 @@ class SelfAttention(Attention):
 
 
 class SelfAttention2d(SelfAttention):
-    structural_attrs = Attention.structural_attrs + ["channels"]
-
     def __init__(
         self,
         channels: int,

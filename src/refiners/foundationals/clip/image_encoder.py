@@ -4,8 +4,6 @@ from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
 
 
 class ClassEncoder(fl.Chain):
-    structural_attrs = ["embedding_dim"]
-
     def __init__(
         self,
         embedding_dim: int,
@@ -20,8 +18,6 @@ class ClassEncoder(fl.Chain):
 
 
 class PatchEncoder(fl.Chain):
-    structural_attrs = ["in_channels", "out_channels", "patch_size", "use_bias"]
-
     def __init__(
         self,
         in_channels: int,
@@ -50,8 +46,6 @@ class PatchEncoder(fl.Chain):
 
 
 class TransformerLayer(fl.Chain):
-    structural_attrs = ["embedding_dim", "feedforward_dim", "num_attention_heads", "layer_norm_eps"]
-
     def __init__(
         self,
         embedding_dim: int = 768,
@@ -80,8 +74,6 @@ class TransformerLayer(fl.Chain):
 
 
 class ViTEmbeddings(fl.Chain):
-    structural_attrs = ["image_size", "embedding_dim", "patch_size"]
-
     def __init__(
         self,
         image_size: int = 224,
@@ -90,6 +82,9 @@ class ViTEmbeddings(fl.Chain):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
+        self.image_size = image_size
+        self.embedding_dim = embedding_dim
+        self.patch_size = patch_size
         super().__init__(
             fl.Concatenate(
                 ClassEncoder(embedding_dim=embedding_dim, device=device, dtype=dtype),
@@ -118,16 +113,6 @@ class ViTEmbeddings(fl.Chain):
 
 
 class CLIPImageEncoder(fl.Chain):
-    structural_attrs = [
-        "image_size",
-        "embedding_dim",
-        "output_dim",
-        "patch_size",
-        "num_layers",
-        "num_attention_heads",
-        "feedforward_dim",
-    ]
-
     def __init__(
         self,
         image_size: int = 224,

@@ -44,8 +44,6 @@ def generate_unique_names(
 
 
 class UseContext(ContextModule):
-    structural_attrs = ["context", "key", "func"]
-
     def __init__(self, context: str, key: str) -> None:
         super().__init__()
         self.context = context
@@ -73,8 +71,6 @@ class SetContext(ContextModule):
     The context need to pre exist in the context provider.
     #TODO Is there a way to create the context if it doesn't exist?
     """
-
-    structural_attrs = ["context", "key", "callback"]
 
     def __init__(self, context: str, key: str, callback: Callable[[Any, Any], Any] | None = None) -> None:
         super().__init__()
@@ -374,29 +370,16 @@ class Chain(ContextModule):
 
         Such copies can be adapted without disrupting the base model, but do not
         require extra GPU memory since the weights are in the leaves and hence not copied.
-
-        This assumes all subclasses define the class variable `structural_attrs` which
-        contains a list of basic attributes set in the constructor. In complicated cases
-        it may be required to overwrite that method.
         """
         if hasattr(self, "_pre_structural_copy"):
             self._pre_structural_copy()
 
         modules = [structural_copy(m) for m in self]
-
-        # Instantiate the right subclass, but do not initialize.
-        clone = object.__new__(self.__class__)
-
-        # Copy all basic attributes of the class declared in `structural_attrs`.
-        for k in self.__class__.structural_attrs:
-            setattr(clone, k, getattr(self, k))
-
-        # Call constructor of Chain, which among other things refreshes the context tree.
-        Chain.__init__(clone, *modules)
+        clone = super().structural_copy()
+        clone._provider = ContextProvider()
 
         for module in modules:
-            if isinstance(module, ContextModule):
-                module._set_parent(clone)
+            clone.append(module=module)
 
         if hasattr(clone, "_post_structural_copy"):
             clone._post_structural_copy(self)
@@ -477,7 +460,6 @@ class Breakpoint(ContextModule):
 
 class Concatenate(Chain):
     _tag = "CAT"
-    structural_attrs = ["dim"]
 
     def __init__(self, *modules: Module, dim: int = 0) -> None:
         super().__init__(*modules)

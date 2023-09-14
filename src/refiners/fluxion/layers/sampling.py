@@ -9,8 +9,6 @@ from torch import Tensor, Size, device as Device, dtype as DType
 
 
 class Downsample(Chain):
-    structural_attrs = ["channels", "in_channels", "out_channels", "scale_factor", "padding"]
-
     def __init__(
         self,
         channels: int,
@@ -59,8 +57,6 @@ class Interpolate(Module):
 
 
 class Upsample(Chain):
-    structural_attrs = ["channels", "upsample_factor"]
-
     def __init__(
         self,
         channels: int,

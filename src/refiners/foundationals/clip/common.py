@@ -3,8 +3,6 @@ import refiners.fluxion.layers as fl
 
 
 class PositionalEncoder(fl.Chain):
-    structural_attrs = ["max_sequence_length", "embedding_dim"]
-
     def __init__(
         self,
         max_sequence_length: int,
@@ -33,8 +31,6 @@ class PositionalEncoder(fl.Chain):
 
 
 class FeedForward(fl.Chain):
-    structural_attrs = ["embedding_dim", "feedforward_dim"]
-
     def __init__(
         self,
         embedding_dim: int,
