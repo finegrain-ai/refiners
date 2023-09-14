@@ -13,9 +13,9 @@ from refiners.foundationals.latent_diffusion.cross_attention import CrossAttenti
 
 
 @torch.no_grad()
-def test_sai_inject_eject() -> None:
+def test_refonly_inject_eject() -> None:
     unet = SD1UNet(in_channels=9)
-    sai = ReferenceOnlyControlAdapter(unet)
+    adapter = ReferenceOnlyControlAdapter(unet)
 
     nb_cross_attention_blocks = len(list(unet.walk(CrossAttentionBlock)))
     assert nb_cross_attention_blocks > 0
@@ -26,21 +26,21 @@ def test_sai_inject_eject() -> None:
     assert len(list(unet.walk(SelfAttentionInjectionAdapter))) == 0
 
     with pytest.raises(AssertionError) as exc:
-        sai.eject()
+        adapter.eject()
     assert "not the first element" in str(exc.value)
 
-    sai.inject()
+    adapter.inject()
 
-    assert unet.parent == sai
+    assert unet.parent == adapter
     assert len(list(unet.walk(SelfAttentionInjectionPassthrough))) == 1
     assert len(list(unet.walk(SaveLayerNormAdapter))) == nb_cross_attention_blocks
     assert len(list(unet.walk(SelfAttentionInjectionAdapter))) == nb_cross_attention_blocks
 
     with pytest.raises(AssertionError) as exc:
-        sai.inject()
+        adapter.inject()
     assert "already injected" in str(exc.value)
 
-    sai.eject()
+    adapter.eject()
 
     assert unet.parent is None
     assert len(list(unet.walk(SelfAttentionInjectionPassthrough))) == 0
