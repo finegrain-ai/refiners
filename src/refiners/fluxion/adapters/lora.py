@@ -12,8 +12,6 @@ TLoraAdapter = TypeVar("TLoraAdapter", bound="LoraAdapter[Any]")  # Self (see PE
 
 
 class Lora(fl.Chain):
-    structural_attrs = ["in_features", "out_features", "rank", "scale"]
-
     def __init__(
         self,
         in_features: int,
@@ -56,8 +54,6 @@ class Lora(fl.Chain):
 
 
 class SingleLoraAdapter(fl.Sum, Adapter[fl.Linear]):
-    structural_attrs = ["in_features", "out_features", "rank", "scale"]
-
     def __init__(
         self,
         target: fl.Linear,

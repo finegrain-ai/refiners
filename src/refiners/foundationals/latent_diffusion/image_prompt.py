@@ -22,8 +22,6 @@ TIPAdapter = TypeVar("TIPAdapter", bound="IPAdapter[Any]")  # Self (see PEP 673)
 
 
 class ImageProjection(fl.Chain):
-    structural_attrs = ["clip_image_embedding_dim", "clip_text_embedding_dim", "sequence_length"]
-
     def __init__(
         self,
         clip_image_embedding_dim: int = 1024,
@@ -57,8 +55,6 @@ class InjectionPoint(fl.Chain):
 
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
-    structural_attrs = ["text_sequence_length", "image_sequence_length", "scale"]
-
     def __init__(
         self,
         target: fl.Attention,

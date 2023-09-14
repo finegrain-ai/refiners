@@ -19,8 +19,6 @@ class ConditionEncoder(Chain):
     Input is a `batch 3 width height` tensor, output is a `batch 320 width//8 height//8` tensor.
     """
 
-    structural_attrs = ["out_channels"]
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.out_channels = (16, 32, 96, 256)
         super().__init__(
@@ -72,8 +70,6 @@ class ConditionEncoder(Chain):
 
 
 class Controlnet(Passthrough):
-    structural_attrs = ["scale", "name"]
-
     def __init__(
         self, name: str, scale: float = 1.0, device: Device | str | None = None, dtype: DType | None = None
     ) -> None:

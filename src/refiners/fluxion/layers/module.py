@@ -1,5 +1,7 @@
 from inspect import signature, Parameter
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Generator, TypeVar, TypedDict, cast
 
 from torch import device as Device, dtype as DType
@@ -96,11 +98,6 @@ class ContextModule(Module):
     _parent: "list[Chain]"
     _can_refresh_parent: bool = True  # see usage in Adapter and Chain
 
-    # Contains simple attributes set on the instance by `__init__` in subclasses
-    # and copied by `structural_copy`. Note that is not the case of `device` since
-    # Chain's __init__ takes care of it.
-    structural_attrs: list[str] = []
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, *kwargs)
         self._parent = []
@@ -139,9 +136,20 @@ class ContextModule(Module):
 
     def structural_copy(self: TContextModule) -> TContextModule:
         clone = object.__new__(self.__class__)
-        for k in self.__class__.structural_attrs:
+
+        not_torch_attributes = [
+            key
+            for key, value in self.__dict__.items()
+            if not key.startswith("_")
+            and isinstance(sys.modules.get(type(value).__module__), ModuleType)
+            and "torch" not in sys.modules[type(value).__module__].__name__
+        ]
+
+        for k in not_torch_attributes:
             setattr(clone, k, getattr(self, k))
-        ContextModule.__init__(clone)
+
+        ContextModule.__init__(self=clone)
+
         return clone
 
 

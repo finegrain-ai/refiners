@@ -21,8 +21,6 @@ def compute_sinusoidal_embedding(
 
 
 class RangeEncoder(fl.Chain):
-    structural_attrs = ["sinuosidal_embedding_dim", "embedding_dim"]
-
     def __init__(
         self,
         sinuosidal_embedding_dim: int,
@@ -45,8 +43,6 @@ class RangeEncoder(fl.Chain):
 
 
 class RangeAdapter2d(fl.Sum, Adapter[fl.Conv2d]):
-    structural_attrs = ["channels", "embedding_dim", "context_key"]
-
     def __init__(
         self,
         target: fl.Conv2d,

@@ -16,8 +16,6 @@ from refiners.foundationals.latent_diffusion.range_adapter import (
 
 
 class TextTimeEmbedding(fl.Chain):
-    structural_attrs = ["timestep_embedding_dim", "time_ids_embedding_dim", "text_time_embedding_dim"]
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.timestep_embedding_dim = 1280
         self.time_ids_embedding_dim = 256
@@ -54,8 +52,6 @@ class TextTimeEmbedding(fl.Chain):
 
 
 class TimestepEncoder(fl.Passthrough):
-    structural_attrs = ["timestep_embedding_dim"]
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.timestep_embedding_dim = 1280
         super().__init__(
@@ -98,8 +94,6 @@ class SDXLCrossAttention(CrossAttentionBlock2d):
 
 
 class DownBlocks(fl.Chain):
-    structural_attrs = ["in_channels"]
-
     def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.in_channels = in_channels
 
@@ -158,8 +152,6 @@ class DownBlocks(fl.Chain):
 
 
 class UpBlocks(fl.Chain):
-    structural_attrs = []
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         first_blocks = [
             fl.Chain(
@@ -225,8 +217,6 @@ class UpBlocks(fl.Chain):
 
 
 class MiddleBlock(fl.Chain):
-    structural_attrs = []
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__(
             ResidualBlock(in_channels=1280, out_channels=1280, device=device, dtype=dtype),
@@ -238,8 +228,6 @@ class MiddleBlock(fl.Chain):
 
 
 class OutputBlock(fl.Chain):
-    structural_attrs = []
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__(
             fl.GroupNorm(channels=320, num_groups=32, device=device, dtype=dtype),
@@ -249,8 +237,6 @@ class OutputBlock(fl.Chain):
 
 
 class SDXLUNet(fl.Chain):
-    structural_attrs = ["in_channels"]
-
     def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.in_channels = in_channels
         super().__init__(

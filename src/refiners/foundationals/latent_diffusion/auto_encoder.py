@@ -17,8 +17,6 @@ from PIL import Image
 
 
 class Resnet(Sum):
-    structural_attrs = ["in_channels", "out_channels"]
-
     def __init__(
         self,
         in_channels: int,
@@ -125,8 +123,6 @@ class Encoder(Chain):
 
 
 class Decoder(Chain):
-    structural_attrs = ["resnet_sizes", "latent_dim", "output_channels"]
-
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.resnet_sizes: list[int] = [128, 256, 512, 512, 512]
         self.latent_dim: int = 4
@@ -196,7 +192,6 @@ class Decoder(Chain):
 
 
 class LatentDiffusionAutoencoder(Chain):
-    structural_attrs = ["encoder_scale"]
     encoder_scale = 0.18125
 
     def __init__(

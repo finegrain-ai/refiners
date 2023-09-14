@@ -5,8 +5,6 @@ from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
 
 class TokenEncoder(fl.Embedding):
-    structural_attrs = ["vocabulary_size", "embedding_dim"]
-
     def __init__(
         self,
         vocabulary_size: int,
@@ -25,8 +23,6 @@ class TokenEncoder(fl.Embedding):
 
 
 class TransformerLayer(fl.Chain):
-    structural_attrs = ["embedding_dim", "num_attention_heads", "feedforward_dim", "layer_norm_eps"]
-
     def __init__(
         self,
         embedding_dim: int,
@@ -74,17 +70,6 @@ class TransformerLayer(fl.Chain):
 
 
 class CLIPTextEncoder(fl.Chain):
-    structural_attrs = [
-        "embedding_dim",
-        "max_sequence_length",
-        "vocabulary_size",
-        "num_layers",
-        "num_attention_heads",
-        "feedforward_dim",
-        "layer_norm_eps",
-        "use_quick_gelu",
-    ]
-
     def __init__(
         self,
         embedding_dim: int = 768,
