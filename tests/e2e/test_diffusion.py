@@ -864,7 +864,7 @@ def test_diffusion_refonly(
     prompt = "Chicken"
     clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = ReferenceOnlyControlAdapter(sd15.unet).inject()
+    refonly_adapter = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
     guide = sd15.lda.encode_image(condition_image_refonly)
     guide = torch.cat((guide, guide))
@@ -875,7 +875,7 @@ def test_diffusion_refonly(
     for step in sd15.steps:
         noise = torch.randn(2, 4, 64, 64, device=test_device)
         noised_guide = sd15.scheduler.add_noise(guide, noise, step)
-        sai.set_controlnet_condition(noised_guide)
+        refonly_adapter.set_controlnet_condition(noised_guide)
         x = sd15(
             x,
             step=step,
@@ -903,7 +903,7 @@ def test_diffusion_inpainting_refonly(
     prompt = ""  # unconditional
     clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
-    sai = ReferenceOnlyControlAdapter(sd15.unet).inject()
+    refonly_adapter = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
     sd15.set_num_inference_steps(n_steps)
     sd15.set_inpainting_conditions(target_image_inpainting_refonly, mask_image_inpainting_refonly)
@@ -921,7 +921,7 @@ def test_diffusion_inpainting_refonly(
         # inpaint variation models")
         noised_guide = torch.cat([noised_guide, torch.zeros_like(noised_guide)[:, 0:1, :, :], guide], dim=1)
 
-        sai.set_controlnet_condition(noised_guide)
+        refonly_adapter.set_controlnet_condition(noised_guide)
         x = sd15(
             x,
             step=step,
