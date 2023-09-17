@@ -15,36 +15,22 @@ ______________________________________________________________________
 [![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE)
 </div>
 
-
-- [Motivation](#motivation)
-- [Design](#design)
-- [Downsides](#downsides)
-- [Overview](#overview)
+- [Design Pillars](#design-pillars)
 - [Key Concepts](#key-concepts)
-    - [The Chain class](#the-chain-class)
-    - [The Context API](#the-context-api)
-    - [The Adapter API](#the-adapter-api)
+  - [The Chain class](#the-chain-class)
+  - [The Context API](#the-context-api)
+  - [The Adapter API](#the-adapter-api)
+- [Adapter Zoo](#adapter-zoo)
 - [Getting Started](#getting-started)
   - [Install](#install)
   - [Hello World](#hello-world)
-- [Training](#training)
+  - [Training](#training)
+- [Motivation](#motivation)
+- [Awesome Adaptation Papers](#awesome-adaptation-papers)
 - [Credits](#credits)
 - [Citation](#citation)
 
-
-## Motivation
-
-At [Finegrain](https://finegrain.ai), we're on a mission to automate product photography. Given our "no human in the loop approach", nailing the quality of the outputs we generate is paramount to our success. 
-
-That's why we're building Refiners.
-
-It's a framework to easily bridge the last mile quality gap of foundational models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
-
-We decided to build Refiners in the open. 
-
-It's because model adaptation is a new paradigm that goes beyond our specific use cases. Our hope is to help people looking at creating their own adapters save time, whatever the foundation model they're using.
-
-## Design
+## Design Pillars
 
 We are huge fans of PyTorch (we actually were core committers to [Torch](http://torch.ch/) in another life), but we felt it's too low level for the specific model adaptation task: PyTorch models are generally hard to understand, and their adaptation requires intricate ad hoc code.
 
@@ -56,20 +42,6 @@ Instead, we needed:
 - Native support for iconic adapter types like LoRAs and their community trained incarnations (hosted on [Civitai](http://civitai.com/) and the likes)
 
 Refiners is designed to tackle all these challenges while remaining just one abstraction away from our beloved PyTorch.
-
-## Downsides
-
-As they say, there is no free lunch. Given Refiners comes with a new model structure, it can only work with models implemented that way. For now, we support Stable Diffusion 1.5, but more is in the making (SDXL, SAM, ...) - stay tuned.
-
-## Overview
-
-The Refiners library is made of:
-
-1. An abstraction layer (called Fluxion) on top of [PyTorch](https://pytorch.org/) to easily build models
-2. A zoo of compatible foundational models
-3. Adapter APIs to easily patch supported foundational models
-4. Training utils to train concrete adapters
-5. Conversion scripts to easily use existing community adapters
 
 ## Key Concepts
 
@@ -188,6 +160,17 @@ for layer in vit.layers(fl.Attention):
 # ... and load existing weights if the LoRAs are pretrained ...
 ```
 
+## Adapter Zoo
+
+For now, given [finegrain](https://finegrain.ai)'s mission, we are focusing on image edition tasks. We support:
+
+| Adapter  | Foundation Model |
+| ----------------- | ------- |
+| LoRA | `SD15` `SDXL` |
+| ControlNets  | `SD15` |
+| Ref Only Control  | `SD15` |
+| IP-Adapter  | `SD15` `SDXL` |
+
 ## Getting Started
 
 ### Install
@@ -277,7 +260,7 @@ You should get:
 
 ![pokemon cat output](https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/pokemon_cat.png)
 
-## Training
+### Training
 
 Refiners has a built-in training utils library and provides scripts that can be used as a starting point.
 
@@ -286,6 +269,39 @@ E.g. to train a LoRA on top of Stable Diffusion, copy and edit `configs/finetune
 ```bash
 python scripts/training/finetune-ldm-lora.py configs/finetune-lora.toml
 ```
+
+## Motivation
+
+At [Finegrain](https://finegrain.ai), we're on a mission to automate product photography. Given our "no human in the loop approach", nailing the quality of the outputs we generate is paramount to our success. 
+
+That's why we're building Refiners.
+
+It's a framework to easily bridge the last mile quality gap of foundational models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
+
+We decided to build Refiners in the open. 
+
+It's because model adaptation is a new paradigm that goes beyond our specific use cases. Our hope is to help people looking at creating their own adapters save time, whatever the foundation model they're using.
+
+## Awesome Adaptation Papers
+
+If you're interested in understanding the diversity of use cases for foundation model adaptation (potentially beyond the specific adapters supported by Refiners), we suggest you take a look at these outstanding papers:
+
+### SAM
+
+- [Medical SAM Adapter](https://arxiv.org/abs/2304.12620)
+- [3DSAM-adapter](https://arxiv.org/abs/2306.13465)
+- [SAM-adapter](https://arxiv.org/abs/2304.09148)
+- [Cross Modality Attention Adapter](https://arxiv.org/abs/2307.01124)
+
+### SD
+
+- [ControlNet](https://arxiv.org/abs/2302.05543)
+- [T2I-Adapter](https://arxiv.org/abs/2302.08453)
+- [IP-Adapter](https://arxiv.org/abs/2308.06721)
+
+### BLIP
+
+- [UniAdapter](https://arxiv.org/abs/2302.06605)
 
 ## Credits
 
