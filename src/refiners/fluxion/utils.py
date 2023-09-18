@@ -37,21 +37,18 @@ def interpolate(x: Tensor, factor: float | torch.Size, mode: str = "nearest") ->
 
 # Adapted from https://github.com/pytorch/vision/blob/main/torchvision/transforms/_functional_tensor.py
 def normalize(
-    tensor: Float[Tensor, "*batch channels height width"], mean: list[float], std: list[float], inplace: bool = False
+    tensor: Float[Tensor, "*batch channels height width"], mean: list[float], std: list[float]
 ) -> Float[Tensor, "*batch channels height width"]:
     assert tensor.is_floating_point()
     assert tensor.ndim >= 3
 
-    if not inplace:
-        tensor = tensor.clone()
-
     dtype = tensor.dtype
-    mean_tensor = torch.tensor(mean, dtype=dtype, device=tensor.device).view(-1, 1, 1)
-    std_tensor = torch.tensor(std, dtype=dtype, device=tensor.device).view(-1, 1, 1)
-    if (std_tensor == 0).any():
+    pixel_mean = torch.tensor(mean, dtype=dtype, device=tensor.device).view(-1, 1, 1)
+    pixel_std = torch.tensor(std, dtype=dtype, device=tensor.device).view(-1, 1, 1)
+    if (pixel_std == 0).any():
         raise ValueError(f"std evaluated to zero after conversion to {dtype}, leading to division by zero.")
 
-    return tensor.sub_(mean_tensor).div_(std_tensor)
+    return (tensor - pixel_mean) / pixel_std
 
 
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
