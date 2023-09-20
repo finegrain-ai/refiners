@@ -49,16 +49,16 @@ class LatentDiffusionModel(fl.Module, ABC):
         first_step: int = 0,
         noise: Tensor | None = None,
     ) -> Tensor:
+        height, width = size
         if noise is None:
-            height, width = size
             noise = torch.randn(1, 4, height // 8, width // 8, device=self.device)
         assert list(noise.shape[2:]) == [
-            size[0] // 8,
-            size[1] // 8,
+            height // 8,
+            width // 8,
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
         if init_image is None:
             return noise
-        encoded_image = self.lda.encode_image(image=init_image.resize(size=size))
+        encoded_image = self.lda.encode_image(image=init_image.resize(size=(width, height)))
         return self.scheduler.add_noise(x=encoded_image, noise=noise, step=self.steps[first_step])
 
     @property
