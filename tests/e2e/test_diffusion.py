@@ -493,6 +493,21 @@ def test_diffusion_std_init_image(
 
 
 @torch.no_grad()
+def test_rectangular_init_latents(
+    sd15_std: StableDiffusion_1,
+    cutecat_init: Image.Image,
+):
+    sd15 = sd15_std
+
+    # Just check latents initialization with a non-square image (and not the entire diffusion)
+    width, height = 512, 504
+    rect_init_image = cutecat_init.crop((0, 0, width, height))
+    x = sd15.init_latents((height, width), rect_init_image)
+
+    assert sd15.lda.decode_latents(x).size == (width, height)
+
+
+@torch.no_grad()
 def test_diffusion_inpainting(
     sd15_inpainting: StableDiffusion_1_Inpainting,
     kitchen_dog: Image.Image,
