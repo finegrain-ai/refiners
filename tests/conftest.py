@@ -28,3 +28,8 @@ def test_e2e_path() -> Path:
 @fixture(scope="session")
 def test_textual_inversion_path() -> Path:
     return PARENT_PATH / "foundationals" / "clip" / "test_concepts_ref"
+
+
+@fixture(scope="session")
+def test_sam_path() -> Path:
+    return PARENT_PATH / "foundationals" / "segment_anything"
