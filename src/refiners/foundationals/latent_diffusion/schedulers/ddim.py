@@ -20,7 +20,7 @@ class DDIM(Scheduler):
         similar to diffusers settings for the DDIM scheduler in Stable Diffusion 1.5
         """
         step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = arange(start=0, end=self.num_inference_steps, step=1) * step_ratio + 1
+        timesteps = arange(start=0, end=self.num_inference_steps, step=1, device=self.device) * step_ratio + 1
         return timesteps.flip(0)
 
     def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
