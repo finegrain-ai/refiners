@@ -376,7 +376,7 @@ class Chain(ContextModule):
 
         modules = [structural_copy(m) for m in self]
         clone = super().structural_copy()
-        clone._provider = ContextProvider()
+        clone._provider = ContextProvider.create(clone.init_context())
 
         for module in modules:
             clone.append(module=module)
