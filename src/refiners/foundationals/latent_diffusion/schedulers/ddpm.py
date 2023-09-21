@@ -20,7 +20,7 @@ class DDPM(Scheduler):
 
     def _generate_timesteps(self) -> Tensor:
         step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = arange(start=0, end=self.num_inference_steps, step=1) * step_ratio
+        timesteps = arange(start=0, end=self.num_inference_steps, step=1, device=self.device) * step_ratio
         return timesteps.flip(0)
 
     def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
