@@ -39,6 +39,7 @@ class Scheduler(ABC):
                 start=initial_diffusion_rate**0.5,
                 end=final_diffusion_rate**0.5,
                 steps=num_train_timesteps,
+                device=device,
                 dtype=dtype,
             )
             ** 2
