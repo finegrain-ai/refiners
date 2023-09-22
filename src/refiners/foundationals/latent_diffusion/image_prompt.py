@@ -162,6 +162,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
 
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
+    # Prevent PyTorch module registration
+    _clip_image_encoder: list[CLIPImageEncoderH]
+    _image_proj: list[ImageProjection]
+
     def __init__(
         self,
         target: T,
@@ -174,13 +178,15 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
         cross_attn_2d = target.ensure_find(CrossAttentionBlock2d)
 
-        self.clip_image_encoder = clip_image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
-        self.image_proj = ImageProjection(
-            clip_image_embedding_dim=self.clip_image_encoder.output_dim,
-            clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
-            device=target.device,
-            dtype=target.dtype,
-        )
+        self._clip_image_encoder = [clip_image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)]
+        self._image_proj = [
+            ImageProjection(
+                clip_image_embedding_dim=self.clip_image_encoder.output_dim,
+                clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
+                device=target.device,
+                dtype=target.dtype,
+            )
+        ]
 
         self.sub_adapters = [
             CrossAttentionAdapter(target=cross_attn, scale=scale)
@@ -202,6 +208,14 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     cross_attn_state_dict[k.removeprefix(prefix)] = v
 
                 cross_attn.load_state_dict(state_dict=cross_attn_state_dict)
+
+    @property
+    def clip_image_encoder(self) -> CLIPImageEncoderH:
+        return self._clip_image_encoder[0]
+
+    @property
+    def image_proj(self) -> ImageProjection:
+        return self._image_proj[0]
 
     def inject(self: "TIPAdapter", parent: fl.Chain | None = None) -> "TIPAdapter":
         for adapter in self.sub_adapters:
