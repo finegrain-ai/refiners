@@ -1125,6 +1125,13 @@ def test_diffusion_ip_adapter_controlnet(
     ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
     ip_adapter.inject()
 
+    depth_controlnet = SD1ControlnetAdapter(
+        sd15.unet,
+        name="depth",
+        scale=1.0,
+        weights=load_from_safetensors(depth_cn_weights_path),
+    ).inject()
+
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(input_image))
 
@@ -1138,12 +1145,6 @@ def test_diffusion_ip_adapter_controlnet(
         )
     )
 
-    depth_controlnet = SD1ControlnetAdapter(
-        sd15.unet,
-        name="depth",
-        scale=1.0,
-        weights=load_from_safetensors(depth_cn_weights_path),
-    ).inject()
     depth_cn_condition = image_to_tensor(
         depth_condition_image.convert("RGB"),
         device=test_device,
