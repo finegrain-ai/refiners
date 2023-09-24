@@ -11,11 +11,13 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     SD1UNet,
     SD1ControlnetAdapter,
     SD1IPAdapter,
+    SD1T2IAdapter,
 )
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLUNet,
     DoubleTextEncoder,
     SDXLIPAdapter,
+    SDXLT2IAdapter,
 )
 
 
@@ -25,9 +27,11 @@ __all__ = [
     "SD1UNet",
     "SD1ControlnetAdapter",
     "SD1IPAdapter",
+    "SD1T2IAdapter",
     "SDXLUNet",
     "DoubleTextEncoder",
     "SDXLIPAdapter",
+    "SDXLT2IAdapter",
     "DPMSolver",
     "Scheduler",
     "CLIPTextEncoderL",
