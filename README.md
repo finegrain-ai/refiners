@@ -170,6 +170,7 @@ For now, given [finegrain](https://finegrain.ai)'s mission, we are focusing on i
 | ControlNets  | `SD15` |
 | Ref Only Control  | `SD15` |
 | IP-Adapter  | `SD15` `SDXL` |
+| T2I-Adapter  | `SD15` `SDXL` |
 
 ## Getting Started
 
