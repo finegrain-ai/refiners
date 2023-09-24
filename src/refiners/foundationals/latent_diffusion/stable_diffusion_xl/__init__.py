@@ -2,6 +2,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt import SDXLIPAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.t2i_adapter import SDXLT2IAdapter
 
 
 __all__ = [
@@ -9,4 +10,5 @@ __all__ = [
     "DoubleTextEncoder",
     "StableDiffusion_XL",
     "SDXLIPAdapter",
+    "SDXLT2IAdapter",
 ]
