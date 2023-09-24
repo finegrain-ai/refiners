@@ -44,8 +44,9 @@ def our_encoder_with_new_concepts(
 @pytest.fixture(scope="module")
 def ref_sd15_with_new_concepts(
     runwayml_weights_path: Path, test_textual_inversion_path: Path, test_device: torch.device
-):
+) -> StableDiffusionPipeline:
     pipe = StableDiffusionPipeline.from_pretrained(runwayml_weights_path).to(test_device)  # type: ignore
+    assert isinstance(pipe, StableDiffusionPipeline)
     pipe.load_textual_inversion(test_textual_inversion_path / "cat-toy")  # type: ignore
     pipe.load_textual_inversion(test_textual_inversion_path / "gta5-artwork")  # type: ignore
     return pipe
