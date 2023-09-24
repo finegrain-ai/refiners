@@ -107,6 +107,18 @@ def test_chain_insert_after_type() -> None:
     assert module_keys(parent_2) == ["Conv2d", "Linear", "Chain"]
 
 
+def test_chain_insert_before_type() -> None:
+    child = fl.Chain()
+
+    parent_1 = fl.Chain(fl.Linear(1, 1), fl.Linear(1, 1))
+    parent_1.insert_before_type(fl.Linear, child)
+    assert module_keys(parent_1) == ["Chain", "Linear_1", "Linear_2"]
+
+    parent_2 = fl.Chain(fl.Conv2d(1, 1, 1), fl.Linear(1, 1))
+    parent_2.insert_before_type(fl.Linear, child)
+    assert module_keys(parent_2) == ["Conv2d", "Chain", "Linear"]
+
+
 def test_chain_insert_overflow() -> None:
     # This behaves as insert() in lists in Python.
 

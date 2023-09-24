@@ -310,6 +310,13 @@ class Chain(ContextModule):
             module._set_parent(self)
         self._register_provider()
 
+    def insert_before_type(self, module_type: type[Module], new_module: Module) -> None:
+        for i, module in enumerate(self):
+            if isinstance(module, module_type):
+                self.insert(i, new_module)
+                return
+        raise ValueError(f"No module of type {module_type.__name__} found in the chain.")
+
     def insert_after_type(self, module_type: type[Module], new_module: Module) -> None:
         for i, module in enumerate(self):
             if isinstance(module, module_type):
