@@ -40,6 +40,7 @@ from refiners.fluxion.layers.conv import Conv2d, ConvTranspose2d
 from refiners.fluxion.layers.linear import Linear, MultiLinear
 from refiners.fluxion.layers.module import Module, WeightedModule, ContextModule
 from refiners.fluxion.layers.padding import ReflectionPad2d
+from refiners.fluxion.layers.pixelshuffle import PixelUnshuffle
 from refiners.fluxion.layers.sampling import Downsample, Upsample, Interpolate
 from refiners.fluxion.layers.embedding import Embedding
 from refiners.fluxion.layers.converter import Converter
@@ -101,5 +102,6 @@ __all__ = [
     "ContextModule",
     "Interpolate",
     "ReflectionPad2d",
+    "PixelUnshuffle",
     "Converter",
 ]
