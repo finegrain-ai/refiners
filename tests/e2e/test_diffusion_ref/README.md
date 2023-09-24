@@ -35,7 +35,12 @@ output.images[0].save("std_random_init_expected.png")
 Special cases:
 
 - `expected_refonly.png` has been generated [with Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui).
-- `expected_inpainting_refonly.png`, `expected_image_ip_adapter_woman.png`, `expected_image_sdxl_ip_adapter_woman.png` and `expected_ip_adapter_controlnet.png` have been generated with refiners itself (and inspected so that they look reasonable).
+- The following references have been generated with refiners itself (and inspected so that they look reasonable):
+    - `expected_inpainting_refonly.png`,
+    - `expected_image_ip_adapter_woman.png`,
+    - `expected_image_sdxl_ip_adapter_woman.png`
+    - `expected_ip_adapter_controlnet.png`
+    - `expected_t2i_adapter_xl_canny.png`
 
 ## Other images
 
@@ -45,12 +50,14 @@ Special cases:
 
 - `kitchen_mask.png` is made manually.
 
-- Controlnet guides have been manually generated using open source software and models, namely:
+- Controlnet guides have been manually generated (x) using open source software and models, namely:
     - Canny: opencv-python
     - Depth: https://github.com/isl-org/ZoeDepth
     - Lineart: https://github.com/lllyasviel/ControlNet-v1-1-nightly/tree/main/annotator/lineart
     - Normals: https://github.com/baegwangbin/surface_normal_uncertainty/tree/fe2b9f1
     - SAM: https://huggingface.co/spaces/mfidabel/controlnet-segment-anything
+
+(x): excepted `fairy_guide_canny.png` which comes from [TencentARC/t2i-adapter-canny-sdxl-1.0](https://huggingface.co/TencentARC/t2i-adapter-canny-sdxl-1.0)
 
 - `cyberpunk_guide.png` [comes from Lexica](https://lexica.art/prompt/5ba40855-0d0c-4322-8722-51115985f573).
 

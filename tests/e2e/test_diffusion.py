@@ -16,6 +16,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1IPAdapter,
     SD1T2IAdapter,
     SDXLIPAdapter,
+    SDXLT2IAdapter,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
@@ -129,12 +130,22 @@ def controlnet_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str,
     weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1p_sd15_depth.safetensors"
     return cn_name, condition_image, expected_image, weights_path
 
+
 @pytest.fixture(scope="module")
 def t2i_adapter_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     name = "depth"
     condition_image = Image.open(ref_path / f"cutecat_guide_{name}.png").convert("RGB")
     expected_image = Image.open(ref_path / f"expected_t2i_adapter_{name}.png").convert("RGB")
     weights_path = test_weights_path / "T2I-Adapter" / "t2iadapter_depth_sd15v2.safetensors"
+    return name, condition_image, expected_image, weights_path
+
+
+@pytest.fixture(scope="module")
+def t2i_adapter_xl_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+    name = "canny"
+    condition_image = Image.open(ref_path / f"fairy_guide_{name}.png").convert("RGB")
+    expected_image = Image.open(ref_path / f"expected_t2i_adapter_xl_{name}.png").convert("RGB")
+    weights_path = test_weights_path / "T2I-Adapter" / "t2i-adapter-canny-sdxl-1.0.safetensors"
     return name, condition_image, expected_image, weights_path
 
 
@@ -1281,5 +1292,54 @@ def test_t2i_adapter_depth(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image)
+
+
+@torch.no_grad()
+def test_t2i_adapter_xl_canny(
+    sdxl_ddim: StableDiffusion_XL,
+    t2i_adapter_xl_data_canny: tuple[str, Image.Image, Image.Image, Path],
+    test_device: torch.device,
+):
+    sdxl = sdxl_ddim
+    n_steps = 30
+
+    name, condition_image, expected_image, weights_path = t2i_adapter_xl_data_canny
+
+    if not weights_path.is_file():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    prompt = "Mystical fairy in real, magic, 4k picture, high quality"
+    negative_prompt = (
+        "extra digit, fewer digits, cropped, worst quality, low quality, glitch, deformed, mutated, ugly, disfigured"
+    )
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+
+    sdxl.set_num_inference_steps(n_steps)
+
+    t2i_adapter = SDXLT2IAdapter(target=sdxl.unet, name=name, weights=load_from_safetensors(weights_path)).inject()
+    t2i_adapter.set_scale(0.8)
+
+    condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
+    t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
+
+    manual_seed(2)
+    x = torch.randn(1, 4, condition_image.height // 8, condition_image.width // 8, device=test_device)
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=7.5,
+        )
+    predicted_image = sdxl.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image)
