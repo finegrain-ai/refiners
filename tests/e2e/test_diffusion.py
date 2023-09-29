@@ -1269,7 +1269,6 @@ def test_diffusion_ip_adapter_plus(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.decode_latents(x)
-    predicted_image.save("output.png")
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_plus_statue, min_psnr=35, min_ssim=0.98)
 
@@ -1326,7 +1325,6 @@ def test_diffusion_sdxl_ip_adapter_plus(
         )
     sdxl.lda.to(dtype=torch.float32)
     predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
-    predicted_image.save("output.png")
 
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman)
 
