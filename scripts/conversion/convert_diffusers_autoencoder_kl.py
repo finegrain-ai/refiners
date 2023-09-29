@@ -16,7 +16,7 @@ class Args(argparse.Namespace):
 
 def setup_converter(args: Args) -> ModelConverter:
     target = LatentDiffusionAutoencoder()
-    source: nn.Module = AutoencoderKL.from_pretrained(pretrained_model_name_or_path=args.source_path, subfolder="vae")  # type: ignore
+    source: nn.Module = AutoencoderKL.from_pretrained(pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder)  # type: ignore
     x = torch.randn(1, 3, 512, 512)
     converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
     if not converter.run(source_args=(x,)):
@@ -34,6 +34,13 @@ if __name__ == "__main__":
         dest="source_path",
         default="runwayml/stable-diffusion-v1-5",
         help="Path to the source pretrained model (default: 'runwayml/stable-diffusion-v1-5').",
+    )
+    parser.add_argument(
+        "--subfolder",
+        type=str,
+        dest="subfolder",
+        default="vae",
+        help="Subfolder in the source path where the model is located inside the Hub (default: 'vae')",
     )
     parser.add_argument(
         "--to",
