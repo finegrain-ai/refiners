@@ -70,12 +70,14 @@ def main() -> None:
     assert isinstance(weights, dict)
     assert sorted(weights.keys()) == ["image_proj", "ip_adapter"]
 
+    fine_grained = "latents" in weights["image_proj"]  # aka IP-Adapter plus
+
     match len(weights["ip_adapter"]):
         case 32:
-            ip_adapter = SD1IPAdapter(target=SD1UNet(in_channels=4))
+            ip_adapter = SD1IPAdapter(target=SD1UNet(in_channels=4), fine_grained=fine_grained)
             cross_attn_mapping = CROSS_ATTN_MAPPING["sd15"]
         case 140:
-            ip_adapter = SDXLIPAdapter(target=SDXLUNet(in_channels=4))
+            ip_adapter = SDXLIPAdapter(target=SDXLUNet(in_channels=4), fine_grained=fine_grained)
             cross_attn_mapping = CROSS_ATTN_MAPPING["sdxl"]
         case _:
             raise ValueError("Unexpected number of keys in input checkpoint")
@@ -86,12 +88,43 @@ def main() -> None:
     state_dict: dict[str, torch.Tensor] = {}
 
     image_proj_weights = weights["image_proj"]
-    image_proj_state_dict: dict[str, torch.Tensor] = {
-        "Linear.weight": image_proj_weights["proj.weight"],
-        "Linear.bias": image_proj_weights["proj.bias"],
-        "LayerNorm.weight": image_proj_weights["norm.weight"],
-        "LayerNorm.bias": image_proj_weights["norm.bias"],
-    }
+    image_proj_state_dict: dict[str, torch.Tensor]
+
+    if fine_grained:
+        w = image_proj_weights
+        image_proj_state_dict = {
+            "LatentsEncoder.Parallel.Parameter.parameter": w["latents"].squeeze(0),  # drop batch dim = 1
+            "Linear_1.weight": w["proj_in.weight"],
+            "Linear_1.bias": w["proj_in.bias"],
+            "Linear_2.weight": w["proj_out.weight"],
+            "Linear_2.bias": w["proj_out.bias"],
+            "LayerNorm.weight": w["norm_out.weight"],
+            "LayerNorm.bias": w["norm_out.bias"],
+        }
+        for i in range(4):
+            t_pfx, s_pfx = f"Transformer.TransformerLayer_{i+1}.Residual_", f"layers.{i}."
+            image_proj_state_dict.update(
+                {
+                    f"{t_pfx}1.Chain.PerceiverAttention.Distribute.LayerNorm_1.weight": w[f"{s_pfx}0.norm1.weight"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Distribute.LayerNorm_1.bias": w[f"{s_pfx}0.norm1.bias"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Distribute.LayerNorm_2.weight": w[f"{s_pfx}0.norm2.weight"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Distribute.LayerNorm_2.bias": w[f"{s_pfx}0.norm2.bias"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Parallel.Chain_2.Linear.weight": w[f"{s_pfx}0.to_q.weight"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Parallel.Chain_1.Linear.weight": w[f"{s_pfx}0.to_kv.weight"],
+                    f"{t_pfx}1.Chain.PerceiverAttention.Linear.weight": w[f"{s_pfx}0.to_out.weight"],
+                    f"{t_pfx}2.Chain.LayerNorm.weight": w[f"{s_pfx}1.0.weight"],
+                    f"{t_pfx}2.Chain.LayerNorm.bias": w[f"{s_pfx}1.0.bias"],
+                    f"{t_pfx}2.Chain.FeedForward.Linear_1.weight": w[f"{s_pfx}1.1.weight"],
+                    f"{t_pfx}2.Chain.FeedForward.Linear_2.weight": w[f"{s_pfx}1.3.weight"],
+                }
+            )
+    else:
+        image_proj_state_dict = {
+            "Linear.weight": image_proj_weights["proj.weight"],
+            "Linear.bias": image_proj_weights["proj.bias"],
+            "LayerNorm.weight": image_proj_weights["norm.weight"],
+            "LayerNorm.bias": image_proj_weights["norm.bias"],
+        }
     ip_adapter.image_proj.load_state_dict(state_dict=image_proj_state_dict)
 
     for k, v in image_proj_state_dict.items():
