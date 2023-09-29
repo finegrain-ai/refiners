@@ -41,6 +41,7 @@ Special cases:
     - `expected_image_sdxl_ip_adapter_woman.png`
     - `expected_ip_adapter_controlnet.png`
     - `expected_t2i_adapter_xl_canny.png`
+    - `expected_image_sdxl_ip_adapter_plus_woman.png`
 
 ## Other images
 
@@ -67,6 +68,8 @@ Special cases:
     - `inpainting-target.png`: computed with `convert <(convert -size 512x512 xc:white png:-) kitchen_dog.png <(convert inpainting-mask.png -negate png:-) -compose Over -composite inpainting-target.png`
 
 - `woman.png` [comes from tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter/blob/8b96670cc5c8ef00278b42c0c7b62fe8a74510b9/assets/images/woman.png).
+
+- `statue.png` [comes from tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/assets/images/statue.png).
 
 ## VAE without randomness
 
