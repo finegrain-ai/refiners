@@ -425,6 +425,10 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             adapter.eject()
         super().eject()
 
+    def set_scale(self, scale: float) -> None:
+        for cross_attn in self.sub_adapters:
+            cross_attn.scale = scale
+
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_clip_image_embedding(self, image_prompt: Tensor) -> Tensor:
         image_encoder = self.clip_image_encoder if not self.fine_grained else self.grid_image_encoder
