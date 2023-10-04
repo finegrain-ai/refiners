@@ -23,8 +23,8 @@ def manual_seed(seed: int) -> None:
     _manual_seed(seed)
 
 
-def pad(x: Tensor, pad: Iterable[int], value: float = 0.0) -> Tensor:
-    return _pad(input=x, pad=pad, value=value)  # type: ignore
+def pad(x: Tensor, pad: Iterable[int], value: float = 0.0, mode: str = "constant") -> Tensor:
+    return _pad(input=x, pad=pad, value=value, mode=mode)  # type: ignore
 
 
 def interpolate(x: Tensor, factor: float | torch.Size, mode: str = "nearest") -> Tensor:
