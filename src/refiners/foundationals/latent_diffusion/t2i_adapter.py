@@ -117,12 +117,8 @@ class ConditionEncoder(fl.Chain):
                 )
                 for i in range(1, len(channels))
             ),
-            fl.UseContext(context="t2iadapter", key="features").compose(func=self.scale_outputs),
+            fl.UseContext(context="t2iadapter", key="features"),
         )
-
-    def scale_outputs(self, features: list[Tensor]) -> tuple[Tensor, ...]:
-        assert len(features) == 4
-        return tuple([x * self.scale for x in features])
 
     def init_context(self) -> Contexts:
         return {"t2iadapter": {"features": []}}
@@ -157,23 +153,25 @@ class ConditionEncoderXL(ConditionEncoder, fl.Chain):
                 channels[1], channels[2], num_residual_blocks, downsample=True, device=device, dtype=dtype
             ),
             StatefulResidualBlocks(channels[2], channels[3], num_residual_blocks, device=device, dtype=dtype),
-            fl.UseContext(context="t2iadapter", key="features").compose(func=self.scale_outputs),
+            fl.UseContext(context="t2iadapter", key="features"),
         )
 
 
 class T2IFeatures(fl.Residual):
-    def __init__(self, name: str, index: int) -> None:
+    def __init__(self, name: str, index: int, scale: float = 1.0) -> None:
         self.name = name
         self.index = index
+        self.scale = scale
         super().__init__(
             fl.UseContext(context="t2iadapter", key=f"condition_features_{self.name}").compose(
-                func=lambda features: features[self.index]
+                func=lambda features: self.scale * features[self.index]
             )
         )
 
 
 class T2IAdapter(Generic[T], fl.Chain, Adapter[T]):
     _condition_encoder: list[ConditionEncoder]  # prevent PyTorch module registration
+    _features: list[T2IFeatures] = []
 
     def __init__(
         self,
@@ -207,7 +205,8 @@ class T2IAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.set_context("t2iadapter", {f"condition_features_{self.name}": features})
 
     def set_scale(self, scale: float) -> None:
-        self.condition_encoder.scale = scale
+        for f in self._features:
+            f.scale = scale
 
     def init_context(self) -> Contexts:
         return {"t2iadapter": {f"condition_features_{self.name}": None}}
