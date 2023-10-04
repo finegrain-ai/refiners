@@ -25,7 +25,7 @@ class SDXLT2IAdapter(T2IAdapter[SDXLUNet]):
         )
 
     def inject(self: "SDXLT2IAdapter", parent: fl.Chain | None = None) -> "SDXLT2IAdapter":
-        def sanity_check_t2i(block: fl.Module) -> None:
+        def sanity_check_t2i(block: fl.Chain) -> None:
             for t2i_layer in block.layers(layer_type=T2IFeatures):
                 assert t2i_layer.name != self.name, f"T2I-Adapter named {self.name} is already injected"
 
