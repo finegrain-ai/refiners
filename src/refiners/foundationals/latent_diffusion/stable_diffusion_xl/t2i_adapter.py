@@ -1,5 +1,3 @@
-from typing import cast, Iterable
-
 from torch import Tensor
 
 from refiners.foundationals.latent_diffusion.t2i_adapter import T2IAdapter, T2IFeatures, ConditionEncoderXL
@@ -14,9 +12,11 @@ class SDXLT2IAdapter(T2IAdapter[SDXLUNet]):
         target: SDXLUNet,
         name: str,
         condition_encoder: ConditionEncoderXL | None = None,
+        scale: float = 1.0,
         weights: dict[str, Tensor] | None = None,
     ) -> None:
         self.residual_indices = (3, 5, 8)  # the UNet's middle block is handled separately (see `inject` and `eject`)
+        self._features = [T2IFeatures(name=name, index=i, scale=scale) for i in range(4)]
         super().__init__(
             target=target,
             name=name,
@@ -29,29 +29,20 @@ class SDXLT2IAdapter(T2IAdapter[SDXLUNet]):
             for t2i_layer in block.layers(layer_type=T2IFeatures):
                 assert t2i_layer.name != self.name, f"T2I-Adapter named {self.name} is already injected"
 
-        for n, block in enumerate(cast(Iterable[fl.Chain], self.target.DownBlocks)):
-            if n not in self.residual_indices:
-                continue
+        # Note: `strict=False` because `residual_indices` is shorter than `_features` due to MiddleBlock (see below)
+        for n, feat in zip(self.residual_indices, self._features, strict=False):
+            block = self.target.DownBlocks[n]
             sanity_check_t2i(block)
-            block.insert_before_type(
-                ResidualAccumulator, T2IFeatures(name=self.name, index=self.residual_indices.index(n))
-            )
-        sanity_check_t2i(self.target.MiddleBlock)
+            block.insert_before_type(ResidualAccumulator, feat)
+
         # Special case: the MiddleBlock has no ResidualAccumulator (this is done via a subsequent layer) so just append
-        self.target.MiddleBlock.append(T2IFeatures(name=self.name, index=-1))
+        sanity_check_t2i(self.target.MiddleBlock)
+        self.target.MiddleBlock.append(self._features[-1])
         return super().inject(parent)
 
     def eject(self: "SDXLT2IAdapter") -> None:
-        def eject_t2i(block: fl.Module) -> None:
-            t2i_layers = [
-                t2i_layer for t2i_layer in block.layers(layer_type=T2IFeatures) if t2i_layer.name == self.name
-            ]
-            assert len(t2i_layers) == 1
-            block.remove(t2i_layers.pop())
-
-        for n, block in enumerate(cast(Iterable[fl.Chain], self.target.DownBlocks)):
-            if n not in self.residual_indices:
-                continue
-            eject_t2i(block)
-        eject_t2i(self.target.MiddleBlock)
+        # See `inject` re: `strict=False`
+        for n, feat in zip(self.residual_indices, self._features, strict=False):
+            self.target.DownBlocks[n].remove(feat)
+        self.target.MiddleBlock.remove(self._features[-1])
         super().eject()
