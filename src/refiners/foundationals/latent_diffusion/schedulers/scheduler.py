@@ -78,10 +78,19 @@ class Scheduler(ABC):
         step: int,
     ) -> Tensor:
         timestep = self.timesteps[step]
-        cumulative_scale_factors = self.cumulative_scale_factors[timestep].unsqueeze(-1).unsqueeze(-1)
-        noise_stds = self.noise_std[timestep].unsqueeze(-1).unsqueeze(-1)
+        cumulative_scale_factors = self.cumulative_scale_factors[timestep]
+        noise_stds = self.noise_std[timestep]
         noised_x = cumulative_scale_factors * x + noise_stds * noise
         return noised_x
+
+    def remove_noise(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
+        timestep = self.timesteps[step]
+        cumulative_scale_factors = self.cumulative_scale_factors[timestep]
+        noise_stds = self.noise_std[timestep]
+        # See equation (15) from https://arxiv.org/pdf/2006.11239.pdf. Useful to preview progress or for guidance like
+        # in https://arxiv.org/pdf/2210.00939.pdf (self-attention guidance)
+        denoised_x = (x - noise_stds * noise) / cumulative_scale_factors
+        return denoised_x
 
     def to(self: T, device: Device | str | None = None, dtype: DType | None = None) -> T:  # type: ignore
         if device is not None:
