@@ -91,7 +91,7 @@ def gaussian_blur(
         sx, sy = sigma
 
     channels = tensor.shape[-3]
-    kernel = get_gaussian_kernel2d(kx, ky, sx, sy, dtype=torch.float32, device=tensor.device)
+    kernel = get_gaussian_kernel2d(kx, ky, sx, sy, dtype=tensor.dtype, device=tensor.device)
     kernel = kernel.expand(channels, 1, kernel.shape[0], kernel.shape[1])
 
     # pad = (left, right, top, bottom)
