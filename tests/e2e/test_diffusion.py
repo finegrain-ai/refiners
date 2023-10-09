@@ -65,6 +65,11 @@ def expected_image_std_random_init(ref_path: Path) -> Image.Image:
 
 
 @pytest.fixture
+def expected_image_std_random_init_sag(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_std_random_init_sag.png").convert("RGB")
+
+
+@pytest.fixture
 def expected_image_std_init_image(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_std_init_image.png").convert("RGB")
 
@@ -107,6 +112,11 @@ def expected_image_ip_adapter_controlnet(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_sdxl_ddim_random_init(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_sdxl_ddim_random_init_sag(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert(mode="RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -512,6 +522,35 @@ def test_diffusion_std_random_init_float16(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_diffusion_std_random_init_sag(
+    sd15_std: StableDiffusion_1, expected_image_std_random_init_sag: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_std
+    n_steps = 30
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+    sd15.set_self_attention_guidance(enable=True, scale=0.75)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_std_random_init_sag)
 
 
 @torch.no_grad()
@@ -1362,6 +1401,42 @@ def test_sdxl_random_init(
     predicted_image = sdxl.lda.decode_latents(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_sdxl_random_init_sag(
+    sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init_sag: Image.Image, test_device: torch.device
+) -> None:
+    sdxl = sdxl_ddim
+    expected_image = expected_sdxl_ddim_random_init_sag
+    n_steps = 30
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+
+    sdxl.set_num_inference_steps(num_inference_steps=n_steps)
+    sdxl.set_self_attention_guidance(enable=True, scale=0.75)
+
+    manual_seed(seed=2)
+    x = torch.randn(1, 4, 128, 128, device=test_device)
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+    predicted_image = sdxl.lda.decode_latents(x=x)
+
+    ensure_similar_images(img_1=predicted_image, img_2=expected_image)
 
 
 @torch.no_grad()

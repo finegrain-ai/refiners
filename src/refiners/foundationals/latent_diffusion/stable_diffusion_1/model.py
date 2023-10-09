@@ -6,6 +6,7 @@ from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from PIL import Image
 import numpy as np
 from torch import device as Device, dtype as DType, Tensor
@@ -53,6 +54,47 @@ class StableDiffusion_1(LatentDiffusionModel):
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
+        if enable:
+            if sag := self._find_sag_adapter():
+                sag.scale = scale
+            else:
+                sag = SD1SAGAdapter(target=self.unet, scale=scale)
+            sag.inject()
+        else:
+            if sag := self._find_sag_adapter():
+                sag.eject()
+
+    def has_self_attention_guidance(self) -> bool:
+        return self._find_sag_adapter() is not None
+
+    def _find_sag_adapter(self) -> SD1SAGAdapter | None:
+        for p in self.unet.get_parents():
+            if isinstance(p, SD1SAGAdapter):
+                return p
+        return None
+
+    def compute_self_attention_guidance(
+        self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
+    ) -> Tensor:
+        sag = self._find_sag_adapter()
+        assert sag is not None
+
+        degraded_latents = sag.compute_degraded_latents(
+            scheduler=self.scheduler,
+            latents=x,
+            noise=noise,
+            step=step,
+            classifier_free_guidance=True,
+        )
+
+        negative_embedding, _ = clip_text_embedding.chunk(2)
+        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        self.set_unet_context(timestep=timestep, clip_text_embedding=negative_embedding, **kwargs)
+        degraded_noise = self.unet(degraded_latents)
+
+        return sag.scale * (noise - degraded_noise)
 
 
 class StableDiffusion_1_Inpainting(StableDiffusion_1):

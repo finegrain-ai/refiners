@@ -4,6 +4,7 @@ from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.ddim import DDIM
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.self_attention_guidance import SDXLSAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 from torch import device as Device, dtype as DType, Tensor
 
@@ -67,7 +68,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         clip_text_embedding: Tensor,
         pooled_text_embedding: Tensor,
         time_ids: Tensor,
-        **_: Tensor
+        **_: Tensor,
     ) -> None:
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
@@ -83,7 +84,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         pooled_text_embedding: Tensor,
         time_ids: Tensor,
         condition_scale: float = 5.0,
-        **kwargs: Tensor
+        **kwargs: Tensor,
     ) -> Tensor:
         return super().forward(
             x=x,
@@ -92,5 +93,62 @@ class StableDiffusion_XL(LatentDiffusionModel):
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
             condition_scale=condition_scale,
-            **kwargs
+            **kwargs,
         )
+
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
+        if enable:
+            if sag := self._find_sag_adapter():
+                sag.scale = scale
+            else:
+                sag = SDXLSAGAdapter(target=self.unet, scale=scale)
+            sag.inject()
+        else:
+            if sag := self._find_sag_adapter():
+                sag.eject()
+
+    def has_self_attention_guidance(self) -> bool:
+        return self._find_sag_adapter() is not None
+
+    def _find_sag_adapter(self) -> SDXLSAGAdapter | None:
+        for p in self.unet.get_parents():
+            if isinstance(p, SDXLSAGAdapter):
+                return p
+        return None
+
+    def compute_self_attention_guidance(
+        self,
+        x: Tensor,
+        noise: Tensor,
+        step: int,
+        *,
+        clip_text_embedding: Tensor,
+        pooled_text_embedding: Tensor,
+        time_ids: Tensor,
+        **kwargs: Tensor,
+    ) -> Tensor:
+        sag = self._find_sag_adapter()
+        assert sag is not None
+
+        degraded_latents = sag.compute_degraded_latents(
+            scheduler=self.scheduler,
+            latents=x,
+            noise=noise,
+            step=step,
+            classifier_free_guidance=True,
+        )
+
+        negative_embedding, _ = clip_text_embedding.chunk(2)
+        negative_pooled_embedding, _ = pooled_text_embedding.chunk(2)
+        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        time_ids, _ = time_ids.chunk(2)
+        self.set_unet_context(
+            timestep=timestep,
+            clip_text_embedding=negative_embedding,
+            pooled_text_embedding=negative_pooled_embedding,
+            time_ids=time_ids,
+            **kwargs,
+        )
+        degraded_noise = self.unet(degraded_latents)
+
+        return sag.scale * (noise - degraded_noise)

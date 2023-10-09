@@ -7,7 +7,6 @@ import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 
-
 T = TypeVar("T", bound="fl.Module")
 
 
@@ -68,6 +67,17 @@ class LatentDiffusionModel(fl.Module, ABC):
     @abstractmethod
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None: ...
 
+    @abstractmethod
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None: ...
+
+    @abstractmethod
+    def has_self_attention_guidance(self) -> bool: ...
+
+    @abstractmethod
+    def compute_self_attention_guidance(
+        self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
+    ) -> Tensor: ...
+
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
     ) -> Tensor:
@@ -80,6 +90,12 @@ class LatentDiffusionModel(fl.Module, ABC):
         # classifier-free guidance
         noise = unconditional_prediction + condition_scale * (conditional_prediction - unconditional_prediction)
         x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
+
+        if self.has_self_attention_guidance():
+            noise += self.compute_self_attention_guidance(
+                x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
+            )
+
         return self.scheduler(x, noise=noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:

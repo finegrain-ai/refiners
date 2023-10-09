@@ -34,6 +34,7 @@ output.images[0].save("std_random_init_expected.png")
 
 Special cases:
 
+- For self-attention guidance, `StableDiffusionSAGPipeline` has been used instead of the default pipeline.
 - `expected_refonly.png` has been generated [with Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui).
 - The following references have been generated with refiners itself (and inspected so that they look reasonable):
     - `expected_inpainting_refonly.png`,
@@ -42,6 +43,7 @@ Special cases:
     - `expected_ip_adapter_controlnet.png`
     - `expected_t2i_adapter_xl_canny.png`
     - `expected_image_sdxl_ip_adapter_plus_woman.png`
+    - `expected_cutecat_sdxl_ddim_random_init_sag.png`
 
 ## Other images
 
