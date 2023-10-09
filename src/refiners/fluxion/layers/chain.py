@@ -143,6 +143,14 @@ class Chain(ContextModule):
             if isinstance(module, ContextModule) and module.parent != self:
                 module._set_parent(self)
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if isinstance(value, torch.nn.Module):
+            raise ValueError(
+                "Chain does not support setting modules by attribute. Instead, use a mutation method like `append` or"
+                " wrap it within a single element list to prevent pytorch from registering it as a submodule."
+            )
+        super().__setattr__(name, value)
+
     @property
     def provider(self) -> ContextProvider:
         return self._provider

@@ -11,7 +11,7 @@ from torch.nn.modules.module import Module as TorchModule
 from refiners.fluxion.utils import load_from_safetensors
 from refiners.fluxion.context import Context, ContextProvider
 
-from typing import Callable, TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from refiners.fluxion.layers.chain import Chain
@@ -26,11 +26,14 @@ class Module(TorchModule):
     _buffers: dict[str, Any]
     _tag: str = ""
 
-    __getattr__: Callable[["Module", str], Any]  # type: ignore
-    __setattr__: Callable[["Module", str, Any], None]  # type: ignore
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, *kwargs)  # type: ignore
+        super().__init__(*args, *kwargs)  # type: ignore[reportUnknownMemberType]
+
+    def __getattr__(self, name: str) -> Any:
+        return super().__getattr__(name=name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        return super().__setattr__(name=name, value=value)
 
     def load_from_safetensors(self, tensors_path: str | Path, strict: bool = True) -> "Module":
         state_dict = load_from_safetensors(tensors_path)

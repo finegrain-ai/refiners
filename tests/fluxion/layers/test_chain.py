@@ -217,3 +217,12 @@ def test_chain_structural_copy() -> None:
     y2 = m2(x)
     assert y2.shape == (7, 12)
     torch.equal(y2, y)
+
+
+def test_setattr_dont_register() -> None:
+    chain = fl.Chain(fl.Linear(in_features=1, out_features=1), fl.Linear(in_features=1, out_features=1))
+
+    with pytest.raises(expected_exception=ValueError):
+        chain.foo = fl.Linear(in_features=1, out_features=1)
+
+    assert module_keys(chain=chain) == ["Linear_1", "Linear_2"]
