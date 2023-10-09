@@ -196,6 +196,14 @@ If you want to depend on Refiners in your project which uses Poetry, you can do 
 poetry add git+ssh://git@github.com:finegrain-ai/refiners.git#main
 ```
 
+If you want to run tests, we provide a script to download and convert all the necessary weights first. Be aware that this will use around 50 GB of disk space.
+
+```bash
+poetry shell
+./scripts/prepare-test-weights.sh
+pytest
+```
+
 ### Hello World
 
 Here is how to perform a text-to-image inference using the Stable Diffusion 1.5 foundational model patched with a Pokemon LoRA:
