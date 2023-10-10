@@ -59,7 +59,7 @@ class Module(TorchModule):
 
     def pretty_print(self, depth: int = -1) -> None:
         tree = ModuleTree(module=self)
-        print(tree.generate_tree_repr(tree.root, is_root=True, depth=depth))
+        print(tree._generate_tree_repr(tree.root, is_root=True, depth=depth))  # type: ignore[reportPrivateUsage]
 
     def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType]:
         """Return a dictionary of basic attributes of the module.
@@ -182,10 +182,22 @@ class ModuleTree:
         return f"{self.__class__.__name__}(root={self.root['value']})"
 
     def __repr__(self) -> str:
-        return self.generate_tree_repr(node=self.root, is_root=True, depth=7)
+        return self._generate_tree_repr(self.root, is_root=True, depth=7)
 
-    def generate_tree_repr(
-        self, node: TreeNode, prefix: str = "", is_last: bool = True, is_root: bool = True, depth: int = -1
+    def __iter__(self) -> Generator[TreeNode, None, None]:
+        for child in self.root["children"]:
+            yield child
+
+    @classmethod
+    def shorten_tree_repr(cls, tree_repr: str, /, line_index: int = 0, max_lines: int = 20) -> str:
+        """Shorten the tree representation to a given number of lines around a given line index."""
+        lines = tree_repr.split(sep="\n")
+        start_idx = max(0, line_index - max_lines // 2)
+        end_idx = min(len(lines), line_index + max_lines // 2 + 1)
+        return "\n".join(lines[start_idx:end_idx])
+
+    def _generate_tree_repr(
+        self, node: TreeNode, /, *, prefix: str = "", is_last: bool = True, is_root: bool = True, depth: int = -1
     ) -> str:
         if depth == 0 and node["children"]:
             return f"{prefix}{'└── ' if is_last else '├── '}{node['value']} ..."
@@ -211,7 +223,7 @@ class ModuleTree:
             else:
                 child_value = child["value"]
 
-            child_str = self.generate_tree_repr(
+            child_str = self._generate_tree_repr(
                 {"value": child_value, "class_name": child["class_name"], "children": child["children"]},
                 prefix=prefix + new_prefix,
                 is_last=i == len(node["children"]) - 1,

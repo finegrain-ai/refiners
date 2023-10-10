@@ -1,10 +1,15 @@
+from collections import defaultdict
 import inspect
+import re
+import sys
+import traceback
 from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
 from refiners.fluxion.layers.basics import Identity
-from refiners.fluxion.layers.module import Module, ContextModule, WeightedModule
+from refiners.fluxion.layers.module import Module, ContextModule, ModuleTree, WeightedModule
 from refiners.fluxion.context import Contexts, ContextProvider
+from refiners.fluxion.utils import summarize_tensor
 
 
 T = TypeVar("T", bound=Module)
@@ -109,6 +114,13 @@ def structural_copy(m: T) -> T:
     return m.structural_copy() if isinstance(m, ContextModule) else m
 
 
+class ChainError(RuntimeError):
+    """Exception raised when an error occurs during the execution of a Chain."""
+
+    def __init__(self, message: str, /) -> None:
+        super().__init__(message)
+
+
 class Chain(ContextModule):
     _modules: dict[str, Module]
     _provider: ContextProvider
@@ -173,34 +185,98 @@ class Chain(ContextModule):
         self._provider.set_context(context, value)
         self._register_provider()
 
-    def debug_repr(self, layer_name: str = "") -> str:
-        lines: list[str] = []
-        tab = "  "
-        tab_length = 0
-        for i, parent in enumerate(self.get_parents()[::-1]):
-            lines.append(f"{tab*tab_length}{'└─ ' if i else ''}{parent.__class__.__name__}")
-            tab_length += 1
+    def _show_error_in_tree(self, name: str, /, max_lines: int = 20) -> str:
+        tree = ModuleTree(module=self)
+        classname_counter: dict[str, int] = defaultdict(int)
+        first_ancestor = self.get_parents()[-1] if self.get_parents() else self
 
-        lines.append(f"{tab*tab_length}└─ {self.__class__.__name__}")
+        def find_state_dict_key(module: Module, /) -> str | None:
+            for key, layer in module.named_modules():
+                if layer == self:
+                    return ".".join((key, name))
+            return None
 
-        for name, _ in self._modules.items():
-            error_arrow = "⚠️" if name == layer_name else ""
-            lines.append(f"{tab*tab_length} | {name} {error_arrow}")
+        for child in tree:
+            classname, count = name.rsplit(sep="_", maxsplit=1) if "_" in name else (name, "1")
+            if child["class_name"] == classname:
+                classname_counter[classname] += 1
+                if classname_counter[classname] == int(count):
+                    state_dict_key = find_state_dict_key(first_ancestor)
+                    child["value"] = f">>> {child['value']} | {state_dict_key}"
+                    break
 
-        return "\n".join(lines)
+        tree_repr = tree._generate_tree_repr(tree.root, depth=3)  # type: ignore[reportPrivateUsage]
 
-    def call_layer(self, layer: Module, layer_name: str, *args: Any):
+        lines = tree_repr.split(sep="\n")
+        error_line_idx = next((idx for idx, line in enumerate(iterable=lines) if line.startswith(">>>")), 0)
+
+        return ModuleTree.shorten_tree_repr(tree_repr, line_index=error_line_idx, max_lines=max_lines)
+
+    @staticmethod
+    def _pretty_print_args(*args: Any) -> str:
+        """
+        Flatten nested tuples and print tensors with their shape and other informations.
+        """
+
+        def _flatten_tuple(t: Tensor | tuple[Any, ...], /) -> list[Any]:
+            if isinstance(t, tuple):
+                return [item for subtuple in t for item in _flatten_tuple(subtuple)]
+            else:
+                return [t]
+
+        flat_args = _flatten_tuple(args)
+
+        return "\n".join(
+            [
+                f"{idx}: {summarize_tensor(arg) if isinstance(arg, Tensor) else arg}"
+                for idx, arg in enumerate(iterable=flat_args)
+            ]
+        )
+
+    def _filter_traceback(self, *frames: traceback.FrameSummary) -> list[traceback.FrameSummary]:
+        patterns_to_exclude = [
+            (r"torch/nn/modules/", r"^_call_impl$"),
+            (r"torch/nn/functional\.py", r""),
+            (r"refiners/fluxion/layers/", r"^_call_layer$"),
+            (r"refiners/fluxion/layers/", r"^forward$"),
+            (r"refiners/fluxion/layers/chain\.py", r""),
+            (r"", r"^_"),
+        ]
+
+        def should_exclude(frame: traceback.FrameSummary, /) -> bool:
+            for filename_pattern, name_pattern in patterns_to_exclude:
+                if re.search(pattern=filename_pattern, string=frame.filename) and re.search(
+                    pattern=name_pattern, string=frame.name
+                ):
+                    return True
+            return False
+
+        return [frame for frame in frames if not should_exclude(frame)]
+
+    def _call_layer(self, layer: Module, name: str, /, *args: Any) -> Any:
         try:
             return layer(*args)
         except Exception as e:
-            pretty_print = self.debug_repr(layer_name)
-            raise ValueError(f"Error in layer {layer_name}, args:\n {args}\n \n{pretty_print}") from e
+            exc_type, _, exc_traceback = sys.exc_info()
+            assert exc_type
+            tb_list = traceback.extract_tb(tb=exc_traceback)
+            filtered_tb_list = self._filter_traceback(*tb_list)
+            formatted_tb = "".join(traceback.format_list(extracted_list=filtered_tb_list))
+            pretty_args = Chain._pretty_print_args(args)
+            error_tree = self._show_error_in_tree(name)
+
+            exception_str = re.sub(pattern=r"\n\s*\n", repl="\n", string=str(object=e))
+            message = f"{formatted_tb}\n{exception_str}\n---------------\n{error_tree}\n{pretty_args}"
+            if "Error" not in exception_str:
+                message = f"{exc_type.__name__}:\n {message}"
+
+            raise ChainError(message) from None
 
     def forward(self, *args: Any) -> Any:
         result: tuple[Any] | Any = None
         intermediate_args: tuple[Any, ...] = args
         for name, layer in self._modules.items():
-            result = self.call_layer(layer, name, *intermediate_args)
+            result = self._call_layer(layer, name, *intermediate_args)
             intermediate_args = (result,) if not isinstance(result, tuple) else result
 
         self._reset_context()
@@ -409,7 +485,7 @@ class Parallel(Chain):
     _tag = "PAR"
 
     def forward(self, *args: Any) -> tuple[Tensor, ...]:
-        return tuple([self.call_layer(module, name, *args) for name, module in self._modules.items()])
+        return tuple([self._call_layer(module, name, *args) for name, module in self._modules.items()])
 
     def _show_only_tag(self) -> bool:
         return self.__class__ == Parallel
@@ -421,7 +497,7 @@ class Distribute(Chain):
     def forward(self, *args: Any) -> tuple[Tensor, ...]:
         n, m = len(args), len(self._modules)
         assert n == m, f"Number of positional arguments ({n}) must match number of sub-modules ({m})."
-        return tuple([self.call_layer(module, name, arg) for arg, (name, module) in zip(args, self._modules.items())])
+        return tuple([self._call_layer(module, name, arg) for arg, (name, module) in zip(args, self._modules.items())])
 
     def _show_only_tag(self) -> bool:
         return self.__class__ == Distribute

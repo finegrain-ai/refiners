@@ -137,3 +137,23 @@ def load_metadata_from_safetensors(path: Path | str) -> dict[str, str] | None:
 
 def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: dict[str, str] | None = None) -> None:
     _save_file(tensors, path, metadata)  # type: ignore
+
+
+def summarize_tensor(tensor: torch.Tensor, /) -> str:
+    return (
+        "Tensor("
+        + ", ".join(
+            [
+                f"shape=({', '.join(map(str, tensor.shape))})",
+                f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
+                f"device={tensor.device}",
+                f"min={tensor.min():.2f}",  # type: ignore
+                f"max={tensor.max():.2f}",  # type: ignore
+                f"mean={tensor.mean():.2f}",
+                f"std={tensor.std():.2f}",
+                f"norm={norm(x=tensor):.2f}",
+                f"grad={tensor.requires_grad}",
+            ]
+        )
+        + ")"
+    )
