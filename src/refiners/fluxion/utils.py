@@ -87,7 +87,7 @@ def gaussian_blur(
     elif isinstance(sigma, float):
         sx, sy = sigma, sigma
     else:
-        assert isinstance(sigma, tuple)  # TODO: remove with pyright +1.1.330
+        assert isinstance(sigma, tuple)
         sx, sy = sigma
 
     channels = tensor.shape[-3]
