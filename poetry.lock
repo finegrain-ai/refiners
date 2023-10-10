@@ -3439,4 +3439,4 @@ training = ["bitsandbytes", "datasets", "loguru", "prodigyopt", "pydantic", "sci
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "d37a0d9e9176073651aa23aad45b4006f28bffb4dbd45a43abaa687a4bfc93d3"
+content-hash = "da05256f6a2f3cd39d2329a0136f929c3c7bf13b60f5d5a1cb21206b807cd15f"
