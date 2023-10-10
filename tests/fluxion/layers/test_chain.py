@@ -226,3 +226,19 @@ def test_setattr_dont_register() -> None:
         chain.foo = fl.Linear(in_features=1, out_features=1)
 
     assert module_keys(chain=chain) == ["Linear_1", "Linear_2"]
+
+
+EXPECTED_TREE = (
+    "(CHAIN)\n    ├── Linear(in_features=1, out_features=1) (x2)\n    └── (CHAIN)\n        ├── Linear(in_features=1,"
+    " out_features=1) #1\n        └── Linear(in_features=2, out_features=1) #2"
+)
+
+
+def test_debug_print() -> None:
+    chain = fl.Chain(
+        fl.Linear(1, 1),
+        fl.Linear(1, 1),
+        fl.Chain(fl.Linear(1, 1), fl.Linear(2, 1)),
+    )
+
+    assert chain._show_error_in_tree("Chain.Linear_2") == EXPECTED_TREE  # type: ignore[reportPrivateUsage]
