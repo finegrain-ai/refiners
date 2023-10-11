@@ -101,8 +101,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
             if sag := self._find_sag_adapter():
                 sag.scale = scale
             else:
-                sag = SDXLSAGAdapter(target=self.unet, scale=scale)
-            sag.inject()
+                SDXLSAGAdapter(target=self.unet, scale=scale).inject()
         else:
             if sag := self._find_sag_adapter():
                 sag.eject()
