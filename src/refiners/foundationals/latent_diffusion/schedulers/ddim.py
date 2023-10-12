@@ -1,4 +1,4 @@
-from torch import Tensor, device as Device, arange, sqrt
+from torch import Tensor, device as Device, dtype as Dtype, arange, sqrt, float32, tensor
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 
 
@@ -10,8 +10,16 @@ class DDIM(Scheduler):
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         device: Device | str = "cpu",
+        dtype: Dtype = float32,
     ) -> None:
-        super().__init__(num_inference_steps, num_train_timesteps, initial_diffusion_rate, final_diffusion_rate, device)
+        super().__init__(
+            num_inference_steps,
+            num_train_timesteps,
+            initial_diffusion_rate,
+            final_diffusion_rate,
+            device=device,
+            dtype=dtype,
+        )
         self.timesteps = self._generate_timesteps()
 
     def _generate_timesteps(self) -> Tensor:
@@ -26,7 +34,11 @@ class DDIM(Scheduler):
     def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         timestep, previous_timestep = (
             self.timesteps[step],
-            self.timesteps[step] - self.num_train_timesteps // self.num_inference_steps,
+            (
+                self.timesteps[step + 1]
+                if step < self.num_inference_steps - 1
+                else tensor(data=[0], device=self.device, dtype=self.dtype)
+            ),
         )
         current_scale_factor, previous_scale_factor = self.cumulative_scale_factors[timestep], (
             self.cumulative_scale_factors[previous_timestep]
