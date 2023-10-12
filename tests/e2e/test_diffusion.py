@@ -20,6 +20,7 @@ from refiners.foundationals.latent_diffusion import (
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
+from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.clip.concepts import ConceptExtender
@@ -219,6 +220,11 @@ def expected_image_textual_inversion_random_init(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_multi_diffusion(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_multi_diffusion.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_restart(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_restart.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -1558,3 +1564,43 @@ def test_t2i_adapter_xl_canny(
     predicted_image = sdxl.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image)
+
+
+@torch.no_grad()
+def test_restart(
+    sd15_ddim: StableDiffusion_1,
+    expected_restart: Image.Image,
+    test_device: torch.device,
+):
+    sd15 = sd15_ddim
+    n_steps = 30
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+    restart = Restart(ldm=sd15)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=8,
+        )
+
+        if step == restart.start_step:
+            x = restart(
+                x,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale=8,
+            )
+
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
