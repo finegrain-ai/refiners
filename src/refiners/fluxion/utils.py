@@ -102,13 +102,49 @@ def gaussian_blur(
 
 
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
-    return torch.tensor(array(image).astype(float32).transpose(2, 0, 1) / 255.0, device=device, dtype=dtype).unsqueeze(
-        0
-    )
+    """
+    Convert a PIL Image to a Tensor.
+
+    If the image is in mode `RGB` the tensor will have shape `[3, H, W]`, otherwise
+    `[1, H, W]` for mode `L` (grayscale) or `[4, H, W]` for mode `RGBA`.
+
+    Values are clamped to the range `[0, 1]`.
+    """
+    image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
+
+    match image.mode:
+        case "L":
+            image_tensor = image_tensor.unsqueeze(0)
+        case "RGBA" | "RGB":
+            image_tensor = image_tensor.permute(2, 0, 1)
+        case _:
+            raise ValueError(f"Unsupported image mode: {image.mode}")
+
+    return image_tensor.unsqueeze(0)
 
 
 def tensor_to_image(tensor: Tensor) -> Image.Image:
-    return Image.fromarray((tensor.clamp(0, 1).squeeze(0).permute(1, 2, 0).cpu().numpy() * 255).astype("uint8"))  # type: ignore
+    """
+    Convert a Tensor to a PIL Image.
+
+    The tensor must have shape `[1, channels, height, width]` where the number of
+    channels is either 1 (grayscale) or 3 (RGB) or 4 (RGBA).
+
+    Expected values are in the range `[0, 1]` and are clamped to this range.
+    """
+    assert tensor.ndim == 4 and tensor.shape[0] == 1, f"Unsupported tensor shape: {tensor.shape}"
+    num_channels = tensor.shape[1]
+    tensor = tensor.clamp(0, 1).squeeze(0)
+
+    match num_channels:
+        case 1:
+            tensor = tensor.squeeze(0)
+        case 3 | 4:
+            tensor = tensor.permute(1, 2, 0)
+        case _:
+            raise ValueError(f"Unsupported number of channels: {num_channels}")
+
+    return Image.fromarray((tensor.cpu().numpy() * 255).astype("uint8"))  # type: ignore[reportUnknownType]
 
 
 def safe_open(

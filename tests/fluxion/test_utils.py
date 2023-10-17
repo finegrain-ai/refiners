@@ -3,10 +3,11 @@ from warnings import warn
 
 from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
 from torch import device as Device, dtype as DType
+from PIL import Image
 import pytest
 import torch
 
-from refiners.fluxion.utils import gaussian_blur, manual_seed
+from refiners.fluxion.utils import gaussian_blur, image_to_tensor, manual_seed, tensor_to_image
 
 
 @dataclass
@@ -47,3 +48,17 @@ def test_gaussian_blur(test_device: Device, blur_input: BlurInput) -> None:
     our_blur = gaussian_blur(tensor, blur_input.kernel_size, blur_input.sigma)
 
     assert torch.equal(our_blur, ref_blur)
+
+
+def test_image_to_tensor() -> None:
+    image = Image.new("RGB", (512, 512))
+
+    assert image_to_tensor(image).shape == (1, 3, 512, 512)
+    assert image_to_tensor(image.convert("L")).shape == (1, 1, 512, 512)
+    assert image_to_tensor(image.convert("RGBA")).shape == (1, 4, 512, 512)
+
+
+def test_tensor_to_image() -> None:
+    assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"
+    assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"
+    assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"
