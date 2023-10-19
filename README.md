@@ -15,20 +15,147 @@ ______________________________________________________________________
 [![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE)
 </div>
 
-- [Design Pillars](#design-pillars)
-- [Key Concepts](#key-concepts)
-  - [The Chain class](#the-chain-class)
-  - [The Context API](#the-context-api)
-  - [The Adapter API](#the-adapter-api)
-- [Adapter Zoo](#adapter-zoo)
-- [Getting Started](#getting-started)
-  - [Install](#install)
-  - [Hello World](#hello-world)
-  - [Training](#training)
-- [Motivation](#motivation)
-- [Awesome Adaptation Papers](#awesome-adaptation-papers)
-- [Credits](#credits)
-- [Citation](#citation)
+## Latest News 🔥
+
+- Added [Restart Sampling](https://github.com/Newbeeer/diffusion_restart_sampling) for improved image generation ([example](https://github.com/Newbeeer/diffusion_restart_sampling/issues/4))
+- Added [Self-Attention Guidance](https://github.com/KU-CVLAB/Self-Attention-Guidance/) to avoid e.g. too smooth images ([example](https://github.com/SusungHong/Self-Attention-Guidance/issues/4))
+- Added [T2I-Adapter](https://github.com/TencentARC/T2I-Adapter) for extra guidance ([example](https://github.com/TencentARC/T2I-Adapter/discussions/93))
+- Added [MultiDiffusion](https://github.com/omerbt/MultiDiffusion) for e.g. panorama images
+- Added [IP-Adapter](https://github.com/tencent-ailab/IP-Adapter), aka image prompt ([example](https://github.com/tencent-ailab/IP-Adapter/issues/92))
+- Added [Segment Anything](https://github.com/facebookresearch/segment-anything) to foundational models
+- Added [SDXL 1.0](https://github.com/Stability-AI/generative-models) to foundational models
+- Made possible to add new concepts to the CLIP text encoder, e.g. via [Textual Inversion](https://arxiv.org/abs/2208.01618)
+
+## Getting Started
+
+### Install
+
+Refiners is still an early stage project so we recommend using the `main` branch directly with [Poetry](https://python-poetry.org).
+
+If you just want to use Refiners directly, clone the repository and run:
+
+```bash
+poetry install --all-extras
+```
+
+There is currently [a bug with PyTorch 2.0.1 and Poetry](https://github.com/pytorch/pytorch/issues/100974), to work around it run:
+
+```bash
+poetry run pip install --upgrade torch torchvision
+```
+
+If you want to depend on Refiners in your project which uses Poetry, you can do so:
+
+```bash
+poetry add git+ssh://git@github.com:finegrain-ai/refiners.git#main
+```
+
+If you want to run tests, we provide a script to download and convert all the necessary weights first. Be aware that this will use around 50 GB of disk space.
+
+```bash
+poetry shell
+./scripts/prepare-test-weights.sh
+pytest
+```
+
+### Hello World
+
+Here is how to perform a text-to-image inference using the Stable Diffusion 1.5 foundational model patched with a Pokemon LoRA:
+
+Step 1: prepare the model weights in refiners' format:
+
+```bash
+python scripts/conversion/convert_transformers_clip_text_model.py --to clip.safetensors
+python scripts/conversion/convert_diffusers_autoencoder_kl.py --to lda.safetensors
+python scripts/conversion/convert_diffusers_unet.py --to unet.safetensors
+```
+
+> Note: this will download the original weights from https://huggingface.co/runwayml/stable-diffusion-v1-5 which takes some time. If you already have this repo cloned locally, use the `--from /path/to/stable-diffusion-v1-5` option instead.
+
+Step 2: download and convert a community Pokemon LoRA, e.g. [this one](https://huggingface.co/pcuenq/pokemon-lora)
+
+```bash
+curl -LO https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin
+python scripts/conversion/convert_diffusers_lora.py \
+  --from pytorch_lora_weights.bin \
+  --to pokemon_lora.safetensors
+```
+
+Step 3: run inference using the GPU:
+
+```python
+from refiners.foundationals.latent_diffusion import StableDiffusion_1
+from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
+from refiners.fluxion.utils import load_from_safetensors, manual_seed
+import torch
+
+
+sd15 = StableDiffusion_1(device="cuda")
+sd15.clip_text_encoder.load_from_safetensors("clip.safetensors")
+sd15.lda.load_from_safetensors("lda.safetensors")
+sd15.unet.load_from_safetensors("unet.safetensors")
+
+SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path="pokemon_lora.safetensors", scale=1.0).inject()
+
+prompt = "a cute cat"
+
+with torch.no_grad():
+    clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
+
+sd15.set_num_inference_steps(30)
+
+manual_seed(2)
+x = torch.randn(1, 4, 64, 64, device=sd15.device)
+
+with torch.no_grad():
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image.save("pokemon_cat.png")
+```
+
+You should get:
+
+![pokemon cat output](https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/pokemon_cat.png)
+
+### Training
+
+Refiners has a built-in training utils library and provides scripts that can be used as a starting point.
+
+E.g. to train a LoRA on top of Stable Diffusion, copy and edit `configs/finetune-lora.toml` to suit your needs and launch the training as follows:
+
+```bash
+python scripts/training/finetune-ldm-lora.py configs/finetune-lora.toml
+```
+
+## Adapter Zoo
+
+For now, given [finegrain](https://finegrain.ai)'s mission, we are focusing on image edition tasks. We support:
+
+| Adapter  | Foundation Model |
+| ----------------- | ------- |
+| LoRA | `SD15` `SDXL` |
+| ControlNets  | `SD15` |
+| Ref Only Control  | `SD15` |
+| IP-Adapter  | `SD15` `SDXL` |
+| T2I-Adapter  | `SD15` `SDXL` |
+
+## Motivation
+
+At [Finegrain](https://finegrain.ai), we're on a mission to automate product photography. Given our "no human in the loop approach", nailing the quality of the outputs we generate is paramount to our success. 
+
+That's why we're building Refiners.
+
+It's a framework to easily bridge the last mile quality gap of foundational models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
+
+We decided to build Refiners in the open. 
+
+It's because model adaptation is a new paradigm that goes beyond our specific use cases. Our hope is to help people looking at creating their own adapters save time, whatever the foundation model they're using.
 
 ## Design Pillars
 
@@ -159,137 +286,6 @@ for layer in vit.layers(fl.Attention):
 
 # ... and load existing weights if the LoRAs are pretrained ...
 ```
-
-## Adapter Zoo
-
-For now, given [finegrain](https://finegrain.ai)'s mission, we are focusing on image edition tasks. We support:
-
-| Adapter  | Foundation Model |
-| ----------------- | ------- |
-| LoRA | `SD15` `SDXL` |
-| ControlNets  | `SD15` |
-| Ref Only Control  | `SD15` |
-| IP-Adapter  | `SD15` `SDXL` |
-| T2I-Adapter  | `SD15` `SDXL` |
-
-## Getting Started
-
-### Install
-
-Refiners is still an early stage project so we recommend using the `main` branch directly with [Poetry](https://python-poetry.org).
-
-If you just want to use Refiners directly, clone the repository and run:
-
-```bash
-poetry install --all-extras
-```
-
-There is currently [a bug with PyTorch 2.0.1 and Poetry](https://github.com/pytorch/pytorch/issues/100974), to work around it run:
-
-```bash
-poetry run pip install --upgrade torch torchvision
-```
-
-If you want to depend on Refiners in your project which uses Poetry, you can do so:
-
-```bash
-poetry add git+ssh://git@github.com:finegrain-ai/refiners.git#main
-```
-
-If you want to run tests, we provide a script to download and convert all the necessary weights first. Be aware that this will use around 50 GB of disk space.
-
-```bash
-poetry shell
-./scripts/prepare-test-weights.sh
-pytest
-```
-
-### Hello World
-
-Here is how to perform a text-to-image inference using the Stable Diffusion 1.5 foundational model patched with a Pokemon LoRA:
-
-Step 1: prepare the model weights in refiners' format:
-
-```bash
-python scripts/conversion/convert_transformers_clip_text_model.py --to clip.safetensors
-python scripts/conversion/convert_diffusers_autoencoder_kl.py --to lda.safetensors
-python scripts/conversion/convert_diffusers_unet.py --to unet.safetensors
-```
-
-> Note: this will download the original weights from https://huggingface.co/runwayml/stable-diffusion-v1-5 which takes some time. If you already have this repo cloned locally, use the `--from /path/to/stable-diffusion-v1-5` option instead.
-
-Step 2: download and convert a community Pokemon LoRA, e.g. [this one](https://huggingface.co/pcuenq/pokemon-lora)
-
-```bash
-curl -LO https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin
-python scripts/conversion/convert_diffusers_lora.py \
-  --from pytorch_lora_weights.bin \
-  --to pokemon_lora.safetensors
-```
-
-Step 3: run inference using the GPU:
-
-```python
-from refiners.foundationals.latent_diffusion import StableDiffusion_1
-from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
-from refiners.fluxion.utils import load_from_safetensors, manual_seed
-import torch
-
-
-sd15 = StableDiffusion_1(device="cuda")
-sd15.clip_text_encoder.load_from_safetensors("clip.safetensors")
-sd15.lda.load_from_safetensors("lda.safetensors")
-sd15.unet.load_from_safetensors("unet.safetensors")
-
-SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path="pokemon_lora.safetensors", scale=1.0).inject()
-
-prompt = "a cute cat"
-
-with torch.no_grad():
-    clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
-
-sd15.set_num_inference_steps(30)
-
-manual_seed(2)
-x = torch.randn(1, 4, 64, 64, device=sd15.device)
-
-with torch.no_grad():
-    for step in sd15.steps:
-        x = sd15(
-            x,
-            step=step,
-            clip_text_embedding=clip_text_embedding,
-            condition_scale=7.5,
-        )
-    predicted_image = sd15.lda.decode_latents(x)
-    predicted_image.save("pokemon_cat.png")
-```
-
-You should get:
-
-![pokemon cat output](https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/pokemon_cat.png)
-
-### Training
-
-Refiners has a built-in training utils library and provides scripts that can be used as a starting point.
-
-E.g. to train a LoRA on top of Stable Diffusion, copy and edit `configs/finetune-lora.toml` to suit your needs and launch the training as follows:
-
-```bash
-python scripts/training/finetune-ldm-lora.py configs/finetune-lora.toml
-```
-
-## Motivation
-
-At [Finegrain](https://finegrain.ai), we're on a mission to automate product photography. Given our "no human in the loop approach", nailing the quality of the outputs we generate is paramount to our success. 
-
-That's why we're building Refiners.
-
-It's a framework to easily bridge the last mile quality gap of foundational models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
-
-We decided to build Refiners in the open. 
-
-It's because model adaptation is a new paradigm that goes beyond our specific use cases. Our hope is to help people looking at creating their own adapters save time, whatever the foundation model they're using.
 
 ## Awesome Adaptation Papers
 
