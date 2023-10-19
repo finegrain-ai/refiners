@@ -1,5 +1,5 @@
 from refiners.fluxion.context import Contexts
-from refiners.fluxion.layers import Chain, Conv2d, SiLU, Lambda, Passthrough, UseContext, Sum, Identity, Slicing
+from refiners.fluxion.layers import Chain, Conv2d, SiLU, Lambda, Passthrough, UseContext, Slicing, Residual
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
     SD1UNet,
     DownBlocks,
@@ -92,12 +92,9 @@ class Controlnet(Passthrough):
         # We run the condition encoder at each step. Caching the result
         # is not worth it as subsequent runs take virtually no time (FG-374).
         self.DownBlocks[0].append(
-            Sum(
-                Identity(),
-                Chain(
-                    UseContext("controlnet", f"condition_{name}"),
-                    ConditionEncoder(device=device, dtype=dtype),
-                ),
+            Residual(
+                UseContext("controlnet", f"condition_{name}"),
+                ConditionEncoder(device=device, dtype=dtype),
             ),
         )
         for residual_block in self.layers(ResidualBlock):

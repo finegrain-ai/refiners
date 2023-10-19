@@ -10,7 +10,6 @@ from refiners.fluxion.layers import (
     Parallel,
     LayerNorm,
     Attention,
-    Sum,
     UseContext,
     Linear,
     GLU,
@@ -19,6 +18,7 @@ from refiners.fluxion.layers import (
     Conv2d,
     SelfAttention,
     SetContext,
+    Residual,
 )
 
 
@@ -41,43 +41,34 @@ class CrossAttentionBlock(Chain):
         self.use_bias = use_bias
 
         super().__init__(
-            Sum(
-                Identity(),
-                Chain(
-                    LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
-                    SelfAttention(
-                        embedding_dim=embedding_dim, num_heads=num_heads, use_bias=use_bias, device=device, dtype=dtype
-                    ),
+            Residual(
+                LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
+                SelfAttention(
+                    embedding_dim=embedding_dim, num_heads=num_heads, use_bias=use_bias, device=device, dtype=dtype
                 ),
             ),
-            Sum(
-                Identity(),
-                Chain(
-                    LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
-                    Parallel(
-                        Identity(),
-                        UseContext(context=self.context, key=context_key),
-                        UseContext(context=self.context, key=context_key),
-                    ),
-                    Attention(
-                        embedding_dim=embedding_dim,
-                        num_heads=num_heads,
-                        key_embedding_dim=context_embedding_dim,
-                        value_embedding_dim=context_embedding_dim,
-                        use_bias=use_bias,
-                        device=device,
-                        dtype=dtype,
-                    ),
+            Residual(
+                LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
+                Parallel(
+                    Identity(),
+                    UseContext(context=self.context, key=context_key),
+                    UseContext(context=self.context, key=context_key),
+                ),
+                Attention(
+                    embedding_dim=embedding_dim,
+                    num_heads=num_heads,
+                    key_embedding_dim=context_embedding_dim,
+                    value_embedding_dim=context_embedding_dim,
+                    use_bias=use_bias,
+                    device=device,
+                    dtype=dtype,
                 ),
             ),
-            Sum(
-                Identity(),
-                Chain(
-                    LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
-                    Linear(in_features=embedding_dim, out_features=2 * 4 * embedding_dim, device=device, dtype=dtype),
-                    GLU(GeLU()),
-                    Linear(in_features=4 * embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
-                ),
+            Residual(
+                LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
+                Linear(in_features=embedding_dim, out_features=2 * 4 * embedding_dim, device=device, dtype=dtype),
+                GLU(GeLU()),
+                Linear(in_features=4 * embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
             ),
         )
 
@@ -98,7 +89,7 @@ class StatefulFlatten(Chain):
         )
 
 
-class CrossAttentionBlock2d(Sum):
+class CrossAttentionBlock2d(Residual):
     def __init__(
         self,
         channels: int,
@@ -164,23 +155,20 @@ class CrossAttentionBlock2d(Sum):
         )
 
         super().__init__(
-            Identity(),
+            in_block,
             Chain(
-                in_block,
-                Chain(
-                    CrossAttentionBlock(
-                        embedding_dim=channels,
-                        context_embedding_dim=context_embedding_dim,
-                        context_key=context_key,
-                        num_heads=num_attention_heads,
-                        use_bias=use_bias,
-                        device=device,
-                        dtype=dtype,
-                    )
-                    for _ in range(num_attention_layers)
-                ),
-                out_block,
+                CrossAttentionBlock(
+                    embedding_dim=channels,
+                    context_embedding_dim=context_embedding_dim,
+                    context_key=context_key,
+                    num_heads=num_attention_heads,
+                    use_bias=use_bias,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_attention_layers)
             ),
+            out_block,
         )
 
     def init_context(self) -> Contexts:

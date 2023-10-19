@@ -6,7 +6,6 @@ import traceback
 from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
-from refiners.fluxion.layers.basics import Identity
 from refiners.fluxion.layers.module import Module, ContextModule, ModuleTree, WeightedModule
 from refiners.fluxion.context import Contexts, ContextProvider
 from refiners.fluxion.utils import summarize_tensor
@@ -530,9 +529,12 @@ class Sum(Chain):
         return self.__class__ == Sum
 
 
-class Residual(Sum):
-    def __init__(self, *modules: Module) -> None:
-        super().__init__(Identity(), Chain(*modules))
+class Residual(Chain):
+    _tag = "RES"
+
+    def forward(self, *inputs: Any) -> Any:
+        assert len(inputs) == 1, "Residual connection can only be used with a single input."
+        return super().forward(*inputs) + inputs[0]
 
 
 class Breakpoint(ContextModule):

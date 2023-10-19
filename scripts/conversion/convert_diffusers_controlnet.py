@@ -65,11 +65,11 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
 
     expected_target_order = [
         "DownBlocks.Chain_1.Passthrough.Conv2d",
-        "DownBlocks.Chain_2.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_2.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_2.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_2.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_2.Passthrough.Conv2d",
-        "DownBlocks.Chain_3.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_3.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_3.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_3.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_3.Passthrough.Conv2d",
         "DownBlocks.Chain_4.Passthrough.Conv2d",
     ]
@@ -102,11 +102,11 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     ]
 
     expected_target_order = [
-        "DownBlocks.Chain_5.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_5.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_5.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_5.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_5.Passthrough.Conv2d",
-        "DownBlocks.Chain_6.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_6.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_6.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_6.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_6.Passthrough.Conv2d",
         "DownBlocks.Chain_7.Passthrough.Conv2d",
     ]
@@ -143,17 +143,17 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     ]
 
     expected_target_order = [
-        "DownBlocks.Chain_8.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_8.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_8.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_8.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_8.Passthrough.Conv2d",
-        "DownBlocks.Chain_9.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "DownBlocks.Chain_9.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "DownBlocks.Chain_9.CLIPLCrossAttention.Chain_1.Conv2d",
+        "DownBlocks.Chain_9.CLIPLCrossAttention.Chain_3.Conv2d",
         "DownBlocks.Chain_9.Passthrough.Conv2d",
         "DownBlocks.Chain_10.Passthrough.Conv2d",
         "DownBlocks.Chain_11.Passthrough.Conv2d",
         "DownBlocks.Chain_12.Passthrough.Conv2d",
-        "MiddleBlock.CLIPLCrossAttention.Chain.Chain_1.Conv2d",
-        "MiddleBlock.CLIPLCrossAttention.Chain.Chain_3.Conv2d",
+        "MiddleBlock.CLIPLCrossAttention.Chain_1.Conv2d",
+        "MiddleBlock.CLIPLCrossAttention.Chain_3.Conv2d",
         "MiddleBlock.Passthrough.Conv2d",
     ]
 

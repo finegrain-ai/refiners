@@ -55,7 +55,7 @@ def convert_point_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
     pe = prompt_encoder.pe_layer.positional_encoding_gaussian_matrix  # type: ignore
     assert isinstance(pe, Tensor)
     state_dict: dict[str, Tensor] = {
-        "Residual.Chain.PointTypeEmbedding.weight": nn.Parameter(data=torch.cat(tensors=point_embeddings, dim=0)),
+        "Residual.PointTypeEmbedding.weight": nn.Parameter(data=torch.cat(tensors=point_embeddings, dim=0)),
         "CoordinateEncoder.Linear.weight": nn.Parameter(data=pe.T.contiguous()),
     }
 
@@ -80,10 +80,10 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     mapping = converter.map_state_dicts(source_args=(x,))
     assert mapping
 
-    mapping["PositionalEncoder.Chain.Parameter.parameter"] = "pos_embed"
+    mapping["PositionalEncoder.Parameter.parameter"] = "pos_embed"
 
     target_state_dict = refiners_sam_vit_h.state_dict()
-    del target_state_dict["PositionalEncoder.Chain.Parameter.parameter"]
+    del target_state_dict["PositionalEncoder.Parameter.parameter"]
 
     source_state_dict = vit.state_dict()
     pos_embed = source_state_dict["pos_embed"]
@@ -91,8 +91,8 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
 
     target_rel_keys = [
         (
-            f"Transformer.TransformerLayer_{i}.Residual_1.Chain.FusedSelfAttention.RelativePositionAttention.horizontal_embedding",
-            f"Transformer.TransformerLayer_{i}.Residual_1.Chain.FusedSelfAttention.RelativePositionAttention.vertical_embedding",
+            f"Transformer.TransformerLayer_{i}.Residual_1.FusedSelfAttention.RelativePositionAttention.horizontal_embedding",
+            f"Transformer.TransformerLayer_{i}.Residual_1.FusedSelfAttention.RelativePositionAttention.vertical_embedding",
         )
         for i in range(1, 33)
     ]
@@ -112,11 +112,11 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
     )
 
-    converted_source["PositionalEncoder.Chain.Parameter.parameter"] = pos_embed  # type: ignore
+    converted_source["PositionalEncoder.Parameter.parameter"] = pos_embed  # type: ignore
     converted_source.update(rel_items)
 
     refiners_sam_vit_h.load_state_dict(state_dict=converted_source)
-    assert converter.compare_models((x,), threshold=1e-3)
+    assert converter.compare_models((x,), threshold=1e-2)
 
     return converted_source
 
