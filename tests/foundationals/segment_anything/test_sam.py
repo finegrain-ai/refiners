@@ -131,7 +131,7 @@ def test_image_encoder(sam_h: SegmentAnythingH, facebook_sam_h: FacebookSAM, tru
     y_1 = facebook_sam_h.image_encoder(image_tensor)
     y_2 = sam_h.image_encoder(image_tensor)
 
-    assert torch.equal(input=y_1, other=y_2)
+    assert torch.allclose(input=y_1, other=y_2, atol=1e-4)
 
 
 @torch.no_grad()

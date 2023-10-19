@@ -176,6 +176,12 @@ download_t2i_adapter () {
         curl -LO https://huggingface.co/TencentARC/t2iadapter_depth_sd15v2/raw/main/config.json
         curl -LO https://huggingface.co/TencentARC/t2iadapter_depth_sd15v2/resolve/main/diffusion_pytorch_model.bin
     popd
+
+    mkdir -p tests/weights/TencentARC/t2i-adapter-canny-sdxl-1.0
+    pushd tests/weights/TencentARC/t2i-adapter-canny-sdxl-1.0
+        curl -LO https://huggingface.co/TencentARC/t2i-adapter-canny-sdxl-1.0/raw/main/config.json
+        curl -LO https://huggingface.co/TencentARC/t2i-adapter-canny-sdxl-1.0/resolve/main/diffusion_pytorch_model.safetensors
+    popd
 }
 
 download_sam () {
@@ -191,18 +197,18 @@ convert_sd15 () {
         --from "tests/weights/runwayml/stable-diffusion-v1-5" \
         --to "tests/weights/CLIPTextEncoderL.safetensors" \
         --half
-    check_hash "tests/weights/CLIPTextEncoderL.safetensors" bef71657
+    check_hash "tests/weights/CLIPTextEncoderL.safetensors" 6c9cbc59
 
     python scripts/conversion/convert_diffusers_autoencoder_kl.py \
         --from "tests/weights/runwayml/stable-diffusion-v1-5" \
         --to "tests/weights/lda.safetensors"
-    check_hash "tests/weights/lda.safetensors" 28f38b35
+    check_hash "tests/weights/lda.safetensors" 329e369c
 
     python scripts/conversion/convert_diffusers_unet.py \
         --from "tests/weights/runwayml/stable-diffusion-v1-5" \
         --to "tests/weights/unet.safetensors" \
         --half
-    check_hash "tests/weights/unet.safetensors" d283a9a5
+    check_hash "tests/weights/unet.safetensors" f81ac65a
 
     mkdir tests/weights/inpainting
 
@@ -210,7 +216,7 @@ convert_sd15 () {
         --from "tests/weights/runwayml/stable-diffusion-inpainting" \
         --to "tests/weights/inpainting/unet.safetensors" \
         --half
-    check_hash "tests/weights/inpainting/unet.safetensors" 78069e20
+    check_hash "tests/weights/inpainting/unet.safetensors" c07a8c61
 }
 
 convert_sdxl () {
@@ -219,19 +225,19 @@ convert_sdxl () {
         --to "tests/weights/DoubleCLIPTextEncoder.safetensors" \
         --subfolder2 text_encoder_2 \
         --half
-    check_hash "tests/weights/DoubleCLIPTextEncoder.safetensors" a68fd375
+    check_hash "tests/weights/DoubleCLIPTextEncoder.safetensors" 7f99c30b
 
     python scripts/conversion/convert_diffusers_autoencoder_kl.py \
         --from "tests/weights/stabilityai/stable-diffusion-xl-base-1.0" \
         --to "tests/weights/sdxl-lda.safetensors" \
         --half
-    check_hash "tests/weights/sdxl-lda.safetensors" b00aaf87
+    check_hash "tests/weights/sdxl-lda.safetensors" 7464e9dc
 
     python scripts/conversion/convert_diffusers_unet.py \
         --from "tests/weights/stabilityai/stable-diffusion-xl-base-1.0" \
         --to "tests/weights/sdxl-unet.safetensors" \
         --half
-    check_hash "tests/weights/sdxl-unet.safetensors" 861b57fd
+    check_hash "tests/weights/sdxl-unet.safetensors" 2e5c4911
 }
 
 convert_vae_ft_mse () {
@@ -239,7 +245,7 @@ convert_vae_ft_mse () {
         --from "tests/weights/stabilityai/sd-vae-ft-mse" \
         --to "tests/weights/lda_ft_mse.safetensors" \
         --half
-    check_hash "tests/weights/lda_ft_mse.safetensors" 6cfb7776
+    check_hash "tests/weights/lda_ft_mse.safetensors" 4d0bae7e
 }
 
 convert_lora () {
@@ -259,7 +265,7 @@ convert_preprocessors () {
         --from "tests/weights/carolineec/informativedrawings/model2.pth" \
         --to "tests/weights/informative-drawings.safetensors"
     rm -f src/model.py
-    check_hash "tests/weights/informative-drawings.safetensors" 0294ac8a
+    check_hash "tests/weights/informative-drawings.safetensors" 93dca207
 }
 
 convert_controlnet () {
@@ -268,27 +274,27 @@ convert_controlnet () {
     python scripts/conversion/convert_diffusers_controlnet.py \
         --from "tests/weights/lllyasviel/control_v11p_sd15_canny" \
         --to "tests/weights/controlnet/lllyasviel_control_v11p_sd15_canny.safetensors"
-    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_canny.safetensors" be9ffe47
+    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_canny.safetensors" 9a1a48cf
 
     python scripts/conversion/convert_diffusers_controlnet.py \
         --from "tests/weights/lllyasviel/control_v11f1p_sd15_depth" \
         --to "tests/weights/controlnet/lllyasviel_control_v11f1p_sd15_depth.safetensors"
-    check_hash "tests/weights/controlnet/lllyasviel_control_v11f1p_sd15_depth.safetensors" bbeaa1ba
+    check_hash "tests/weights/controlnet/lllyasviel_control_v11f1p_sd15_depth.safetensors" bbe7e5a6
 
     python scripts/conversion/convert_diffusers_controlnet.py \
         --from "tests/weights/lllyasviel/control_v11p_sd15_normalbae" \
         --to "tests/weights/controlnet/lllyasviel_control_v11p_sd15_normalbae.safetensors"
-    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_normalbae.safetensors" 24520c5b
+    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_normalbae.safetensors" 9fa88ed5
 
     python scripts/conversion/convert_diffusers_controlnet.py \
         --from "tests/weights/lllyasviel/control_v11p_sd15_lineart" \
         --to "tests/weights/controlnet/lllyasviel_control_v11p_sd15_lineart.safetensors"
-    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_lineart.safetensors" 5bc4de82
+    check_hash "tests/weights/controlnet/lllyasviel_control_v11p_sd15_lineart.safetensors" c29e8c03
 
     python scripts/conversion/convert_diffusers_controlnet.py \
         --from "tests/weights/mfidabel/controlnet-segment-anything" \
         --to "tests/weights/controlnet/mfidabel_controlnet-segment-anything.safetensors"
-    check_hash "tests/weights/controlnet/mfidabel_controlnet-segment-anything.safetensors" ba7059fc
+    check_hash "tests/weights/controlnet/mfidabel_controlnet-segment-anything.safetensors" d536eebb
 }
 
 convert_unclip () {
@@ -296,7 +302,7 @@ convert_unclip () {
         --from "tests/weights/stabilityai/stable-diffusion-2-1-unclip" \
         --to "tests/weights/CLIPImageEncoderH.safetensors" \
         --half
-    check_hash "tests/weights/CLIPImageEncoderH.safetensors" 654842e4
+    check_hash "tests/weights/CLIPImageEncoderH.safetensors" 82918ff4
 }
 
 convert_ip_adapter () {
@@ -315,13 +321,13 @@ convert_ip_adapter () {
         --from "tests/weights/h94/IP-Adapter/models/ip-adapter-plus_sd15.bin" \
         --to "tests/weights/ip-adapter-plus_sd15.safetensors" \
         --half
-    check_hash "tests/weights/ip-adapter-plus_sd15.safetensors" 9cea790f
+    check_hash "tests/weights/ip-adapter-plus_sd15.safetensors" 346a31d1
 
     python scripts/conversion/convert_diffusers_ip_adapter.py \
         --from "tests/weights/h94/IP-Adapter/sdxl_models/ip-adapter-plus_sdxl_vit-h.bin" \
         --to "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" \
         --half
-    check_hash "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" a090ab44
+    check_hash "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" d195feb3
 }
 
 convert_t2i_adapter () {
@@ -330,14 +336,20 @@ convert_t2i_adapter () {
         --from "tests/weights/TencentARC/t2iadapter_depth_sd15v2" \
         --to "tests/weights/T2I-Adapter/t2iadapter_depth_sd15v2.safetensors" \
         --half
-    check_hash "tests/weights/T2I-Adapter/t2iadapter_depth_sd15v2.safetensors" 809a355f
+    check_hash "tests/weights/T2I-Adapter/t2iadapter_depth_sd15v2.safetensors" bb2b3115
+
+    python scripts/conversion/convert_diffusers_t2i_adapter.py \
+        --from "tests/weights/TencentARC/t2i-adapter-canny-sdxl-1.0" \
+        --to "tests/weights/T2I-Adapter/t2i-adapter-canny-sdxl-1.0.safetensors" \
+        --half
+    check_hash "tests/weights/T2I-Adapter/t2i-adapter-canny-sdxl-1.0.safetensors" f07249a6
 }
 
 convert_sam () {
     python scripts/conversion/convert_segment_anything.py \
         --from "tests/weights/sam_vit_h_4b8939.pth" \
         --to "tests/weights/segment-anything-h.safetensors"
-    check_hash "tests/weights/segment-anything-h.safetensors" e11e1ec5
+    check_hash "tests/weights/segment-anything-h.safetensors" 321d6f23
 }
 
 download_all () {

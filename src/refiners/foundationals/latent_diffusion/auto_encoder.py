@@ -10,6 +10,7 @@ from refiners.fluxion.layers import (
     Sum,
     SelfAttention2d,
     Slicing,
+    Residual,
 )
 from refiners.fluxion.utils import image_to_tensor, tensor_to_image
 from torch import Tensor, device as Device, dtype as DType
@@ -82,12 +83,9 @@ class Encoder(Chain):
             channels: int = layer[-1].out_channels  # type: ignore
             layer.append(Downsample(channels=channels, scale_factor=2, device=device, dtype=dtype))
 
-        attention_layer = Sum(
-            Identity(),
-            Chain(
-                GroupNorm(channels=resnet_sizes[-1], num_groups=32, eps=1e-6, device=device, dtype=dtype),
-                SelfAttention2d(channels=resnet_sizes[-1], device=device, dtype=dtype),
-            ),
+        attention_layer = Residual(
+            GroupNorm(channels=resnet_sizes[-1], num_groups=32, eps=1e-6, device=device, dtype=dtype),
+            SelfAttention2d(channels=resnet_sizes[-1], device=device, dtype=dtype),
         )
         resnet_layers[-1].insert_after_type(Resnet, attention_layer)
         super().__init__(
@@ -152,12 +150,9 @@ class Decoder(Chain):
             )
             for i in range(len(resnet_sizes))
         ]
-        attention_layer = Sum(
-            Identity(),
-            Chain(
-                GroupNorm(channels=resnet_sizes[0], num_groups=32, eps=1e-6, device=device, dtype=dtype),
-                SelfAttention2d(channels=resnet_sizes[0], device=device, dtype=dtype),
-            ),
+        attention_layer = Residual(
+            GroupNorm(channels=resnet_sizes[0], num_groups=32, eps=1e-6, device=device, dtype=dtype),
+            SelfAttention2d(channels=resnet_sizes[0], device=device, dtype=dtype),
         )
         resnet_layers[0].insert(1, attention_layer)
         for _, layer in zip(range(3), resnet_layers[1:]):
