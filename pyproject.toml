@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "refiners"
-version = "0.1.0"
+version = "0.2.0"
 description = "The simplest way to train and run adapters on top of foundational models"
 authors = [
     "The Finegrain Team <bonjour@lagon.tech>",
