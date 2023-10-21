@@ -31,12 +31,14 @@ diffusers = {version = "^0.21.0", optional = true}
 transformers = {version = "^4.27.4", optional = true}
 piq = {version = "^0.7.1", optional = true}
 invisible-watermark = {version = "^0.2.0", optional = true}
-segment-anything = {git = "https://github.com/facebookresearch/segment-anything", optional = true}
+# An unofficial Python package for Meta AI's Segment Anything Model:
+# https://github.com/opengeos/segment-anything
+segment-anything-py = {version = "1.0", optional = true}
 
 [tool.poetry.extras]
 training = ["datasets", "tomli", "wandb", "loguru", "bitsandbytes", "prodigyopt", "pydantic", "scipy", "torchvision"]
-conversion = ["diffusers", "transformers", "segment-anything"]
-test = ["diffusers", "transformers", "piq", "invisible-watermark", "segment-anything", "torchvision"]
+conversion = ["diffusers", "transformers", "segment-anything-py"]
+test = ["diffusers", "transformers", "piq", "invisible-watermark", "segment-anything-py", "torchvision"]
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
