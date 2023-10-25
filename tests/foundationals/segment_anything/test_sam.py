@@ -77,7 +77,7 @@ def facebook_sam_h_predictor(facebook_sam_h: FacebookSAM) -> FacebookSAMPredicto
     from segment_anything import SamPredictor  # type: ignore
     from segment_anything.modeling import Sam  # type: ignore
 
-    predictor = SamPredictor(cast(Sam, facebook_sam_h))
+    predictor = SamPredictor(cast(Sam, facebook_sam_h))  # type: ignore
     return cast(FacebookSAMPredictor, predictor)
 
 
