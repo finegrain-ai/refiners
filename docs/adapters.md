@@ -94,4 +94,4 @@ As before, we can call eject the adapter to go back to the original model.
 
 ## A real-world example: LoraAdapter
 
-A popular example of adaptation is [LoRA](https://arxiv.org/abs/2106.09685). You can check out [how we implement it in Refiners](../src/refiners/adapters/lora.py).
+A popular example of adaptation is [LoRA](https://arxiv.org/abs/2106.09685). You can check out [how we implement it in Refiners](../src/refiners/fluxion/adapters/lora.py).
