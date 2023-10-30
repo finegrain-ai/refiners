@@ -1,15 +1,18 @@
-from typing import Iterable, Literal, TypeVar
-from PIL import Image
-from numpy import array, float32
+import json
+import os
+from functools import lru_cache
 from pathlib import Path
+from typing import Iterable, Literal, TypeVar
+
+import torch
+from PIL import Image
+from jaxtyping import Float
+from numpy import array, float32
 from safetensors import safe_open as _safe_open  # type: ignore
 from safetensors.torch import save_file as _save_file  # type: ignore
-from torch import norm as _norm, manual_seed as _manual_seed  # type: ignore
-import torch
-from torch.nn.functional import pad as _pad, interpolate as _interpolate, conv2d  # type: ignore
 from torch import Tensor, device as Device, dtype as DType
-from jaxtyping import Float
-
+from torch import norm as _norm, manual_seed as _manual_seed  # type: ignore
+from torch.nn.functional import pad as _pad, interpolate as _interpolate, conv2d  # type: ignore
 
 T = TypeVar("T")
 E = TypeVar("E")
@@ -163,7 +166,66 @@ def safe_open(
 
 def load_from_safetensors(path: Path | str, device: Device | str = "cpu") -> dict[str, Tensor]:
     with safe_open(path=path, framework="pytorch", device=device) as tensors:  # type: ignore
-        return {key: tensors.get_tensor(key) for key in tensors.keys()}  # type: ignore
+        state_dict = {key: tensors.get_tensor(key) for key in tensors.keys()}  # type: ignore
+    state_dict = autotranslate_state_dict(state_dict, state_dict_origin_path=path)
+    return state_dict
+
+
+@lru_cache(maxsize=None)
+def load_state_dict_conversion_maps():
+    conversion_maps = {}
+    from importlib.resources import files
+
+    for file in files("refiners").joinpath("fluxion/conversion_maps").iterdir():
+        if file.is_file() and file.suffix == ".json":
+            conversion_maps[file.name] = json.loads(file.read_text())
+    return conversion_maps
+
+
+def key_prefixes(keys):
+    return set(k.rsplit(".", 1)[0] for k in keys)
+
+
+def autotranslate_state_dict(state_dict, state_dict_origin_path=""):
+    """Autotranslate state dict from one module type to another."""
+
+    state_dict_prefixes = key_prefixes(state_dict.keys())
+    conversion_maps = load_state_dict_conversion_maps()
+    print(f"Finding conversion for {state_dict_origin_path}")
+    for conversion_map_name, conversion_map in conversion_maps.items():
+        conversion_map_prefixes = (
+            set(conversion_map["mapping"].keys())
+            | set(conversion_map["source_aliases"].keys())
+            | set(conversion_map["ignorable_prefixes"])
+        )
+        if state_dict_prefixes.issubset(conversion_map_prefixes):
+            print(f"  Using conversion map {conversion_map_name} for {state_dict_origin_path}")
+            return convert_state_dict(
+                source_state_dict=state_dict,
+                state_dict_mapping=conversion_map["mapping"],
+                source_aliases=conversion_map["source_aliases"],
+            )
+
+    return state_dict
+
+
+def convert_state_dict(
+    source_state_dict: dict[str, Tensor], state_dict_mapping: dict[str, str], source_aliases: dict[str, str]
+) -> dict[str, Tensor]:
+    converted_state_dict: dict[str, Tensor] = {}
+
+    for source_key in source_state_dict:
+        source_prefix, suffix = source_key.rsplit(sep=".", maxsplit=1)
+        # handle aliases
+        source_prefix = source_aliases.get(source_prefix, source_prefix)
+        try:
+            target_prefix = state_dict_mapping[source_prefix]
+        except KeyError:
+            continue
+        target_key = ".".join([target_prefix, suffix])
+        converted_state_dict[target_key] = source_state_dict[source_key]
+
+    return converted_state_dict
 
 
 def load_metadata_from_safetensors(path: Path | str) -> dict[str, str] | None:
@@ -193,3 +255,41 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
         )
         + ")"
     )
+
+
+def get_cache_dir():
+    xdg_cache_home = os.getenv("XDG_CACHE_HOME", None)
+    if xdg_cache_home is None:
+        user_home = os.getenv("HOME", None)
+        if user_home:
+            xdg_cache_home = os.path.join(user_home, ".cache")
+
+    if xdg_cache_home is not None:
+        return os.path.join(xdg_cache_home, "refiners")
+
+    return os.path.join(os.path.dirname(__file__), ".cached-aimg")
+
+
+def download_diffusers_weights(repo, sub, filename):
+    url = f"https://huggingface.co/{repo}/resolve/main/{sub}/{filename}"
+    dest = f"{get_cache_dir()}/{repo}/{sub}/{filename}"
+
+    if os.path.exists(dest):
+        return dest
+
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    print(f"Downloading {url} to {dest}")
+    torch.hub.download_url_to_file(url, dest)
+    return dest
+
+
+@lru_cache
+def default_device() -> str:
+    """Return the best torch backend available."""
+    if torch.cuda.is_available():
+        return "cuda"
+
+    if torch.backends.mps.is_available():
+        return "mps:0"
+
+    return "cpu"

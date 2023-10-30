@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from enum import Enum, auto
 from pathlib import Path
@@ -230,6 +231,25 @@ class ModelConverter:
         assert self._stored_mapping is not None, "Mapping is not stored"
         return self._stored_mapping
 
+    def get_conversion_mapping(self, aliases: dict | None = None) -> dict[str, dict[str, str]]:
+        """Get the mapping between the source and target models' state_dicts."""
+        mapping = self.get_mapping()
+        # invert the mapping
+        conversion_mapping = {v: k for k, v in mapping.items()}
+
+        # note which prefixes from the source model are not used
+        source_state_dict = self.source_model.state_dict().keys()
+        source_prefixes = set([k.rsplit(".", 1)[0] for k in source_state_dict])
+        ignored_prefixes = source_prefixes - set(conversion_mapping.keys())
+        for ignored_prefix in ignored_prefixes:
+            conversion_mapping[ignored_prefix] = None
+
+        return {
+            "ignorable_prefixes": list(ignored_prefixes),
+            "mapping": conversion_mapping,
+            "source_aliases": aliases if aliases else {},
+        }
+
     def save_to_safetensors(self, path: Path | str, metadata: dict[str, str] | None = None, half: bool = False) -> None:
         """Save the converted model to a SafeTensors file.
 
@@ -248,6 +268,22 @@ class ModelConverter:
         if half:
             state_dict = {key: value.half() for key, value in state_dict.items()}
         save_to_safetensors(path=path, tensors=state_dict, metadata=metadata)
+
+    def save_conversion_mapping(self, path: Path | str, aliases=None) -> None:
+        """Save the mapping between the source and target models' state_dicts to a JSON file.
+
+        This method can only be called after the conversion process is done.
+
+        - `path`: The path to save the mapping to.
+
+        ### Raises:
+        - `ValueError` if the conversion process is not done yet. Run `converter(args)` first.
+        """
+        if not self:
+            raise ValueError("The conversion process is not done yet. Run `converter(args)` first.")
+        mapping = self.get_conversion_mapping(aliases=aliases)
+        with open(path, "w") as f:
+            f.write(json.dumps(mapping, indent=2))
 
     def map_state_dicts(
         self,

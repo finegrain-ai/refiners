@@ -29,3 +29,5 @@ wandb/
 
 # env variable definitions file
 .env
+
+outputs
