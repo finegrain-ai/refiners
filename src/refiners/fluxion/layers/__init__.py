@@ -44,6 +44,7 @@ from refiners.fluxion.layers.pixelshuffle import PixelUnshuffle
 from refiners.fluxion.layers.sampling import Downsample, Upsample, Interpolate
 from refiners.fluxion.layers.embedding import Embedding
 from refiners.fluxion.layers.converter import Converter
+from refiners.fluxion.layers.maxpool import MaxPool1d, MaxPool2d
 
 __all__ = [
     "Embedding",
@@ -104,4 +105,6 @@ __all__ = [
     "ReflectionPad2d",
     "PixelUnshuffle",
     "Converter",
+    "MaxPool1d",
+    "MaxPool2d",
 ]
