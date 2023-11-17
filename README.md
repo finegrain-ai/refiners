@@ -17,6 +17,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added [FreeU](https://github.com/ChenyangSi/FreeU) for improved quality at no cost (contributed by [@isamu-isozaki](https://github.com/isamu-isozaki))
 - Added [Restart Sampling](https://github.com/Newbeeer/diffusion_restart_sampling) for improved image generation ([example](https://github.com/Newbeeer/diffusion_restart_sampling/issues/4))
 - Added [Self-Attention Guidance](https://github.com/KU-CVLAB/Self-Attention-Guidance/) to avoid e.g. too smooth images ([example](https://github.com/SusungHong/Self-Attention-Guidance/issues/4))
 - Added [T2I-Adapter](https://github.com/TencentARC/T2I-Adapter) for extra guidance ([example](https://github.com/TencentARC/T2I-Adapter/discussions/93))
