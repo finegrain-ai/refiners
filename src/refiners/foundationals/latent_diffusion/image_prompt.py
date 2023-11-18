@@ -293,7 +293,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     fl.Chain(
                         fl.Parallel(
                             fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)),
-                            fl.UseContext("ip_mask", "mask")
+                            fl.Chain(
+                                fl.UseContext("ip_mask", "mask"),
+                                fl.Lambda(func=lambda mask: mask[i])
+                            )
                         )
                         IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                         fl.Lambda(func=self.scale_outputs),

@@ -51,9 +51,11 @@ class StableDiffusion_1(LatentDiffusionModel):
         negative_embedding = self.clip_text_encoder(negative_text or "")
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **kwargs: Tensor) -> None:
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+        if "mask" in kwargs:
+            self.unet.set_ip_mask(mask=kwargs["mask"])
 
     def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
         if enable:
