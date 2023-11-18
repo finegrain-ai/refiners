@@ -291,7 +291,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             for i in range(num_image_prompts):
                 ip_attentions.append(
                     fl.Chain(
-                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)),
+                        fl.Parallel(
+                            fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)),
+                            fl.UseContext("ip_mask", "mask")
+                        )
                         IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                         fl.Lambda(func=self.scale_outputs),
                     )
