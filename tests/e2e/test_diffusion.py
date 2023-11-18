@@ -17,6 +17,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1T2IAdapter,
     SDXLIPAdapter,
     SDXLT2IAdapter,
+    SDFreeUAdapter,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
@@ -225,6 +226,11 @@ def expected_multi_diffusion(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_restart(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_restart.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_freeu(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -1604,3 +1610,37 @@ def test_restart(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_freeu(
+    sd15_std: StableDiffusion_1,
+    expected_freeu: Image.Image,
+):
+    sd15 = sd15_std
+    n_steps = 50
+    first_step = 1
+
+    prompt = "best quality, high quality cute cat"
+    negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    SDFreeUAdapter(
+        sd15.unet, backbone_scales=[1.2, 1.2, 1.2, 1.4, 1.4, 1.4], skip_scales=[0.9, 0.9, 0.9, 0.2, 0.2, 0.2]
+    ).inject()
+
+    manual_seed(9752)
+    x = sd15.init_latents(size=(512, 512), first_step=first_step).to(device=sd15.device, dtype=sd15.dtype)
+
+    for step in sd15.steps[first_step:]:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_freeu)
