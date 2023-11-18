@@ -1,6 +1,6 @@
 from enum import IntEnum
 from functools import partial
-from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING
+from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING, List
 import math
 
 from jaxtyping import Float
@@ -14,6 +14,7 @@ from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, normalize
 import refiners.fluxion.layers as fl
+import torch.nn.functional as F
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
@@ -249,6 +250,21 @@ class _CrossAttnIndex(IntEnum):
 class InjectionPoint(fl.Chain):
     pass
 
+class IPScaledDotProductAttention(ScaledDotProductAttention):
+    def __init__(self, num_heads: int = 1, is_causal: bool | None = None, is_optimized: bool = True) -> None:
+        super().__init__(num_heads=num_heads, is_causal=is_causal, is_optimized=is_optimized)
+    def forward(
+        self,
+        query: Float[Tensor, "batch num_queries embedding_dim"],
+        key: Float[Tensor, "batch num_keys embedding_dim"],
+        value: Float[Tensor, "batch num_values embedding_dim"],
+        ip_attention_mask: Float[Tensor, "batch num_queries embedding_dim"],
+        is_causal: bool | None = None,
+    ) -> Float[Tensor, "batch num_queries embedding_dim"]:
+        width = query.shape[1]
+        height = query.shape[2]
+        ip_attention_mask = F.interpolate(ip_attention_mask, size=(width, height), mode="bilinear")
+        return super().forward(query, key, value, is_causal=is_causal)*ip_attention_mask
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
@@ -257,12 +273,22 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         text_sequence_length: int = 77,
         image_sequence_length: int = 4,
         scale: float = 1.0,
+        num_image_prompts: int = 1,
     ) -> None:
         self.text_sequence_length = text_sequence_length
         self.image_sequence_length = image_sequence_length
         self.scale = scale
 
         with self.setup_adapter(target):
+            image_prompts_attentions: List[fl.Chain] = []
+            for i in range(num_image_prompts):
+                image_prompts_attentions.append(
+                    fl.Chain(
+                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN+i)),
+                        IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
+                        fl.Lambda(func=self.scale_outputs),
+                    )
+                )
             super().__init__(
                 fl.Distribute(
                     # Note: the same query is used for image cross-attention as for text cross-attention
@@ -305,11 +331,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                         fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.TXT_CROSS_ATTN)),
                         ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                     ),
-                    fl.Chain(
-                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN)),
-                        ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
-                        fl.Lambda(func=self.scale_outputs),
-                    ),
+                    *image_prompts_attentions
                 ),
                 InjectionPoint(),  # proj
             )
