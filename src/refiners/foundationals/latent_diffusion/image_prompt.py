@@ -266,6 +266,9 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         ip_attention_mask = F.interpolate(ip_attention_mask, size=(width, height), mode="bilinear")
         return super().forward(query, key, value, is_causal=is_causal)*ip_attention_mask
 
+class ParallelLinear(fl.Linear):
+    def forward(self, *xs: List[Float[Tensor]]) -> tuple[Float[Tensor]]:
+        return tuple([super().forward(xs[i]) for i in range(len(xs))])
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
         self,
@@ -280,14 +283,24 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.scale = scale
 
         with self.setup_adapter(target):
-            image_prompts_attentions: List[fl.Chain] = []
+            ip_attentions: List[fl.Chain] = []
+            parallel_splits_k: List[fl.Slicing] = []
+            parallel_splits_v: List[fl.Slicing] = []
+
+
             for i in range(num_image_prompts):
-                image_prompts_attentions.append(
+                ip_attentions.append(
                     fl.Chain(
-                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN+i)),
+                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)),
                         IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                         fl.Lambda(func=self.scale_outputs),
                     )
+                )
+                parallel_splits_k.append(
+                    fl.Slicing(dim=1, start=text_sequence_length+image_sequence_length*i, length=image_sequence_length),
+                )
+                parallel_splits_v.append(
+                    fl.Slicing(dim=1, start=text_sequence_length+image_sequence_length*i, length=image_sequence_length),
                 )
             super().__init__(
                 fl.Distribute(
@@ -299,8 +312,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                             InjectionPoint(),  # Wk
                         ),
                         fl.Chain(
-                            fl.Slicing(dim=1, start=text_sequence_length, length=image_sequence_length),
-                            fl.Linear(
+                            fl.Parallel(
+                                *parallel_splits_k
+                            ),
+                            ParallelLinear(
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,
                                 bias=self.target.use_bias,
@@ -315,8 +330,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                             InjectionPoint(),  # Wv
                         ),
                         fl.Chain(
-                            fl.Slicing(dim=1, start=text_sequence_length, length=image_sequence_length),
-                            fl.Linear(
+                            fl.Parallel(
+                                *parallel_splits_v
+                            ),
+                            ParallelLinear(
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,
                                 bias=self.target.use_bias,
@@ -331,15 +348,15 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                         fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.TXT_CROSS_ATTN)),
                         ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                     ),
-                    *image_prompts_attentions
+                    *ip_attentions
                 ),
                 InjectionPoint(),  # proj
             )
 
     def select_qkv(
-        self, query: Tensor, keys: tuple[Tensor, Tensor], values: tuple[Tensor, Tensor], index: _CrossAttnIndex
+        self, query: Tensor, keys: tuple[Tensor, Tensor], values: tuple[Tensor, Tensor], index: _CrossAttnIndex, index_offset: int=0
     ) -> tuple[Tensor, Tensor, Tensor]:
-        return (query, keys[index.value], values[index.value])
+        return (query, keys[index.value+index_offset], values[index.value+index_offset])
 
     def scale_outputs(self, x: Tensor) -> Tensor:
         return x * self.scale
