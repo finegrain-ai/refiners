@@ -125,6 +125,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
             step=step,
             clip_text_embedding=clip_text_embedding,
             condition_scale=condition_scale,
+            **_
         )
 
     def set_inpainting_conditions(
