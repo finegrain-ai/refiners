@@ -6,7 +6,7 @@
   <img alt="Finegrain Refiners Library" width="352" height="128" style="max-width: 100%;">
 </picture>
 
-**The simplest way to train and run adapters on top of foundational models**
+**The simplest way to train and run adapters on top of foundational models** ([dive in!](https://blog.finegrain.ai/posts/simplifying-ai-code/))
 
 ______________________________________________________________________
 
