@@ -363,6 +363,10 @@ If you're interested in understanding the diversity of use cases for foundation 
 
 - [UniAdapter](https://arxiv.org/abs/2302.06605)
 
+## Projects using Refiners
+
+- https://github.com/brycedrennan/imaginAIry
+
 ## Credits
 
 We took inspiration from these great projects:
