@@ -13,6 +13,7 @@ ______________________________________________________________________
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/refiners)](https://pypi.org/project/refiners/)
 [![PyPI Status](https://badge.fury.io/py/refiners.svg)](https://badge.fury.io/py/refiners)
 [![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE)
+[![code bounties](https://img.shields.io/badge/code-bounties-blue)](https://finegrain.ai/bounties)
 </div>
 
 ## Latest News 🔥
