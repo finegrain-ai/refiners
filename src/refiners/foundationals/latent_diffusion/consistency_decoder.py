@@ -1,2 +1,0 @@
-# TODO
-# adding consistency decoder
