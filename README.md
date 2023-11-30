@@ -14,6 +14,7 @@ ______________________________________________________________________
 [![PyPI Status](https://badge.fury.io/py/refiners.svg)](https://badge.fury.io/py/refiners)
 [![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE)
 [![code bounties](https://img.shields.io/badge/code-bounties-blue)](https://finegrain.ai/bounties)
+[![chat](https://img.shields.io/discord/1179456777406922913?logo=discord&logoColor=white&color=%235765F2)](https://discord.gg/mCmjNUVV7d)
 </div>
 
 ## Latest News 🔥
