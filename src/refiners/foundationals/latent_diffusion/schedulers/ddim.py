@@ -1,5 +1,5 @@
 from torch import Tensor, device as Device, dtype as Dtype, arange, sqrt, float32, tensor
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
 
 class DDIM(Scheduler):
@@ -9,6 +9,7 @@ class DDIM(Scheduler):
         num_train_timesteps: int = 1_000,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
+        noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ) -> None:
@@ -17,6 +18,7 @@ class DDIM(Scheduler):
             num_train_timesteps,
             initial_diffusion_rate,
             final_diffusion_rate,
+            noise_schedule=noise_schedule,
             device=device,
             dtype=dtype,
         )
