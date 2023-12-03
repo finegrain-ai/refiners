@@ -14,10 +14,10 @@ class DDIM(Scheduler):
         dtype: Dtype = float32,
     ) -> None:
         super().__init__(
-            num_inference_steps,
-            num_train_timesteps,
-            initial_diffusion_rate,
-            final_diffusion_rate,
+            num_inference_steps=num_inference_steps,
+            num_train_timesteps=num_train_timesteps,
+            initial_diffusion_rate=initial_diffusion_rate,
+            final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
             device=device,
             dtype=dtype,
