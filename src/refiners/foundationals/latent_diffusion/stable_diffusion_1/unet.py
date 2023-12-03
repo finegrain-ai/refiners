@@ -285,8 +285,6 @@ class SD1UNet(fl.Chain):
 
     def set_clip_text_embedding(self, clip_text_embedding: Tensor) -> None:
         self.set_context("cross_attention_block", {"clip_text_embedding": clip_text_embedding})
-
     def set_timestep(self, timestep: Tensor) -> None:
         self.set_context("diffusion", {"timestep": timestep})
-    def set_ip_mask(self, mask: Tensor) -> None:
-        self.set_context("ip_mask", {"mask": mask})
+

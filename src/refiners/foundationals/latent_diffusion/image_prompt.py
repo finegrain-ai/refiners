@@ -4,7 +4,7 @@ from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING, List
 import math
 
 from jaxtyping import Float
-from torch import Tensor, cat, softmax, zeros_like, device as Device, dtype as DType
+from torch import Tensor, cat, softmax, zeros_like, ones, device as Device, dtype as DType
 from PIL import Image
 
 from refiners.fluxion.adapters.adapter import Adapter
@@ -258,17 +258,25 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         query: Float[Tensor, "batch num_queries embedding_dim"],
         key: Float[Tensor, "batch num_keys embedding_dim"],
         value: Float[Tensor, "batch num_values embedding_dim"],
-        ip_attention_mask: Float[Tensor, "batch num_queries embedding_dim"],
+        ip_attention_mask: Float[Tensor, "batch ..."],
         is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
         width = query.shape[1]
         height = query.shape[2]
-        ip_attention_mask = F.interpolate(ip_attention_mask, size=(width, height), mode="bilinear")
-        return super().forward(query, key, value, is_causal=is_causal)*ip_attention_mask
+        ip_attention_mask = F.interpolate(ip_attention_mask[:, None], size=(width, height), mode="bilinear")[:, 0]
+        output = super().forward(query, key, value, is_causal=is_causal)
+        return output*ip_attention_mask
 
+class ParallelizeIPScaledDotProductAttentionArguments(fl.Parallel):
+    def forward(self, qkv: List[Float[Tensor, "..."]], ip_attention_mask: Float[Tensor, "..."]) -> tuple[Tensor, ...]:
+        return (qkv[0], qkv[1][0], qkv[2][0], ip_attention_mask)
 class ParallelLinear(fl.Linear):
-    def forward(self, *xs: List[Float[Tensor]]) -> tuple[Float[Tensor]]:
-        return tuple([super().forward(xs[i]) for i in range(len(xs))])
+    def forward(self, *xs: List[Float[Tensor, "batch in_features"]]) -> tuple[Float[Tensor, "batch out_features"]]:
+        output = []
+        for i in range(len(xs)):
+            output.append(super().forward(xs[i]))
+        output = tuple(output)
+        return output
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
         self,
@@ -297,7 +305,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                                 fl.UseContext("ip_mask", "mask"),
                                 fl.Lambda(func=lambda mask: mask[i])
                             )
-                        )
+                        ),
+                        ParallelizeIPScaledDotProductAttentionArguments(),
                         IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
                         fl.Lambda(func=self.scale_outputs),
                     )
@@ -416,6 +425,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
+        num_image_prompts: int = 1,
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
@@ -425,9 +435,9 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(clip_image_encoder)]
         self._image_proj = [image_proj]
-
+        self.num_image_prompts = num_image_prompts
         self.sub_adapters = [
-            CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=self.image_proj.num_tokens)
+            CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=self.image_proj.num_tokens, num_image_prompts=num_image_prompts)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -513,3 +523,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
         transfomer_layers.pop()
         return encoder_clone
+    def set_ip_mask(self, mask, batch_size) -> None:
+        if mask is None:
+            mask = [ones((batch_size, 1, 1)).to(device=self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)]
+        self.set_context("ip_mask", {"mask": mask})
