@@ -14,7 +14,7 @@ def test_scheduler_utils():
         def _generate_timesteps(self) -> Tensor:
             return Tensor()
 
-    scheduler = DummyScheduler(10, 20, 0.1, 0.2, "cpu")
+    scheduler = DummyScheduler(num_inference_steps=10, num_train_timesteps=20, initial_diffusion_rate=0.1, final_diffusion_rate=0.2, device="cpu")
     scale_factors = (
         1.0
         - linspace(
