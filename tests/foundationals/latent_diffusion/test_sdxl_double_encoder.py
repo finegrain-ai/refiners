@@ -18,7 +18,8 @@ class DiffusersSDXL(Protocol):
     tokenizer_2: fl.Module
     vae: fl.Module
 
-    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any: ...
+    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any:
+        ...
 
     def encode_prompt(
         self,
@@ -26,7 +27,8 @@ class DiffusersSDXL(Protocol):
         prompt_2: str | None = None,
         negative_prompt: str | None = None,
         negative_prompt_2: str | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: ...
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        ...
 
 
 @pytest.fixture(scope="module")
@@ -67,9 +69,12 @@ def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder:
     manual_seed(seed=0)
     prompt = "A photo of a pizza."
 
-    prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = (
-        diffusers_sdxl.encode_prompt(prompt=prompt, negative_prompt="")
-    )
+    (
+        prompt_embeds,
+        negative_prompt_embeds,
+        pooled_prompt_embeds,
+        negative_pooled_prompt_embeds,
+    ) = diffusers_sdxl.encode_prompt(prompt=prompt, negative_prompt="")
 
     double_embedding, pooled_embedding = double_text_encoder(prompt)
 

@@ -147,13 +147,11 @@ class TrainingClock:
 
     @cached_property
     def unit_to_steps(self) -> dict[TimeUnit, int]:
+        iteration_factor = self.num_batches_per_epoch if self.gradient_accumulation["unit"] == TimeUnit.EPOCH else 1
         return {
             TimeUnit.STEP: 1,
             TimeUnit.EPOCH: self.num_batches_per_epoch,
-            TimeUnit.ITERATION: self.gradient_accumulation["number"] * {
-                TimeUnit.STEP: 1,
-                TimeUnit.EPOCH: self.num_batches_per_epoch,
-            }.get(self.gradient_accumulation["unit"], 1),
+            TimeUnit.ITERATION: self.gradient_accumulation["number"] * iteration_factor,
         }
 
     def convert_time_unit_to_steps(self, number: int, unit: TimeUnit) -> int:

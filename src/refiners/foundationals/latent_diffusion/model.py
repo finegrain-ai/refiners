@@ -65,18 +65,22 @@ class LatentDiffusionModel(fl.Module, ABC):
         return self.scheduler.steps
 
     @abstractmethod
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None: ...
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
+        ...
 
     @abstractmethod
-    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None: ...
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
+        ...
 
     @abstractmethod
-    def has_self_attention_guidance(self) -> bool: ...
+    def has_self_attention_guidance(self) -> bool:
+        ...
 
     @abstractmethod
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
-    ) -> Tensor: ...
+    ) -> Tensor:
+        ...
 
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
