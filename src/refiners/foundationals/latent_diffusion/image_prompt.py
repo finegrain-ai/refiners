@@ -250,6 +250,13 @@ class _CrossAttnIndex(IntEnum):
 class InjectionPoint(fl.Chain):
     pass
 
+def find_closest_factors_to_goal(number: int, goal: float) -> int:
+    goal_number = int(goal)
+    for i in range(goal_number):
+        if number % (goal_number-i) == 0:
+            return goal_number-i
+    return -1
+
 class IPScaledDotProductAttention(ScaledDotProductAttention):
     def __init__(self, num_heads: int = 1, is_causal: bool | None = None, is_optimized: bool = True) -> None:
         super().__init__(num_heads=num_heads, is_causal=is_causal, is_optimized=is_optimized)
@@ -261,15 +268,24 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         ip_attention_mask: Float[Tensor, "batch ..."],
         is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
-        width = query.shape[1]
-        height = query.shape[2]
-        ip_attention_mask = F.interpolate(ip_attention_mask[:, None], size=(width, height), mode="bilinear")[:, 0]
+        batch_size = query.shape[0]
+        num_queries = query.shape[1]
+        embedding_dim = query.shape[2]
+        ip_attention_mask_height = ip_attention_mask.shape[1]
+        ip_attention_mask_width = ip_attention_mask.shape[2]
+        mask_height = find_closest_factors_to_goal(num_queries, math.sqrt(num_queries)*ip_attention_mask_height/ip_attention_mask_width)
+        if mask_height == -1:
+            raise Exception("Change mask dimensions to be more square")
+        mask_width = num_queries // mask_height
+        ip_attention_mask = F.interpolate(ip_attention_mask.unsqueeze(1), size=(mask_width, mask_height), mode="bicubic").squeeze(1)
+        ip_attention_mask = ip_attention_mask.reshape((batch_size, -1, 1)).repeat(1, 1, embedding_dim)
         output = super().forward(query, key, value, is_causal=is_causal)
         return output*ip_attention_mask
 
 class ParallelizeIPScaledDotProductAttentionArguments(fl.Parallel):
     def forward(self, qkv: List[Float[Tensor, "..."]], ip_attention_mask: Float[Tensor, "..."]) -> tuple[Tensor, ...]:
-        return (qkv[0], qkv[1][0], qkv[2][0], ip_attention_mask)
+        return (qkv[0], qkv[1], qkv[2], ip_attention_mask)
+
 class ParallelLinear(fl.Linear):
     def forward(self, *xs: List[Float[Tensor, "batch in_features"]]) -> tuple[Float[Tensor, "batch out_features"]]:
         output = []
@@ -369,9 +385,12 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             )
 
     def select_qkv(
-        self, query: Tensor, keys: tuple[Tensor, Tensor], values: tuple[Tensor, Tensor], index: _CrossAttnIndex, index_offset: int=0
+        self, query: Tensor, keys: tuple[Tensor, tuple[Tensor]], values: tuple[Tensor, tuple[Tensor]], index: _CrossAttnIndex, index_offset: int=0
     ) -> tuple[Tensor, Tensor, Tensor]:
-        return (query, keys[index.value+index_offset], values[index.value+index_offset])
+        if index.value == 0:
+            return (query, keys[index.value], values[index.value])
+        else:
+            return (query, keys[index.value][index_offset], values[index.value][index_offset])
 
     def scale_outputs(self, x: Tensor) -> Tensor:
         return x * self.scale
