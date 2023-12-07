@@ -77,7 +77,7 @@ class LatentDiffusionModel(fl.Module, ABC):
     def has_ip_adapter(self) -> bool: ...
 
     @abstractmethod
-    def set_ip_adapter_mask(self, mask, batch_size) -> None: ...
+    def set_ip_adapter_mask(self, mask) -> None: ...
 
     @abstractmethod
     def compute_self_attention_guidance(
@@ -90,8 +90,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
         if self.has_ip_adapter():
-            batch_size = clip_text_embedding.shape[0]
-            self.set_ip_adapter_mask(kwargs.get("mask", None), batch_size)
+            self.set_ip_adapter_mask(kwargs.get("mask", None))
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 

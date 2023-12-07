@@ -84,9 +84,9 @@ class StableDiffusion_1(LatentDiffusionModel):
             if isinstance(p, SD1IPAdapter):
                 return p
         return None
-    def set_ip_adapter_mask(self, mask, batch_size) -> None:
+    def set_ip_adapter_mask(self, mask) -> None:
         ip_adapter = self._find_ip_adapter()
-        ip_adapter.set_ip_mask(mask, batch_size)
+        ip_adapter.set_ip_adapter_mask(mask)
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
     ) -> Tensor:

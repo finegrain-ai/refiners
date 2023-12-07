@@ -273,7 +273,11 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         embedding_dim = query.shape[2]
         ip_attention_mask_height = ip_attention_mask.shape[1]
         ip_attention_mask_width = ip_attention_mask.shape[2]
-        mask_height = find_closest_factors_to_goal(num_queries, math.sqrt(num_queries)*ip_attention_mask_height/ip_attention_mask_width)
+        # given original mask height as h and width as w, hw/num_queries is how much we shrunk in the area. So the height is h/sqrt(hw/num_queries)
+        # so this becomes sqrt(num_queries*h/w)
+        mask_height = find_closest_factors_to_goal(num_queries, math.sqrt(num_queries*ip_attention_mask_height/ip_attention_mask_width))
+
+        # print(mask_height, math.sqrt(num_queries)*ip_attention_mask_height/ip_attention_mask_width)
         if mask_height == -1:
             raise Exception("Change mask dimensions to be more square")
         mask_width = num_queries // mask_height
@@ -542,7 +546,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
         transfomer_layers.pop()
         return encoder_clone
-    def set_ip_mask(self, mask, batch_size) -> None:
+    def set_ip_adapter_mask(self, mask) -> None:
         if mask is None:
-            mask = [ones((batch_size, 1, 1)).to(device=self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)]
+            mask = [None for _ in range(self.num_image_prompts)]
         self.set_context("ip_mask", {"mask": mask})
