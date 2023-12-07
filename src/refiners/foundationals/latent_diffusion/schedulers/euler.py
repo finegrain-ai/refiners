@@ -1,11 +1,8 @@
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
-from torch import Tensor, device as Device, dtype as Dtype, sqrt, float32, tensor, arange
-import numpy as np
-import torch
+from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, arange, int64
 
 
 class EulerScheduler(Scheduler):
-
     def __init__(
         self,
         num_inference_steps: int,
@@ -30,32 +27,26 @@ class EulerScheduler(Scheduler):
 
     def _generate_timesteps(self) -> Tensor:
         step_ratio = self.num_train_timesteps / self.num_inference_steps
-        timesteps = (np.arange(self.num_train_timesteps, 0,
-                               -step_ratio)).round().copy().astype(int)
+        timesteps = arange(1000, 0, -step_ratio).round().type(int64)
         return timesteps - 1
 
     def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         timestep, previous_timestep = (
             self.timesteps[step],
-            (self.timesteps[step + 1] if step < self.num_inference_steps -
-             1 else tensor(data=[0], device=self.device, dtype=self.dtype)),
+            (
+                self.timesteps[step + 1]
+                if step < self.num_inference_steps - 1
+                else tensor(data=[0], device=self.device, dtype=self.dtype)
+            ),
         )
         current_sigma, previous_sigma = self.sigmas[timestep], (
-            self.sigmas[previous_timestep]
-            if previous_timestep > 0 else self.sigmas[0])
+            self.sigmas[previous_timestep] if previous_timestep > 0 else self.sigmas[0]
+        )
 
-        gamma = 0.0  # modify with inputs(?)
-        eps = noise * 1.0  # modify with inputs(?)
+        predicted_x = x - current_sigma * noise
 
-        # with the hardcoded values sigma_hat is always current_scale_factor
-        sigma_hat = current_sigma * (gamma + 1)
-        if gamma > 0:
-            x = x + eps * (sigma_hat**2 - current_sigma**2)**0.5
-
-        predicted_x = x - sigma_hat * noise
-
-        derivative = (x - predicted_x) / sigma_hat
-        dt = previous_sigma - sigma_hat
+        derivative = (x - predicted_x) / current_sigma
+        dt = previous_sigma - current_sigma
         denoised_x = x + derivative * dt
 
         return denoised_x
