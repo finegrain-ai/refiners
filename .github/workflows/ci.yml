@@ -1,34 +1,35 @@
 name: CI
-on: push
-jobs:
 
+on: push
+
+jobs:
   lint_and_typecheck:
     runs-on: ubuntu-latest
+
     steps:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: Set up python
-        id: setup-python
-        uses: actions/setup-python@v4
+      - name: Install Rye
+        uses: eifinger/setup-rye@v1
         with:
-          python-version: "3.10"
+          enable-cache: true
+          cache-prefix: 'refiners-rye-cache'
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+      - name: add home shims dir to PATH
+        run: echo "$HOME/.rye/shims" >> $GITHUB_PATH
 
-      - name: poetry install
-        run: poetry install --no-interaction --all-extras
+      - name: pin python
+        run: rye pin 3.10
 
-      - name: black
-        run: poetry run black --check .
+      - name: rye sync
+        run: rye sync --all-features
 
-      - name: lint
-        run: poetry run ruff check .
+      - name: ruff format
+        run: rye run ruff format --check .
+
+      - name: ruff check
+        run: rye run ruff check .
 
       - name: typecheck
-        run: poetry run pyright
+        run: rye run pyright

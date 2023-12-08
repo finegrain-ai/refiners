@@ -102,5 +102,5 @@ class InformativeDrawings(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Sigmoid(),
-            )
+            ),
         )

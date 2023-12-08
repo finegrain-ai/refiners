@@ -33,7 +33,9 @@ def stabilityai_unclip_weights_path(test_weights_path: Path):
 
 @pytest.fixture(scope="module")
 def ref_encoder(stabilityai_unclip_weights_path: Path, test_device: torch.device) -> CLIPVisionModelWithProjection:
-    return CLIPVisionModelWithProjection.from_pretrained(stabilityai_unclip_weights_path, subfolder="image_encoder").to(test_device)  # type: ignore
+    return CLIPVisionModelWithProjection.from_pretrained(stabilityai_unclip_weights_path, subfolder="image_encoder").to(  # type: ignore
+        test_device  # type: ignore
+    )
 
 
 def test_encoder(

@@ -1,67 +1,86 @@
-[tool.poetry]
+[project]
 name = "refiners"
 version = "0.2.0"
 description = "The simplest way to train and run adapters on top of foundational models"
-authors = [
-    "The Finegrain Team <bonjour@lagon.tech>",
-]
+authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
+dependencies = [
+    "torch>=2.1.1",
+    "safetensors>=0.4.0",
+    "pillow>=10.1.0",
+    "jaxtyping>=0.2.23",
+]
 readme = "README.md"
-packages = [{include = "refiners", from = "src"}]
+requires-python = ">= 3.10"
 
-[tool.poetry.dependencies]
-python = ">=3.10,<3.12"
-jaxtyping = "^0.2.14"
-torch = "^2.1.0"
-safetensors = "^0.3.0"
-numpy = "^1.24.2"
-pillow = ">=9.5.0"
-datasets = {version = "^2.14.0", optional = true}
-tomli = {version = "^2.0.1", optional = true}
-wandb = {version = "^0.15.7", optional = true}
-loguru = {version = "^0.7.0", optional = true}
-bitsandbytes = {version = "^0.41.0", optional = true}
-prodigyopt = {version = "^1.0", optional = true}
-pydantic = {version = "~2.0.3", optional = true}
-# Added scipy as a work around until this PR gets merged:
-# https://github.com/TimDettmers/bitsandbytes/pull/525
-scipy = {version = "^1.11.1", optional = true}
-torchvision = {version = "^0.16.0", optional = true}
-diffusers = {version = "^0.21.0", optional = true}
-transformers = {version = "^4.27.4", optional = true}
-piq = {version = "^0.7.1", optional = true}
-invisible-watermark = {version = "^0.2.0", optional = true}
-# An unofficial Python package for Meta AI's Segment Anything Model:
-# https://github.com/opengeos/segment-anything
-segment-anything-py = {version = "1.0", optional = true}
-
-[tool.poetry.extras]
-training = ["datasets", "tomli", "wandb", "loguru", "bitsandbytes", "prodigyopt", "pydantic", "scipy", "torchvision"]
-conversion = ["diffusers", "transformers", "segment-anything-py"]
-test = ["diffusers", "transformers", "piq", "invisible-watermark", "segment-anything-py", "torchvision"]
-
-[tool.poetry.group.dev.dependencies]
-black = "^23.1.0"
-pytest = "^7.2.2"
-isort = "^5.12.0"
-ipykernel = "^6.22.0"
-pyright = "^1.1.318"
-ruff = "^0.0.281"
+[project.optional-dependencies]
+training = [
+    "bitsandbytes>=0.41.2.post2",
+    "pydantic>=2.5.2",
+    "prodigyopt>=1.0",
+    "torchvision>=0.16.1",
+    "loguru>=0.7.2",
+    "wandb>=0.16.0",
+    # Added scipy as a work around until this PR gets merged:
+    # https://github.com/TimDettmers/bitsandbytes/pull/525
+    "scipy>=1.11.4",
+    "datasets>=2.15.0",
+]
+test = [
+    "diffusers>=0.24.0",
+    "transformers>=4.35.2",
+    "piq>=0.8.0",
+    "invisible-watermark>=0.2.0",
+    "torchvision>=0.16.1",
+    # An unofficial Python package for Meta AI's Segment Anything Model:
+    # https://github.com/opengeos/segment-anything
+    "segment-anything-py>=1.0",
+]
+conversion = [
+    "diffusers>=0.24.0",
+    "transformers>=4.35.2",
+    "segment-anything-py>=1.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "pyright == 1.1.333",
+    "ruff>=0.0.292",
+    "docformatter>=1.7.5",
+    "pytest>=7.4.2",
+]
+
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.rye.scripts]
+lint = { chain = ["ruff format .", "ruff --fix ."] }
 
 [tool.black]
 line-length = 120
 
 [tool.ruff]
 ignore = [
-    "F722",  # forward-annotation-syntax-error, because of Jaxtyping
-    "E731",  # do-not-assign-lambda
-    "E501",  # line-too-long, because Black (https://beta.ruff.rs/docs/faq/#is-ruff-compatible-with-black)
+    "F722", # forward-annotation-syntax-error, because of Jaxtyping
+    "E731", # do-not-assign-lambda
 ]
 line-length = 120
+
+[tool.docformatter]
+black = true
+
+[tool.isort]
+profile = "black"
+force_sort_within_sections = true
+order_by_type = true
+combine_as_imports = true
 
 [tool.pyright]
 include = ["src/refiners", "tests", "scripts"]

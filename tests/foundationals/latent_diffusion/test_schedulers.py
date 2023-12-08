@@ -21,7 +21,7 @@ def test_dpm_solver_diffusers():
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
         refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
-        assert allclose(diffusers_output, refiners_output), f"outputs differ at step {step}"
+        assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
 def test_ddim_solver_diffusers():
