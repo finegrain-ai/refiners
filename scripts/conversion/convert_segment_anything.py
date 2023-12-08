@@ -80,10 +80,10 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     mapping = converter.map_state_dicts(source_args=(x,))
     assert mapping
 
-    mapping["PositionalEncoder.Parameter.parameter"] = "pos_embed"
+    mapping["PositionalEncoder.Parameter.weight"] = "pos_embed"
 
     target_state_dict = refiners_sam_vit_h.state_dict()
-    del target_state_dict["PositionalEncoder.Parameter.parameter"]
+    del target_state_dict["PositionalEncoder.Parameter.weight"]
 
     source_state_dict = vit.state_dict()
     pos_embed = source_state_dict["pos_embed"]
@@ -112,7 +112,8 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
     )
 
-    converted_source["PositionalEncoder.Parameter.parameter"] = pos_embed  # type: ignore
+    embed = pos_embed.reshape_as(refiners_sam_vit_h.PositionalEncoder.Parameter.weight)
+    converted_source["PositionalEncoder.Parameter.weight"] = embed  # type: ignore
     converted_source.update(rel_items)
 
     refiners_sam_vit_h.load_state_dict(state_dict=converted_source)
