@@ -3,18 +3,10 @@ import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
 
 
-class ClassEncoder(fl.Chain):
-    def __init__(
-        self,
-        embedding_dim: int,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
-    ) -> None:
+class ClassToken(fl.Chain):
+    def __init__(self, embedding_dim: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         self.embedding_dim = embedding_dim
-        super().__init__(
-            fl.Parallel(fl.Identity(), fl.Parameter(embedding_dim, device=device, dtype=dtype)),
-            fl.Lambda(lambda x, p: p.expand(x.shape[0], 1, -1)),
-        )
+        super().__init__(fl.Parameter(1, embedding_dim, device=device, dtype=dtype))
 
 
 class PatchEncoder(fl.Chain):
@@ -87,7 +79,7 @@ class ViTEmbeddings(fl.Chain):
         self.patch_size = patch_size
         super().__init__(
             fl.Concatenate(
-                ClassEncoder(embedding_dim=embedding_dim, device=device, dtype=dtype),
+                ClassToken(embedding_dim, device=device, dtype=dtype),
                 fl.Chain(
                     PatchEncoder(
                         in_channels=3,

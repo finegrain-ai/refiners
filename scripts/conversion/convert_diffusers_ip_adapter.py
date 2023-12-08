@@ -93,7 +93,7 @@ def main() -> None:
     if fine_grained:
         w = image_proj_weights
         image_proj_state_dict = {
-            "LatentsEncoder.Parallel.Parameter.parameter": w["latents"].squeeze(0),  # drop batch dim = 1
+            "LatentsToken.Parameter.weight": w["latents"].squeeze(0),  # drop batch dim = 1
             "Linear_1.weight": w["proj_in.weight"],
             "Linear_1.bias": w["proj_in.bias"],
             "Linear_2.weight": w["proj_out.weight"],

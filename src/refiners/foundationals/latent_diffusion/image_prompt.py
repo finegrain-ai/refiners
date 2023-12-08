@@ -165,18 +165,13 @@ class PerceiverAttention(fl.Chain):
         return cat((x, latents), dim=-2)
 
 
-class LatentsEncoder(fl.Chain):
+class LatentsToken(fl.Chain):
     def __init__(
-        self,
-        num_tokens: int,
-        embeddding_dim: int,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
+        self, num_tokens: int, latents_dim: int, device: Device | str | None = None, dtype: DType | None = None
     ) -> None:
-        super().__init__(
-            fl.Parallel(fl.Identity(), fl.Parameter(num_tokens, embeddding_dim, device=device, dtype=dtype)),
-            fl.Lambda(lambda x, p: p.expand(x.shape[0], -1, -1)),
-        )
+        self.num_tokens = num_tokens
+        self.latents_dim = latents_dim
+        super().__init__(fl.Parameter(num_tokens, latents_dim, device=device, dtype=dtype))
 
 
 class Transformer(fl.Chain):
@@ -211,7 +206,7 @@ class PerceiverResampler(fl.Chain):
         super().__init__(
             fl.Linear(in_features=input_dim, out_features=latents_dim, device=device, dtype=dtype),
             fl.SetContext(context="perceiver_resampler", key="x"),
-            LatentsEncoder(num_tokens=num_tokens, embeddding_dim=latents_dim, device=device, dtype=dtype),
+            LatentsToken(num_tokens, latents_dim, device=device, dtype=dtype),
             Transformer(
                 TransformerLayer(
                     fl.Residual(
