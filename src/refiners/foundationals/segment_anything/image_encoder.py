@@ -46,7 +46,6 @@ class PositionalEncoder(fl.Residual):
         self.image_embedding_size = image_embedding_size
         super().__init__(
             fl.Parameter(
-                1,
                 image_embedding_size[0],
                 image_embedding_size[1],
                 embedding_dim,
