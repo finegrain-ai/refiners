@@ -1,5 +1,7 @@
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, arange, int64
+import torch
+import numpy as np
 
 
 class EulerScheduler(Scheduler):
@@ -22,31 +24,45 @@ class EulerScheduler(Scheduler):
             device=device,
             dtype=dtype,
         )
-        self.sigmas = self.noise_std / self.cumulative_scale_factors
-        self.sigmas[0] = 0.0
+        self.sigmas = self._generate_sigmas().to(device=self.device, dtype=self.dtype)
 
     def _generate_timesteps(self) -> Tensor:
+        # using "trailing" timestep
         step_ratio = self.num_train_timesteps / self.num_inference_steps
         timesteps = arange(1000, 0, -step_ratio).round().type(int64)
         return timesteps - 1
 
-    def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
-        timestep, previous_timestep = (
-            self.timesteps[step],
-            (
-                self.timesteps[step + 1]
-                if step < self.num_inference_steps - 1
-                else tensor(data=[0], device=self.device, dtype=self.dtype)
-            ),
+    def _generate_sigmas(self) -> Tensor:
+        sigmas = self.noise_std / self.cumulative_scale_factors
+        sigmas = torch.from_numpy(
+            np.interp(self.timesteps.cpu().numpy(), np.arange(0, len(sigmas)), sigmas.cpu().numpy())
         )
-        current_sigma, previous_sigma = self.sigmas[timestep], (
-            self.sigmas[previous_timestep] if previous_timestep > 0 else self.sigmas[0]
-        )
+        sigmas = torch.cat([sigmas, tensor([0.0])])
+        print(sigmas)
+        return sigmas
 
-        predicted_x = x - current_sigma * noise
+    def __call__(
+        self,
+        x: Tensor,
+        noise: Tensor,
+        step: int,
+        s_churn: float = 0.0,
+        s_tmin: float = 0.0,
+        s_tmax: float = float("inf"),
+        s_noise: float = 1.0,
+    ) -> Tensor:
+        sigma = self.sigmas[step]
 
-        derivative = (x - predicted_x) / current_sigma
-        dt = previous_sigma - current_sigma
+        gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0
+
+        eps = noise * s_noise
+        sigma_hat = sigma * (gamma + 1)
+        if gamma > 0:
+            x = x + eps * (sigma_hat**2 - sigma**2) ** 0.5
+
+        predicted_x = x * torch.sqrt(sigma_hat**2 + 1) - eps * sigma_hat
+
+        derivative = (x - predicted_x) / sigma_hat
+        dt = self.sigmas[step + 1] - sigma_hat
         denoised_x = x + derivative * dt
-
         return denoised_x

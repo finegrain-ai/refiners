@@ -68,6 +68,7 @@ def test_euler_solver_diffusers():
     noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
+        # scaled_sample = diffusers_scheduler.scale_model_input(sample, timestep)
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
         refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
 
