@@ -64,9 +64,7 @@ def setup_converter(args: Args) -> ModelConverter:
 
     # Remove the class embedding from state dict since it was not mapped by the model converter
     class_embedding = target.ensure_find(fl.Parameter)
-    class_embedding_key = next(
-        (n for n, p in target.named_parameters() if id(p) == id(class_embedding.parameter)), None
-    )
+    class_embedding_key = next((n for n, p in target.named_parameters() if id(p) == id(class_embedding.weight)), None)
     assert class_embedding_key is not None
     assert class_embedding_key in target_state_dict
     del target_state_dict[class_embedding_key]
@@ -77,7 +75,8 @@ def setup_converter(args: Args) -> ModelConverter:
     target.load_state_dict(state_dict=converted_state_dict, strict=False)
 
     # Ad hoc post-conversion steps
-    class_embedding.parameter = torch.nn.Parameter(source.vision_model.embeddings.class_embedding.clone())  # type: ignore
+    embed = source.vision_model.embeddings.class_embedding
+    class_embedding.weight = torch.nn.Parameter(embed.clone().reshape_as(class_embedding.weight))  # type: ignore
 
     assert converter.compare_models((x,), threshold=args.threshold)
 
