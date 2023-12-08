@@ -16,7 +16,9 @@ class Args(argparse.Namespace):
 
 def setup_converter(args: Args) -> ModelConverter:
     target = LatentDiffusionAutoencoder()
-    source: nn.Module = AutoencoderKL.from_pretrained(pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder)  # type: ignore
+    source: nn.Module = AutoencoderKL.from_pretrained(  # type: ignore
+        pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder
+    )  # type: ignore
     x = torch.randn(1, 3, 512, 512)
     converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
     if not converter.run(source_args=(x,)):

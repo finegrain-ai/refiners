@@ -82,11 +82,13 @@ def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder:
     assert pooled_embedding.shape == torch.Size([1, 1280])
 
     embedding_1, embedding_2 = cast(
-        tuple[Tensor, Tensor], prompt_embeds.split(split_size=[768, 1280], dim=-1)  # type: ignore
+        tuple[Tensor, Tensor],
+        prompt_embeds.split(split_size=[768, 1280], dim=-1),  # type: ignore
     )
 
     rembedding_1, rembedding_2 = cast(
-        tuple[Tensor, Tensor], double_embedding.split(split_size=[768, 1280], dim=-1)  # type: ignore
+        tuple[Tensor, Tensor],
+        double_embedding.split(split_size=[768, 1280], dim=-1),  # type: ignore
     )
 
     assert torch.allclose(input=embedding_1, other=rembedding_1, rtol=1e-3, atol=1e-3)

@@ -51,7 +51,9 @@ def convert_mask_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
 
 def convert_point_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
-    point_embeddings: list[Tensor] = [pe.weight for pe in prompt_encoder.point_embeddings] + [prompt_encoder.not_a_point_embed.weight]  # type: ignore
+    point_embeddings: list[Tensor] = [pe.weight for pe in prompt_encoder.point_embeddings] + [
+        prompt_encoder.not_a_point_embed.weight
+    ]  # type: ignore
     pe = prompt_encoder.pe_layer.positional_encoding_gaussian_matrix  # type: ignore
     assert isinstance(pe, Tensor)
     state_dict: dict[str, Tensor] = {
@@ -161,8 +163,14 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
     assert mapping is not None
     mapping["IOUMaskEncoder"] = "iou_token"
 
-    state_dict = converter._convert_state_dict(source_state_dict=mask_decoder.state_dict(), target_state_dict=refiners_mask_decoder.state_dict(), state_dict_mapping=mapping)  # type: ignore
-    state_dict["IOUMaskEncoder.weight"] = torch.cat(tensors=[mask_decoder.iou_token.weight, mask_decoder.mask_tokens.weight], dim=0)  # type: ignore
+    state_dict = converter._convert_state_dict(  # type: ignore
+        source_state_dict=mask_decoder.state_dict(),
+        target_state_dict=refiners_mask_decoder.state_dict(),
+        state_dict_mapping=mapping,
+    )
+    state_dict["IOUMaskEncoder.weight"] = torch.cat(
+        tensors=[mask_decoder.iou_token.weight, mask_decoder.mask_tokens.weight], dim=0
+    )  # type: ignore
 
     refiners_mask_decoder.load_state_dict(state_dict=state_dict)
 

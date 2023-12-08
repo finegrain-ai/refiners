@@ -65,9 +65,7 @@ class DDPM(Scheduler):
             ),
         )
         current_factor = current_cumulative_factor / previous_cumulative_scale_factor
-        estimated_denoised_data = (
-            x - (1 - current_cumulative_factor) ** 0.5 * noise
-        ) / current_cumulative_factor**0.5
+        estimated_denoised_data = (x - (1 - current_cumulative_factor) ** 0.5 * noise) / current_cumulative_factor**0.5
         estimated_denoised_data = estimated_denoised_data.clamp(-1, 1)
         original_data_coeff = (previous_cumulative_scale_factor**0.5 * (1 - current_factor)) / (
             1 - current_cumulative_factor

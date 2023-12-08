@@ -33,32 +33,17 @@ ______________________________________________________________________
 
 ### Install
 
-Refiners is still an early stage project so we recommend using the `main` branch directly with [Poetry](https://python-poetry.org).
-
-If you just want to use Refiners directly, clone the repository and run:
+Refiners is still an early stage project, and we do not release minor versions yet. We recommend
+installing the latest version via a git install:
 
 ```bash
-poetry install --all-extras
+pip install git+https://github.com/finegrain-ai/refiners.git
 ```
 
-There is currently [a bug with PyTorch 2.0.1 and Poetry](https://github.com/pytorch/pytorch/issues/100974), to work around it run:
+To include the training utils, use:
 
 ```bash
-poetry run pip install --upgrade torch torchvision
-```
-
-If you want to depend on Refiners in your project which uses Poetry, you can do so:
-
-```bash
-poetry add git+ssh://git@github.com:finegrain-ai/refiners.git#main
-```
-
-If you want to run tests, we provide a script to download and convert all the necessary weights first. Be aware that this will use around 50 GB of disk space.
-
-```bash
-poetry shell
-./scripts/prepare-test-weights.sh
-pytest
+pip install 'refiners[training] @ git+https://github.com/finegrain-ai/refiners.git'
 ```
 
 ### Hello World

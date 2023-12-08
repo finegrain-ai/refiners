@@ -42,10 +42,13 @@ class DDIM(Scheduler):
                 else tensor(data=[0], device=self.device, dtype=self.dtype)
             ),
         )
-        current_scale_factor, previous_scale_factor = self.cumulative_scale_factors[timestep], (
-            self.cumulative_scale_factors[previous_timestep]
-            if previous_timestep > 0
-            else self.cumulative_scale_factors[0]
+        current_scale_factor, previous_scale_factor = (
+            self.cumulative_scale_factors[timestep],
+            (
+                self.cumulative_scale_factors[previous_timestep]
+                if previous_timestep > 0
+                else self.cumulative_scale_factors[0]
+            ),
         )
         predicted_x = (x - sqrt(1 - current_scale_factor**2) * noise) / current_scale_factor
         denoised_x = previous_scale_factor * predicted_x + sqrt(1 - previous_scale_factor**2) * noise

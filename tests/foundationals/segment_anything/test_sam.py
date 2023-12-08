@@ -264,8 +264,14 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
     assert mapping is not None
     mapping["IOUMaskEncoder"] = "iou_token"
 
-    state_dict = converter._convert_state_dict(source_state_dict=facebook_mask_decoder.state_dict(), target_state_dict=refiners_mask_decoder.state_dict(), state_dict_mapping=mapping)  # type: ignore
-    state_dict["IOUMaskEncoder.weight"] = torch.cat([facebook_mask_decoder.iou_token.weight, facebook_mask_decoder.mask_tokens.weight], dim=0)  # type: ignore
+    state_dict = converter._convert_state_dict(  # type: ignore
+        source_state_dict=facebook_mask_decoder.state_dict(),
+        target_state_dict=refiners_mask_decoder.state_dict(),
+        state_dict_mapping=mapping,
+    )
+    state_dict["IOUMaskEncoder.weight"] = torch.cat(
+        [facebook_mask_decoder.iou_token.weight, facebook_mask_decoder.mask_tokens.weight], dim=0
+    )  # type: ignore
     refiners_mask_decoder.load_state_dict(state_dict=state_dict)
 
     facebook_output = facebook_mask_decoder(**inputs)
