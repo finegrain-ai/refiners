@@ -74,15 +74,6 @@ class LatentDiffusionModel(fl.Module, ABC):
     def has_self_attention_guidance(self) -> bool: ...
 
     @abstractmethod
-    def has_ip_adapter(self) -> bool: ...
-
-    @abstractmethod
-    def get_ip_adapter_num_image_prompts(self) -> int: ...
-
-    @abstractmethod
-    def set_ip_adapter_mask(self, mask: tuple[Tensor, ...]) -> None: ...
-
-    @abstractmethod
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
     ) -> Tensor: ...
@@ -92,6 +83,7 @@ class LatentDiffusionModel(fl.Module, ABC):
     ) -> Tensor:
         timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
+
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 
@@ -103,6 +95,7 @@ class LatentDiffusionModel(fl.Module, ABC):
             noise += self.compute_self_attention_guidance(
                 x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
             )
+
         return self.scheduler(x, noise=noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:

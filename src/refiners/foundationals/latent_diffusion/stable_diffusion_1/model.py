@@ -7,12 +7,9 @@ from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSol
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter
-
 from PIL import Image
 import numpy as np
 from torch import device as Device, dtype as DType, Tensor
-from typing import List
 
 
 class SD1Autoencoder(LatentDiffusionAutoencoder):
@@ -54,7 +51,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         negative_embedding = self.clip_text_encoder(negative_text or "")
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, mask: Tensor = None, **kwargs: Tensor) -> None:
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
@@ -76,6 +73,7 @@ class StableDiffusion_1(LatentDiffusionModel):
             if isinstance(p, SD1SAGAdapter):
                 return p
         return None
+
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
     ) -> Tensor:
