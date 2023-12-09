@@ -277,7 +277,6 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         # so this becomes sqrt(num_queries*h/w)
         mask_height = find_closest_factors_to_goal(num_queries, math.sqrt(num_queries*ip_attention_mask_height/ip_attention_mask_width))
 
-        # print(mask_height, math.sqrt(num_queries)*ip_attention_mask_height/ip_attention_mask_width)
         if mask_height == -1:
             raise Exception("Change mask dimensions to be more square")
         mask_width = num_queries // mask_height
@@ -297,6 +296,7 @@ class ParallelLinear(fl.Linear):
             output.append(super().forward(xs[i]))
         output = tuple(output)
         return output
+
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
         self,
@@ -323,7 +323,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                             fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)),
                             fl.Chain(
                                 fl.UseContext("ip_mask", "mask"),
-                                fl.Lambda(func=lambda mask: mask[i])
+                                fl.Lambda(func=lambda *mask: mask[i])
                             )
                         ),
                         ParallelizeIPScaledDotProductAttentionArguments(),
@@ -459,7 +459,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             self._grid_image_encoder = [self.convert_to_grid_features(clip_image_encoder)]
         self._image_proj = [image_proj]
         self.num_image_prompts = num_image_prompts
-        self.set_ip_adapter_mask()
         self.sub_adapters = [
             CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=self.image_proj.num_tokens, num_image_prompts=num_image_prompts)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
@@ -546,7 +545,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
         transfomer_layers.pop()
         return encoder_clone
-    def set_ip_adapter_mask(self, mask: tuple[Tensor, ...]=tuple()) -> None:
+    def set_mask(self, mask: tuple[Tensor, ...]=tuple()) -> None:
         if mask is tuple():
-            mask = tuple([ones((1, 1, 1)).to(self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)])
+            mask = tuple([ones((2, 1, 1)).to(self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)])
         self.set_context("ip_mask", {"mask": mask})

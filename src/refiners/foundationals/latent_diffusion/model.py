@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import TypeVar, Callable
 from torch import Tensor, device as Device, dtype as DType
 from PIL import Image
 import torch
@@ -79,10 +79,11 @@ class LatentDiffusionModel(fl.Module, ABC):
     ) -> Tensor: ...
 
     def forward(
-        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
+        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, context_callback: Callable[[], None] = lambda: None, **kwargs: Tensor
     ) -> Tensor:
         timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
+        context_callback()
 
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)

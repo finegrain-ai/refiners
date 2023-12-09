@@ -7,6 +7,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.self_attention_guidance import SDXLSAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 from torch import device as Device, dtype as DType, Tensor
+from typing import Callable
 
 
 class SDXLAutoencoder(LatentDiffusionAutoencoder):
@@ -84,6 +85,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         pooled_text_embedding: Tensor,
         time_ids: Tensor,
         condition_scale: float = 5.0,
+        context_callback: Callable[[], None] = lambda: None,
         **kwargs: Tensor,
     ) -> Tensor:
         return super().forward(
@@ -93,6 +95,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
             condition_scale=condition_scale,
+            context_callback=context_callback,
             **kwargs,
         )
 
