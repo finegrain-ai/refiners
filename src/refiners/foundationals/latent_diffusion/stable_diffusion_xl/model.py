@@ -115,17 +115,6 @@ class StableDiffusion_XL(LatentDiffusionModel):
             if isinstance(p, SDXLSAGAdapter):
                 return p
         return None
-    def has_ip_adapter(self) -> bool:
-        return self._find_ip_adapter() is not None
-
-    def _find_ip_adapter(self) -> SDXLIPAdapter | None:
-        for p in self.unet.get_parents():
-            if isinstance(p, SDXLIPAdapter):
-                return p
-        return None
-    def set_ip_adapter_mask(self, mask) -> None:
-        ip_adapter = self._find_ip_adapter()
-        ip_adapter.set_ip_adapter_mask(mask)
     def compute_self_attention_guidance(
         self,
         x: Tensor,

@@ -459,6 +459,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             self._grid_image_encoder = [self.convert_to_grid_features(clip_image_encoder)]
         self._image_proj = [image_proj]
         self.num_image_prompts = num_image_prompts
+        self.set_ip_adapter_mask()
         self.sub_adapters = [
             CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=self.image_proj.num_tokens, num_image_prompts=num_image_prompts)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
@@ -479,7 +480,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     cross_attn_state_dict[k.removeprefix(prefix)] = v
 
                 cross_attn.load_state_dict(state_dict=cross_attn_state_dict)
-
     @property
     def clip_image_encoder(self) -> CLIPImageEncoderH:
         return self._clip_image_encoder[0]
@@ -546,7 +546,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
         transfomer_layers.pop()
         return encoder_clone
-    def set_ip_adapter_mask(self, mask) -> None:
-        if mask is None:
-            mask = [None for _ in range(self.num_image_prompts)]
+    def set_ip_adapter_mask(self, mask: tuple[Tensor, ...]=tuple()) -> None:
+        if mask is tuple():
+            mask = tuple([ones((1, 1, 1)).to(self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)])
         self.set_context("ip_mask", {"mask": mask})
