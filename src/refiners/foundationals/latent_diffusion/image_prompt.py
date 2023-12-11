@@ -1,17 +1,11 @@
 import math
 from enum import IntEnum
 from functools import partial
-<<<<<<< HEAD
 from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING, List
 import math
 
 from jaxtyping import Float
 from torch import Tensor, cat, softmax, zeros_like, ones, device as Device, dtype as DType
-=======
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
-
-from jaxtyping import Float
->>>>>>> 42a0fc4aa06f685efaffbe7ecb6550561d166811
 from PIL import Image
 from torch import Tensor, cat, device as Device, dtype as DType, softmax, zeros_like
 
