@@ -1,19 +1,19 @@
+import math
 from enum import IntEnum
 from functools import partial
-from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING
-import math
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
 from jaxtyping import Float
-from torch import Tensor, cat, softmax, zeros_like, device as Device, dtype as DType
 from PIL import Image
+from torch import Tensor, cat, device as Device, dtype as DType, softmax, zeros_like
 
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.adapters.lora import Lora
-from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, normalize
-import refiners.fluxion.layers as fl
+from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet

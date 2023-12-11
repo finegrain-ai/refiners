@@ -1,8 +1,8 @@
-from refiners.fluxion.layers.module import WeightedModule
-from torch.nn import Embedding as _Embedding
-from torch import Tensor, device as Device, dtype as DType
-
 from jaxtyping import Float, Int
+from torch import Tensor, device as Device, dtype as DType
+from torch.nn import Embedding as _Embedding
+
+from refiners.fluxion.layers.module import WeightedModule
 
 
 class Embedding(_Embedding, WeightedModule):  # type: ignore

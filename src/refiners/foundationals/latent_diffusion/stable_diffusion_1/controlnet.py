@@ -1,16 +1,18 @@
+from typing import Iterable, cast
+
+from torch import Tensor, device as Device, dtype as DType
+
+from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
-from refiners.fluxion.layers import Chain, Conv2d, SiLU, Lambda, Passthrough, UseContext, Slicing, Residual
+from refiners.fluxion.layers import Chain, Conv2d, Lambda, Passthrough, Residual, SiLU, Slicing, UseContext
+from refiners.foundationals.latent_diffusion.range_adapter import RangeAdapter2d
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
-    SD1UNet,
     DownBlocks,
     MiddleBlock,
     ResidualBlock,
+    SD1UNet,
     TimestepEncoder,
 )
-from refiners.fluxion.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.range_adapter import RangeAdapter2d
-from typing import cast, Iterable
-from torch import Tensor, device as Device, dtype as DType
 
 
 class ConditionEncoder(Chain):

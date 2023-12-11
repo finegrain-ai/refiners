@@ -1,23 +1,21 @@
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, Callable
+from typing import Callable, Iterator
 
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors
-
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.fluxion.adapters.lora import LoraAdapter, Lora
-
+from refiners.fluxion.adapters.lora import Lora, LoraAdapter
+from refiners.fluxion.utils import load_from_safetensors, load_metadata_from_safetensors
 from refiners.foundationals.clip.text_encoder import FeedForward, TransformerLayer
-from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion import (
-    StableDiffusion_1,
-    SD1UNet,
     CLIPTextEncoderL,
     LatentDiffusionAutoencoder,
+    SD1UNet,
+    StableDiffusion_1,
 )
+from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import Controlnet
 
 MODELS = ["unet", "text_encoder", "lda"]

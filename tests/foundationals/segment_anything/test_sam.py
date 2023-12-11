@@ -3,26 +3,25 @@ from pathlib import Path
 from typing import cast
 from warnings import warn
 
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
-import numpy as np
-
 from PIL import Image
-from torch import Tensor
-from refiners.fluxion import manual_seed
-from refiners.fluxion.model_converter import ModelConverter
-
-from refiners.fluxion.utils import image_to_tensor
-from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
-from refiners.foundationals.segment_anything.model import SegmentAnythingH
-from refiners.foundationals.segment_anything.transformer import TwoWayTranformerLayer
 from tests.foundationals.segment_anything.utils import (
     FacebookSAM,
     FacebookSAMPredictor,
     SAMPrompt,
     intersection_over_union,
 )
+from torch import Tensor
+
+from refiners.fluxion import manual_seed
+from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import image_to_tensor
+from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
+from refiners.foundationals.segment_anything.model import SegmentAnythingH
+from refiners.foundationals.segment_anything.transformer import TwoWayTranformerLayer
 
 # See predictor_example.ipynb official notebook (note: mask_input is not yet properly supported)
 PROMPTS: list[SAMPrompt] = [
@@ -235,8 +234,9 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
     point_embedding = torch.randn(1, 3, 256, device=facebook_sam_h.device)
     mask_embedding = torch.randn(1, 256, 64, 64, device=facebook_sam_h.device)
 
-    import refiners.fluxion.layers as fl
     from segment_anything.modeling.common import LayerNorm2d  # type: ignore
+
+    import refiners.fluxion.layers as fl
 
     assert issubclass(LayerNorm2d, nn.Module)
     custom_layers = {LayerNorm2d: fl.LayerNorm2d}

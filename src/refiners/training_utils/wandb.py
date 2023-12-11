@@ -1,4 +1,5 @@
 from typing import Any
+
 import wandb
 from PIL import Image
 

@@ -1,8 +1,10 @@
-from enum import Enum, auto
 from collections.abc import Sequence
-from torch import device as Device, dtype as DType, Tensor, nn
+from enum import Enum, auto
+
 import torch
 from jaxtyping import Float, Int
+from torch import Tensor, device as Device, dtype as DType, nn
+
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 

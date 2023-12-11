@@ -1,6 +1,7 @@
-from refiners.fluxion.adapters.lora import Lora, SingleLoraAdapter, LoraAdapter
-from torch import randn, allclose
+from torch import allclose, randn
+
 import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.lora import Lora, LoraAdapter, SingleLoraAdapter
 
 
 def test_single_lora_adapter() -> None:

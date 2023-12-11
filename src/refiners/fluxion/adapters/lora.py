@@ -1,11 +1,11 @@
-from typing import Iterable, Generic, TypeVar, Any
-
-import refiners.fluxion.layers as fl
-from refiners.fluxion.adapters.adapter import Adapter
+from typing import Any, Generic, Iterable, TypeVar
 
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn import Parameter as TorchParameter
-from torch.nn.init import zeros_, normal_
+from torch.nn.init import normal_, zeros_
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.adapter import Adapter
 
 T = TypeVar("T", bound=fl.Chain)
 TLoraAdapter = TypeVar("TLoraAdapter", bound="LoraAdapter[Any]")  # Self (see PEP 673)

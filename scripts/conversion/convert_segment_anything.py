@@ -1,20 +1,19 @@
 import argparse
 import types
 from typing import Any, Callable, cast
+
 import torch
 import torch.nn as nn
+from segment_anything import build_sam_vit_h  # type: ignore
+from segment_anything.modeling.common import LayerNorm2d  # type: ignore
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import manual_seed, save_to_safetensors
 from refiners.foundationals.segment_anything.image_encoder import SAMViTH
-from refiners.foundationals.segment_anything.prompt_encoder import PointEncoder, MaskEncoder
-
-from segment_anything import build_sam_vit_h  # type: ignore
-from segment_anything.modeling.common import LayerNorm2d  # type: ignore
-
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
+from refiners.foundationals.segment_anything.prompt_encoder import MaskEncoder, PointEncoder
 
 
 class FacebookSAM(nn.Module):
@@ -134,8 +133,9 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
     point_embedding = torch.randn(1, 3, 256)
     mask_embedding = torch.randn(1, 256, 64, 64)
 
-    import refiners.fluxion.layers as fl
     from segment_anything.modeling.common import LayerNorm2d  # type: ignore
+
+    import refiners.fluxion.layers as fl
 
     assert issubclass(LayerNorm2d, nn.Module)
     custom_layers = {LayerNorm2d: fl.LayerNorm2d}

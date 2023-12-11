@@ -1,4 +1,5 @@
 import pytest
+
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.layers import Chain, Linear
 

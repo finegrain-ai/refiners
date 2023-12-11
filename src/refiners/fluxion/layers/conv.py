@@ -1,4 +1,5 @@
-from torch import nn, device as Device, dtype as DType
+from torch import device as Device, dtype as DType, nn
+
 from refiners.fluxion.layers.module import WeightedModule
 
 

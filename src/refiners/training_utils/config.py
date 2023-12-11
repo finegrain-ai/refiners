@@ -1,17 +1,18 @@
+from enum import Enum
 from logging import warn
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Type, TypeVar
-from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
-from torch.optim import AdamW, SGD, Optimizer, Adam
-from torch.nn import Parameter
-from enum import Enum
-from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
-from pydantic import BaseModel, validator
-import tomli
-import refiners.fluxion.layers as fl
-from prodigyopt import Prodigy  # type: ignore
-from refiners.training_utils.dropout import apply_dropout, apply_gyro_dropout
 
+import tomli
+from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
+from prodigyopt import Prodigy  # type: ignore
+from pydantic import BaseModel, validator
+from torch.nn import Parameter
+from torch.optim import SGD, Adam, AdamW, Optimizer
+from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
+
+import refiners.fluxion.layers as fl
+from refiners.training_utils.dropout import apply_dropout, apply_gyro_dropout
 
 __all__ = [
     "parse_number_unit_field",

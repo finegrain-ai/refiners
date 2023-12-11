@@ -1,24 +1,24 @@
-from torch import Tensor, Size, device as Device, dtype as DType
+from torch import Size, Tensor, device as Device, dtype as DType
 
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (
-    Identity,
-    Flatten,
-    Unflatten,
-    Transpose,
-    Chain,
-    Parallel,
-    LayerNorm,
-    Attention,
-    UseContext,
-    Linear,
     GLU,
+    Attention,
+    Chain,
+    Conv2d,
+    Flatten,
     GeLU,
     GroupNorm,
-    Conv2d,
+    Identity,
+    LayerNorm,
+    Linear,
+    Parallel,
+    Residual,
     SelfAttention,
     SetContext,
-    Residual,
+    Transpose,
+    Unflatten,
+    UseContext,
 )
 
 

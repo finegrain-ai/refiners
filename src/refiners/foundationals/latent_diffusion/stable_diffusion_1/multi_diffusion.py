@@ -1,6 +1,7 @@
-from dataclasses import field, dataclass
-from torch import Tensor
+from dataclasses import dataclass, field
+
 from PIL import Image
+from torch import Tensor
 
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget, MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import (

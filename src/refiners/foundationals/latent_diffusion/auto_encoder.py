@@ -1,20 +1,21 @@
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (
     Chain,
     Conv2d,
+    Downsample,
     GroupNorm,
     Identity,
-    SiLU,
-    Downsample,
-    Upsample,
-    Sum,
-    SelfAttention2d,
-    Slicing,
     Residual,
+    SelfAttention2d,
+    SiLU,
+    Slicing,
+    Sum,
+    Upsample,
 )
 from refiners.fluxion.utils import image_to_tensor, tensor_to_image
-from torch import Tensor, device as Device, dtype as DType
-from PIL import Image
 
 
 class Resnet(Sum):

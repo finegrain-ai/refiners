@@ -1,20 +1,21 @@
 import random
 from typing import Any
-from pydantic import BaseModel
+
 from loguru import logger
-from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.latent_diffusion.lora import LoraTarget, LoraAdapter, MODELS, lora_targets
-import refiners.fluxion.layers as fl
+from pydantic import BaseModel
 from torch import Tensor
 from torch.utils.data import Dataset
 
+import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import save_to_safetensors
+from refiners.foundationals.latent_diffusion.lora import MODELS, LoraAdapter, LoraTarget, lora_targets
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
+    LatentDiffusionConfig,
+    LatentDiffusionTrainer,
     TextEmbeddingLatentsBatch,
     TextEmbeddingLatentsDataset,
-    LatentDiffusionTrainer,
-    LatentDiffusionConfig,
 )
 
 

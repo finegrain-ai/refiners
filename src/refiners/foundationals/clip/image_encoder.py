@@ -1,6 +1,7 @@
 from torch import device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
-from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
+from refiners.foundationals.clip.common import FeedForward, PositionalEncoder
 
 
 class ClassToken(fl.Chain):

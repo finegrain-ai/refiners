@@ -1,23 +1,23 @@
-from typing import Any
-from pydantic import BaseModel
-from loguru import logger
-from torch.utils.data import Dataset
-from torch import randn, Tensor
 import random
+from typing import Any
 
+from loguru import logger
+from pydantic import BaseModel
+from torch import Tensor, randn
+from torch.utils.data import Dataset
+
+from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.clip.concepts import ConceptExtender, EmbeddingExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, TokenEncoder
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.fluxion.utils import save_to_safetensors
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
-    TextEmbeddingLatentsBatch,
-    LatentDiffusionTrainer,
     LatentDiffusionConfig,
+    LatentDiffusionTrainer,
+    TextEmbeddingLatentsBatch,
     TextEmbeddingLatentsDataset,
 )
-
 
 IMAGENET_TEMPLATES_SMALL = [
     "a photo of a {}",

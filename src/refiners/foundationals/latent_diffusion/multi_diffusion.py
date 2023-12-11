@@ -8,7 +8,6 @@ from torch import Tensor, device as Device, dtype as DType
 
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 
-
 MAX_STEPS = 1000
 
 

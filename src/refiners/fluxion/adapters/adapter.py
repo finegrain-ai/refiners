@@ -1,7 +1,7 @@
 import contextlib
-import refiners.fluxion.layers as fl
-from typing import Any, Generic, TypeVar, Iterator
+from typing import Any, Generic, Iterator, TypeVar
 
+import refiners.fluxion.layers as fl
 
 T = TypeVar("T", bound=fl.Module)
 TAdapter = TypeVar("TAdapter", bound="Adapter[Any]")  # Self (see PEP 673)

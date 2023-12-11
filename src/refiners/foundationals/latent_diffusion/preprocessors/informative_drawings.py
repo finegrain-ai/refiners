@@ -1,6 +1,7 @@
 # Adapted from https://github.com/carolineec/informative-drawings, MIT License
 
 from torch import device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
 
 

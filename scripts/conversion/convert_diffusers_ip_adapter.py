@@ -1,11 +1,11 @@
+import argparse
 from pathlib import Path
 from typing import Any
-import argparse
 
 import torch
 
-from refiners.foundationals.latent_diffusion import SD1UNet, SD1IPAdapter, SDXLUNet, SDXLIPAdapter
 from refiners.fluxion.utils import save_to_safetensors
+from refiners.foundationals.latent_diffusion import SD1IPAdapter, SD1UNet, SDXLIPAdapter, SDXLUNet
 
 # Running:
 #

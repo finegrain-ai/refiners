@@ -1,11 +1,13 @@
 import gzip
-from pathlib import Path
+import re
 from functools import lru_cache
 from itertools import islice
-import re
+from pathlib import Path
+
 from torch import Tensor, tensor
-from refiners.fluxion import pad
+
 import refiners.fluxion.layers as fl
+from refiners.fluxion import pad
 
 
 class CLIPTokenizer(fl.Module):

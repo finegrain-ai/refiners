@@ -1,5 +1,6 @@
-from refiners.fluxion.layers.module import Module
 from torch.nn import PixelUnshuffle as _PixelUnshuffle
+
+from refiners.fluxion.layers.module import Module
 
 
 class PixelUnshuffle(_PixelUnshuffle, Module):

@@ -1,12 +1,12 @@
-from typing import Generic, TypeVar, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn import AvgPool2d as _AvgPool2d
 
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.module import Module
-import refiners.fluxion.layers as fl
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet

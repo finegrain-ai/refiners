@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from torch import Tensor, randint, cat, rand
+from torch import Tensor, cat, rand, randint
 from torch.nn import Dropout as TorchDropout
 
 import refiners.fluxion.layers as fl
-from refiners.training_utils.callback import Callback
 from refiners.fluxion.adapters.adapter import Adapter
+from refiners.training_utils.callback import Callback
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig

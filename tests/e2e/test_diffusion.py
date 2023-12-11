@@ -1,34 +1,32 @@
-import torch
-import pytest
-
-from typing import Iterator
-
-from warnings import warn
-from PIL import Image
 from pathlib import Path
+from typing import Iterator
+from warnings import warn
 
-from refiners.fluxion.utils import load_from_safetensors, image_to_tensor, manual_seed
+import pytest
+import torch
+from PIL import Image
+
+from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed
+from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
-    StableDiffusion_1,
-    StableDiffusion_1_Inpainting,
-    SD1UNet,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
+    SD1UNet,
+    SDFreeUAdapter,
     SDXLIPAdapter,
     SDXLT2IAdapter,
-    SDFreeUAdapter,
+    StableDiffusion_1,
+    StableDiffusion_1_Inpainting,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
+from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
-from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
-from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
-
 from tests.utils import ensure_similar_images
 
 

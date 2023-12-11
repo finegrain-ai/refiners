@@ -1,6 +1,7 @@
-import torch
-import pytest
 from warnings import warn
+
+import pytest
+import torch
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.layers.chain import ChainError, Distribute

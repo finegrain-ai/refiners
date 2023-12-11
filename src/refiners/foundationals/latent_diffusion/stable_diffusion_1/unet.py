@@ -1,12 +1,11 @@
-from typing import cast, Iterable
+from typing import Iterable, cast
 
 from torch import Tensor, device as Device, dtype as DType
 
-from refiners.fluxion.context import Contexts
 import refiners.fluxion.layers as fl
-
+from refiners.fluxion.context import Contexts
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder, RangeAdapter2d
+from refiners.foundationals.latent_diffusion.range_adapter import RangeAdapter2d, RangeEncoder
 
 
 class TimestepEncoder(fl.Passthrough):
