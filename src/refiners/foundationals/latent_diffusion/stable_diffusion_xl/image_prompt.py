@@ -3,7 +3,7 @@ from torch import Tensor
 from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, IPAdapter, PerceiverResampler
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 
 class SDXLIPAdapter(IPAdapter[SDXLUNet]):
