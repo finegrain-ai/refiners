@@ -29,3 +29,6 @@ wandb/
 
 # env variable definitions file
 .env
+
+# lock files
+requirements-dev.lock

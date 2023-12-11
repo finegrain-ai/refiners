@@ -1,11 +1,11 @@
 from typing import Iterator
 
-import torch
 import pytest
+import torch
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import lookup_top_adapter
-from refiners.foundationals.latent_diffusion import SD1UNet, SD1ControlnetAdapter
+from refiners.foundationals.latent_diffusion import SD1ControlnetAdapter, SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import Controlnet
 
 

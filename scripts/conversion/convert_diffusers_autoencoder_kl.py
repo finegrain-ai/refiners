@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
+
 import torch
-from torch import nn
 from diffusers import AutoencoderKL  # type: ignore
-from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
+from torch import nn
+
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 
 
 class Args(argparse.Namespace):
@@ -16,7 +18,9 @@ class Args(argparse.Namespace):
 
 def setup_converter(args: Args) -> ModelConverter:
     target = LatentDiffusionAutoencoder()
-    source: nn.Module = AutoencoderKL.from_pretrained(pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder)  # type: ignore
+    source: nn.Module = AutoencoderKL.from_pretrained(  # type: ignore
+        pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder
+    )  # type: ignore
     x = torch.randn(1, 3, 512, 512)
     converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
     if not converter.run(source_args=(x,)):

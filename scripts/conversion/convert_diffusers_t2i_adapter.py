@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
+
 import torch
-from torch import nn
 from diffusers import T2IAdapter  # type: ignore
-from refiners.foundationals.latent_diffusion.t2i_adapter import ConditionEncoder, ConditionEncoderXL
+from torch import nn
+
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.foundationals.latent_diffusion.t2i_adapter import ConditionEncoder, ConditionEncoderXL
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert a pretrained diffusers T2I-Adapter model to refiners")

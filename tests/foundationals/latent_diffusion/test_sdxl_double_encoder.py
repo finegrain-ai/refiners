@@ -1,12 +1,13 @@
-from typing import Any, Protocol, cast
 from pathlib import Path
+from typing import Any, Protocol, cast
 from warnings import warn
+
 import pytest
 import torch
 from torch import Tensor
 
-from refiners.fluxion.utils import manual_seed
 import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import manual_seed
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 
 
@@ -18,7 +19,8 @@ class DiffusersSDXL(Protocol):
     tokenizer_2: fl.Module
     vae: fl.Module
 
-    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any: ...
+    def __call__(self, prompt: str, *args: Any, **kwargs: Any) -> Any:
+        ...
 
     def encode_prompt(
         self,
@@ -26,7 +28,8 @@ class DiffusersSDXL(Protocol):
         prompt_2: str | None = None,
         negative_prompt: str | None = None,
         negative_prompt_2: str | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: ...
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        ...
 
 
 @pytest.fixture(scope="module")
@@ -67,9 +70,12 @@ def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder:
     manual_seed(seed=0)
     prompt = "A photo of a pizza."
 
-    prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = (
-        diffusers_sdxl.encode_prompt(prompt=prompt, negative_prompt="")
-    )
+    (
+        prompt_embeds,
+        negative_prompt_embeds,
+        pooled_prompt_embeds,
+        negative_pooled_prompt_embeds,
+    ) = diffusers_sdxl.encode_prompt(prompt=prompt, negative_prompt="")
 
     double_embedding, pooled_embedding = double_text_encoder(prompt)
 
@@ -77,11 +83,13 @@ def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder:
     assert pooled_embedding.shape == torch.Size([1, 1280])
 
     embedding_1, embedding_2 = cast(
-        tuple[Tensor, Tensor], prompt_embeds.split(split_size=[768, 1280], dim=-1)  # type: ignore
+        tuple[Tensor, Tensor],
+        prompt_embeds.split(split_size=[768, 1280], dim=-1),  # type: ignore
     )
 
     rembedding_1, rembedding_2 = cast(
-        tuple[Tensor, Tensor], double_embedding.split(split_size=[768, 1280], dim=-1)  # type: ignore
+        tuple[Tensor, Tensor],
+        double_embedding.split(split_size=[768, 1280], dim=-1),  # type: ignore
     )
 
     assert torch.allclose(input=embedding_1, other=rembedding_1, rtol=1e-3, atol=1e-3)

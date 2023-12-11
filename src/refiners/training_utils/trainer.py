@@ -1,41 +1,43 @@
-from functools import cached_property, wraps
-from pathlib import Path
 import random
 import time
+from functools import cached_property, wraps
+from pathlib import Path
+from typing import Any, Callable, Generic, Iterable, TypeVar, cast
+
 import numpy as np
-from torch import device as Device, Tensor, get_rng_state, no_grad, set_rng_state, cuda, stack
+from loguru import logger
+from torch import Tensor, cuda, device as Device, get_rng_state, no_grad, set_rng_state, stack
+from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import (
+    CosineAnnealingLR,
+    CosineAnnealingWarmRestarts,
+    CyclicLR,
+    ExponentialLR,
+    LambdaLR,
+    LRScheduler,
+    MultiplicativeLR,
+    MultiStepLR,
+    OneCycleLR,
+    ReduceLROnPlateau,
+    StepLR,
+)
 from torch.utils.data import DataLoader, Dataset
-from torch.autograd import backward
-from typing import Any, Callable, Generic, Iterable, TypeVar, cast
-from loguru import logger
+
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import manual_seed
-from refiners.training_utils.wandb import WandbLogger, WandbLoggable
-from refiners.training_utils.config import BaseConfig, TimeUnit, TimeValue, SchedulerType
-from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.callback import (
     Callback,
     ClockCallback,
     GradientNormClipping,
-    GradientValueClipping,
     GradientNormLogging,
+    GradientValueClipping,
     MonitorLoss,
 )
-from torch.optim.lr_scheduler import (
-    StepLR,
-    ExponentialLR,
-    ReduceLROnPlateau,
-    CosineAnnealingLR,
-    LambdaLR,
-    OneCycleLR,
-    LRScheduler,
-    MultiplicativeLR,
-    CosineAnnealingWarmRestarts,
-    CyclicLR,
-    MultiStepLR,
-)
+from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
+from refiners.training_utils.dropout import DropoutCallback
+from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -147,13 +149,11 @@ class TrainingClock:
 
     @cached_property
     def unit_to_steps(self) -> dict[TimeUnit, int]:
+        iteration_factor = self.num_batches_per_epoch if self.gradient_accumulation["unit"] == TimeUnit.EPOCH else 1
         return {
             TimeUnit.STEP: 1,
             TimeUnit.EPOCH: self.num_batches_per_epoch,
-            TimeUnit.ITERATION: self.gradient_accumulation["number"] * {
-                TimeUnit.STEP: 1,
-                TimeUnit.EPOCH: self.num_batches_per_epoch,
-            }.get(self.gradient_accumulation["unit"], 1),
+            TimeUnit.ITERATION: self.gradient_accumulation["number"] * iteration_factor,
         }
 
     def convert_time_unit_to_steps(self, number: int, unit: TimeUnit) -> int:

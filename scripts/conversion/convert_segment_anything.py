@@ -1,20 +1,19 @@
 import argparse
 import types
 from typing import Any, Callable, cast
+
 import torch
 import torch.nn as nn
+from segment_anything import build_sam_vit_h  # type: ignore
+from segment_anything.modeling.common import LayerNorm2d  # type: ignore
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import manual_seed, save_to_safetensors
 from refiners.foundationals.segment_anything.image_encoder import SAMViTH
-from refiners.foundationals.segment_anything.prompt_encoder import PointEncoder, MaskEncoder
-
-from segment_anything import build_sam_vit_h  # type: ignore
-from segment_anything.modeling.common import LayerNorm2d  # type: ignore
-
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
+from refiners.foundationals.segment_anything.prompt_encoder import MaskEncoder, PointEncoder
 
 
 class FacebookSAM(nn.Module):
@@ -51,7 +50,9 @@ def convert_mask_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
 
 def convert_point_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
-    point_embeddings: list[Tensor] = [pe.weight for pe in prompt_encoder.point_embeddings] + [prompt_encoder.not_a_point_embed.weight]  # type: ignore
+    point_embeddings: list[Tensor] = [pe.weight for pe in prompt_encoder.point_embeddings] + [
+        prompt_encoder.not_a_point_embed.weight
+    ]  # type: ignore
     pe = prompt_encoder.pe_layer.positional_encoding_gaussian_matrix  # type: ignore
     assert isinstance(pe, Tensor)
     state_dict: dict[str, Tensor] = {
@@ -80,10 +81,10 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     mapping = converter.map_state_dicts(source_args=(x,))
     assert mapping
 
-    mapping["PositionalEncoder.Parameter.parameter"] = "pos_embed"
+    mapping["PositionalEncoder.Parameter.weight"] = "pos_embed"
 
     target_state_dict = refiners_sam_vit_h.state_dict()
-    del target_state_dict["PositionalEncoder.Parameter.parameter"]
+    del target_state_dict["PositionalEncoder.Parameter.weight"]
 
     source_state_dict = vit.state_dict()
     pos_embed = source_state_dict["pos_embed"]
@@ -112,7 +113,8 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
     )
 
-    converted_source["PositionalEncoder.Parameter.parameter"] = pos_embed  # type: ignore
+    embed = pos_embed.reshape_as(refiners_sam_vit_h.PositionalEncoder.Parameter.weight)
+    converted_source["PositionalEncoder.Parameter.weight"] = embed  # type: ignore
     converted_source.update(rel_items)
 
     refiners_sam_vit_h.load_state_dict(state_dict=converted_source)
@@ -131,8 +133,9 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
     point_embedding = torch.randn(1, 3, 256)
     mask_embedding = torch.randn(1, 256, 64, 64)
 
-    import refiners.fluxion.layers as fl
     from segment_anything.modeling.common import LayerNorm2d  # type: ignore
+
+    import refiners.fluxion.layers as fl
 
     assert issubclass(LayerNorm2d, nn.Module)
     custom_layers = {LayerNorm2d: fl.LayerNorm2d}
@@ -160,8 +163,14 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
     assert mapping is not None
     mapping["IOUMaskEncoder"] = "iou_token"
 
-    state_dict = converter._convert_state_dict(source_state_dict=mask_decoder.state_dict(), target_state_dict=refiners_mask_decoder.state_dict(), state_dict_mapping=mapping)  # type: ignore
-    state_dict["IOUMaskEncoder.weight"] = torch.cat(tensors=[mask_decoder.iou_token.weight, mask_decoder.mask_tokens.weight], dim=0)  # type: ignore
+    state_dict = converter._convert_state_dict(  # type: ignore
+        source_state_dict=mask_decoder.state_dict(),
+        target_state_dict=refiners_mask_decoder.state_dict(),
+        state_dict_mapping=mapping,
+    )
+    state_dict["IOUMaskEncoder.weight"] = torch.cat(
+        tensors=[mask_decoder.iou_token.weight, mask_decoder.mask_tokens.weight], dim=0
+    )  # type: ignore
 
     refiners_mask_decoder.load_state_dict(state_dict=state_dict)
 

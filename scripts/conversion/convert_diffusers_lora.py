@@ -3,16 +3,15 @@ from pathlib import Path
 from typing import cast
 
 import torch
-from torch import Tensor
-from torch.nn.init import zeros_
-from torch.nn import Parameter as TorchParameter
-
 from diffusers import DiffusionPipeline  # type: ignore
+from torch import Tensor
+from torch.nn import Parameter as TorchParameter
+from torch.nn.init import zeros_
 
 import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.lora import Lora, LoraAdapter
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.fluxion.adapters.lora import Lora, LoraAdapter
 from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
 

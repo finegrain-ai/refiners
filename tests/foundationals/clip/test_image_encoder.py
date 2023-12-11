@@ -1,13 +1,12 @@
-import torch
-import pytest
-
-from warnings import warn
 from pathlib import Path
+from warnings import warn
 
+import pytest
+import torch
 from transformers import CLIPVisionModelWithProjection  # type: ignore
 
-from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 from refiners.fluxion.utils import load_from_safetensors
+from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 
 
 @pytest.fixture(scope="module")
@@ -33,7 +32,9 @@ def stabilityai_unclip_weights_path(test_weights_path: Path):
 
 @pytest.fixture(scope="module")
 def ref_encoder(stabilityai_unclip_weights_path: Path, test_device: torch.device) -> CLIPVisionModelWithProjection:
-    return CLIPVisionModelWithProjection.from_pretrained(stabilityai_unclip_weights_path, subfolder="image_encoder").to(test_device)  # type: ignore
+    return CLIPVisionModelWithProjection.from_pretrained(stabilityai_unclip_weights_path, subfolder="image_encoder").to(  # type: ignore
+        test_device  # type: ignore
+    )
 
 
 def test_encoder(

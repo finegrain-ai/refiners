@@ -1,15 +1,13 @@
-import torch
-import pytest
-
-from warnings import warn
 from pathlib import Path
+from warnings import warn
 
-from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
-from refiners.fluxion.utils import load_from_safetensors
-
+import pytest
+import torch
 import transformers  # type: ignore
-from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
+from refiners.fluxion.utils import load_from_safetensors
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
 long_prompt = """
 Above these apparent hieroglyphics was a figure of evidently pictorial intent,

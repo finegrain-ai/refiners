@@ -1,15 +1,16 @@
-from collections import defaultdict
 import inspect
 import re
 import sys
 import traceback
+from collections import defaultdict
 from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
+
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
-from refiners.fluxion.layers.module import Module, ContextModule, ModuleTree, WeightedModule
-from refiners.fluxion.context import Contexts, ContextProvider
-from refiners.fluxion.utils import summarize_tensor
 
+from refiners.fluxion.context import ContextProvider, Contexts
+from refiners.fluxion.layers.module import ContextModule, Module, ModuleTree, WeightedModule
+from refiners.fluxion.utils import summarize_tensor
 
 T = TypeVar("T", bound=Module)
 TChain = TypeVar("TChain", bound="Chain")  # because Self (PEP 673) is not in 3.10
@@ -292,13 +293,16 @@ class Chain(ContextModule):
         return Chain(*self, *other)
 
     @overload
-    def __getitem__(self, key: int) -> Module: ...
+    def __getitem__(self, key: int) -> Module:
+        ...
 
     @overload
-    def __getitem__(self, key: str) -> Module: ...
+    def __getitem__(self, key: str) -> Module:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> "Chain": ...
+    def __getitem__(self, key: slice) -> "Chain":
+        ...
 
     def __getitem__(self, key: int | str | slice) -> Module:
         if isinstance(key, slice):
@@ -346,10 +350,12 @@ class Chain(ContextModule):
     @overload
     def walk(
         self, predicate: Callable[[Module, "Chain"], bool] | None = None, recurse: bool = False
-    ) -> Iterator[tuple[Module, "Chain"]]: ...
+    ) -> Iterator[tuple[Module, "Chain"]]:
+        ...
 
     @overload
-    def walk(self, predicate: type[T], recurse: bool = False) -> Iterator[tuple[T, "Chain"]]: ...
+    def walk(self, predicate: type[T], recurse: bool = False) -> Iterator[tuple[T, "Chain"]]:
+        ...
 
     def walk(
         self, predicate: type[T] | Callable[[Module, "Chain"], bool] | None = None, recurse: bool = False

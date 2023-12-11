@@ -1,11 +1,11 @@
-from refiners.fluxion.layers.chain import Chain, UseContext, SetContext
-from refiners.fluxion.layers.conv import Conv2d
+from torch import Size, Tensor, device as Device, dtype as DType
+from torch.nn.functional import pad
+
 from refiners.fluxion.layers.basics import Identity
-from refiners.fluxion.layers.chain import Parallel, Lambda
+from refiners.fluxion.layers.chain import Chain, Lambda, Parallel, SetContext, UseContext
+from refiners.fluxion.layers.conv import Conv2d
 from refiners.fluxion.layers.module import Module
 from refiners.fluxion.utils import interpolate
-from torch.nn.functional import pad
-from torch import Tensor, Size, device as Device, dtype as DType
 
 
 class Downsample(Chain):

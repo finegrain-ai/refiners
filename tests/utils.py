@@ -1,6 +1,6 @@
-import torch
-import piq  # type: ignore
 import numpy as np
+import piq  # type: ignore
+import torch
 from PIL import Image
 
 

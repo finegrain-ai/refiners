@@ -1,20 +1,29 @@
+import math
 from enum import IntEnum
 from functools import partial
+<<<<<<< HEAD
 from typing import Generic, TypeVar, Any, Callable, TYPE_CHECKING, List
 import math
 
 from jaxtyping import Float
 from torch import Tensor, cat, softmax, zeros_like, ones, device as Device, dtype as DType
-from PIL import Image
+=======
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
+from jaxtyping import Float
+>>>>>>> 42a0fc4aa06f685efaffbe7ecb6550561d166811
+from PIL import Image
+from torch import Tensor, cat, device as Device, dtype as DType, softmax, zeros_like
+
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.adapters.lora import Lora
-from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, normalize
 import refiners.fluxion.layers as fl
 import torch.nn.functional as F
+from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
@@ -166,18 +175,13 @@ class PerceiverAttention(fl.Chain):
         return cat((x, latents), dim=-2)
 
 
-class LatentsEncoder(fl.Chain):
+class LatentsToken(fl.Chain):
     def __init__(
-        self,
-        num_tokens: int,
-        embeddding_dim: int,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
+        self, num_tokens: int, latents_dim: int, device: Device | str | None = None, dtype: DType | None = None
     ) -> None:
-        super().__init__(
-            fl.Parallel(fl.Identity(), fl.Parameter(num_tokens, embeddding_dim, device=device, dtype=dtype)),
-            fl.Lambda(lambda x, p: p.expand(x.shape[0], -1, -1)),
-        )
+        self.num_tokens = num_tokens
+        self.latents_dim = latents_dim
+        super().__init__(fl.Parameter(num_tokens, latents_dim, device=device, dtype=dtype))
 
 
 class Transformer(fl.Chain):
@@ -212,7 +216,7 @@ class PerceiverResampler(fl.Chain):
         super().__init__(
             fl.Linear(in_features=input_dim, out_features=latents_dim, device=device, dtype=dtype),
             fl.SetContext(context="perceiver_resampler", key="x"),
-            LatentsEncoder(num_tokens=num_tokens, embeddding_dim=latents_dim, device=device, dtype=dtype),
+            LatentsToken(num_tokens, latents_dim, device=device, dtype=dtype),
             Transformer(
                 TransformerLayer(
                     fl.Residual(

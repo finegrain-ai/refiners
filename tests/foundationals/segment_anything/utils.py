@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from jaxtyping import Bool
-from torch import Tensor, nn
 import numpy as np
 import numpy.typing as npt
 import torch
+from jaxtyping import Bool
+from torch import Tensor, nn
 
 NDArrayUInt8 = npt.NDArray[np.uint8]
 NDArray = npt.NDArray[Any]
@@ -32,16 +32,19 @@ class FacebookSAM(nn.Module):
     prompt_encoder: nn.Module
     mask_decoder: nn.Module
 
-    def __call__(self, batched_input: list[SAMInput], multimask_output: bool) -> list[SAMOutput]: ...
+    def __call__(self, batched_input: list[SAMInput], multimask_output: bool) -> list[SAMOutput]:
+        ...
 
     @property
-    def device(self) -> Any: ...
+    def device(self) -> Any:
+        ...
 
 
 class FacebookSAMPredictor:
     model: FacebookSAM
 
-    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None: ...
+    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None:
+        ...
 
     def predict(
         self,
@@ -51,7 +54,8 @@ class FacebookSAMPredictor:
         mask_input: NDArray | None = None,
         multimask_output: bool = True,
         return_logits: bool = False,
-    ) -> tuple[NDArray, NDArray, NDArray]: ...
+    ) -> tuple[NDArray, NDArray, NDArray]:
+        ...
 
 
 @dataclass

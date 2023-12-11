@@ -1,11 +1,10 @@
-from torch import device as Device, dtype as DType
+from jaxtyping import Float
+from torch import Tensor, device as Device, dtype as DType
 from torch.nn import Linear as _Linear
-from torch import Tensor
-from refiners.fluxion.layers.module import Module, WeightedModule
+
 from refiners.fluxion.layers.activations import ReLU
 from refiners.fluxion.layers.chain import Chain
-
-from jaxtyping import Float
+from refiners.fluxion.layers.module import Module, WeightedModule
 
 
 class Linear(_Linear, WeightedModule):

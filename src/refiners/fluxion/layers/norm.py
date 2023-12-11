@@ -1,5 +1,6 @@
-from torch import nn, ones, zeros, Tensor, sqrt, device as Device, dtype as DType
 from jaxtyping import Float
+from torch import Tensor, device as Device, dtype as DType, nn, ones, sqrt, zeros
+
 from refiners.fluxion.layers.module import Module, WeightedModule
 
 

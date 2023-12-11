@@ -2,7 +2,11 @@ from abc import ABC, abstractmethod
 from typing import TypeVar, Callable
 from torch import Tensor, device as Device, dtype as DType
 from PIL import Image
+
 import torch
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
@@ -65,18 +69,22 @@ class LatentDiffusionModel(fl.Module, ABC):
         return self.scheduler.steps
 
     @abstractmethod
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None: ...
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
+        ...
 
     @abstractmethod
-    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None: ...
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
+        ...
 
     @abstractmethod
-    def has_self_attention_guidance(self) -> bool: ...
+    def has_self_attention_guidance(self) -> bool:
+        ...
 
     @abstractmethod
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
-    ) -> Tensor: ...
+    ) -> Tensor:
+        ...
 
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, context_callback: Callable[[], None] = lambda: None, **kwargs: Tensor

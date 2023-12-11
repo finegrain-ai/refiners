@@ -1,6 +1,7 @@
-from refiners.foundationals.latent_diffusion import SD1UNet
-from refiners.fluxion import manual_seed
 import torch
+
+from refiners.fluxion import manual_seed
+from refiners.foundationals.latent_diffusion import SD1UNet
 
 
 def test_unet_context_flush():

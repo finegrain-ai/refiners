@@ -1,6 +1,7 @@
 import os
-import torch
 from pathlib import Path
+
+import torch
 from pytest import fixture
 
 PARENT_PATH = Path(__file__).parent

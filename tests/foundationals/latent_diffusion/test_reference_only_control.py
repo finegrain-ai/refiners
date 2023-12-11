@@ -1,15 +1,14 @@
-import torch
 import pytest
-
+import torch
 
 from refiners.foundationals.latent_diffusion import SD1UNet
+from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock
 from refiners.foundationals.latent_diffusion.reference_only_control import (
     ReferenceOnlyControlAdapter,
     SaveLayerNormAdapter,
     SelfAttentionInjectionAdapter,
     SelfAttentionInjectionPassthrough,
 )
-from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock
 
 
 @torch.no_grad()

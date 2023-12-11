@@ -8,7 +8,6 @@ from torch import Tensor, device as Device, dtype as DType
 
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 
-
 MAX_STEPS = 1000
 
 
@@ -69,7 +68,8 @@ class MultiDiffusion(Generic[T, D], ABC):
         return torch.where(condition=num_updates > 0, input=cumulative_values / num_updates, other=x)
 
     @abstractmethod
-    def diffuse_target(self, x: Tensor, step: int, target: D) -> Tensor: ...
+    def diffuse_target(self, x: Tensor, step: int, target: D) -> Tensor:
+        ...
 
     @property
     def steps(self) -> list[int]:

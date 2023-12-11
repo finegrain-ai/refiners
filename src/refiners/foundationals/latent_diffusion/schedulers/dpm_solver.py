@@ -1,7 +1,9 @@
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
-import numpy as np
-from torch import Tensor, device as Device, tensor, exp, float32, dtype as Dtype
 from collections import deque
+
+import numpy as np
+from torch import Tensor, device as Device, dtype as Dtype, exp, float32, tensor
+
+from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
 
 class DPMSolver(Scheduler):
@@ -16,6 +18,7 @@ class DPMSolver(Scheduler):
         num_train_timesteps: int = 1_000,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
+        noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
@@ -24,6 +27,7 @@ class DPMSolver(Scheduler):
             num_train_timesteps=num_train_timesteps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
+            noise_schedule=noise_schedule,
             device=device,
             dtype=dtype,
         )

@@ -1,8 +1,8 @@
 from torch import Tensor
 
-from refiners.foundationals.latent_diffusion.t2i_adapter import T2IAdapter, T2IFeatures, ConditionEncoder
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet, ResidualAccumulator
 import refiners.fluxion.layers as fl
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import ResidualAccumulator, SD1UNet
+from refiners.foundationals.latent_diffusion.t2i_adapter import ConditionEncoder, T2IAdapter, T2IFeatures
 
 
 class SD1T2IAdapter(T2IAdapter[SD1UNet]):

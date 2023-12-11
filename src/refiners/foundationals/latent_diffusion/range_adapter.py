@@ -1,9 +1,10 @@
 import math
-from torch import Tensor, arange, float32, exp, sin, cat, cos, device as Device, dtype as DType
-from jaxtyping import Float, Int
 
-from refiners.fluxion.adapters.adapter import Adapter
+from jaxtyping import Float, Int
+from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, exp, float32, sin
+
 import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.adapter import Adapter
 
 
 def compute_sinusoidal_embedding(

@@ -1,10 +1,11 @@
 # pyright: reportPrivateUsage=false
 import pytest
 import torch
-from torch import nn, Tensor
-from refiners.fluxion.utils import manual_seed
-from refiners.fluxion.model_converter import ModelConverter, ConversionStage
+from torch import Tensor, nn
+
 import refiners.fluxion.layers as fl
+from refiners.fluxion.model_converter import ConversionStage, ModelConverter
+from refiners.fluxion.utils import manual_seed
 
 
 class CustomBasicLayer1(fl.Module):

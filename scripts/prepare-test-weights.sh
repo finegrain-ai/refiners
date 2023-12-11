@@ -302,7 +302,7 @@ convert_unclip () {
         --from "tests/weights/stabilityai/stable-diffusion-2-1-unclip" \
         --to "tests/weights/CLIPImageEncoderH.safetensors" \
         --half
-    check_hash "tests/weights/CLIPImageEncoderH.safetensors" 82918ff4
+    check_hash "tests/weights/CLIPImageEncoderH.safetensors" 4ddb44d2
 }
 
 convert_ip_adapter () {
@@ -321,13 +321,13 @@ convert_ip_adapter () {
         --from "tests/weights/h94/IP-Adapter/models/ip-adapter-plus_sd15.bin" \
         --to "tests/weights/ip-adapter-plus_sd15.safetensors" \
         --half
-    check_hash "tests/weights/ip-adapter-plus_sd15.safetensors" 346a31d1
+    check_hash "tests/weights/ip-adapter-plus_sd15.safetensors" 842b20e2
 
     python scripts/conversion/convert_diffusers_ip_adapter.py \
         --from "tests/weights/h94/IP-Adapter/sdxl_models/ip-adapter-plus_sdxl_vit-h.bin" \
         --to "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" \
         --half
-    check_hash "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" d195feb3
+    check_hash "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors" 0409974b
 }
 
 convert_t2i_adapter () {
@@ -349,7 +349,7 @@ convert_sam () {
     python scripts/conversion/convert_segment_anything.py \
         --from "tests/weights/sam_vit_h_4b8939.pth" \
         --to "tests/weights/segment-anything-h.safetensors"
-    check_hash "tests/weights/segment-anything-h.safetensors" 321d6f23
+    check_hash "tests/weights/segment-anything-h.safetensors" 6b843800
 }
 
 download_all () {

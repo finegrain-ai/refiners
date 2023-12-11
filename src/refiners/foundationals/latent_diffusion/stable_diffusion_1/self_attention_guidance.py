@@ -1,11 +1,11 @@
+import refiners.fluxion.layers as fl
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.foundationals.latent_diffusion.self_attention_guidance import (
     SAGAdapter,
-    SelfAttentionShape,
     SelfAttentionMap,
+    SelfAttentionShape,
 )
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet, MiddleBlock, ResidualBlock
-from refiners.fluxion.layers.attentions import ScaledDotProductAttention
-import refiners.fluxion.layers as fl
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import MiddleBlock, ResidualBlock, SD1UNet
 
 
 class SD1SAGAdapter(SAGAdapter[SD1UNet]):

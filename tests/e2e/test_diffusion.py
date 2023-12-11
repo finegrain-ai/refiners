@@ -1,32 +1,32 @@
-import torch
-import pytest
-
-from typing import Iterator
-
-from warnings import warn
-from PIL import Image
 from pathlib import Path
+from typing import Iterator
+from warnings import warn
 
-from refiners.fluxion.utils import load_from_safetensors, image_to_tensor, manual_seed
+import pytest
+import torch
+from PIL import Image
+
+from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed
+from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
-    StableDiffusion_1,
-    StableDiffusion_1_Inpainting,
-    SD1UNet,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
+    SD1UNet,
+    SDFreeUAdapter,
     SDXLIPAdapter,
     SDXLT2IAdapter,
+    StableDiffusion_1,
+    StableDiffusion_1_Inpainting,
 )
 from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
+from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.schedulers import DDIM
-from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
-from refiners.foundationals.clip.concepts import ConceptExtender
+from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
-
 from tests.utils import ensure_similar_images
 
 
@@ -63,6 +63,11 @@ def statue_image(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_std_random_init(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_std_random_init.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_karras_random_init(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_karras_random_init.png").convert("RGB")
 
 
 @pytest.fixture
@@ -225,6 +230,11 @@ def expected_multi_diffusion(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_restart(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_restart.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_freeu(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -411,6 +421,24 @@ def sd15_ddim(
 
 
 @pytest.fixture
+def sd15_ddim_karras(
+    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+) -> StableDiffusion_1:
+    if test_device.type == "cpu":
+        warn("not running on CPU, skipping")
+        pytest.skip()
+
+    ddim_scheduler = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_std)
+
+    return sd15
+
+
+@pytest.fixture
 def sd15_ddim_lda_ft_mse(
     text_encoder_weights: Path, lda_ft_mse_weights: Path, unet_weights_std: Path, test_device: torch.device
 ) -> StableDiffusion_1:
@@ -499,6 +527,31 @@ def test_diffusion_std_random_init(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init)
+
+
+@torch.no_grad()
+def test_diffusion_karras_random_init(
+    sd15_ddim_karras: StableDiffusion_1, expected_karras_random_init: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_ddim_karras
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_karras_random_init, min_psnr=35, min_ssim=0.98)
 
 
 @torch.no_grad()
@@ -1604,3 +1657,37 @@ def test_restart(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
+
+
+@torch.no_grad()
+def test_freeu(
+    sd15_std: StableDiffusion_1,
+    expected_freeu: Image.Image,
+):
+    sd15 = sd15_std
+    n_steps = 50
+    first_step = 1
+
+    prompt = "best quality, high quality cute cat"
+    negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    SDFreeUAdapter(
+        sd15.unet, backbone_scales=[1.2, 1.2, 1.2, 1.4, 1.4, 1.4], skip_scales=[0.9, 0.9, 0.9, 0.2, 0.2, 0.2]
+    ).inject()
+
+    manual_seed(9752)
+    x = sd15.init_latents(size=(512, 512), first_step=first_step).to(device=sd15.device, dtype=sd15.dtype)
+
+    for step in sd15.steps[first_step:]:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_freeu)

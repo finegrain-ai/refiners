@@ -1,13 +1,14 @@
+import re
+from typing import cast
+
+import torch.nn.functional as F
+from torch import Tensor, cat, zeros
+from torch.nn import Parameter
+
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, TokenEncoder
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-import refiners.fluxion.layers as fl
-from typing import cast
-
-from torch import Tensor, cat, zeros
-import torch.nn.functional as F
-from torch.nn import Parameter
-import re
 
 
 class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):

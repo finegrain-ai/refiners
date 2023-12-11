@@ -1,9 +1,9 @@
-from torch import device as Device, dtype as DType, Tensor
-from refiners.fluxion.context import Contexts
-import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import pad
-from torch import nn
 import torch
+from torch import Tensor, device as Device, dtype as DType, nn
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.context import Contexts
+from refiners.fluxion.utils import pad
 
 
 class PatchEncoder(fl.Chain):
@@ -46,7 +46,6 @@ class PositionalEncoder(fl.Residual):
         self.image_embedding_size = image_embedding_size
         super().__init__(
             fl.Parameter(
-                1,
                 image_embedding_size[0],
                 image_embedding_size[1],
                 embedding_dim,

@@ -1,13 +1,14 @@
 import math
 from typing import Any, Generic, TypeVar
 
-import refiners.fluxion.layers as fl
 import torch
+from torch import Tensor
+from torch.fft import fftn, fftshift, ifftn, ifftshift  # type: ignore
+
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import ResidualConcatenator, SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from torch import Tensor
-from torch.fft import fftn, fftshift, ifftn, ifftshift  # type: ignore
 
 T = TypeVar("T", bound="SD1UNet | SDXLUNet")
 TSDFreeUAdapter = TypeVar("TSDFreeUAdapter", bound="SDFreeUAdapter[Any]")  # Self (see PEP 673)

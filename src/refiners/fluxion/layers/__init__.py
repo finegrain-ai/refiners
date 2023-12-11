@@ -1,49 +1,50 @@
-from refiners.fluxion.layers.activations import GLU, SiLU, ReLU, ApproximateGeLU, GeLU, Sigmoid
-from refiners.fluxion.layers.norm import LayerNorm, GroupNorm, LayerNorm2d, InstanceNorm2d
+from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
 from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
 from refiners.fluxion.layers.basics import (
-    Identity,
-    View,
+    Buffer,
+    Chunk,
+    Cos,
     Flatten,
-    Unflatten,
-    Transpose,
     GetArg,
+    Identity,
+    Multiply,
+    Parameter,
     Permute,
     Reshape,
-    Squeeze,
-    Unsqueeze,
-    Slicing,
     Sin,
-    Cos,
-    Chunk,
-    Multiply,
+    Slicing,
+    Squeeze,
+    Transpose,
     Unbind,
-    Parameter,
-    Buffer,
+    Unflatten,
+    Unsqueeze,
+    View,
 )
 from refiners.fluxion.layers.chain import (
+    Breakpoint,
+    Chain,
+    Concatenate,
+    Distribute,
     Lambda,
-    Sum,
+    Matmul,
+    Parallel,
+    Passthrough,
     Residual,
     Return,
-    Chain,
-    UseContext,
     SetContext,
-    Parallel,
-    Distribute,
-    Passthrough,
-    Breakpoint,
-    Concatenate,
-    Matmul,
+    Sum,
+    UseContext,
 )
 from refiners.fluxion.layers.conv import Conv2d, ConvTranspose2d
+from refiners.fluxion.layers.converter import Converter
+from refiners.fluxion.layers.embedding import Embedding
 from refiners.fluxion.layers.linear import Linear, MultiLinear
-from refiners.fluxion.layers.module import Module, WeightedModule, ContextModule
+from refiners.fluxion.layers.maxpool import MaxPool1d, MaxPool2d
+from refiners.fluxion.layers.module import ContextModule, Module, WeightedModule
+from refiners.fluxion.layers.norm import GroupNorm, InstanceNorm2d, LayerNorm, LayerNorm2d
 from refiners.fluxion.layers.padding import ReflectionPad2d
 from refiners.fluxion.layers.pixelshuffle import PixelUnshuffle
-from refiners.fluxion.layers.sampling import Downsample, Upsample, Interpolate
-from refiners.fluxion.layers.embedding import Embedding
-from refiners.fluxion.layers.converter import Converter
+from refiners.fluxion.layers.sampling import Downsample, Interpolate, Upsample
 
 __all__ = [
     "Embedding",
@@ -104,4 +105,6 @@ __all__ = [
     "ReflectionPad2d",
     "PixelUnshuffle",
     "Converter",
+    "MaxPool1d",
+    "MaxPool2d",
 ]

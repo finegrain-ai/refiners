@@ -1,36 +1,38 @@
+import random
 from dataclasses import dataclass
-from typing import Any, TypeVar, TypedDict, Callable
-from pydantic import BaseModel
-from torch import device as Device, Tensor, randn, dtype as DType, Generator, cat
-from loguru import logger
-from torch.utils.data import Dataset
-from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
-import refiners.fluxion.layers as fl
-from PIL import Image
 from functools import cached_property
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
-from refiners.training_utils.config import BaseConfig
+from typing import Any, Callable, TypedDict, TypeVar
+
+from loguru import logger
+from PIL import Image
+from pydantic import BaseModel
+from torch import Generator, Tensor, cat, device as Device, dtype as DType, randn
+from torch.nn import Module
+from torch.nn.functional import mse_loss
+from torch.utils.data import Dataset
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
+
+import refiners.fluxion.layers as fl
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion import (
-    StableDiffusion_1,
     DPMSolver,
     SD1UNet,
+    StableDiffusion_1,
 )
 from refiners.foundationals.latent_diffusion.schedulers import DDPM
-from torch.nn.functional import mse_loss
-import random
-from refiners.training_utils.wandb import WandbLoggable
-from refiners.training_utils.trainer import Trainer
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.huggingface_datasets import load_hf_dataset, HuggingfaceDataset
-from torch.nn import Module
+from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, load_hf_dataset
+from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.wandb import WandbLoggable
 
 
 class LatentDiffusionConfig(BaseModel):
     unconditional_sampling_probability: float = 0.2
     offset_noise: float = 0.1
-    min_timestep: int = 0
-    max_timestep: int = 999
+    min_step: int = 0
+    max_step: int = 999
 
 
 class TestDiffusionConfig(BaseModel):
@@ -154,9 +156,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         ).to(device=self.device)
 
     def sample_timestep(self) -> Tensor:
-        random_step = random.randint(
-            a=self.config.latent_diffusion.min_timestep, b=self.config.latent_diffusion.max_timestep
-        )
+        random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
         return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
 

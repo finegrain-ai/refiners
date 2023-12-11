@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING, Generic, Iterable, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterable, TypeVar
+
+from loguru import logger
 from torch import tensor
 from torch.nn import Parameter
-from loguru import logger
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
@@ -42,59 +43,82 @@ T = TypeVar("T")
 
 
 class Callback(Generic[T]):
-    def on_train_begin(self, trainer: T) -> None: ...
+    def on_train_begin(self, trainer: T) -> None:
+        ...
 
-    def on_train_end(self, trainer: T) -> None: ...
+    def on_train_end(self, trainer: T) -> None:
+        ...
 
-    def on_epoch_begin(self, trainer: T) -> None: ...
+    def on_epoch_begin(self, trainer: T) -> None:
+        ...
 
-    def on_epoch_end(self, trainer: T) -> None: ...
+    def on_epoch_end(self, trainer: T) -> None:
+        ...
 
-    def on_batch_begin(self, trainer: T) -> None: ...
+    def on_batch_begin(self, trainer: T) -> None:
+        ...
 
-    def on_batch_end(self, trainer: T) -> None: ...
+    def on_batch_end(self, trainer: T) -> None:
+        ...
 
-    def on_backward_begin(self, trainer: T) -> None: ...
+    def on_backward_begin(self, trainer: T) -> None:
+        ...
 
-    def on_backward_end(self, trainer: T) -> None: ...
+    def on_backward_end(self, trainer: T) -> None:
+        ...
 
-    def on_optimizer_step_begin(self, trainer: T) -> None: ...
+    def on_optimizer_step_begin(self, trainer: T) -> None:
+        ...
 
-    def on_optimizer_step_end(self, trainer: T) -> None: ...
+    def on_optimizer_step_end(self, trainer: T) -> None:
+        ...
 
-    def on_compute_loss_begin(self, trainer: T) -> None: ...
+    def on_compute_loss_begin(self, trainer: T) -> None:
+        ...
 
-    def on_compute_loss_end(self, trainer: T) -> None: ...
+    def on_compute_loss_end(self, trainer: T) -> None:
+        ...
 
-    def on_evaluate_begin(self, trainer: T) -> None: ...
+    def on_evaluate_begin(self, trainer: T) -> None:
+        ...
 
-    def on_evaluate_end(self, trainer: T) -> None: ...
+    def on_evaluate_end(self, trainer: T) -> None:
+        ...
 
-    def on_lr_scheduler_step_begin(self, trainer: T) -> None: ...
+    def on_lr_scheduler_step_begin(self, trainer: T) -> None:
+        ...
 
-    def on_lr_scheduler_step_end(self, trainer: T) -> None: ...
+    def on_lr_scheduler_step_end(self, trainer: T) -> None:
+        ...
 
-    def on_checkpoint_save(self, trainer: T) -> None: ...
+    def on_checkpoint_save(self, trainer: T) -> None:
+        ...
 
 
 class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
     def on_train_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.reset()
-        logger.info(f"""Starting training for a total of:
-            {trainer.clock.num_steps} steps.
-            {trainer.clock.num_epochs} epochs.
-            {trainer.clock.num_iterations} iterations.
-        """)
+        logger.info(
+            (
+                "Starting training for a total of: "
+                f"{trainer.clock.num_steps} steps, "
+                f"{trainer.clock.num_epochs} epochs, "
+                f"{trainer.clock.num_iterations} iterations."
+            )
+        )
         trainer.clock.start_timer()
 
     def on_train_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.stop_timer()
-        logger.info(f"""Training took:
-            {trainer.clock.time_elapsed} seconds.
-            {trainer.clock.iteration} iterations.
-            {trainer.clock.epoch} epochs.
-            {trainer.clock.step} steps.
-        """)
+        logger.info(
+            (
+                "Training took: "
+                f"{trainer.clock.time_elapsed} seconds, "
+                f"{trainer.clock.iteration} iterations, "
+                f"{trainer.clock.epoch} epochs, "
+                f"{trainer.clock.step} steps."
+            )
+        )
 
     def on_epoch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         logger.info(f"Epoch {trainer.clock.epoch} started.")

@@ -37,6 +37,7 @@ Special cases:
 - For self-attention guidance, `StableDiffusionSAGPipeline` has been used instead of the default pipeline.
 - `expected_refonly.png` has been generated [with Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui).
 - The following references have been generated with refiners itself (and inspected so that they look reasonable):
+    - `expected_karras_random_init.png`,
     - `expected_inpainting_refonly.png`,
     - `expected_image_ip_adapter_woman.png`,
     - `expected_image_sdxl_ip_adapter_woman.png`
@@ -45,6 +46,7 @@ Special cases:
     - `expected_image_sdxl_ip_adapter_plus_woman.png`
     - `expected_cutecat_sdxl_ddim_random_init_sag.png`
     - `expected_restart.png`
+    - `expected_freeu.png`
 
 ## Other images
 

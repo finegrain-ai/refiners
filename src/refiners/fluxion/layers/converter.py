@@ -1,5 +1,6 @@
-from refiners.fluxion.layers.module import ContextModule
 from torch import Tensor
+
+from refiners.fluxion.layers.module import ContextModule
 
 
 class Converter(ContextModule):

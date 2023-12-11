@@ -1,7 +1,8 @@
-from refiners.fluxion.layers.module import Module, WeightedModule
 import torch
-from torch import randn, Tensor, Size, device as Device, dtype as DType
+from torch import Size, Tensor, device as Device, dtype as DType, randn
 from torch.nn import Parameter as TorchParameter
+
+from refiners.fluxion.layers.module import Module, WeightedModule
 
 
 class Identity(Module):
@@ -158,18 +159,10 @@ class Parameter(WeightedModule):
     def __init__(self, *dims: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__()
         self.dims = dims
-        self.register_parameter("parameter", TorchParameter(randn(*dims, device=device, dtype=dtype)))
+        self.weight = TorchParameter(randn(*dims, device=device, dtype=dtype))
 
-    @property
-    def device(self) -> Device:
-        return self.parameter.device
-
-    @property
-    def dtype(self) -> DType:
-        return self.parameter.dtype
-
-    def forward(self, _: Tensor) -> Tensor:
-        return self.parameter
+    def forward(self, x: Tensor) -> Tensor:
+        return self.weight.expand(x.shape[0], *self.dims)
 
 
 class Buffer(WeightedModule):

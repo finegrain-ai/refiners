@@ -1,11 +1,11 @@
+import argparse
 from pathlib import Path
 from typing import Any
-import argparse
 
 import torch
 
-from refiners.foundationals.latent_diffusion import SD1UNet, SD1IPAdapter, SDXLUNet, SDXLIPAdapter
 from refiners.fluxion.utils import save_to_safetensors
+from refiners.foundationals.latent_diffusion import SD1IPAdapter, SD1UNet, SDXLIPAdapter, SDXLUNet
 
 # Running:
 #
@@ -93,7 +93,7 @@ def main() -> None:
     if fine_grained:
         w = image_proj_weights
         image_proj_state_dict = {
-            "LatentsEncoder.Parallel.Parameter.parameter": w["latents"].squeeze(0),  # drop batch dim = 1
+            "LatentsToken.Parameter.weight": w["latents"].squeeze(0),  # drop batch dim = 1
             "Linear_1.weight": w["proj_in.weight"],
             "Linear_1.bias": w["proj_in.bias"],
             "Linear_2.weight": w["proj_out.weight"],

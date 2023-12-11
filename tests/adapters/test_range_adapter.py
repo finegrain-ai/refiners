@@ -1,7 +1,8 @@
 import torch
+
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder
 from refiners.fluxion.layers import Chain, Linear
+from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder
 
 
 class DummyLinearAdapter(Chain, Adapter[Linear]):

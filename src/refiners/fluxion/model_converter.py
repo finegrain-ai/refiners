@@ -1,10 +1,11 @@
 from collections import defaultdict
 from enum import Enum, auto
 from pathlib import Path
+from typing import Any, DefaultDict, TypedDict
+
+import torch
 from torch import Tensor, nn
 from torch.utils.hooks import RemovableHandle
-import torch
-from typing import Any, DefaultDict, TypedDict
 
 from refiners.fluxion.utils import norm, save_to_safetensors
 

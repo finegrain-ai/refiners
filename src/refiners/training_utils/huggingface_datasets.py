@@ -1,5 +1,6 @@
-from datasets import load_dataset as _load_dataset, VerificationMode  # type: ignore
 from typing import Any, Generic, Protocol, TypeVar, cast
+
+from datasets import VerificationMode, load_dataset as _load_dataset  # type: ignore
 
 __all__ = ["load_hf_dataset", "HuggingfaceDataset"]
 
@@ -8,9 +9,11 @@ T = TypeVar("T", covariant=True)
 
 
 class HuggingfaceDataset(Generic[T], Protocol):
-    def __getitem__(self, index: int) -> T: ...
+    def __getitem__(self, index: int) -> T:
+        ...
 
-    def __len__(self) -> int: ...
+    def __len__(self) -> int:
+        ...
 
 
 def load_hf_dataset(

@@ -1,4 +1,5 @@
-from torch import dtype as DType, device as Device
+from torch import device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
 
 

@@ -1,16 +1,20 @@
+import numpy as np
 import torch
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 from refiners.fluxion.utils import image_to_tensor, interpolate
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from PIL import Image
 import numpy as np
 from torch import device as Device, dtype as DType, Tensor
 from typing import Callable
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
 
 class SD1Autoencoder(LatentDiffusionAutoencoder):
@@ -145,3 +149,30 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         self.target_image_latents = self.lda.encode(x=masked_init_image)
 
         return self.mask_latents, self.target_image_latents
+
+    def compute_self_attention_guidance(
+        self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
+    ) -> Tensor:
+        sag = self._find_sag_adapter()
+        assert sag is not None
+        assert self.mask_latents is not None
+        assert self.target_image_latents is not None
+
+        degraded_latents = sag.compute_degraded_latents(
+            scheduler=self.scheduler,
+            latents=x,
+            noise=noise,
+            step=step,
+            classifier_free_guidance=True,
+        )
+
+        negative_embedding, _ = clip_text_embedding.chunk(2)
+        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        self.set_unet_context(timestep=timestep, clip_text_embedding=negative_embedding, **kwargs)
+        x = torch.cat(
+            tensors=(degraded_latents, self.mask_latents, self.target_image_latents),
+            dim=1,
+        )
+        degraded_noise = self.unet(x)
+
+        return sag.scale * (noise - degraded_noise)

@@ -1,18 +1,16 @@
-import torch
-import pytest
-
-from warnings import warn
 from pathlib import Path
+from warnings import warn
 
+import pytest
+import torch
+import transformers  # type: ignore
+from diffusers import StableDiffusionPipeline  # type: ignore
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import load_from_safetensors
 from refiners.foundationals.clip.concepts import ConceptExtender, TokenExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.fluxion.utils import load_from_safetensors
-import refiners.fluxion.layers as fl
-
-from diffusers import StableDiffusionPipeline  # type: ignore
-import transformers  # type: ignore
-
 
 PROMPTS = [
     "a cute cat",  # a simple prompt
