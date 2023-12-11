@@ -3,9 +3,9 @@ from typing import Iterator
 import pytest
 import torch
 
-from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
-from refiners.foundationals.latent_diffusion.freeu import SDFreeUAdapter, FreeUResidualConcatenator
 from refiners.fluxion import manual_seed
+from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
+from refiners.foundationals.latent_diffusion.freeu import FreeUResidualConcatenator, SDFreeUAdapter
 
 
 @pytest.fixture(scope="module", params=[True, False])

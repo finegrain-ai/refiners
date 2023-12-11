@@ -1,11 +1,12 @@
 from typing import cast
-from torch import device as Device, dtype as DType, Tensor, cat
+
+from jaxtyping import Float
+from torch import Tensor, cat, device as Device, dtype as DType
+
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
-import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderG, CLIPTextEncoderL
-from jaxtyping import Float
-
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
 

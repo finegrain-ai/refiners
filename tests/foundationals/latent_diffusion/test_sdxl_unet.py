@@ -1,12 +1,13 @@
-from typing import Any
 from pathlib import Path
+from typing import Any
 from warnings import warn
+
 import pytest
 import torch
-from refiners.fluxion.utils import manual_seed
 
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
 from refiners.fluxion.model_converter import ConversionStage, ModelConverter
+from refiners.fluxion.utils import manual_seed
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
 
 
 @pytest.fixture(scope="module")

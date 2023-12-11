@@ -1,17 +1,15 @@
-from collections import defaultdict
-from inspect import signature, Parameter
 import sys
+from collections import defaultdict
+from inspect import Parameter, signature
 from pathlib import Path
 from types import ModuleType
-from typing import Any, DefaultDict, Generator, TypeVar, TypedDict, cast
+from typing import TYPE_CHECKING, Any, DefaultDict, Generator, Sequence, TypedDict, TypeVar, cast
 
 from torch import device as Device, dtype as DType
 from torch.nn.modules.module import Module as TorchModule
 
-from refiners.fluxion.utils import load_from_safetensors
 from refiners.fluxion.context import Context, ContextProvider
-
-from typing import TYPE_CHECKING, Sequence
+from refiners.fluxion.utils import load_from_safetensors
 
 if TYPE_CHECKING:
     from refiners.fluxion.layers.chain import Chain

@@ -1,12 +1,12 @@
-import refiners.fluxion.layers as fl
-from torch import device as Device, dtype as DType, Tensor, nn
 import torch
+from torch import Tensor, device as Device, dtype as DType, nn
 
+import refiners.fluxion.layers as fl
+from refiners.fluxion.context import Contexts
 from refiners.foundationals.segment_anything.transformer import (
     SparseCrossDenseAttention,
     TwoWayTranformerLayer,
 )
-from refiners.fluxion.context import Contexts
 
 
 class EmbeddingsAggregator(fl.ContextModule):

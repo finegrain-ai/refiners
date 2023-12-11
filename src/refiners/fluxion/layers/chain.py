@@ -1,15 +1,16 @@
-from collections import defaultdict
 import inspect
 import re
 import sys
 import traceback
+from collections import defaultdict
 from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
+
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
-from refiners.fluxion.layers.module import Module, ContextModule, ModuleTree, WeightedModule
-from refiners.fluxion.context import Contexts, ContextProvider
-from refiners.fluxion.utils import summarize_tensor
 
+from refiners.fluxion.context import ContextProvider, Contexts
+from refiners.fluxion.layers.module import ContextModule, Module, ModuleTree, WeightedModule
+from refiners.fluxion.utils import summarize_tensor
 
 T = TypeVar("T", bound=Module)
 TChain = TypeVar("TChain", bound="Chain")  # because Self (PEP 673) is not in 3.10

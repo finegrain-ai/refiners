@@ -1,5 +1,6 @@
-from datasets import load_dataset as _load_dataset, VerificationMode  # type: ignore
 from typing import Any, Generic, Protocol, TypeVar, cast
+
+from datasets import VerificationMode, load_dataset as _load_dataset  # type: ignore
 
 __all__ = ["load_hf_dataset", "HuggingfaceDataset"]
 

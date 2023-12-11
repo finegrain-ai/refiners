@@ -1,14 +1,13 @@
-import torch
-import pytest
-
-from warnings import warn
-from PIL import Image
 from pathlib import Path
+from warnings import warn
+
+import pytest
+import torch
+from PIL import Image
+from tests.utils import ensure_similar_images
 
 from refiners.fluxion.utils import load_from_safetensors
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
-
-from tests.utils import ensure_similar_images
 
 
 @pytest.fixture(scope="module")

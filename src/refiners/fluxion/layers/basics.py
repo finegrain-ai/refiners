@@ -1,7 +1,8 @@
-from refiners.fluxion.layers.module import Module, WeightedModule
 import torch
-from torch import randn, Tensor, Size, device as Device, dtype as DType
+from torch import Size, Tensor, device as Device, dtype as DType, randn
 from torch.nn import Parameter as TorchParameter
+
+from refiners.fluxion.layers.module import Module, WeightedModule
 
 
 class Identity(Module):

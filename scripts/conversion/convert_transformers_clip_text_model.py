@@ -1,14 +1,16 @@
 import argparse
 from pathlib import Path
 from typing import cast
+
 from torch import nn
-from refiners.fluxion.model_converter import ModelConverter
 from transformers import CLIPTextModelWithProjection  # type: ignore
-from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, CLIPTextEncoderL, CLIPTextEncoderG
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import save_to_safetensors
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, CLIPTextEncoderG, CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
-from refiners.fluxion.utils import save_to_safetensors
-import refiners.fluxion.layers as fl
 
 
 class Args(argparse.Namespace):

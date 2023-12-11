@@ -1,17 +1,19 @@
 from typing import cast
+
 from torch import Tensor, device as Device, dtype as DType
-from refiners.fluxion.context import Contexts
+
 import refiners.fluxion.layers as fl
+from refiners.fluxion.context import Contexts
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
-    ResidualAccumulator,
-    ResidualBlock,
-    ResidualConcatenator,
-)
 from refiners.foundationals.latent_diffusion.range_adapter import (
     RangeAdapter2d,
     RangeEncoder,
     compute_sinusoidal_embedding,
+)
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
+    ResidualAccumulator,
+    ResidualBlock,
+    ResidualConcatenator,
 )
 
 

@@ -1,7 +1,10 @@
-from refiners.fluxion.layers.module import Module
-from torch.nn.functional import silu
 from torch import Tensor, sigmoid
-from torch.nn.functional import gelu  # type: ignore
+from torch.nn.functional import (
+    gelu,  # type: ignore
+    silu,
+)
+
+from refiners.fluxion.layers.module import Module
 
 
 class Activation(Module):

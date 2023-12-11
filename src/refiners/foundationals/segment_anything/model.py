@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from typing import Sequence
-from PIL import Image
-from torch import device as Device, dtype as DType, Tensor
+
 import numpy as np
 import torch
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import image_to_tensor, normalize, pad, interpolate
+from refiners.fluxion.utils import image_to_tensor, interpolate, normalize, pad
 from refiners.foundationals.segment_anything.image_encoder import SAMViT, SAMViTH
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
 from refiners.foundationals.segment_anything.prompt_encoder import MaskEncoder, PointEncoder

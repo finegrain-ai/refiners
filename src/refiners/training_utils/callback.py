@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING, Generic, Iterable, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterable, TypeVar
+
+from loguru import logger
 from torch import tensor
 from torch.nn import Parameter
-from loguru import logger
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig

@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from jaxtyping import Bool
-from torch import Tensor, nn
 import numpy as np
 import numpy.typing as npt
 import torch
+from jaxtyping import Bool
+from torch import Tensor, nn
 
 NDArrayUInt8 = npt.NDArray[np.uint8]
 NDArray = npt.NDArray[Any]

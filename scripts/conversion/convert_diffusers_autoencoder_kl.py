@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
+
 import torch
-from torch import nn
 from diffusers import AutoencoderKL  # type: ignore
-from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
+from torch import nn
+
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 
 
 class Args(argparse.Namespace):

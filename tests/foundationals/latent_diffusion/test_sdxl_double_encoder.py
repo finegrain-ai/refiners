@@ -1,12 +1,13 @@
-from typing import Any, Protocol, cast
 from pathlib import Path
+from typing import Any, Protocol, cast
 from warnings import warn
+
 import pytest
 import torch
 from torch import Tensor
 
-from refiners.fluxion.utils import manual_seed
 import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import manual_seed
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 
 

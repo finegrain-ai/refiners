@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar
-from torch import Tensor, device as Device, dtype as DType
-from PIL import Image
+
 import torch
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler

@@ -2,14 +2,14 @@ import math
 
 import torch
 from jaxtyping import Float
-from torch.nn.functional import scaled_dot_product_attention as _scaled_dot_product_attention  # type: ignore
 from torch import Tensor, device as Device, dtype as DType
+from torch.nn.functional import scaled_dot_product_attention as _scaled_dot_product_attention  # type: ignore
 
+from refiners.fluxion.context import Contexts
+from refiners.fluxion.layers.basics import Identity
+from refiners.fluxion.layers.chain import Chain, Distribute, Lambda, Parallel
 from refiners.fluxion.layers.linear import Linear
 from refiners.fluxion.layers.module import Module
-from refiners.fluxion.layers.chain import Chain, Distribute, Parallel, Lambda
-from refiners.fluxion.layers.basics import Identity
-from refiners.fluxion.context import Contexts
 
 
 def scaled_dot_product_attention(

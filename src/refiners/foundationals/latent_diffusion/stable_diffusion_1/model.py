@@ -1,15 +1,16 @@
+import numpy as np
 import torch
+from PIL import Image
+from torch import Tensor, device as Device, dtype as DType
+
 from refiners.fluxion.utils import image_to_tensor, interpolate
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
-from PIL import Image
-import numpy as np
-from torch import device as Device, dtype as DType, Tensor
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
 
 class SD1Autoencoder(LatentDiffusionAutoencoder):

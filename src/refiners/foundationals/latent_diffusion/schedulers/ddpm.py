@@ -1,4 +1,5 @@
-from torch import Tensor, device as Device, randn, arange, Generator, tensor
+from torch import Generator, Tensor, arange, device as Device, randn, tensor
+
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 
 

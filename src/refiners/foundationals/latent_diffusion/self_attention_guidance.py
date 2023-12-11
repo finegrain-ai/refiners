@@ -1,15 +1,15 @@
-from typing import Any, Generic, TypeVar, TYPE_CHECKING
 import math
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from torch import Tensor, Size
-from jaxtyping import Float
 import torch
+from jaxtyping import Float
+from torch import Size, Tensor
 
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
-from refiners.fluxion.utils import interpolate, gaussian_blur
-import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import gaussian_blur, interpolate
+from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet

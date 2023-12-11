@@ -1,7 +1,8 @@
+import sys
 from importlib import import_module
 from importlib.metadata import requires
+
 from packaging.requirements import Requirement
-import sys
 
 refiners_requires = requires("refiners")
 assert refiners_requires is not None

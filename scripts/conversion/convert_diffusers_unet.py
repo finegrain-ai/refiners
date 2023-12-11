@@ -1,9 +1,11 @@
 import argparse
 from pathlib import Path
+
 import torch
-from torch import nn
-from refiners.fluxion.model_converter import ModelConverter
 from diffusers import UNet2DConditionModel  # type: ignore
+from torch import nn
+
+from refiners.fluxion.model_converter import ModelConverter
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 
 

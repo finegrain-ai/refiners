@@ -1,9 +1,11 @@
-import pytest
 from typing import cast
 from warnings import warn
-from refiners.foundationals.latent_diffusion.schedulers import DPMSolver, DDIM
+
+import pytest
+from torch import Tensor, allclose, device as Device, randn
+
 from refiners.fluxion import manual_seed
-from torch import randn, Tensor, allclose, device as Device
+from refiners.foundationals.latent_diffusion.schedulers import DDIM, DPMSolver
 
 
 def test_dpm_solver_diffusers():

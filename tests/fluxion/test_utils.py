@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from warnings import warn
 
-from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
-from torch import device as Device, dtype as DType
-from PIL import Image
 import pytest
 import torch
+from PIL import Image
+from torch import device as Device, dtype as DType
+from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
 
 from refiners.fluxion.utils import gaussian_blur, image_to_tensor, manual_seed, tensor_to_image
 
