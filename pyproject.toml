@@ -79,6 +79,10 @@ ignore = [
 line-length = 120
 
 [tool.ruff.lint.isort]
+# Allow this kind of import on a single line:
+#
+#     from torch import device as Device, dtype as DType
+#
 combine-as-imports = true
 
 [tool.docformatter]
