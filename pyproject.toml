@@ -68,11 +68,18 @@ lint = { chain = ["ruff format .", "ruff --fix ."] }
 line-length = 120
 
 [tool.ruff]
+src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
+select = [
+  "I", # isort
+]
 ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
     "E731", # do-not-assign-lambda
 ]
 line-length = 120
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
 
 [tool.docformatter]
 black = true
