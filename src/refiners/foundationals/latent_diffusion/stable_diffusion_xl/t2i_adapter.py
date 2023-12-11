@@ -2,7 +2,7 @@ from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import ResidualAccumulator
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 from refiners.foundationals.latent_diffusion.t2i_adapter import ConditionEncoderXL, T2IAdapter, T2IFeatures
 
 
