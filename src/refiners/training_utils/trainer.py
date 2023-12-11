@@ -278,10 +278,12 @@ class Trainer(Generic[ConfigType, Batch]):
         )
         self.callbacks = callbacks or []
         self.callbacks += self.default_callbacks()
+        self._call_callbacks(event_name="on_init_begin")
         self.load_wandb()
         self.load_models()
         self.prepare_models()
         self.prepare_checkpointing()
+        self._call_callbacks(event_name="on_init_end")
 
     def default_callbacks(self) -> list[Callback[Any]]:
         return [
