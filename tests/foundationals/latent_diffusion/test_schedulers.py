@@ -26,8 +26,10 @@ def test_dpm_solver_diffusers():
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_ddim_solver_diffusers():
+def test_ddim_diffusers():
     from diffusers import DDIMScheduler  # type: ignore
+
+    manual_seed(0)
 
     diffusers_scheduler = DDIMScheduler(
         beta_end=0.012,
@@ -53,6 +55,8 @@ def test_ddim_solver_diffusers():
 
 def test_scheduler_remove_noise():
     from diffusers import DDIMScheduler  # type: ignore
+
+    manual_seed(0)
 
     diffusers_scheduler = DDIMScheduler(
         beta_end=0.012,
