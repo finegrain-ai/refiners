@@ -264,11 +264,13 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     InjectionPoint(),  # Wq
                     fl.Parallel(
                         fl.Chain(
-                            fl.Slicing(dim=1, start=0, length=text_sequence_length),
+                            fl.Slicing(dim=1, end=text_sequence_length),
                             InjectionPoint(),  # Wk
                         ),
                         fl.Chain(
-                            fl.Slicing(dim=1, start=text_sequence_length, length=image_sequence_length),
+                            fl.Slicing(
+                                dim=1, start=text_sequence_length, end=text_sequence_length + image_sequence_length
+                            ),
                             fl.Linear(
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,
@@ -280,11 +282,13 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     ),
                     fl.Parallel(
                         fl.Chain(
-                            fl.Slicing(dim=1, start=0, length=text_sequence_length),
+                            fl.Slicing(dim=1, end=text_sequence_length),
                             InjectionPoint(),  # Wv
                         ),
                         fl.Chain(
-                            fl.Slicing(dim=1, start=text_sequence_length, length=image_sequence_length),
+                            fl.Slicing(
+                                dim=1, start=text_sequence_length, end=text_sequence_length + image_sequence_length
+                            ),
                             fl.Linear(
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,

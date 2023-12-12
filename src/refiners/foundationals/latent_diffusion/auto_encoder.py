@@ -113,7 +113,7 @@ class Encoder(Chain):
             ),
             Chain(
                 Conv2d(in_channels=8, out_channels=8, kernel_size=1, device=device, dtype=dtype),
-                Slicing(dim=1, start=0, length=4),
+                Slicing(dim=1, end=4),
             ),
         )
 

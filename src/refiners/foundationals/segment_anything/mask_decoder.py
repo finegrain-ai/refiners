@@ -60,7 +60,7 @@ class Hypernetworks(fl.Concatenate):
         super().__init__(
             *[
                 fl.Chain(
-                    fl.Slicing(dim=1, start=i + 1, length=1),
+                    fl.Slicing(dim=1, start=i + 1, end=i + 2),
                     fl.MultiLinear(
                         input_dim=embedding_dim,
                         output_dim=embedding_dim // 8,
@@ -156,7 +156,7 @@ class MaskPrediction(fl.Chain):
                 ),
                 other=DenseEmbeddingUpscaling(embedding_dim=embedding_dim, device=device, dtype=dtype),
             ),
-            fl.Slicing(dim=1, start=1, length=num_mask_tokens),
+            fl.Slicing(dim=1, start=1, end=num_mask_tokens + 1),
             fl.Reshape(num_mask_tokens, embedding_dim, embedding_dim),
         )
 
@@ -173,7 +173,7 @@ class IOUPrediction(fl.Chain):
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
         super().__init__(
-            fl.Slicing(dim=1, start=0, length=1),
+            fl.Slicing(dim=1, start=0, end=1),
             fl.Squeeze(dim=0),
             fl.MultiLinear(
                 input_dim=embedding_dim,
@@ -183,7 +183,7 @@ class IOUPrediction(fl.Chain):
                 device=device,
                 dtype=dtype,
             ),
-            fl.Slicing(dim=-1, start=1, length=num_mask_tokens),
+            fl.Slicing(dim=-1, start=1, end=num_mask_tokens + 1),
         )
 
 
