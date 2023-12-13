@@ -156,7 +156,7 @@ class MaskPrediction(fl.Chain):
                 ),
                 other=DenseEmbeddingUpscaling(embedding_dim=embedding_dim, device=device, dtype=dtype),
             ),
-            fl.Slicing(dim=1, start=1, end=num_mask_tokens + 1),
+            fl.Slicing(dim=1, start=1),
             fl.Reshape(num_mask_tokens, embedding_dim, embedding_dim),
         )
 
@@ -183,7 +183,7 @@ class IOUPrediction(fl.Chain):
                 device=device,
                 dtype=dtype,
             ),
-            fl.Slicing(dim=-1, start=1, end=num_mask_tokens + 1),
+            fl.Slicing(dim=-1, start=1),
         )
 
 
