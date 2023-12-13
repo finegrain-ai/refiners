@@ -1,5 +1,5 @@
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
-from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, arange, int64
+from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, arange
 import torch
 import numpy as np
 
@@ -26,11 +26,15 @@ class EulerScheduler(Scheduler):
         )
         self.sigmas = self._generate_sigmas().to(device=self.device, dtype=self.dtype)
 
+    @property
+    def init_noise_sigma(self) -> Tensor:
+        return (self.sigmas.max() ** 2 + 1) ** 0.5
+
     def _generate_timesteps(self) -> Tensor:
-        # using "trailing" timestep
-        step_ratio = self.num_train_timesteps / self.num_inference_steps
-        timesteps = arange(1000, 0, -step_ratio).round().type(int64)
-        return timesteps - 1
+        # using "leading" timestep
+        step_ratio = self.num_train_timesteps // self.num_inference_steps
+        timesteps = (arange(start=0, end=self.num_inference_steps, step=1) * step_ratio).flip(0)
+        return timesteps
 
     def _generate_sigmas(self) -> Tensor:
         sigmas = self.noise_std / self.cumulative_scale_factors
@@ -38,31 +42,45 @@ class EulerScheduler(Scheduler):
             np.interp(self.timesteps.cpu().numpy(), np.arange(0, len(sigmas)), sigmas.cpu().numpy())
         )
         sigmas = torch.cat([sigmas, tensor([0.0])])
-        print(sigmas)
         return sigmas
+
+    def scale_model_input(self, x: Tensor, step: int) -> Tensor:
+        sigma = self.noise_std[self.timesteps[step]]
+        # x = x * sigma
+        x = x / ((sigma**2 + 1) ** 0.5)
+        return x
 
     def __call__(
         self,
         x: Tensor,
         noise: Tensor,
         step: int,
-        s_churn: float = 0.0,
+        s_churn: float = 1.0,
         s_tmin: float = 0.0,
         s_tmax: float = float("inf"),
-        s_noise: float = 1.0,
+        s_noise: float = 1.1,
     ) -> Tensor:
         sigma = self.sigmas[step]
 
         gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0
 
-        eps = noise * s_noise
+        alt_noise = torch.randn_like(noise)
+        eps = alt_noise * s_noise
         sigma_hat = sigma * (gamma + 1)
         if gamma > 0:
             x = x + eps * (sigma_hat**2 - sigma**2) ** 0.5
 
-        predicted_x = x * torch.sqrt(sigma_hat**2 + 1) - eps * sigma_hat
+        # predicted_x = x * torch.sqrt(sigma_hat**2 + 1) - noise * sigma_hat
+        predicted_x = x - sigma_hat * noise
 
+        # 1st order Euler
         derivative = (x - predicted_x) / sigma_hat
         dt = self.sigmas[step + 1] - sigma_hat
         denoised_x = x + derivative * dt
+
+        # 2nd order Euler
+        if step + 1 < len(self.timesteps):
+            predicted_denoised = denoised_x - self.sigmas[step + 1] * noise
+            derivative_prime = (denoised_x - predicted_denoised) / self.sigmas[step + 1]
+            denoised_x = x + (self.sigmas[step + 1] - sigma_hat) * 0.5 * (derivative + derivative_prime)
         return denoised_x
