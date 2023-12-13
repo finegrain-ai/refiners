@@ -21,8 +21,8 @@ def test_slicing_negative_indices() -> None:
 
 def test_none_end_slicing() -> None:
     x = torch.randn(2, 1000, 400)
-    slicing = Slicing(dim=1, start=1)
-    sliced = slicing(x)
+    slicing_layer = Slicing(dim=1, start=1)
+    sliced = slicing_layer(x)
     expected = x[:, 1:, :]
     assert torch.equal(sliced, expected)
 
