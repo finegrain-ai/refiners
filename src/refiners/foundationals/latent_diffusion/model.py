@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar
-from torch import Tensor, device as Device, dtype as DType
-from PIL import Image
 
 import torch
 from PIL import Image

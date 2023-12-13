@@ -7,7 +7,6 @@ from refiners.foundationals.latent_diffusion.schedulers.ddim import DDIM
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.self_attention_guidance import SDXLSAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
-from torch import device as Device, dtype as DType, Tensor
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 

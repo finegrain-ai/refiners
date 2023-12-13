@@ -10,9 +10,6 @@ from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
-from PIL import Image
-import numpy as np
-from torch import device as Device, dtype as DType, Tensor
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
 
