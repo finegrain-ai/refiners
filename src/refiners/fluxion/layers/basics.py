@@ -84,7 +84,7 @@ class Permute(Module):
 
 
 class Slicing(Module):
-    def __init__(self, dim: int = 0, start: int = 0, end: int = -1, step: int = 1) -> None:
+    def __init__(self, dim: int = 0, start: int = 0, end: int | None = None, step: int = 1) -> None:
         super().__init__()
         self.dim = dim
         self.start = start
@@ -94,7 +94,8 @@ class Slicing(Module):
     def forward(self, x: Tensor) -> Tensor:
         dim_size = x.shape[self.dim]
         start = self.start if self.start >= 0 else dim_size + self.start
-        end = self.end if self.end >= 0 else dim_size + self.end
+        end = self.end or dim_size
+        end = end if end >= 0 else dim_size + end
         start = max(min(start, dim_size), 0)
         end = max(min(end, dim_size), 0)
         if start >= end:
