@@ -477,6 +477,10 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     cross_attn_state_dict[k.removeprefix(prefix)] = v
 
                 cross_attn.load_state_dict(state_dict=cross_attn_state_dict)
+    def init_context(self) -> Contexts:
+        return {
+            "ip_mask": {"mask": None},
+        }
     @property
     def clip_image_encoder(self) -> CLIPImageEncoderH:
         return self._clip_image_encoder[0]

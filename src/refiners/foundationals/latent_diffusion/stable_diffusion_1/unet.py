@@ -279,7 +279,6 @@ class SD1UNet(fl.Chain):
             "diffusion": {"timestep": None},
             "range_adapter": {"timestep_embedding": None},
             "sampling": {"shapes": []},
-            "ip_mask": {"mask": None},
         }
 
     def set_clip_text_embedding(self, clip_text_embedding: Tensor) -> None:

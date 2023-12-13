@@ -270,7 +270,6 @@ class SDXLUNet(fl.Chain):
             "diffusion": {"timestep": None, "time_ids": None, "pooled_text_embedding": None},
             "range_adapter": {"timestep_embedding": None},
             "sampling": {"shapes": []},
-            "ip_mask": {"mask": None},
         }
 
     def set_clip_text_embedding(self, clip_text_embedding: Tensor) -> None:

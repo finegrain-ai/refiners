@@ -13,7 +13,6 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_g
 from PIL import Image
 import numpy as np
 from torch import device as Device, dtype as DType, Tensor
-from typing import Callable
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
 
@@ -118,7 +117,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         )
 
     def forward(
-        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, context_callback: Callable[[], None] = lambda: None, **_: Tensor
+        self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **_: Tensor
     ) -> Tensor:
         assert self.mask_latents is not None
         assert self.target_image_latents is not None
@@ -128,7 +127,6 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
             step=step,
             clip_text_embedding=clip_text_embedding,
             condition_scale=condition_scale,
-            context_callback=context_callback,
         )
 
     def set_inpainting_conditions(
