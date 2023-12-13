@@ -86,7 +86,7 @@ class Controlnet(Passthrough):
         self.scale = scale
         super().__init__(
             TimestepEncoder(context_key=f"timestep_embedding_{name}", device=device, dtype=dtype),
-            Slicing(dim=1, start=0, length=4),  # support inpainting
+            Slicing(dim=1, end=4),  # support inpainting
             DownBlocks(in_channels=4, device=device, dtype=dtype),
             MiddleBlock(device=device, dtype=dtype),
         )

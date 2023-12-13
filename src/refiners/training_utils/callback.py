@@ -43,6 +43,12 @@ T = TypeVar("T")
 
 
 class Callback(Generic[T]):
+    def on_init_begin(self, trainer: T) -> None:
+        ...
+
+    def on_init_end(self, trainer: T) -> None:
+        ...
+
     def on_train_begin(self, trainer: T) -> None:
         ...
 

@@ -84,14 +84,32 @@ class Permute(Module):
 
 
 class Slicing(Module):
-    def __init__(self, dim: int, start: int, length: int) -> None:
+    def __init__(self, dim: int = 0, start: int = 0, end: int | None = None, step: int = 1) -> None:
         super().__init__()
         self.dim = dim
         self.start = start
-        self.length = length
+        self.end = end
+        self.step = step
 
     def forward(self, x: Tensor) -> Tensor:
-        return x.narrow(self.dim, self.start, self.length)
+        dim_size = x.shape[self.dim]
+        start = self.start if self.start >= 0 else dim_size + self.start
+        end = self.end or dim_size
+        end = end if end >= 0 else dim_size + end
+        start = max(min(start, dim_size), 0)
+        end = max(min(end, dim_size), 0)
+        if start >= end:
+            return self.get_empty_slice(x)
+        indices = torch.arange(start=start, end=end, step=self.step, device=x.device)
+        return x.index_select(self.dim, indices)
+
+    def get_empty_slice(self, x: Tensor) -> Tensor:
+        """
+        Return an empty slice of the same shape as the input tensor to mimic PyTorch's slicing behavior.
+        """
+        shape = list(x.shape)
+        shape[self.dim] = 0
+        return torch.empty(*shape, device=x.device)
 
 
 class Squeeze(Module):

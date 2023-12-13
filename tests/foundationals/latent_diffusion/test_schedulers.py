@@ -2,10 +2,20 @@ from typing import cast
 from warnings import warn
 
 import pytest
-from torch import Tensor, allclose, device as Device, randn
+from torch import Tensor, allclose, device as Device, equal, randn
 
 from refiners.fluxion import manual_seed
-from refiners.foundationals.latent_diffusion.schedulers import DDIM, DPMSolver
+from refiners.foundationals.latent_diffusion.schedulers import DDIM, DDPM, DPMSolver
+
+
+def test_ddpm_diffusers():
+    from diffusers import DDPMScheduler  # type: ignore
+
+    diffusers_scheduler = DDPMScheduler(beta_schedule="scaled_linear", beta_start=0.00085, beta_end=0.012)
+    diffusers_scheduler.set_timesteps(1000)
+    refiners_scheduler = DDPM(num_inference_steps=1000)
+
+    assert equal(diffusers_scheduler.timesteps, refiners_scheduler.timesteps)
 
 
 def test_dpm_solver_diffusers():
@@ -26,8 +36,10 @@ def test_dpm_solver_diffusers():
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_ddim_solver_diffusers():
+def test_ddim_diffusers():
     from diffusers import DDIMScheduler  # type: ignore
+
+    manual_seed(0)
 
     diffusers_scheduler = DDIMScheduler(
         beta_end=0.012,
@@ -53,6 +65,8 @@ def test_ddim_solver_diffusers():
 
 def test_scheduler_remove_noise():
     from diffusers import DDIMScheduler  # type: ignore
+
+    manual_seed(0)
 
     diffusers_scheduler = DDIMScheduler(
         beta_end=0.012,

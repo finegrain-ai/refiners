@@ -341,14 +341,19 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     InjectionPoint(),  # Wq
                     fl.Parallel(
                         fl.Chain(
-                            fl.Slicing(dim=1, start=0, length=text_sequence_length),
+                            fl.Slicing(dim=1, end=text_sequence_length),
                             InjectionPoint(),  # Wk
                         ),
                         fl.Chain(
+<<<<<<< HEAD
                             fl.Parallel(
                                 *parallel_splits_k
                             ),
                             ParallelLinear(
+=======
+                            fl.Slicing(dim=1, start=text_sequence_length),
+                            fl.Linear(
+>>>>>>> e2f2e33add9b5164b2f49b8f921fd6c2ebf46c5b
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,
                                 bias=self.target.use_bias,
@@ -359,14 +364,19 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     ),
                     fl.Parallel(
                         fl.Chain(
-                            fl.Slicing(dim=1, start=0, length=text_sequence_length),
+                            fl.Slicing(dim=1, end=text_sequence_length),
                             InjectionPoint(),  # Wv
                         ),
                         fl.Chain(
+<<<<<<< HEAD
                             fl.Parallel(
                                 *parallel_splits_v
                             ),
                             ParallelLinear(
+=======
+                            fl.Slicing(dim=1, start=text_sequence_length),
+                            fl.Linear(
+>>>>>>> e2f2e33add9b5164b2f49b8f921fd6c2ebf46c5b
                                 in_features=self.target.key_embedding_dim,
                                 out_features=self.target.inner_dim,
                                 bias=self.target.use_bias,
