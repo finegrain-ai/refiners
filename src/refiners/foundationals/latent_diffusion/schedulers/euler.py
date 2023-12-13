@@ -78,9 +78,4 @@ class EulerScheduler(Scheduler):
         dt = self.sigmas[step + 1] - sigma_hat
         denoised_x = x + derivative * dt
 
-        # 2nd order Euler
-        if step + 1 < len(self.timesteps):
-            predicted_denoised = denoised_x - self.sigmas[step + 1] * noise
-            derivative_prime = (denoised_x - predicted_denoised) / self.sigmas[step + 1]
-            denoised_x = x + (self.sigmas[step + 1] - sigma_hat) * 0.5 * (derivative + derivative_prime)
         return denoised_x
