@@ -42,7 +42,7 @@ Running end-to-end tests is pretty compute-intensive, and you must convert all t
 First, install test dependencies with:
 
 ```bash
-rye sync --features test
+rye sync --features test,conversion
 ```
 
 Then, download and convert all the necessary weights. Be aware that this will use around 50 GB of disk space:
@@ -51,24 +51,20 @@ Then, download and convert all the necessary weights. Be aware that this will us
 ./scripts/prepare-test-weights.sh
 ```
 
-To run all the tests, you will need to set the following environment variables:
+Finally, run the tests:
 
 ```bash
-export REFINERS_TEST_DEVICE=cuda:0
-
-export REFINERS_TEST_WEIGHTS_DIR=$(pwd)/tests/weights
-
 rye run pytest
 ```
 
-In particular, `-k` is handy only to run tests that match a given expression, e.g.:
+The `-k` option is handy to run a subset of tests that match a given expression, e.g.:
 
 ```bash
-rye run pytest -k diffusion_std_init_image tests/e2e/test_diffusion.py
+rye run pytest -k diffusion_std_init_image
 ```
 
-You can also run tests that are lightweight and will run on CPU:
+You can enforce running tests on CPU. Tests that require a GPU will be skipped.
 
 ```bash
-rye run pytest -k "not test_diffusion"
+REFINERS_TEST_DEVICE=cpu rye run pytest
 ```
