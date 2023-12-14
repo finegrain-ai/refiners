@@ -27,4 +27,3 @@ __all__ = [
     "ViT_small",
     "ViT_tiny",
 ]
-
