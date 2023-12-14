@@ -41,6 +41,8 @@ conversion = [
     "diffusers>=0.24.0",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
+    "requests>=2.26.0",
+    "tqdm>=4.62.3",
 ]
 
 [build-system]

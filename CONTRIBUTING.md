@@ -48,7 +48,7 @@ rye sync --features test,conversion
 Then, download and convert all the necessary weights. Be aware that this will use around 50 GB of disk space:
 
 ```bash
-./scripts/prepare-test-weights.sh
+rye run python scripts/prepare_test_weights.py
 ```
 
 Finally, run the tests:
