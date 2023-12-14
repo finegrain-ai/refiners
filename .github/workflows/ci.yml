@@ -1,9 +1,13 @@
 name: CI
 
-on: push
+on:
+  push:
+  pull_request_target:
+    types: [labeled]
 
 jobs:
   lint_and_typecheck:
+    if: ${{ github.event.name == 'push' || github.event.label.name == 'run-ci' }}
     runs-on: ubuntu-latest
 
     steps:
