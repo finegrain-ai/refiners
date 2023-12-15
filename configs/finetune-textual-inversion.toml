@@ -44,7 +44,7 @@ dropout_probability = 0
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "acme/cat-toy"
+hf_repo = "acme/images"
 revision = "main"
 horizontal_flip = true
 random_crop = true
