@@ -26,7 +26,7 @@ def load_hf_dataset(
 
 
 class HuggingfaceDatasetConfig(BaseModel):
-    hf_repo: str = "finegrain/unsplash-dummy"
+    hf_repo: str
     revision: str = "main"
     split: str = "train"
     horizontal_flip: bool = False
