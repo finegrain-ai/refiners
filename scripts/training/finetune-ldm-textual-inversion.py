@@ -11,6 +11,7 @@ from refiners.foundationals.clip.concepts import ConceptExtender, EmbeddingExten
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, TokenEncoder
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 from refiners.training_utils.callback import Callback
+from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
     LatentDiffusionConfig,
@@ -112,6 +113,7 @@ class TextualInversionConfig(BaseModel):
 
 
 class TextualInversionLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
+    dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
     textual_inversion: TextualInversionConfig
 
