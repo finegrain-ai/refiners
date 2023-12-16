@@ -269,6 +269,7 @@ class ViT(fl.Chain):
                 ),
                 dim=1,
             ),
+            # TODO: support https://github.com/facebookresearch/dinov2/blob/2302b6b/dinov2/models/vision_transformer.py#L179
             PositionalEncoder(
                 sequence_length=num_patches**2 + 1,
                 embedding_dim=embedding_dim,
