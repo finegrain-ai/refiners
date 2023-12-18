@@ -18,8 +18,11 @@ class Args(argparse.Namespace):
 
 def setup_converter(args: Args) -> ModelConverter:
     target = LatentDiffusionAutoencoder()
+    # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     source: nn.Module = AutoencoderKL.from_pretrained(  # type: ignore
-        pretrained_model_name_or_path=args.source_path, subfolder=args.subfolder
+        pretrained_model_name_or_path=args.source_path,
+        subfolder=args.subfolder,
+        low_cpu_mem_usage=False,
     )  # type: ignore
     x = torch.randn(1, 3, 512, 512)
     converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)

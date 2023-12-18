@@ -40,7 +40,11 @@ class Args(argparse.Namespace):
 @torch.no_grad()
 def process(args: Args) -> None:
     diffusers_state_dict = cast(dict[str, Tensor], torch.load(args.source_path, map_location="cpu"))  # type: ignore
-    diffusers_sd = DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=args.base_model)  # type: ignore
+    # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
+    diffusers_sd = DiffusionPipeline.from_pretrained(  # type: ignore
+        pretrained_model_name_or_path=args.base_model,
+        low_cpu_mem_usage=False,
+    )
     diffusers_model = cast(fl.Module, diffusers_sd.unet)  # type: ignore
 
     refiners_model = SD1UNet(in_channels=4)
