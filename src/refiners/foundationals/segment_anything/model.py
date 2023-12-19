@@ -39,6 +39,7 @@ class SegmentAnything(fl.Module):
         self.mask_encoder = mask_encoder.to(device=self.device, dtype=self.dtype)
         self.mask_decoder = mask_decoder.to(device=self.device, dtype=self.dtype)
 
+    @torch.no_grad()
     def compute_image_embedding(self, image: Image.Image) -> ImageEmbedding:
         original_size = (image.height, image.width)
         target_size = self.compute_target_size(original_size)
@@ -47,6 +48,7 @@ class SegmentAnything(fl.Module):
             original_image_size=original_size,
         )
 
+    @torch.no_grad()
     def predict(
         self,
         input: Image.Image | ImageEmbedding,
