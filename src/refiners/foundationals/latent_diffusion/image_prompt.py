@@ -3,22 +3,26 @@ from enum import IntEnum
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generic, List, TypeVar
 
+import refiners.fluxion.layers as fl
 import torch.nn.functional as F
 from jaxtyping import Float
 from PIL import Image
-from torch import Tensor, cat, device as Device, dtype as DType, ones, softmax, zeros_like
-
-import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.adapters.lora import Lora
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, normalize
 from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
+from torch import Tensor, cat
+from torch import device as Device
+from torch import dtype as DType
+from torch import ones, softmax, zeros_like
 
 if TYPE_CHECKING:
-    from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
-    from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+    from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import \
+        SD1UNet
+    from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import \
+        SDXLUNet
 
 T = TypeVar("T", bound="SD1UNet | SDXLUNet")
 TIPAdapter = TypeVar("TIPAdapter", bound="IPAdapter[Any]")  # Self (see PEP 673)
@@ -254,9 +258,10 @@ def find_closest_factors_to_goal(number: int, goal: float) -> int:
     return -1
 
 
-class IPScaledDotProductAttention(ScaledDotProductAttention):
-    def __init__(self, num_heads: int = 1, is_causal: bool | None = None, is_optimized: bool = True) -> None:
-        super().__init__(num_heads=num_heads, is_causal=is_causal, is_optimized=is_optimized)
+class IPScaledDotProductAttention(fl.Module):
+    def __init__(self, attention: ScaledDotProductAttention) -> None:
+        super().__init__()
+        self.attention = attention
 
     def forward(
         self,
@@ -280,26 +285,26 @@ class IPScaledDotProductAttention(ScaledDotProductAttention):
         if mask_height == -1:
             raise Exception("Change mask dimensions to be more square")
         mask_width = num_queries // mask_height
-        ip_attention_mask = F.interpolate(
-            ip_attention_mask.unsqueeze(1), size=(mask_width, mask_height), mode="bicubic"
-        ).squeeze(1) # type: ignore
-        ip_attention_mask = ip_attention_mask.reshape((batch_size, -1, 1)).repeat(1, 1, embedding_dim)
-        output = super().forward(query, key, value, is_causal=is_causal)
-        return output * ip_attention_mask
+        ip_attention_mask = F.interpolate(  # type: ignore
+            ip_attention_mask[:, None], size=(mask_width, mask_height), mode="bicubic"
+        )[:, 0]
+        ip_attention_mask = ip_attention_mask.reshape((batch_size, -1, 1)).repeat(1, 1, embedding_dim)  # type: ignore
+        output = self.attention(query, key, value, is_causal=is_causal)
+        return output * ip_attention_mask  # type: ignore
 
 
-class ParallelizeIPScaledDotProductAttentionArguments(fl.Parallel):
+class ParallelizeIPScaledDotProductAttentionArguments(fl.Module):
     def forward(self, qkv: List[Float[Tensor, "..."]], ip_attention_mask: Float[Tensor, "..."]) -> tuple[Tensor, ...]:
         return (qkv[0], qkv[1], qkv[2], ip_attention_mask)
 
 
-class ParallelLinear(fl.Linear):
-    def forward(self, *xs: List[Float[Tensor, "batch in_features"]]) -> tuple[Float[Tensor, "batch out_features"]]:
-        output = []
-        for i in range(len(xs)):
-            output.append(super().forward(xs[i]))
-        output = tuple(output)
-        return output
+class ParallelLinear(fl.Module):
+    def __init__(self, linear: fl.Linear):
+        super().__init__()
+        self.linear = linear
+
+    def forward(self, *xs: Float[Tensor, "batch in_features"]) -> tuple[Float[Tensor, "batch out_features"], ...]:
+        return tuple([self.linear(x) for x in xs])
 
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
@@ -333,7 +338,9 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                             fl.Chain(fl.UseContext("ip_mask", "mask"), fl.Lambda(func=lambda *mask: mask[i])),
                         ),
                         ParallelizeIPScaledDotProductAttentionArguments(),
-                        IPScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
+                        IPScaledDotProductAttention(
+                            ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal)
+                        ),
                         fl.Lambda(func=self.scale_outputs),
                     )
                 )
@@ -355,11 +362,13 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                         fl.Chain(
                             fl.Parallel(*parallel_splits_k),
                             ParallelLinear(
-                                in_features=self.target.key_embedding_dim,
-                                out_features=self.target.inner_dim,
-                                bias=self.target.use_bias,
-                                device=target.device,
-                                dtype=target.dtype,
+                                fl.Linear(
+                                    in_features=self.target.key_embedding_dim,
+                                    out_features=self.target.inner_dim,
+                                    bias=self.target.use_bias,
+                                    device=target.device,
+                                    dtype=target.dtype,
+                                )
                             ),  # Wk'
                         ),
                     ),
@@ -371,11 +380,13 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                         fl.Chain(
                             fl.Parallel(*parallel_splits_v),
                             ParallelLinear(
-                                in_features=self.target.key_embedding_dim,
-                                out_features=self.target.inner_dim,
-                                bias=self.target.use_bias,
-                                device=target.device,
-                                dtype=target.dtype,
+                                fl.Linear(
+                                    in_features=self.target.key_embedding_dim,
+                                    out_features=self.target.inner_dim,
+                                    bias=self.target.use_bias,
+                                    device=target.device,
+                                    dtype=target.dtype,
+                                )
                             ),  # Wv'
                         ),
                     ),
