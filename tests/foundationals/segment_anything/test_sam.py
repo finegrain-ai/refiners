@@ -289,7 +289,6 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
     assert torch.equal(input=iou_prediction, other=facebook_prediction)
 
 
-@torch.no_grad()
 def test_predictor(
     facebook_sam_h_predictor: FacebookSAMPredictor, sam_h: SegmentAnythingH, truck: Image.Image, prompt: SAMPrompt
 ) -> None:
@@ -312,7 +311,6 @@ def test_predictor(
         assert isclose(scores[i].item(), facebook_scores[i].item(), rel_tol=1e-05)
 
 
-@torch.no_grad()
 def test_predictor_image_embedding(sam_h: SegmentAnythingH, truck: Image.Image, one_prompt: SAMPrompt) -> None:
     masks_ref, scores_ref, _ = sam_h.predict(truck, **one_prompt.__dict__)
 
