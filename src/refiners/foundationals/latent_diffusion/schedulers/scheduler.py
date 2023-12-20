@@ -70,6 +70,12 @@ class Scheduler(ABC):
     def steps(self) -> list[int]:
         return list(range(self.num_inference_steps))
 
+    def scale_model_input(self, x: Tensor, step: int) -> Tensor:
+        """
+        For compatibility with schedulers that need to scale the input according to the current timestep.
+        """
+        return x
+
     def sample_power_distribution(self, power: float = 2, /) -> Tensor:
         return (
             linspace(

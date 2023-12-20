@@ -45,8 +45,7 @@ class EulerScheduler(Scheduler):
         return sigmas
 
     def scale_model_input(self, x: Tensor, step: int) -> Tensor:
-        sigma = self.noise_std[self.timesteps[step]]
-        # x = x * sigma
+        sigma = self.sigmas[step]
         x = x / ((sigma**2 + 1) ** 0.5)
         return x
 
@@ -55,10 +54,10 @@ class EulerScheduler(Scheduler):
         x: Tensor,
         noise: Tensor,
         step: int,
-        s_churn: float = 1.0,
+        s_churn: float = 0.0,
         s_tmin: float = 0.0,
         s_tmax: float = float("inf"),
-        s_noise: float = 1.1,
+        s_noise: float = 1.0,
     ) -> Tensor:
         sigma = self.sigmas[step]
 
