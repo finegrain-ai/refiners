@@ -34,7 +34,7 @@ class EulerScheduler(Scheduler):
         # using "leading" timestep
         step_ratio = self.num_train_timesteps // self.num_inference_steps
         timesteps = (arange(start=0, end=self.num_inference_steps, step=1) * step_ratio).flip(0)
-        return timesteps
+        return timesteps + 1
 
     def _generate_sigmas(self) -> Tensor:
         sigmas = self.noise_std / self.cumulative_scale_factors
@@ -69,7 +69,6 @@ class EulerScheduler(Scheduler):
         if gamma > 0:
             x = x + eps * (sigma_hat**2 - sigma**2) ** 0.5
 
-        # predicted_x = x * torch.sqrt(sigma_hat**2 + 1) - noise * sigma_hat
         predicted_x = x - sigma_hat * noise
 
         # 1st order Euler

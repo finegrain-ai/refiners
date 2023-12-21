@@ -1,9 +1,19 @@
 import pytest
 from typing import cast
 from warnings import warn
-from refiners.foundationals.latent_diffusion.schedulers import DPMSolver, DDIM, EulerScheduler
+from refiners.foundationals.latent_diffusion.schedulers import DPMSolver, DDIM, EulerScheduler, DDPM
 from refiners.fluxion import manual_seed
-from torch import randn, Tensor, allclose, device as Device
+from torch import equal, randn, Tensor, allclose, device as Device
+
+
+def test_ddpm_diffusers():
+    from diffusers import DDPMScheduler  # type: ignore
+
+    diffusers_scheduler = DDPMScheduler(beta_schedule="scaled_linear", beta_start=0.00085, beta_end=0.012)
+    diffusers_scheduler.set_timesteps(1000)
+    refiners_scheduler = DDPM(num_inference_steps=1000)
+
+    assert equal(diffusers_scheduler.timesteps, refiners_scheduler.timesteps)
 
 
 def test_dpm_solver_diffusers():
@@ -59,7 +69,7 @@ def test_euler_solver_diffusers():
         beta_start=0.00085,
         num_train_timesteps=1000,
         steps_offset=1,
-        timestep_spacing="trailing",
+        timestep_spacing="leading",
     )
     diffusers_scheduler.set_timesteps(30)
     refiners_scheduler = EulerScheduler(num_inference_steps=30)
@@ -68,7 +78,6 @@ def test_euler_solver_diffusers():
     noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        # scaled_sample = diffusers_scheduler.scale_model_input(sample, timestep)
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
         refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
 
