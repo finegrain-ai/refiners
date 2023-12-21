@@ -101,7 +101,8 @@ class ReDilatedConvAdapter(Generic[T], fl.Chain, Adapter[T]):
         else:
             redilation_conv = self.target.conv1
         self.target.conv2 = ReDilatedConv(redilation_conv, self.dilation_factor, self.kernel_inflated, self.progressive, self.inflate_timestep, self.dilation_timestep, self.interpolation_mode)
-
+    def eject(self) -> None:
+        super().eject()
 
 class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
     def __init__(self, target: T, dilation_setting: dict[str, float], inflate_settings: dict[str, str], inflate_timestep: int = 0, dilation_timestep: int = 700, progressive: bool =False) -> None:
