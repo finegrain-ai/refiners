@@ -1,9 +1,9 @@
 from torch import device as Device, dtype as DType, nn
 
-from refiners.fluxion.layers.module import WeightedModule
+from refiners.fluxion.layers.module import WeightedModule, ContextModule
 
 
-class Conv2d(nn.Conv2d, WeightedModule):
+class Conv2d(nn.Conv2d, WeightedModule, ContextModule):
     def __init__(
         self,
         in_channels: int,
