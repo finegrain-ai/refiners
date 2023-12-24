@@ -3,7 +3,7 @@ from typing import cast
 from warnings import warn
 from refiners.foundationals.latent_diffusion.schedulers import DPMSolver, DDIM, EulerScheduler, DDPM
 from refiners.fluxion import manual_seed
-from torch import equal, randn, Tensor, allclose, device as Device
+from torch import equal, randn, Tensor, allclose, device as Device, isclose
 
 
 def test_ddpm_diffusers():
@@ -70,12 +70,15 @@ def test_euler_solver_diffusers():
         num_train_timesteps=1000,
         steps_offset=1,
         timestep_spacing="leading",
+        use_karras_sigmas=False,
     )
     diffusers_scheduler.set_timesteps(30)
     refiners_scheduler = EulerScheduler(num_inference_steps=30)
 
     sample = randn(1, 4, 32, 32)
     noise = randn(1, 4, 32, 32)
+
+    assert isclose(diffusers_scheduler.init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
