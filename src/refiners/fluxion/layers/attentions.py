@@ -59,7 +59,6 @@ class ScaledDotProductAttention(Module):
         query: Float[Tensor, "batch num_queries embedding_dim"],
         key: Float[Tensor, "batch num_keys embedding_dim"],
         value: Float[Tensor, "batch num_values embedding_dim"],
-        *args: Tensor,
         is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries dim"]:
         if self.slice_size is None:
