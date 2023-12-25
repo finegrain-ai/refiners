@@ -48,7 +48,11 @@ if __name__ == "__main__":
 
     sdxl = "xl" in args.source_path
     target = ConditionEncoderXL() if sdxl else ConditionEncoder()
-    source: nn.Module = T2IAdapter.from_pretrained(pretrained_model_name_or_path=args.source_path)  # type: ignore
+    # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
+    source: nn.Module = T2IAdapter.from_pretrained(  # type: ignore
+        pretrained_model_name_or_path=args.source_path,
+        low_cpu_mem_usage=False,
+    )
     assert isinstance(source, nn.Module), "Source model is not a nn.Module"
 
     x = torch.randn(1, 3, 1024, 1024) if sdxl else torch.randn(1, 3, 512, 512)

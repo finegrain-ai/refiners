@@ -26,6 +26,7 @@ training = [
     # https://github.com/TimDettmers/bitsandbytes/pull/525
     "scipy>=1.11.4",
     "datasets>=2.15.0",
+    "tomli>=2.0.1",
 ]
 test = [
     "diffusers>=0.24.0",
@@ -41,6 +42,8 @@ conversion = [
     "diffusers>=0.24.0",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
+    "requests>=2.26.0",
+    "tqdm>=4.62.3",
 ]
 
 [build-system]
