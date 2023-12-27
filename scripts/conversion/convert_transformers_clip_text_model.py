@@ -26,7 +26,7 @@ def setup_converter(args: Args) -> ModelConverter:
     source: nn.Module = CLIPTextModelWithProjection.from_pretrained(  # type: ignore
         pretrained_model_name_or_path=args.source_path,
         subfolder=args.subfolder,
-        low_cpu_mem_usage=False,
+        low_cpu_mem_usage=True,
     )
     assert isinstance(source, nn.Module), "Source model is not a nn.Module"
     architecture: str = source.config.architectures[0]  # type: ignore

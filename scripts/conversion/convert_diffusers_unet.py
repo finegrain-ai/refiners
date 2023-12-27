@@ -21,7 +21,7 @@ def setup_converter(args: Args) -> ModelConverter:
     source: nn.Module = UNet2DConditionModel.from_pretrained(  # type: ignore
         pretrained_model_name_or_path=args.source_path,
         subfolder="unet",
-        low_cpu_mem_usage=False,
+        low_cpu_mem_usage=True,
     )
     source_in_channels: int = source.config.in_channels  # type: ignore
     source_clip_embedding_dim: int = source.config.cross_attention_dim  # type: ignore

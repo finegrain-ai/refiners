@@ -11,6 +11,7 @@ from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSol
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.scale_crafter import SD1ScaleCrafterAdapter
 
 
 class SD1Autoencoder(LatentDiffusionAutoencoder):
@@ -74,7 +75,6 @@ class StableDiffusion_1(LatentDiffusionModel):
             if isinstance(p, SD1SAGAdapter):
                 return p
         return None
-
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
     ) -> Tensor:
@@ -95,6 +95,23 @@ class StableDiffusion_1(LatentDiffusionModel):
         degraded_noise = self.unet(degraded_latents)
 
         return sag.scale * (noise - degraded_noise)
+    def has_scale_crafter(self) -> bool:
+        return self._find_scale_crafter_adapter() is not None
+
+    def _find_scale_crafter_adapter(self) -> SD1ScaleCrafterAdapter | None:
+        for p in self.unet.get_parents():
+            if isinstance(p, SD1ScaleCrafterAdapter):
+                return p
+        return None
+
+    def compute_base_unconditional_prediction(self, unconditional_prediction: Tensor, x: Tensor) -> Tensor:
+        scale_crafter_adapter = self._find_scale_crafter_adapter()
+        if scale_crafter_adapter is None:
+            return unconditional_prediction
+        scale_crafter_adapter.set_noise_damped(True)
+        base_unconditional_prediction = self.unet(x)
+        scale_crafter_adapter.set_noise_damped(False)
+        return base_unconditional_prediction
 
 
 class StableDiffusion_1_Inpainting(StableDiffusion_1):
