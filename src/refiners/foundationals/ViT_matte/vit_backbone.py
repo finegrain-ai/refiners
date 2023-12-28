@@ -1,16 +1,12 @@
-from typing import Iterable, Tuple
 from torch import device as Device, dtype as DType, Tensor
 from refiners.fluxion.context import Contexts
 import refiners.fluxion.layers as fl
-from refiners.fluxion.layers.module import Module
 from refiners.fluxion.utils import pad, interpolate
 from torch import nn
 import torch
 import math
 
 
-# Same functions from segment-anything/image_encoder
-# -----------------------------------------------------------------------
 class PatchEncoder(fl.Chain):
     def __init__(
         self,
@@ -43,8 +39,8 @@ class PositionalEncoder(fl.Residual):
     def __init__(
         self,
         embedding_dim: int,
-        num_position:  int,
-        image_embedding_size : tuple[int,int],
+        num_position: int,
+        image_embedding_size: tuple[int, int],
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -53,16 +49,15 @@ class PositionalEncoder(fl.Residual):
         self.image_embedding_size = image_embedding_size
         super().__init__(
             fl.Parameter(
-                1,
                 num_position,
                 embedding_dim,
                 device=device,
                 dtype=dtype,
             ),
-            fl.Lambda(self.get_abs_pos)
+            fl.Lambda(self.get_abs_pos),
         )
-    #renommer les variables
-    def get_abs_pos(self, x: Tensor) -> Tensor :
+
+    def get_abs_pos(self, x: Tensor) -> Tensor:
         """
         --From the original ViTMatte repo w/ adaptation--
         Calculate absolute positional embeddings. If needed, resize embeddings and remove cls_token
@@ -79,18 +74,16 @@ class PositionalEncoder(fl.Residual):
         size = int(math.sqrt(n_patch))
         assert size * size == n_patch
 
-        if size != self.image_embedding_size[0] or size != self.image_embedding_size[1] :
+        if size != self.image_embedding_size[0] or size != self.image_embedding_size[1]:
             new_abs_pos = interpolate(
                 x.reshape(1, size, size, -1).permute(0, 3, 1, 2),
-                factor = torch.Size((self.image_embedding_size[0], self.image_embedding_size[1])),
+                factor=torch.Size((self.image_embedding_size[0], self.image_embedding_size[1])),
                 mode="bicubic",
             )
 
             return new_abs_pos.permute(0, 2, 3, 1)
         else:
             return x.reshape(1, self.image_embedding_size[0], self.image_embedding_size[1], -1)
-    
-
 
 
 class RelativePositionAttention(fl.WeightedModule):
@@ -351,16 +344,18 @@ class Neck(fl.Chain):
 class ResBlock(fl.Chain):
     def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__(
-            fl.Permute(0, 3, 1, 2),
-            fl.Conv2d(in_channels=in_channels, out_channels=192, kernel_size=(1, 1), use_bias=False),
-            fl.LayerNorm2d(channels=192, device=device, dtype=dtype),
-            fl.GeLU(),
-            fl.Conv2d(in_channels=192, out_channels=192, kernel_size=(3, 3), padding=1, use_bias=False),
-            fl.LayerNorm2d(channels=192, device=device, dtype=dtype),
-            fl.GeLU(),
-            fl.Conv2d(in_channels=192, out_channels=384, kernel_size=(1, 1), use_bias=False),
-            fl.LayerNorm2d(channels=384, device=device, dtype=dtype),
-            fl.Permute(0, 2, 3, 1),
+            fl.Residual(
+                fl.Permute(0, 3, 1, 2),
+                fl.Conv2d(in_channels=in_channels, out_channels=192, kernel_size=(1, 1), use_bias=False),
+                fl.LayerNorm2d(channels=192, device=device, dtype=dtype),
+                fl.GeLU(),
+                fl.Conv2d(in_channels=192, out_channels=192, kernel_size=(3, 3), padding=1, use_bias=False),
+                fl.LayerNorm2d(channels=192, device=device, dtype=dtype),
+                fl.GeLU(),
+                fl.Conv2d(in_channels=192, out_channels=384, kernel_size=(1, 1), use_bias=False),
+                fl.LayerNorm2d(channels=384, device=device, dtype=dtype),
+                fl.Permute(0, 2, 3, 1),
+            )
         )
 
 
@@ -374,7 +369,6 @@ class Transformer(fl.Chain):
 class MViT(fl.Chain):
     def __init__(
         self,
-        
         embedding_dim: int,
         num_layers: int,
         num_heads: int,
@@ -396,15 +390,16 @@ class MViT(fl.Chain):
         self.num_patches = (pretrain_img_size // self.patch_size) * (pretrain_img_size // self.patch_size)
         self.num_positions = self.num_patches + 1
         super().__init__(
-
             PatchEncoder(
                 in_channels=4, out_channels=embedding_dim, patch_size=self.patch_size, device=device, dtype=dtype
             ),
-   
             PositionalEncoder(
-            embedding_dim=embedding_dim, num_position=self.num_positions, image_embedding_size = self.image_embedding_size, device=device, dtype=dtype
+                embedding_dim=embedding_dim,
+                num_position=self.num_positions,
+                image_embedding_size=self.image_embedding_size,
+                device=device,
+                dtype=dtype,
             ),
-
             Transformer(
                 TransformerLayer(
                     embedding_dim=embedding_dim,
@@ -417,6 +412,7 @@ class MViT(fl.Chain):
                 )
                 for i in range(num_layers)
             ),
+            fl.Permute(0, 3, 1, 2),
         )
 
 

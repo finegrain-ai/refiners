@@ -1,35 +1,39 @@
 import argparse
-import types
-from typing import Any, Callable, cast
 import torch
 import torch.nn as nn
 from torch import Tensor
+from typing import Callable, cast
 
-from transformers import VitMatteImageProcessor, VitMatteForImageMatting # type: ignore
-from transformers.models.vitdet.modeling_vitdet import VitDetLayerNorm # type: ignore
-
+from transformers import VitMatteForImageMatting  # type: ignore
+from transformers.models.vitdet.modeling_vitdet import VitDetLayerNorm  # type: ignore
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import manual_seed, save_to_safetensors
+from refiners.foundationals.ViT_matte.decoder import Detail_Capture
 
-from refiners.foundationals.ViT_matte.vitmatte import MViTH
+from refiners.foundationals.ViT_matte.vit_backbone import MViTH
+from refiners.foundationals.ViT_matte.vit_matte import ViTMatte
+
 
 class VitMatte(nn.Module):
-    image_encoder: nn.Module
+    vit_backbone: nn.Module
+    decoder: nn.Module
 
 
-#VitMatteForImageMatting = cast(Callable[[], VitMatte], VitMatteForImageMatting)
+VitMatteForImageMatting = cast(Callable[[], VitMatte], VitMatteForImageMatting)
 
 
 assert issubclass(VitDetLayerNorm, nn.Module)
 custom_layers = {VitDetLayerNorm: fl.LayerNorm2d}
+
 
 class Args(argparse.Namespace):
     source_path: str
     output_path: str
     half: bool
     verbose: bool
+
 
 def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
@@ -39,6 +43,7 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_model=vit,
         target_model=refiners_vit_matte_h,
         custom_layer_mapping=custom_layers,  # type: ignore
+        verbose=True,
     )
     converter.skip_init_check = True
 
@@ -46,9 +51,9 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     mapping = converter.map_state_dicts(source_args=(x,))
     assert mapping
 
-    mapping["PositionalEncoder.Parameter.parameter"] = "embeddings.position_embeddings"
+    mapping["PositionalEncoder.Parameter.weight"] = "embeddings.position_embeddings"
     target_state_dict = refiners_vit_matte_h.state_dict()
-    del target_state_dict["PositionalEncoder.Parameter.parameter"]
+    del target_state_dict["PositionalEncoder.Parameter.weight"]
 
     source_state_dict = vit.state_dict()
     pos_embed = source_state_dict["embeddings.position_embeddings"]
@@ -61,7 +66,9 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         )
         for i in range(1, 13)
     ]
-    source_rel_keys = [(f"encoder.layer.{i}.attention.rel_pos_w", f"encoder.layer.{i}.attention.rel_pos_h") for i in range(12)]
+    source_rel_keys = [
+        (f"encoder.layer.{i}.attention.rel_pos_w", f"encoder.layer.{i}.attention.rel_pos_h") for i in range(12)
+    ]
 
     rel_items: dict[str, Tensor] = {}
 
@@ -77,7 +84,7 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
     )
 
-    converted_source["PositionalEncoder.Parameter.parameter"] = pos_embed  # type: ignore
+    converted_source["PositionalEncoder.Parameter.weight"] = pos_embed.squeeze()  # type: ignore
     converted_source.update(rel_items)
 
     refiners_vit_matte_h.load_state_dict(state_dict=converted_source)
@@ -86,21 +93,40 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     return converted_source
 
 
+def convert_decoder(decoder: nn.Module) -> dict[str, Tensor]:
+    manual_seed(seed=0)
+    features = torch.randn((1, 384, 32, 32))
+    images = torch.randn((1, 4, 512, 512))
+    d_capture = Detail_Capture()
+    d_capture.set_context("detail_capture", {"images": images})
+
+    converter = ModelConverter(
+        source_model=decoder,  # type: ignore
+        target_model=d_capture,
+        verbose=True,
+    )
+    converter.run(source_args=(features, images), target_args=(features,))
+
+    assert converter.compare_models(source_args=(features, images), target_args=(features,), threshold=1e-3)
+
+    return converter.get_state_dict()
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Converts a Segment Anything ViT model to a Refiners SAMViTH model")
+    parser = argparse.ArgumentParser(description="Converts a ViT Matte model to a Refiners VitMatte model")
     parser.add_argument(
         "--from",
         type=str,
-        dest="source_path",
-        default="sam_vit_h_4b8939.pth",
+        dest="pretrained_model",
+        default="hustvl/vitmatte-small-composition-1k",
         # required=True,
-        help="Path to the Segment Anything model weights",
+        help="Path to the refiners VitMatte weights",
     )
     parser.add_argument(
         "--to",
         type=str,
         dest="output_path",
-        default="segment-anything-h.safetensors",
+        default="vitmatte_h.safetensors",
         help="Output path for converted model (as safetensors).",
     )
     parser.add_argument("--half", action="store_true", default=False, help="Convert to half precision. Default: False")
@@ -112,20 +138,26 @@ def main() -> None:
     )
     args = parser.parse_args(namespace=Args())
 
-    sam_h = build_sam_vit_h()  # type: ignore
-    sam_h.load_state_dict(state_dict=torch.load(f=args.source_path))  # type: ignore
+    vitm_h = VitMatteForImageMatting.from_pretrained(args.pretrained_model)  # type: ignore
 
-    vit_state_dict = convert_vit(vit=sam_h.image_encoder)
-    mask_decoder_state_dict = convert_mask_decoder(mask_decoder=sam_h.mask_decoder)
-    point_encoder_state_dict = convert_point_encoder(prompt_encoder=sam_h.prompt_encoder)
-    mask_encoder_state_dict = convert_mask_encoder(prompt_encoder=sam_h.prompt_encoder)
+    vit_state_dict = convert_vit(vit=vitm_h.backbone)  # type: ignore
+    decoder_state_dict = convert_decoder(decoder=vitm_h.decoder)  # type: ignore
 
     output_state_dict = {
-        **{".".join(("image_encoder", key)): value for key, value in vit_state_dict.items()},
-        **{".".join(("mask_decoder", key)): value for key, value in mask_decoder_state_dict.items()},
-        **{".".join(("point_encoder", key)): value for key, value in point_encoder_state_dict.items()},
-        **{".".join(("mask_encoder", key)): value for key, value in mask_encoder_state_dict.items()},
+        **{".".join(("MViTH", key)): value for key, value in vit_state_dict.items()},
+        **{".".join(("Detail_Capture", key)): value for key, value in decoder_state_dict.items()},
     }
+
+    myViTMatte = ViTMatte()
+    myViTMatte.load_state_dict(output_state_dict)
+
+    images = torch.randn((1, 4, 512, 512))
+
+    res_target = myViTMatte(images)
+    res_source = vitm_h(images)
+
+    assert torch.allclose(res_target, res_source.alphas, 0.0001)
+
     if args.half:
         output_state_dict = {key: value.half() for key, value in output_state_dict.items()}
 
@@ -133,7 +165,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    #main()
-    vitm_h = VitMatteForImageMatting.from_pretrained("hustvl/vitmatte-small-composition-1k")  # type: ignore
-
-    vit_state_dict = convert_vit(vit=vitm_h.backbone) # type: ignore
+    main()

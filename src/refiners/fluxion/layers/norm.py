@@ -86,3 +86,28 @@ class InstanceNorm2d(nn.InstanceNorm2d, Module):
             device=device,
             dtype=dtype,
         )
+
+
+class BatchNorm2d(nn.BatchNorm2d, Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-05,
+        momentum: float = 0.1,
+        affine: bool = True,
+        track_running_stats: bool = True,
+        eval_mode: bool = True,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(  # type: ignore
+            num_features=num_features,
+            eps=eps,
+            momentum=momentum,
+            affine=affine,
+            track_running_stats=track_running_stats,
+            device=device,
+            dtype=dtype,
+        )
+        if eval_mode:
+            self.eval()

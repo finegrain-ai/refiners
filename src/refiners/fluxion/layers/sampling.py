@@ -49,11 +49,18 @@ class Downsample(Chain):
 
 
 class Interpolate(Module):
-    def __init__(self) -> None:
+    def __init__(self, factor: float | Size, mode: str = "nearest") -> None:
         super().__init__()
+        self.factor = factor
+        self.mode = mode
+        
 
-    def forward(self, x: Tensor, shape: Size) -> Tensor:
-        return interpolate(x, shape)
+    def forward(self, x: Tensor, shape: Size | None = None) -> Tensor:
+
+        if shape:
+            return interpolate(x, shape) #Kept that here in case it is used somewhere
+        
+        return interpolate(x, self.factor, self.mode)
 
 
 class Upsample(Chain):
