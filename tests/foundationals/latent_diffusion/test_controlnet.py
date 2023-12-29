@@ -1,10 +1,10 @@
 from typing import Iterator
 
 import pytest
-import torch
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import lookup_top_adapter
+from refiners.fluxion.utils import no_grad
 from refiners.foundationals.latent_diffusion import SD1ControlnetAdapter, SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import Controlnet
 
@@ -18,7 +18,7 @@ def unet(request: pytest.FixtureRequest) -> Iterator[SD1UNet]:
     yield unet
 
 
-@torch.no_grad()
+@no_grad()
 def test_single_controlnet(unet: SD1UNet) -> None:
     original_parent = unet.parent
     cn = SD1ControlnetAdapter(unet, name="cn")
@@ -43,7 +43,7 @@ def test_single_controlnet(unet: SD1UNet) -> None:
     assert len(list(unet.walk(Controlnet))) == 0
 
 
-@torch.no_grad()
+@no_grad()
 def test_two_controlnets_eject_bottom_up(unet: SD1UNet) -> None:
     original_parent = unet.parent
     cn1 = SD1ControlnetAdapter(unet, name="cn1").inject()
@@ -71,7 +71,7 @@ def test_two_controlnets_eject_bottom_up(unet: SD1UNet) -> None:
     assert len(list(unet.walk(Controlnet))) == 0
 
 
-@torch.no_grad()
+@no_grad()
 def test_two_controlnets_eject_top_down(unet: SD1UNet) -> None:
     original_parent = unet.parent
     cn1 = SD1ControlnetAdapter(unet, name="cn1").inject()
@@ -86,7 +86,7 @@ def test_two_controlnets_eject_top_down(unet: SD1UNet) -> None:
     assert len(list(unet.walk(Controlnet))) == 0
 
 
-@torch.no_grad()
+@no_grad()
 def test_two_controlnets_same_name(unet: SD1UNet) -> None:
     SD1ControlnetAdapter(unet, name="cnx").inject()
     cn2 = SD1ControlnetAdapter(unet, name="cnx")

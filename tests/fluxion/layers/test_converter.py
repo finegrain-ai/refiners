@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from warnings import warn
 
 import pytest
@@ -60,8 +61,9 @@ def test_converter_multiple_tensors(test_device: torch.device) -> None:
 
 
 def test_converter_no_parent_device_or_dtype() -> None:
+    identity: Callable[[Any], Any] = lambda x: x
     chain = fl.Chain(
-        fl.Lambda(func=(lambda x: x)),
+        fl.Lambda(func=identity),
         fl.Converter(set_device=True, set_dtype=False),
     )
 

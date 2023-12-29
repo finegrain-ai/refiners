@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from tests.utils import ensure_similar_images
 
-from refiners.fluxion.utils import load_from_safetensors
+from refiners.fluxion.utils import load_from_safetensors, no_grad
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 
 
@@ -38,7 +38,7 @@ def sample_image(ref_path: Path) -> Image.Image:
     return img
 
 
-@torch.no_grad()
+@no_grad()
 def test_encode_decode(encoder: LatentDiffusionAutoencoder, sample_image: Image.Image):
     encoded = encoder.encode_image(sample_image)
     decoded = encoder.decode_latents(encoded)
