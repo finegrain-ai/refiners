@@ -250,11 +250,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self,
         target: fl.Attention,
         text_sequence_length: int = 77,
-        image_sequence_length: int = 4,
+        image_sequence_length: int = 4,  # TODO: unused ?
         scale: float = 1.0,
     ) -> None:
         self.text_sequence_length = text_sequence_length
-        self.image_sequence_length = image_sequence_length
+        self.image_sequence_length = image_sequence_length  # TODO: unused ?
         self.scale = scale
 
         with self.setup_adapter(target):
