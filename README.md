@@ -92,7 +92,7 @@ from PIL import Image
 
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion import SDXLIPAdapter, SDXLT2IAdapter
-from refiners.fluxion.utils import manual_seed, image_to_tensor, load_from_safetensors
+from refiners.fluxion.utils import manual_seed, no_grad, image_to_tensor, load_from_safetensors
 
 # Load inputs
 init_image = Image.open("dropy_logo.png")
@@ -122,7 +122,7 @@ t2i_adapter.set_scale(0.8)
 sdxl.set_num_inference_steps(50)
 sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
-with torch.no_grad():
+with no_grad():
     # Note: default text prompts for IP-Adapter
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text="best quality, high quality", negative_text="monochrome, lowres, bad anatomy, worst quality, low quality"

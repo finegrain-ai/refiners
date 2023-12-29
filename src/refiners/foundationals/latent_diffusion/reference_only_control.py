@@ -1,3 +1,5 @@
+from typing import Callable
+
 from torch import Tensor
 
 from refiners.fluxion.adapters.adapter import Adapter
@@ -45,8 +47,9 @@ class SelfAttentionInjectionAdapter(Chain, Adapter[SelfAttention]):
         )
 
         with self.setup_adapter(target):
+            slice_tensor: Callable[[Tensor], Tensor] = lambda x: x[:1]
             super().__init__(
-                Parallel(sa_guided, Chain(Lambda(lambda x: x[:1]), target)),
+                Parallel(sa_guided, Chain(Lambda(slice_tensor), target)),
                 Lambda(self.compute_averaged_unconditioned_x),
             )
 

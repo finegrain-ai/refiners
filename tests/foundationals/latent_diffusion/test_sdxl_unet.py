@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from refiners.fluxion.model_converter import ConversionStage, ModelConverter
-from refiners.fluxion.utils import manual_seed
+from refiners.fluxion.utils import manual_seed, no_grad
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
 
 
@@ -37,7 +37,7 @@ def refiners_sdxl_unet() -> SDXLUNet:
     return unet
 
 
-@torch.no_grad()
+@no_grad()
 def test_sdxl_unet(diffusers_sdxl_unet: Any, refiners_sdxl_unet: SDXLUNet) -> None:
     source = diffusers_sdxl_unet
     target = refiners_sdxl_unet

@@ -1,6 +1,7 @@
 import torch
 
 from refiners.fluxion import manual_seed
+from refiners.fluxion.utils import no_grad
 from refiners.foundationals.latent_diffusion import SD1UNet
 
 
@@ -13,11 +14,11 @@ def test_unet_context_flush():
     unet = SD1UNet(in_channels=4)
     unet.set_clip_text_embedding(clip_text_embedding=text_embedding)  # not flushed between forward-s
 
-    with torch.no_grad():
+    with no_grad():
         unet.set_timestep(timestep=timestep)
         y_1 = unet(x.clone())
 
-    with torch.no_grad():
+    with no_grad():
         unet.set_timestep(timestep=timestep)
         y_2 = unet(x.clone())
 

@@ -7,7 +7,7 @@ import torch
 from torch import Tensor, nn
 from torch.utils.hooks import RemovableHandle
 
-from refiners.fluxion.utils import norm, save_to_safetensors
+from refiners.fluxion.utils import no_grad, norm, save_to_safetensors
 
 TORCH_BASIC_LAYERS: list[type[nn.Module]] = [
     nn.Conv1d,
@@ -512,7 +512,7 @@ class ModelConverter:
 
         return True
 
-    @torch.no_grad()
+    @no_grad()
     def _trace_module_execution_order(
         self,
         module: nn.Module,
@@ -603,7 +603,7 @@ class ModelConverter:
 
         return converted_state_dict
 
-    @torch.no_grad()
+    @no_grad()
     def _collect_layers_outputs(
         self, module: nn.Module, args: ModuleArgs, keys_to_skip: list[str]
     ) -> list[tuple[str, Tensor]]:

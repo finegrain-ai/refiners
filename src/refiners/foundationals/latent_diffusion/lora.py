@@ -122,7 +122,7 @@ class SD1LoraAdapter(fl.Chain, Adapter[StableDiffusion_1]):
         assert metadata is not None, "Invalid safetensors checkpoint: missing metadata"
         tensors = load_from_safetensors(checkpoint_path, device=target.device)
 
-        sub_targets = {}
+        sub_targets: dict[str, list[LoraTarget]] = {}
         for model_name in MODELS:
             if not (v := metadata.get(f"{model_name}_targets", "")):
                 continue

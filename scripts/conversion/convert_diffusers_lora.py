@@ -11,7 +11,7 @@ from torch.nn.init import zeros_
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.lora import Lora, LoraAdapter
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.utils import no_grad, save_to_safetensors
 from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.lora import LoraTarget, lora_targets
 
@@ -37,7 +37,7 @@ class Args(argparse.Namespace):
     verbose: bool
 
 
-@torch.no_grad()
+@no_grad()
 def process(args: Args) -> None:
     diffusers_state_dict = cast(dict[str, Tensor], torch.load(args.source_path, map_location="cpu"))  # type: ignore
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`

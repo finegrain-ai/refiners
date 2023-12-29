@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, no_grad, set_rng_state, stack
+from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
 from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
@@ -26,7 +26,7 @@ from torch.optim.lr_scheduler import (
 from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
-from refiners.fluxion.utils import manual_seed
+from refiners.fluxion.utils import manual_seed, no_grad
 from refiners.training_utils.callback import (
     Callback,
     ClockCallback,

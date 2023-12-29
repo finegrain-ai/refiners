@@ -18,7 +18,7 @@ from torch import Tensor
 
 from refiners.fluxion import manual_seed
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.fluxion.utils import image_to_tensor
+from refiners.fluxion.utils import image_to_tensor, no_grad
 from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
 from refiners.foundationals.segment_anything.model import SegmentAnythingH
 from refiners.foundationals.segment_anything.transformer import TwoWayTranformerLayer
@@ -98,7 +98,7 @@ def truck(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "truck.jpg").convert("RGB")
 
 
-@torch.no_grad()
+@no_grad()
 def test_fused_self_attention(facebook_sam_h: FacebookSAM) -> None:
     manual_seed(seed=0)
     x = torch.randn(25, 14, 14, 1280, device=facebook_sam_h.device)
@@ -124,7 +124,7 @@ def test_fused_self_attention(facebook_sam_h: FacebookSAM) -> None:
     assert torch.equal(input=y_1, other=y_2)
 
 
-@torch.no_grad()
+@no_grad()
 def test_image_encoder(sam_h: SegmentAnythingH, facebook_sam_h: FacebookSAM, truck: Image.Image) -> None:
     image_tensor = image_to_tensor(image=truck.resize(size=(1024, 1024)), device=facebook_sam_h.device)
     y_1 = facebook_sam_h.image_encoder(image_tensor)
@@ -133,7 +133,7 @@ def test_image_encoder(sam_h: SegmentAnythingH, facebook_sam_h: FacebookSAM, tru
     assert torch.allclose(input=y_1, other=y_2, atol=1e-4)
 
 
-@torch.no_grad()
+@no_grad()
 def test_prompt_encoder_dense_positional_embedding(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> None:
     facebook_prompt_encoder = facebook_sam_h.prompt_encoder
     refiners_prompt_encoder = sam_h.point_encoder
@@ -144,7 +144,7 @@ def test_prompt_encoder_dense_positional_embedding(facebook_sam_h: FacebookSAM, 
     assert torch.equal(input=refiners_dense_pe, other=facebook_dense_pe)
 
 
-@torch.no_grad()
+@no_grad()
 def test_prompt_encoder_no_mask_dense_embedding(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> None:
     facebook_prompt_encoder = facebook_sam_h.prompt_encoder
     refiners_prompt_encoder = sam_h.mask_encoder
@@ -155,7 +155,7 @@ def test_prompt_encoder_no_mask_dense_embedding(facebook_sam_h: FacebookSAM, sam
     assert torch.equal(input=refiners_dense_pe, other=facebook_dense_pe)
 
 
-@torch.no_grad()
+@no_grad()
 def test_point_encoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH, prompt: SAMPrompt) -> None:
     facebook_prompt_encoder = facebook_sam_h.prompt_encoder
     refiners_prompt_encoder = sam_h.point_encoder
@@ -174,7 +174,7 @@ def test_point_encoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH, pro
     assert torch.equal(input=refiners_sparse_pe, other=facebook_sparse_pe)
 
 
-@torch.no_grad()
+@no_grad()
 def test_two_way_transformer(facebook_sam_h: FacebookSAM) -> None:
     dense_embedding = torch.randn(1, 64 * 64, 256, device=facebook_sam_h.device)
     dense_positional_embedding = torch.randn(1, 64 * 64, 256, device=facebook_sam_h.device)
@@ -223,7 +223,7 @@ def test_two_way_transformer(facebook_sam_h: FacebookSAM) -> None:
     assert torch.equal(input=y_1, other=y_2)
 
 
-@torch.no_grad()
+@no_grad()
 def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> None:
     manual_seed(seed=0)
     facebook_mask_decoder = facebook_sam_h.mask_decoder

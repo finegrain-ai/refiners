@@ -1,3 +1,5 @@
+from typing import Callable
+
 from torch import Size, Tensor, device as Device, dtype as DType
 from torch.nn.functional import pad
 
@@ -40,7 +42,8 @@ class Downsample(Chain):
             ),
         )
         if padding == 0:
-            self.insert(0, Lambda(lambda x: pad(x, (0, 1, 0, 1))))
+            zero_pad: Callable[[Tensor], Tensor] = lambda x: pad(x, (0, 1, 0, 1))
+            self.insert(0, Lambda(zero_pad))
         if register_shape:
             self.insert(0, SetContext(context="sampling", key="shapes", callback=self.register_shape))
 
