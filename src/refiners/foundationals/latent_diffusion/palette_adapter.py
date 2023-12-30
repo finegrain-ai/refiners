@@ -13,13 +13,11 @@ if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 T = TypeVar("T", bound="SD1UNet | SDXLUNet")
-TPaletteAdapter = TypeVar("TPaletteAdapter", bound="PaletteAdapter[Any]")  # Self (see PEP 673)
+TPaletteAdapter = TypeVar("TPaletteAdapter", bound="PaletteAdapter[Any]")
 
 
-class FillZeroRightPad(fl.Module):
+class FillZeroRightPad(fl.Module):  # TODO: generalizable ?
     """Pad a tensor with zeros on the right to reach a given length."""
-
-    # TODO: generalizable ?
 
     def __init__(
         self,
@@ -94,7 +92,10 @@ class FeedForward(fl.Chain):
 
 
 class SinusoidalEmbedding(fl.Module):
-    """Compute sinusoidal embeddings for a given sequence of indices."""
+    """Compute sinusoidal embeddings for a given sequence of indices.
+
+    See https://www.tensorflow.org/text/tutorials/transformer?hl=en#the_embedding_and_positional_encoding_layer
+    """
 
     def __init__(
         self,
@@ -152,6 +153,8 @@ class SinusoidalEmbedding(fl.Module):
 
 
 class ColorEncoder(fl.Passthrough):
+    """Encode a sequence of (RGB) colors into a sequence of embeddings."""
+
     def __init__(
         self,
         dim_sinusoids: int,
@@ -194,12 +197,14 @@ class ColorEncoder(fl.Passthrough):
                 max_length=max_colors + 1,
                 dim=1,
             ),
-            # (max_colors, dim_embeddings)
+            # (max_colors + 1, dim_embeddings)
             fl.SetContext("palette", "embeddings"),
         )
 
 
 class PaletteCrossAttention(fl.Chain):
+    """Cross attention module, using the palette embeddings for keys and values."""
+
     def __init__(
         self,
         linear_input_dim: int,
@@ -214,25 +219,24 @@ class PaletteCrossAttention(fl.Chain):
 
         super().__init__(
             fl.Distribute(
-                fl.Identity(),  # Q
-                fl.Chain(  # K
+                fl.Identity(),  # Q (from the original CrossAttention)
+                fl.Chain(  # K (palette)
                     fl.UseContext("palette", "embeddings"),
                     fl.Linear(linear_input_dim, linear_output_dim),
                 ),
-                fl.Chain(  # V
+                fl.Chain(  # V (palette)
                     fl.UseContext("palette", "embeddings"),
                     fl.Linear(linear_input_dim, linear_output_dim),
                 ),
             ),
             ScaledDotProductAttention(num_heads=num_heads),
-            fl.Lambda(func=self.scale_outputs),
+            fl.Multiply(scale=scale),
         )
-
-    def scale_outputs(self, x: torch.Tensor) -> torch.Tensor:
-        return x * self.scale
 
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
+    """Inject a PaletteCrossAttention module in a given Attention module."""
+
     def __init__(
         self,
         target: fl.Attention,
@@ -247,7 +251,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def inject(self, parent: fl.Chain | None = None) -> "CrossAttentionAdapter":
         # find the ScaledDotProductAttention
         scaled_dot_product_attention = self.target.ensure_find(ScaledDotProductAttention)
-        # replace the ScaledDotProductAttention
+        # replace it by a Sum of the ScaledDotProductAttention and the PaletteCrossAttention
         self.target.replace(
             old_module=scaled_dot_product_attention,
             new_module=fl.Sum(
@@ -265,9 +269,9 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def eject(self) -> None:
         # find the PaletteCrossAttention
         palette_cross_attention = self.target.ensure_find(PaletteCrossAttention)
-        # find it's parent
+        # find it's parent (Sum)
         parent = self.target.ensure_find_parent(palette_cross_attention)
-        # remove the PaletteCrossAttention
+        # extract the original ScaledDotProductAttention out of the Sum
         self.target.replace(
             old_module=parent,
             new_module=parent[0],
@@ -276,6 +280,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
 
 class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
+    """Inject a ColorEncoder and PaletteCrossAttention modules in a given UNet module."""
+
     def __init__(
         self,
         target: T,
@@ -293,20 +299,16 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
     def inject(self: "TPaletteAdapter", parent: fl.Chain | None = None) -> "TPaletteAdapter":
         # prepend the color encoder
         self.target.insert(0, self.color_encoder[0])
-
         # inject all the cross attention adapters
         for adapter in self.cross_attention_adapters:
             adapter.inject()
-
         return super().inject(parent)
 
     def eject(self) -> None:
         # remove the color encoder
         color_encoder = self.target.ensure_find(ColorEncoder)
         self.target.remove(color_encoder)
-
         # eject all the cross attention adapters
         for adapter in self.cross_attention_adapters:
             adapter.eject()
-
         super().eject()
