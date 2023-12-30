@@ -116,8 +116,6 @@ if __name__ == "__main__":
     import sys
 
     config_path = sys.argv[1]
-    config = LoraLatentDiffusionConfig.load_from_toml(
-        toml_path=config_path,
-    )
+    config = LoraLatentDiffusionConfig.load_from_toml(toml_path=config_path)
     trainer = LoraLatentDiffusionTrainer(config=config)
     trainer.train()
