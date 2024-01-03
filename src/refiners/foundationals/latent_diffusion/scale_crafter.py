@@ -23,7 +23,7 @@ class ReDilatedConv(fl.Module):
         self.kernel_inflated = kernel_inflated
         self.inflate_timestep = inflate_timestep
         self.dilation_timestep = dilation_timestep
-    def forward(self, x: Tensor, timestep: Tensor) -> Tensor:
+    def forward(self, x: Tensor, timestep: int) -> Tensor:
         if timestep >= self.dilation_timestep:
             return self.conv(x)
         dilation_factor = self.dilation_factor
@@ -75,12 +75,13 @@ class ConvNode(fl.Module):
             return self.conv_map1(x, switchCondition)
         return self.conv_map2(x, switchCondition)
 
-class ScaleCrafterRouter(fl.Chain):
+class ScaleCrafterRouter(fl.Module):
     def __init__(self, conv_node: ConvNode, inflate_timestep: int = 0, noise_damped_timestep: int = 700):
+        super().__init__()
         self.conv_node = conv_node
         self.inflate_timestep = inflate_timestep
         self.noise_damped_timestep = noise_damped_timestep
-        super().__init__(
+        self.chain = fl.Chain(
             fl.Parallel(
                 fl.Chain(
                     fl.Parallel(
@@ -96,10 +97,12 @@ class ScaleCrafterRouter(fl.Chain):
             ),
             conv_node
         )
-    def route_inflate(self, timestep: Tensor):
-        return int(timestep < self.inflate_timestep)
-    def route_noise_damped(self, timestep: Tensor, noise_damped: bool) -> int:
-        return int(timestep < self.noise_damped_timestep)
+    def __call__(self, x: Tensor):
+        return self.chain(x)
+    def route_inflate(self, timestep: int):
+        return int(timestep >= self.inflate_timestep)
+    def route_noise_damped(self, timestep: int, noise_damped: bool):
+        return int(not ((timestep < self.noise_damped_timestep) and noise_damped))
 class ReDilatedConvAdapter(Generic[TConvMap], fl.Chain, Adapter[TConvMap]):
     def __init__(self, target: ConvMap, dilation_factor: float = 1.0, kernel_inflated: bool = False, progressive: bool = False, inflate_timestep: int = 0, dilation_timestep: int = 700):
         self.target = target
@@ -133,7 +136,7 @@ class InflatedConvAdapter(Generic[TConvMap], fl.Chain, Adapter[TConvMap]):
             super().__init__(target)
     def inject(self: TConvMap, parent: fl.Chain | None = None) -> TConvMap:
         if isinstance(self.target.convs[-1], RedilatedConvChain):
-            print("Dilation must be done after inflation not before")
+            raise Exception("Dilation must be done after inflation not before")
         inflated_weight = self.target.convs[0].weight.clone()
         out_channels, in_channels = inflated_weight.shape[0], inflated_weight.shape[1]
         inflated_kernel_size = int(math.sqrt(self.inflation_transform.shape[0]))
@@ -150,7 +153,7 @@ class InflatedConvAdapter(Generic[TConvMap], fl.Chain, Adapter[TConvMap]):
         super().eject()
 
 class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
-    def __init__(self, target: T, dilation_settings: dict[str, float], inflate_settings: list[str], noise_damped_dilation_settings: dict[str, float], noise_damped_inflate_settings: dict[str, str], inflate_transform: Tensor | None = None, inflate_timestep: int = 0, dilation_timestep: int = 700, noise_damped_timestep: int = 700, progressive: bool =False) -> None:
+    def __init__(self, target: T, dilation_settings: dict[str, float] = {}, inflate_settings: list[str] = [], noise_damped_dilation_settings: dict[str, float] = {}, noise_damped_inflate_settings: list[str] = [], inflate_transform: Tensor | None = None, inflate_timestep: int = 0, dilation_timestep: int = 700, noise_damped_timestep: int = 0, progressive: bool =False) -> None:
         self.dilation_settings = dilation_settings
         self.noise_damped_dilation_settings = noise_damped_dilation_settings
         self.inflate_transform = inflate_transform
@@ -164,15 +167,18 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
             super().__init__(target)
     def init_context(self) -> Contexts:
         return {
-            "scale_crafter": {"noise_damped": False}
+            "scale_crafter": {"noise_damped": False},
+            "diffusion": {"timestep": None},
         }
     def set_noise_damped(self, noise_damped: bool) -> None:
         self.set_context("scale_crafter", {"noise_damped": noise_damped})
+    def set_timestep(self, timestep: int) -> None:
+        self.set_context(context="diffusion", value={"timestep": timestep})
     def inject(self: TSDScaleCrafterAdapter, parent: fl.Chain | None = None) -> TSDScaleCrafterAdapter:
         for name, module in self.target.named_modules():
             if isinstance(module, fl.Conv2d):
                 conv1 = module
-                parent = conv1._parent[0]
+                conv_chain = conv1._parent[0]
                 conv_switch = ConvMap([conv1])
                 kernel_inflated = False
                 if name in self.inflate_settings:
@@ -198,7 +204,7 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
                     noise_damped_redilated_conv_adapter = ReDilatedConvAdapter(noise_damped_conv_switch, dilation, noise_dampled_kernel_inflated, self.progressive, self.inflate_timestep, self.dilation_timestep)
                     noise_damped_redilated_conv_adapter.inject()
                 conv_node = ConvNode(conv_switch, noise_damped_conv_switch)
-                parent.replace(conv1, ScaleCrafterRouter(conv_node))
+                conv_chain.replace(conv1, ScaleCrafterRouter(conv_node))
         return super().inject(parent)
 
     def eject(self) -> None:

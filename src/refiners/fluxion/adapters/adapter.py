@@ -38,19 +38,16 @@ class Adapter(Generic[T]):
 
     def inject(self: TAdapter, parent: fl.Chain | None = None) -> TAdapter:
         assert isinstance(self, fl.Chain)
-
         if (parent is None) and isinstance(self.target, fl.ContextModule):
             parent = self.target.parent
             if parent is not None:
                 assert isinstance(parent, fl.Chain), f"{self.target} has invalid parent {parent}"
 
         target_parent = self.find_parent(self.target)
-
         if parent is None:
             if isinstance(self.target, fl.ContextModule):
                 self.target._set_parent(target_parent)  # type: ignore[reportPrivateUsage]
             return self
-
         # In general, `true_parent` is `parent`. We do this to support multiple adaptation,
         # i.e. initializing two adapters before injecting them.
         true_parent = parent.ensure_find_parent(self.target)

@@ -155,13 +155,15 @@ class StableDiffusion_XL(LatentDiffusionModel):
         return sag.scale * (noise - degraded_noise)
     def has_scale_crafter(self) -> bool:
         return self._find_scale_crafter_adapter() is not None
-
     def _find_scale_crafter_adapter(self) -> SDXLScaleCrafterAdapter | None:
         for p in self.unet.get_parents():
             if isinstance(p, SDXLScaleCrafterAdapter):
                 return p
         return None
-
+    def set_adapter_timesteps(self, timestep: int) -> None:
+        scale_crafter_adapter = self._find_scale_crafter_adapter()
+        if scale_crafter_adapter is not None:
+            scale_crafter_adapter.set_timestep(timestep=timestep)
     def compute_base_unconditional_prediction(self, unconditional_prediction: Tensor, x: Tensor) -> Tensor:
         scale_crafter_adapter = self._find_scale_crafter_adapter()
         if scale_crafter_adapter is None:
