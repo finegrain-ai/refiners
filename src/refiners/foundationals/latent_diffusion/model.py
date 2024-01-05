@@ -96,7 +96,6 @@ class LatentDiffusionModel(fl.Module, ABC):
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
-        # Unet contexts seem to reset after one forwardpass. TODO: Figure out fix
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding[0][None], **kwargs)
         base_unconditional_prediction = self.compute_base_unconditional_prediction(unconditional_prediction, x)
         # classifier-free guidance

@@ -70,7 +70,6 @@ class ConvNode(fl.Module):
         self.conv_map2 = conv_map2
     def forward(self, x: Tensor, timestep_tensor: Tensor, nodeCondition: bool = True, switchCondition: int = 0) -> Tensor:
         timestep = Tensor2int(timestep_tensor)
-        print(timestep, nodeCondition, switchCondition)
         if nodeCondition or (self.conv_map2 is None):
             return self.conv_map1(x, timestep, switchCondition)
         return self.conv_map2(x, timestep, switchCondition)
@@ -172,7 +171,7 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
     def set_noise_damped(self, noise_damped: bool) -> None:
         self.set_context("scale_crafter", {"noise_damped": noise_damped})
     def uses_noise_damped(self) -> bool:
-        return self.noise_damped_timestep > 0
+        return self.noise_damped_timestep < 1000
     def inject(self: TSDScaleCrafterAdapter, parent: fl.Chain | None = None) -> TSDScaleCrafterAdapter:
         for name, module in self.target.named_modules():
             if isinstance(module, fl.Conv2d):
