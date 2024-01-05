@@ -11,9 +11,13 @@ text_encoder = { checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.sa
 lda = { checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors", train = false }
 color_encoder = { train = true }
 
-[latent_diffusion]
+[ldm]
 unconditional_sampling_probability = 0.05
 offset_noise = 0.1
+
+[adapter.color_encoder]
+dim_sinusoids = 64
+dim_hidden = 256
 
 [training]
 duration = "2000:step"

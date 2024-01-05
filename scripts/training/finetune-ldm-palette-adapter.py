@@ -53,7 +53,7 @@ class ColorEncoderConfig(BaseModel):
 class AdapterConfig(BaseModel):
     """Configuration for the palette adapter."""
 
-    color_encoder_config: ColorEncoderConfig
+    color_encoder: ColorEncoderConfig
 
 
 class DatasetConfig(BaseModel):
@@ -105,8 +105,7 @@ class PaletteBatch(TypedDict):
 class PaletteDataset(Dataset[PaletteBatch]):
     """Dataset for the palette adapter.
 
-    Transforms PaletteImages from the HuggingfaceDataset into PaletteBatches.
-    This would be called a PaletteDatamodule if we were using PyTorch Lightning.
+    Transforms the data from the Hugging Face dataset into PaletteBatches.
     """
 
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
@@ -201,7 +200,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
             desc="Downloading images",  # type: ignore
         )
 
-        # cast the images to PIL.Image
+        # cast the "image" column Image
         dataset = dataset.cast_column(  # type: ignore
             column="image",
             feature=datasets.Image(),
@@ -272,8 +271,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
     def color_encoder(self) -> ColorEncoder:
         assert self.config.models["color_encoder"] is not None, "The config must contain a color_encoder entry."
         return ColorEncoder(
-            dim_sinusoids=self.config.adapter.color_encoder_config.dim_sinusoids,
-            dim_embeddings=self.config.adapter.color_encoder_config.dim_embeddings,
+            dim_sinusoids=self.config.adapter.color_encoder.dim_sinusoids,
+            dim_embeddings=self.config.adapter.color_encoder.dim_embeddings,
             device=self.device,
         ).to(device=self.device)
 
