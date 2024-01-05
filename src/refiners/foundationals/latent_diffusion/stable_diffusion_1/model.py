@@ -103,10 +103,6 @@ class StableDiffusion_1(LatentDiffusionModel):
             if isinstance(p, SD1ScaleCrafterAdapter):
                 return p
         return None
-    def set_adapter_timesteps(self, timestep: int) -> None:
-        scale_crafter_adapter = self._find_scale_crafter_adapter()
-        if scale_crafter_adapter is not None:
-            scale_crafter_adapter.set_timestep(timestep=timestep)
     def compute_base_unconditional_prediction(self, unconditional_prediction: Tensor, x: Tensor) -> Tensor:
         scale_crafter_adapter = self._find_scale_crafter_adapter()
         if scale_crafter_adapter is None:

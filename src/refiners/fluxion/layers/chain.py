@@ -567,6 +567,9 @@ class Concatenate(Chain):
 
     def forward(self, *args: Any) -> Tensor:
         outputs = [module(*args) for module in self]
+        # print("start")
+        # for output in outputs:
+        #     print(output.shape)
         return cat([output for output in outputs if output is not None], dim=self.dim)
 
     def _show_only_tag(self) -> bool:
