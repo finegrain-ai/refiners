@@ -42,6 +42,7 @@ class ColorPaletteEncoder(fl.Chain):
         
         
         super().__init__(
+            fl.Converter(set_device=True, set_dtype=True),
             fl.Linear(
                 in_features=3, 
                 out_features=model_dim, 
@@ -86,27 +87,18 @@ class SD1ColorPaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
     def __init__(
         self,
         target: T,
-        model_dim: int,
+        color_palette_encoder: ColorPaletteEncoder | None = None,
         scale: float = 1.0,
-        max_colors: int = 8,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
         
-        cross_attn_2d = target.ensure_find(CrossAttentionBlock2d)
-        
-        self._color_palette_encoder = [ColorPaletteEncoder(
-            model_dim=model_dim,
-            max_colors=max_colors,
-            embedding_dim=cross_attn_2d.context_embedding_dim,
-            device=device,
-            dtype=dtype,
-        )]
+        self._color_palette_encoder = [color_palette_encoder]
 
         self.sub_adapters = [
-            CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=max_colors)
+            CrossAttentionAdapter(target=cross_attn, scale=scale, image_sequence_length=color_palette_encoder.max_colors)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -129,4 +121,5 @@ class SD1ColorPaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
         return self._color_palette_encoder[0]
     
     def encode_colors(self, x: Int[Tensor, "*batch n 3"]) -> Float[Tensor, "*batch max_colors model_dim"]:
-        return self.color_palette_encoder[0](x)
+        encoded = self.color_palette_encoder[0](x)
+        

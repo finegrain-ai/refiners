@@ -6,9 +6,10 @@ entity = "acme"
 project = "test-color-palette-training"
 
 [models]
-unet = {checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors"}
-text_encoder = {checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
-lda = {checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors"}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors"}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors"}
+color_palette_encoder = {}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.05
@@ -17,14 +18,14 @@ offset_noise = 0.1
 [color_palette]
 max_colors = 8
 model_dim = 256
-trigger_phrase: str = ""
-use_only_trigger_probability: float = 0.0
+trigger_phrase = "a spsh photo,"
+use_only_trigger_probability = 1.0
 
 [training]
 duration = "1000:epoch"
 seed = 0
 gpu_index = 0
-batch_size = 4
+batch_size = 2
 gradient_accumulation = "4:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
@@ -49,8 +50,10 @@ dropout_probability = 0.2
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "acme/images"
+hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
+local_folder = "data/1aurent/unsplash-lite-palette"
+resize_image_max_size = 512
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"
@@ -60,8 +63,5 @@ save_interval = "1:step"
 num_inference_steps = 30
 use_short_prompts = false
 prompts = [
-        "a cute cat",
-        "a cute dog",
-        "a cute bird",
-        "a cute horse",
+        "a cute cat"
 ]
