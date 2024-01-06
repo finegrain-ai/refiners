@@ -49,6 +49,9 @@ class ColorPaletteEncoder(fl.Chain):
                 device=device,
                 dtype=dtype
             ),
+            # Question : I used compute_sinuosoidal_embedding as 
+            # a positionnal embedding for the color 'rank' (1st color, 2nd color ...)
+            # It's not exactly the same as the TimestepEncoder
             fl.Residual(fl.Lambda(self.compute_sinuosoidal_embedding)),
             fl.Linear(in_features=model_dim, out_features=model_dim, device=device, dtype=dtype),
             fl.GeLU(),
