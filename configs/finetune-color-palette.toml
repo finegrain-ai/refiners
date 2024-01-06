@@ -63,5 +63,5 @@ save_interval = "1:step"
 num_inference_steps = 30
 use_short_prompts = false
 prompts = [
-        "a cute cat"
+        {"text" = "a cute cat", "color_palette" = [[0,0,255]]}
 ]
