@@ -9,6 +9,7 @@ from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusion
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.seamless_tiles import TileModeType, TilingAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
@@ -95,6 +96,22 @@ class StableDiffusion_1(LatentDiffusionModel):
         degraded_noise = self.unet(degraded_latents)
 
         return sag.scale * (noise - degraded_noise)
+
+    def _find_tile_adapter(self) -> TilingAdapter | None:
+        for p in self.unet.get_parents():
+            if isinstance(p, TilingAdapter):
+                return p
+        return None
+
+    def set_tile_mode(self, tile_mode: TileModeType):
+        if tile_mode:
+            if tile_adapter := self._find_tile_adapter():
+                tile_adapter.set_tile_mode(tile_mode)
+            else:
+                TilingAdapter(target=self.unet, tile_mode=tile_mode).inject()
+        else:
+            if tile_adapter := self._find_tile_adapter():
+                tile_adapter.eject()
 
 
 class StableDiffusion_1_Inpainting(StableDiffusion_1):

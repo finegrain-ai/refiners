@@ -257,6 +257,7 @@ class Chain(ContextModule):
         try:
             return layer(*args)
         except Exception as e:
+            raise e
             exc_type, _, exc_traceback = sys.exc_info()
             assert exc_type
             tb_list = traceback.extract_tb(tb=exc_traceback)
