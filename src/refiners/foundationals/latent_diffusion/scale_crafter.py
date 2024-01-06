@@ -56,6 +56,7 @@ class ReDilatedConv(fl.Module):
 class ConvMap(fl.Module):
     def __init__(self, convs: List[fl.Conv2d | ReDilatedConv]):
         super().__init__()
+        assert len(convs) > 0
         self.convs = convs
     def forward(self, x: Tensor, timestep: int, index: int = 0) -> Tensor:
         conv = self.convs[index]
@@ -133,17 +134,18 @@ class InflatedConvAdapter(Generic[TConvMap], fl.Chain, Adapter[TConvMap]):
         with self.setup_adapter(target):
             super().__init__(target)
     def inject(self: TConvMap, parent: fl.Chain | None = None) -> TConvMap:
-        if isinstance(self.target.convs[-1], ReDilatedConv):
+        target_conv = self.target.convs[0]
+        if isinstance(target_conv, ReDilatedConv):
             raise Exception("Dilation must be done after inflation not before")
-        inflated_weight = self.target.convs[0].weight.clone()
+        inflated_weight = target_conv.weight.clone()
         out_channels, in_channels = inflated_weight.shape[0], inflated_weight.shape[1]
         inflated_kernel_size = int(math.sqrt(self.inflation_transform.shape[0]))
         transformed_weight = einsum(
-            "mn, ion -> iom", self.inflation_transform.to(dtype=self.target.dtype), inflated_weight.view(out_channels, in_channels, -1))
-        inflated_target = fl.Conv2d(in_channels, out_channels, inflated_kernel_size, self.target.stride, self.target.padding, self.target.groups, self.target.use_bias, self.target.dilation[0], self.target.padding_mode, self.target.device, self.target.dtype)
+            "mn, ion -> iom", self.inflation_transform.to(dtype=target_conv.dtype), inflated_weight.view(out_channels, in_channels, -1))
+        inflated_target = fl.Conv2d(in_channels, out_channels, inflated_kernel_size, target_conv.stride, target_conv.padding, target_conv.groups, target_conv.use_bias, target_conv.dilation[0], target_conv.padding_mode, target_conv.device, target_conv.dtype)
         inflated_target.weight.detach().copy_(transformed_weight.view(out_channels, in_channels, inflated_kernel_size, inflated_kernel_size))
         if inflated_target.bias is not None:
-            inflated_target.bias.detach().copy_(self.target.bias.detach())
+            inflated_target.bias.detach().copy_(target_conv.bias.detach())
         self.target.convs.append(inflated_target)
         return super().inject(parent)
     def eject(self) -> None:
@@ -207,7 +209,7 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
                     self.sub_adapters[name]["noise_damped_redilated_conv_adapter"] = noise_damped_redilated_conv_adapter
                     noise_damped_redilated_conv_adapter.inject()
                 conv_node = ConvNode(conv_switch, noise_damped_conv_switch)
-                conv_chain.replace(conv1, ScaleCrafterRouter(conv_node))
+                conv_chain.replace(conv1, ScaleCrafterRouter(conv_node, self.inflate_timestep, self.noise_damped_timestep))
         return super().inject(parent)
 
     def eject(self) -> None:
