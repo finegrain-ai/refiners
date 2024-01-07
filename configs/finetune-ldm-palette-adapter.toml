@@ -6,9 +6,9 @@ entity = "acme"
 project = "finetune-ldm-palette-adapter"
 
 [models]
-unet = { checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors", train = false }
-text_encoder = { checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false }
-lda = { checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors", train = false }
+unet = { checkpoint = "weights/unet.safetensors", train = false }
+text_encoder = { checkpoint = "weights/clip.safetensors", train = false }
+lda = { checkpoint = "weights/lda.safetensors", train = false }
 color_encoder = { train = true }
 
 [ldm]
@@ -23,7 +23,7 @@ dim_hidden = 256
 duration = "2000:step"
 seed = 0
 gpu_index = 0
-batch_size = 4
+batch_size = 2
 gradient_accumulation = "1:step"
 evaluation_interval = "250:step"
 evaluation_seed = 1

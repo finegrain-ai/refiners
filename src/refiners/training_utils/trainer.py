@@ -422,11 +422,13 @@ class Trainer(Generic[ConfigType, Batch]):
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
         model.to(self.device)
         model.zero_grad()
+        logger.info(f"Model `{model_name}` prepared.")
 
     def prepare_models(self) -> None:
         assert self.models, "No models found."
         for model_name in self.models:
             self.prepare_model(model_name=model_name)
+        logger.info("All models prepared.")
 
     def prepare_checkpointing(self) -> None:
         if self.config.checkpointing.save_folder is not None:

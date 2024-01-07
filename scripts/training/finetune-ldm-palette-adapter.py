@@ -1,5 +1,5 @@
 import random
-from functools import cached_property, partial
+from functools import cached_property
 from typing import Any, TypedDict
 
 import datasets
@@ -7,10 +7,9 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Generator, Tensor, device as Device, dtype as DType, randn
-from torch.nn import Module
 from torch.utils.data import Dataset
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
-
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
+from torch.nn.functional import mse_loss
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
@@ -24,6 +23,8 @@ from refiners.training_utils.latent_diffusion import (
     LatentDiffusionConfig,
 )
 from refiners.training_utils.trainer import Trainer
+
+Image.MAX_IMAGE_PIXELS = None
 
 
 def sample_noise(
@@ -77,13 +78,6 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     ldm: LatentDiffusionConfig
     adapter: AdapterConfig
 
-    def model_post_init(self, _context: Any) -> None:
-        """Pydantic v2 does post init differently, so we need to override this method too."""
-        logger.info("Freezing models to train only the adapter.")
-        self.models["lda"].train = False
-        self.models["unet"].train = False
-        self.models["text_encoder"].train = False
-        self.models["color_encoder"].train = True
 
 
 class PaletteBatch(TypedDict):
@@ -115,13 +109,13 @@ class PaletteDataset(Dataset[PaletteBatch]):
 
     @staticmethod
     def download_image(
-        data: dict[str, Any],  # not "batched"
+        data: dict[str, list[Any]],  # "batched"
         dl_manager: datasets.DownloadManager,
-    ) -> dict[str, str]:
+    ) -> dict[str, list[str]]:
         """Download the image from the url."""
-        url = data["url"]
-        filename: str = dl_manager.download(url)  # type: ignore (TODO: open PR upstream)
-        return {"image": filename}
+        urls = data["url"]
+        filenames: list[str] = dl_manager.download(urls)  # type: ignore
+        return {"image": filenames}
 
     @staticmethod
     def resize_image(
@@ -129,9 +123,8 @@ class PaletteDataset(Dataset[PaletteBatch]):
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
         """Resize the longest side of the image to `max_size`."""
-        return {
-            "image": [image.convert("RGB").thumbnail((max_size, max_size)) for image in data["image"]],
-        }
+        # TODO
+        return data
 
     @staticmethod
     def encode_caption(
@@ -140,39 +133,8 @@ class PaletteDataset(Dataset[PaletteBatch]):
     ) -> dict[str, list[Tensor]]:
         """Encode the caption with the encoder."""
         return {
-            "text_embedding": [text_encoder(caption) for caption in data["caption"]],
+            "text_embedding": [text_encoder(caption).squeeze(0) for caption in data["caption"]],
         }
-
-    @staticmethod
-    def transform(
-        data: dict[str, list[Any]],  # "batched"
-        image_encoder: Module,
-        random_crop_size: int | None = None,
-        horizontal_flip_probability: float | None = None,
-        text_embedding_drop_probability: float | None = None,
-        empty_text_embedding: Tensor | None = None,
-    ) -> dict[str, list[Any]]:
-        """Apply transforms to data."""
-        # create the image transform
-        image_transforms: list[Module] = []
-        if random_crop_size:
-            image_transforms.append(RandomCrop(size=random_crop_size))
-        if horizontal_flip_probability:
-            image_transforms.append(RandomHorizontalFlip(p=horizontal_flip_probability))
-        image_compose = Compose(image_transforms)
-
-        # encode the images into latents
-        data["latent"] = [image_encoder(image=image_compose(image)) for image in data["image"]]
-        del data["image"]
-
-        # drop text embeddings randomly (classifier-free guidance ?)
-        if text_embedding_drop_probability:
-            data["text_embedding"] = [
-                empty_text_embedding if random.random() < text_embedding_drop_probability else embedding
-                for embedding in data["text_embedding"]
-            ]
-
-        return data
 
     def load_huggingface_dataset(self) -> datasets.Dataset:
         """Load the dataset from Hugging Face.
@@ -182,25 +144,28 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset_config = self.trainer.config.dataset
         logger.info(
             f"Loading dataset from {dataset_config.hf_repo}, "
-            f"split {dataset_config.split}, "
-            f"revision {dataset_config.revision}"
+            f"revision {dataset_config.revision}, "
+            f"split {dataset_config.split}"
         )
         dataset = datasets.load_dataset(  # type: ignore
             path=dataset_config.hf_repo,
             revision=dataset_config.revision,
             split=dataset_config.split,
-        ).with_format(type="torch")
+        )
+        dataset = dataset.select(list(range(100)))  # type: ignore # TODO: temporary
 
         # download images from urls
         dl_manager = datasets.DownloadManager()
         dataset = dataset.map(  # type: ignore
             function=self.download_image,
+            batched=True,
+            num_proc=8,
             remove_columns=["url"],
             fn_kwargs={"dl_manager": dl_manager},
             desc="Downloading images",  # type: ignore
         )
 
-        # cast the "image" column Image
+        # cast the "image" column to Image feature type
         dataset = dataset.cast_column(  # type: ignore
             column="image",
             feature=datasets.Image(),
@@ -210,41 +175,84 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.map(  # type: ignore
             function=self.resize_image,
             batched=True,
+            batch_size=10,
+            # num_proc=8,
             fn_kwargs={"max_size": dataset_config.resize_image_max_size},
             desc="Capping image sizes",  # type: ignore
         )
 
-        # encode the captions into text embeddings
-        encoded_empty_caption: Tensor = self.trainer.text_encoder("")
+        # encode the captions into text embedding
+        self.trainer.prepare_model("text_encoder")
+        dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_caption,
             batched=True,
+            batch_size=50,
             remove_columns=["caption"],
-            fn_kwargs={"encoder": self.trainer.text_encoder},
+            fn_kwargs={
+                "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
+            },
             desc="Encoding captions into embeddings",  # type: ignore
         )
 
-        # set the "on-the-fly" transform
-        transform = partial(  # FIXME: not proud of `partial` usage, find something better
-            self.transform,
-            random_crop_size=dataset_config.random_crop_size,
-            horizontal_flip_probability=dataset_config.horizontal_flip_probability,
-            image_encoder=self.trainer.lda,
-            text_embedding_drop_probability=self.trainer.config.ldm.unconditional_sampling_probability,
-            empty_text_embedding=encoded_empty_caption,
+        # convert entries to torch tensors, except the image
+        dataset.set_format(  # type: ignore
+            type="torch",
+            output_all_columns=True,
+            columns=[
+                "text_embedding",
+                *[f"palette_{i}" for i in range(1, 9)],
+            ],
         )
-        dataset.set_transform(transform=transform)  # type: ignore
 
         return dataset  # type: ignore
 
+    def transform(self, data: dict[str, Any]) -> PaletteBatch:  # TODO: break into smaller chunks ?
+        """Apply transforms to data."""
+        # create the image transform
+        image_transforms: list[Any] = []
+        if self.trainer.config.dataset.random_crop_size:
+            image_transforms.append(
+                RandomCrop(size=self.trainer.config.dataset.random_crop_size),
+            )
+        if self.trainer.config.dataset.horizontal_flip_probability:
+            image_transforms.append(
+                RandomHorizontalFlip(p=self.trainer.config.dataset.horizontal_flip_probability),
+            )
+        image_compose = Compose(image_transforms)
+
+        # encode the image into latent
+        data["latent"] = self.trainer.lda.encode_image(
+            image=image_compose(data["image"]),  # type: ignore
+        ).squeeze(0)
+        del data["image"]
+
+        # randomly drop the text embedding
+        if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
+            data["text_embedding"] = self.trainer.text_encoder("")  # FIXME: not optimized
+
+        return data
+
     def __getitem__(self, index: int) -> PaletteBatch:
-        return self.dataset[index]  # type: ignore
+        # retreive data from dataset
+        data = self.dataset[index]  # type: ignore
+
+        # transform data
+        data = self.transform(data)
+
+        return data
 
     def __len__(self) -> int:
         return len(self.dataset)
 
 
-class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, PaletteBatch]):
+class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, PaletteBatch]):  # TODO: change inherentance
+    @cached_property
+    def device(self) -> Device:  # TODO: remove, temporary
+        selected_device = Device("cpu")
+        logger.info(f"Using device: {selected_device}")
+        return selected_device
+
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
@@ -309,6 +317,34 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
             device=self.device,
             dtype=dtype,
         )
+
+    def compute_loss(self, batch: PaletteBatch) -> Tensor:
+        # retreive data from batch
+        clip_text_embedding = batch["text_embedding"]
+        latents = batch["latent"]
+        colors = batch["palette_5"]  # FIXME: temporary, use other palettes too
+        
+        # set unet clip context
+        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+
+        # set unet palette context
+        self.unet.set_context("palette", {"colors": colors})
+
+        # sample timestep
+        timestep = self.sample_timestep()
+        self.unet.set_timestep(timestep=timestep)
+        
+        # sample noise and noisify the latents
+        noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
+        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+        
+        # get prediction from unet
+        prediction = self.unet(noisy_latents)
+        
+        # compute mse loss
+        loss = mse_loss(input=prediction, target=noise)
+        
+        return loss
 
     def __init__(
         self,
