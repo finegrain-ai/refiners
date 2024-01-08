@@ -68,19 +68,8 @@ class ColorPaletteEncoder(fl.Chain):
             return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
         if negative_color_palette is None:
-            # We use the negative color palette
-            # colors are int between 0 and 255, we simply switch the values
-            # to build a negative classifier-free guidance negative embedding
-
-            # Question : I made this choice by simplicity, to make first test
-            # But i would be glad to have feedback on it
-            # If we have a black and white palette, then the negative
-            # palette is a white and black palette, not sure it will help the model
-            #
-            # An other approach would be to the 27 centroid in the 3*3*3 RGB cubes, to calculate
-            # their min distance to the colors in the palette, and then to use the 8 furthest cendroid
-
-            negative_color_palette = 255 - x
+            # a palette without any color in it
+            negative_color_palette = tensor(x.shape[0], 0, 3)
 
         negative_embedding = self(negative_color_palette)
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
