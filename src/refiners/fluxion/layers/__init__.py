@@ -1,4 +1,5 @@
 from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
+from refiners.fluxion.layers.norm import LayerNorm, GroupNorm, LayerNorm2d, InstanceNorm2d, BatchNorm2d
 from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
 from refiners.fluxion.layers.basics import (
     Buffer,
@@ -52,6 +53,7 @@ __all__ = [
     "GroupNorm",
     "LayerNorm2d",
     "InstanceNorm2d",
+    "BatchNorm2d",
     "GeLU",
     "GLU",
     "SiLU",
