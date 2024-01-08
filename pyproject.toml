@@ -67,6 +67,7 @@ allow-direct-references = true
 
 [tool.rye.scripts]
 lint = { chain = ["ruff format .", "ruff --fix ."] }
+serve-docs = "mkdocs serve"
 
 [tool.black]
 line-length = 120
