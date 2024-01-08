@@ -86,6 +86,7 @@ class PaletteBatch(TypedDict):
     latent: Tensor
     text_embedding: Tensor
 
+    # TODO: faire un dict ici ?
     palette_1: Tensor
     palette_2: Tensor
     palette_3: Tensor
@@ -123,7 +124,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
         """Resize the longest side of the image to `max_size`."""
-        # TODO
+        # TODO resize smallest size to max_size 
         return data
 
     @staticmethod
@@ -152,7 +153,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
             revision=dataset_config.revision,
             split=dataset_config.split,
         )
-        dataset = dataset.select(list(range(100)))  # type: ignore # TODO: temporary
+        dataset = dataset.select(list(range(100)))  # type: ignore # FIXME: temporary
 
         # download images from urls
         dl_manager = datasets.DownloadManager()
