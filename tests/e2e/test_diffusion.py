@@ -1168,16 +1168,7 @@ def test_diffusion_ip_adapter(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -1220,16 +1211,8 @@ def test_diffusion_sdxl_ip_adapter(
             text=prompt, negative_text=negative_prompt
         )
         clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+        ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-        negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-        negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-        clip_text_embedding = torch.cat(
-            (
-                torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-                torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-            )
-        )
     time_ids = sdxl.default_time_ids
     sdxl.set_num_inference_steps(n_steps)
 
@@ -1285,16 +1268,7 @@ def test_diffusion_ip_adapter_controlnet(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(input_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     depth_cn_condition = image_to_tensor(
         depth_condition_image.convert("RGB"),
@@ -1343,16 +1317,7 @@ def test_diffusion_ip_adapter_plus(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(statue_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -1396,16 +1361,8 @@ def test_diffusion_sdxl_ip_adapter_plus(
         text=prompt, negative_text=negative_prompt
     )
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
     time_ids = sdxl.default_time_ids
     sdxl.set_num_inference_steps(n_steps)
 

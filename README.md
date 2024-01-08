@@ -128,16 +128,7 @@ with no_grad():
         text="best quality, high quality", negative_text="monochrome, lowres, bad anatomy, worst quality, low quality"
     )
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(image_prompt))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
     time_ids = sdxl.default_time_ids
 
     condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
