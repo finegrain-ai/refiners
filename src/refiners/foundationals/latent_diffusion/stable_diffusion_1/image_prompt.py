@@ -15,6 +15,7 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
+        num_image_prompts: int = 1,
     ) -> None:
         clip_image_encoder = clip_image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
@@ -50,4 +51,5 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             scale=scale,
             fine_grained=fine_grained,
             weights=weights,
+            num_image_prompts=num_image_prompts,
         )
