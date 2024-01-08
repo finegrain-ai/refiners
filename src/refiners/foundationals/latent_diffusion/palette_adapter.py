@@ -169,13 +169,13 @@ class ColorEncoder(fl.Passthrough):
 
         super().__init__(
             fl.UseContext("palette", "colors"),
-            # (n_colors, 3): uint8
+            # (batch, n_colors, 3): uint8
             fl.Concatenate(
                 fl.Chain(
                     SinusoidalEmbedding(dim_embedding=dim_sinusoids),
-                    # (n_colors, 3, dim_sinusoids): float32
+                    # (batch, n_colors, 3, dim_sinusoids): float32
                     fl.Reshape(-1, dim_sinusoids * 3),
-                    # (n_colors, 3 * dim_sinusoids)
+                    # (batch, n_colors, 3 * dim_sinusoids)
                     FeedForward(
                         input_dim=dim_sinusoids * 3,
                         intermediate_dim=dim_sinusoids * 3,
@@ -183,21 +183,21 @@ class ColorEncoder(fl.Passthrough):
                         device=device,
                         dtype=dtype,
                     ),
-                    # (n_colors, dim_embeddings)
+                    # (batch, n_colors, dim_embeddings)
                 ),
                 EOSToken(
                     embedding_dim=dim_embeddings,
                     device=device,
                     dtype=dtype,
-                ),  # (1, dim_embeddings)
+                ),  # (batch, 1, dim_embeddings)
                 dim=1,
             ),
-            # (n_colors + 1, dim_embeddings)
+            # (batch, n_colors + 1, dim_embeddings)
             FillZeroRightPad(
                 max_length=max_colors + 1,
                 dim=1,
             ),
-            # (max_colors + 1, dim_embeddings)
+            # (batch, max_colors + 1, dim_embeddings)
             fl.SetContext("palette", "embeddings"),
         )
 
