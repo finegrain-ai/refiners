@@ -185,6 +185,9 @@ class Chain(ContextModule):
         self._provider.set_context(context, value)
         self._register_provider()
 
+    def get_context(self, context: str) -> Any:
+        return self._provider.get_context(context)
+
     def _show_error_in_tree(self, name: str, /, max_lines: int = 20) -> str:
         tree = ModuleTree(module=self)
         classname_counter: dict[str, int] = defaultdict(int)
