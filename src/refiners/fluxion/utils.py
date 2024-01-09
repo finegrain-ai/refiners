@@ -195,10 +195,9 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
         f"max={tensor.max():.2f}",  # type: ignore
     ]
 
-    # Only add mean, std, and norm for float and complex tensors
-    if tensor.dtype == torch.float or tensor.dtype == torch.double:
-        info_list.extend([f"mean={tensor.mean():.2f}", f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}"])
+    if tensor.dtype == torch.float or tensor.dtype == torch.complex:
+        info_list.append(f"mean={tensor.mean():.2f}")
 
-    info_list.append(f"grad={tensor.requires_grad}")
+    info_list.extend([f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}", f"grad={tensor.requires_grad}"])
 
     return "Tensor(" + ", ".join(info_list) + ")"
