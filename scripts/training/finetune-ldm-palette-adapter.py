@@ -207,7 +207,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
     @cached_property
     def empty_text_embedding(self) -> Tensor:
         """Return an empty text embedding."""
-        return self.trainer.text_encoder("")
+        return self.trainer.text_encoder("").squeeze(0)
 
     def transform(self, data: dict[str, Any]) -> PaletteBatch:  # TODO: break into smaller chunks ?
         """Apply transforms to data."""
