@@ -24,7 +24,7 @@ extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - home/index.md
+    - index.md
     - home/adapters.md
   - Getting started: getting_started.md
   - Models: 
