@@ -25,14 +25,14 @@ extra_css:
 nav:
   - Home: 
     - index.md
-    - home/adapters.md
   - Getting started: getting_started.md
   - Models: 
     - models/index.md
-    - models/stable_diffusion.md
+    - models/latent_diffusion.md
     - models/segment_anything.md
   - Fluxion:
     - fluxion/index.md
+    - fluxion/adapters.md
   - Training utils: 
     - training_utils/index.md
   - Contributing:
