@@ -7,6 +7,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, device as Device, dtype as DType
+from torch.distributions import Beta
 from torch.nn.functional import mse_loss
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
@@ -171,8 +172,8 @@ class PaletteDataset(Dataset[PaletteBatch]):
             batch_size=10,  # FIXME: harcoded value
             num_proc=8,  # FIXME: harcoded value
             fn_kwargs={
-                "min_size": dataset_config.resize_image_min_size
-                "max_size": dataset_config.resize_image_max_size
+                "min_size": dataset_config.resize_image_min_size,
+                "max_size": dataset_config.resize_image_max_size,
             },
             desc="Capping image sizes",  # type: ignore
         )
@@ -318,7 +319,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         # retreive data from batch
         clip_text_embedding = batch["text_embedding"]
         latents = batch["latent"]
-        colors = batch["palette_5"]  # FIXME: temporary, use other palettes too
+        # select a palette at random, biased towards the middle, by using a Β(2, 2) distribution
+        beta = Beta(2, 2)
+        i = int(beta.sample() * 8) + 1
+        colors = batch[f"palette_{i}"]  # type: ignore
 
         # set unet clip context
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
