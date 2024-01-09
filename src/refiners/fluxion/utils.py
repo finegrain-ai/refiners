@@ -191,13 +191,18 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
         f"shape=({', '.join(map(str, tensor.shape))})",
         f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
         f"device={tensor.device}",
-        f"min={tensor.min():.2f}",  # type: ignore
-        f"max={tensor.max():.2f}",  # type: ignore
     ]
+    if not tensor.is_complex():
+        info_list.extend(
+            [
+                f"min={tensor.min():.2f}",  # type: ignore
+                f"max={tensor.max():.2f}",  # type: ignore
+            ]
+        )
 
-    if tensor.dtype == torch.float or tensor.dtype == torch.complex:
-        info_list.append(f"mean={tensor.mean():.2f}")
+    if tensor.dtype == torch.float or tensor.is_complex():
+        info_list.extend([f"mean={tensor.mean():.2f}", f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}"])
 
-    info_list.extend([f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}", f"grad={tensor.requires_grad}"])
+    info_list.extend([f"grad={tensor.requires_grad}"])
 
     return "Tensor(" + ", ".join(info_list) + ")"

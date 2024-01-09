@@ -7,7 +7,14 @@ from PIL import Image
 from torch import device as Device, dtype as DType
 from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
 
-from refiners.fluxion.utils import gaussian_blur, image_to_tensor, manual_seed, no_grad, tensor_to_image
+from refiners.fluxion.utils import (
+    gaussian_blur,
+    image_to_tensor,
+    manual_seed,
+    no_grad,
+    summarize_tensor,
+    tensor_to_image,
+)
 
 
 @dataclass
@@ -62,6 +69,13 @@ def test_tensor_to_image() -> None:
     assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"
     assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"
     assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"
+
+
+def test_summarize_tensor() -> None:
+    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).int())) == str
+    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).float())) == str
+    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).double())) == str
+    assert type(summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))) == str
 
 
 def test_no_grad() -> None:
