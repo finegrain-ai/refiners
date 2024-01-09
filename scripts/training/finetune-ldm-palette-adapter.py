@@ -204,6 +204,11 @@ class PaletteDataset(Dataset[PaletteBatch]):
 
         return dataset  # type: ignore
 
+    @cached_property
+    def empty_text_embedding(self) -> Tensor:
+        """Return an empty text embedding."""
+        return self.trainer.text_encoder("")
+
     def transform(self, data: dict[str, Any]) -> PaletteBatch:  # TODO: break into smaller chunks ?
         """Apply transforms to data."""
         # create the image transform
@@ -226,7 +231,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
 
         # randomly drop the text embedding
         if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
-            data["text_embedding"] = self.trainer.text_encoder("")  # FIXME: not optimized
+            data["text_embedding"] = self.empty_text_embedding
 
         return data  # type: ignore
 
