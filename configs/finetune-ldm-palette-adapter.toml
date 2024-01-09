@@ -49,9 +49,8 @@ revision = "main"
 split = "train"
 horizontal_flip_probability = 0.5
 random_crop_size = 384                    # (256 + 128, quick math)
-# random_crop_size = 512
-resize_image_max_size = 400
-# resize_image_max_size = 576
+resize_image_min_size = 384
+resize_image_max_size = 416               # (384 + 32, quick math)
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"

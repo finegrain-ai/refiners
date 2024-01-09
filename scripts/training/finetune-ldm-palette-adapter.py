@@ -6,10 +6,11 @@ import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Generator, Tensor, device as Device, dtype as DType, randn
-from torch.utils.data import Dataset
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
+from torch import Tensor, device as Device, dtype as DType
 from torch.nn.functional import mse_loss
+from torch.utils.data import Dataset
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
+
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
@@ -21,27 +22,12 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.latent_diffusion import (
     LatentDiffusionConfig,
+    resize_image,
+    sample_noise,
 )
 from refiners.training_utils.trainer import Trainer
 
 Image.MAX_IMAGE_PIXELS = None
-
-
-def sample_noise(
-    size: tuple[int, ...],
-    offset_noise: float = 0.1,
-    device: Device | str = "cpu",
-    dtype: DType | None = None,
-    generator: Generator | None = None,
-) -> Tensor:
-    """Sample noise from a normal distribution.
-
-    If `offset_noise` is more than 0, the noise will be offset by a small amount. It allows the model to generate
-    images with a wider range of contrast https://www.crosslabs.org/blog/diffusion-with-offset-noise.
-    """
-    device = Device(device)
-    noise = randn(*size, generator=generator, device=device, dtype=dtype)
-    return noise + offset_noise * randn(*size[:2], 1, 1, generator=generator, device=device, dtype=dtype)
 
 
 class ColorEncoderConfig(BaseModel):
@@ -64,8 +50,9 @@ class DatasetConfig(BaseModel):
     revision: str = "main"
     split: str = "train"
     horizontal_flip_probability: float = 0.5
-    random_crop_size: int = 512
+    resize_image_min_size: int = 512
     resize_image_max_size: int = 576
+    random_crop_size: int = 512
 
 
 class AdapterLatentDiffusionConfig(BaseConfig):
@@ -77,7 +64,6 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
     adapter: AdapterConfig
-
 
 
 class PaletteBatch(TypedDict):
@@ -121,11 +107,20 @@ class PaletteDataset(Dataset[PaletteBatch]):
     @staticmethod
     def resize_image(
         data: dict[str, list[Any]],  # "batched"
+        min_size: int = 512,
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
-        """Resize the longest side of the image to `max_size`."""
-        # TODO resize smallest size to max_size 
-        return data
+        """Resize the shortest side of the image between `min_size` and `max_size`."""
+        return {
+            "image": [
+                resize_image(
+                    image=image,
+                    min_size=min_size,
+                    max_size=max_size,
+                )
+                for image in data["image"]
+            ],
+        }
 
     @staticmethod
     def encode_caption(
@@ -138,10 +133,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         }
 
     def load_huggingface_dataset(self) -> datasets.Dataset:
-        """Load the dataset from Hugging Face.
-
-        Apply some pre-processing and set the "on-the-fly" transform.
-        """
+        """Load the dataset from Hugging Face and apply some pre-processing."""
         dataset_config = self.trainer.config.dataset
         logger.info(
             f"Loading dataset from {dataset_config.hf_repo}, "
@@ -160,7 +152,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.map(  # type: ignore
             function=self.download_image,
             batched=True,
-            num_proc=8,
+            num_proc=8,  # FIXME: harcoded value
             remove_columns=["url"],
             fn_kwargs={"dl_manager": dl_manager},
             desc="Downloading images",  # type: ignore
@@ -176,9 +168,12 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.map(  # type: ignore
             function=self.resize_image,
             batched=True,
-            batch_size=10,
-            # num_proc=8,
-            fn_kwargs={"max_size": dataset_config.resize_image_max_size},
+            batch_size=10,  # FIXME: harcoded value
+            num_proc=8,  # FIXME: harcoded value
+            fn_kwargs={
+                "min_size": dataset_config.resize_image_min_size
+                "max_size": dataset_config.resize_image_max_size
+            },
             desc="Capping image sizes",  # type: ignore
         )
 
@@ -188,7 +183,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.map(  # type: ignore
             function=self.encode_caption,
             batched=True,
-            batch_size=50,
+            batch_size=50,  # FIXME: harcoded value
             remove_columns=["caption"],
             fn_kwargs={
                 "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
@@ -200,7 +195,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset.set_format(  # type: ignore
             type="torch",
             output_all_columns=True,
-            columns=[
+            columns=[  # "image" column is ommited
                 "text_embedding",
                 *[f"palette_{i}" for i in range(1, 9)],
             ],
@@ -232,14 +227,14 @@ class PaletteDataset(Dataset[PaletteBatch]):
         if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
             data["text_embedding"] = self.trainer.text_encoder("")  # FIXME: not optimized
 
-        return data
+        return data  # type: ignore
 
     def __getitem__(self, index: int) -> PaletteBatch:
         # retreive data from dataset
         data = self.dataset[index]  # type: ignore
 
         # transform data
-        data = self.transform(data)
+        data = self.transform(data)  # type: ignore
 
         return data
 
@@ -324,7 +319,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         clip_text_embedding = batch["text_embedding"]
         latents = batch["latent"]
         colors = batch["palette_5"]  # FIXME: temporary, use other palettes too
-        
+
         # set unet clip context
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
@@ -334,17 +329,17 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         # sample timestep
         timestep = self.sample_timestep()
         self.unet.set_timestep(timestep=timestep)
-        
+
         # sample noise and noisify the latents
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-        
+
         # get prediction from unet
         prediction = self.unet(noisy_latents)
-        
+
         # compute mse loss
         loss = mse_loss(input=prediction, target=noise)
-        
+
         return loss
 
     def __init__(
@@ -373,8 +368,8 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         unet = trainer.unet
         adapter = unet.parent
-        color_encoder = adapter.color_encoder
-        cross_attention_adapters = adapter.cross_attention_adapters
+        color_encoder = adapter.color_encoder  # type: ignore
+        cross_attention_adapters = adapter.cross_attention_adapters  # type: ignore
 
         tensors: dict[str, Tensor] = {}
         tensors |= {f"ColorEncoder.{key}": value for key, value in color_encoder.state_dict().items()}

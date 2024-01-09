@@ -282,6 +282,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
     """Inject a ColorEncoder and PaletteCrossAttention modules in a given UNet module."""
 
+    # TODO: adding a small LoRA to the Attention's projection layer could be worth trying
+
     def __init__(
         self,
         target: T,
