@@ -1,6 +1,6 @@
 site_name: "Refiners Documentation"
 theme:
-  favicon: assets/dropy_logo.png
+  favicon: assets/favicon.png
   name: material
   palette:
     primary: deep orange
