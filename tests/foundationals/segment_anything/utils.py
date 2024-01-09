@@ -63,8 +63,7 @@ class SAMPrompt:
     foreground_points: Sequence[tuple[float, float]] | None = None
     background_points: Sequence[tuple[float, float]] | None = None
     box_points: Sequence[Sequence[tuple[float, float]]] | None = None
-    # TODO: support masks
-    # masks: Sequence[Image.Image] | None = None
+    low_res_mask: Tensor | None = None
 
     def facebook_predict_kwargs(self) -> dict[str, NDArray]:
         prompt: dict[str, NDArray] = {}
@@ -85,13 +84,18 @@ class SAMPrompt:
             prompt["box"] = np.array([coord for batch in self.box_points for xy in batch for coord in xy]).reshape(
                 len(self.box_points), 4
             )
+        if self.low_res_mask is not None:
+            prompt["mask_input"] = np.array(self.low_res_mask)
         return prompt
 
-    def facebook_prompt_encoder_kwargs(self, device: torch.device | None = None):
+    def facebook_prompt_encoder_kwargs(
+        self, device: torch.device | None = None
+    ) -> dict[str, Tensor | tuple[Tensor, Tensor | None] | None]:
         prompt = self.facebook_predict_kwargs()
         coords: Tensor | None = None
         labels: Tensor | None = None
         boxes: Tensor | None = None
+        masks: Tensor | None = None
         if "point_coords" in prompt:
             coords = torch.as_tensor(prompt["point_coords"], dtype=torch.float, device=device).unsqueeze(0)
         if "point_labels" in prompt:
@@ -99,8 +103,9 @@ class SAMPrompt:
         if "box" in prompt:
             boxes = torch.as_tensor(prompt["box"], dtype=torch.float, device=device).unsqueeze(0)
         points = (coords, labels) if coords is not None else None
-        # TODO: support masks
-        return {"points": points, "boxes": boxes, "masks": None}
+        if "mask_input" in prompt:
+            masks = torch.as_tensor(prompt["mask_input"], dtype=torch.float, device=device).unsqueeze(0)
+        return {"points": points, "boxes": boxes, "masks": masks}
 
 
 def intersection_over_union(

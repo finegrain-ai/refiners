@@ -58,6 +58,7 @@ dev-dependencies = [
     "ruff>=0.0.292",
     "docformatter>=1.7.5",
     "pytest>=7.4.2",
+    "mkdocs-material>=9.5.3",
 ]
 
 
@@ -66,6 +67,7 @@ allow-direct-references = true
 
 [tool.rye.scripts]
 lint = { chain = ["ruff format .", "ruff --fix ."] }
+serve-docs = "mkdocs serve"
 
 [tool.black]
 line-length = 120
