@@ -1,5 +1,5 @@
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
-from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, arange
+from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, Generator
 import torch
 import numpy as np
 
@@ -15,6 +15,8 @@ class EulerScheduler(Scheduler):
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
+        if noise_schedule != NoiseSchedule.QUADRATIC:
+            raise NotImplementedError
         super().__init__(
             num_inference_steps=num_inference_steps,
             num_train_timesteps=num_train_timesteps,
@@ -24,36 +26,38 @@ class EulerScheduler(Scheduler):
             device=device,
             dtype=dtype,
         )
-        self.sigmas = self._generate_sigmas().to(device=self.device, dtype=self.dtype)
+        self.sigmas = self._generate_sigmas()
 
     @property
     def init_noise_sigma(self) -> Tensor:
-        return (self.sigmas.max() ** 2 + 1) ** 0.5
+        return self.sigmas.max()
 
     def _generate_timesteps(self) -> Tensor:
-        # using "leading" timestep
-        step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = (arange(start=0, end=self.num_inference_steps, step=1) * step_ratio).flip(0)
-        return timesteps + 1
+        # We need to use numpy here because:
+        # numpy.linspace(0,999,31)[15] is 499.49999999999994
+        # torch.linspace(0,999,31)[15] is 499.5
+        # ...and we want the same result as the original codebase.
+        timesteps = torch.tensor(
+            np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps), dtype=self.dtype, device=self.device
+        ).flip(0)
+        return timesteps
 
     def _generate_sigmas(self) -> Tensor:
         sigmas = self.noise_std / self.cumulative_scale_factors
-        sigmas = torch.from_numpy(
-            np.interp(self.timesteps.cpu().numpy(), np.arange(0, len(sigmas)), sigmas.cpu().numpy())
-        )
+        sigmas = torch.tensor(np.interp(self.timesteps.cpu().numpy(), np.arange(0, len(sigmas)), sigmas.cpu().numpy()))
         sigmas = torch.cat([sigmas, tensor([0.0])])
-        return sigmas
+        return sigmas.to(device=self.device, dtype=self.dtype)
 
     def scale_model_input(self, x: Tensor, step: int) -> Tensor:
         sigma = self.sigmas[step]
-        x = x / ((sigma**2 + 1) ** 0.5)
-        return x
+        return x / ((sigma**2 + 1) ** 0.5)
 
     def __call__(
         self,
         x: Tensor,
         noise: Tensor,
         step: int,
+        generator: Generator | None = None,
         s_churn: float = 0.0,
         s_tmin: float = 0.0,
         s_tmax: float = float("inf"),
@@ -63,7 +67,7 @@ class EulerScheduler(Scheduler):
 
         gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0
 
-        alt_noise = torch.randn_like(noise)
+        alt_noise = torch.randn(noise.shape, generator=generator)
         eps = alt_noise * s_noise
         sigma_hat = sigma * (gamma + 1)
         if gamma > 0:

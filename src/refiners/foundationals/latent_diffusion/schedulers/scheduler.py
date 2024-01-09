@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from torch import Tensor, device as Device, dtype as DType, linspace, float32, sqrt, log
+from torch import Tensor, device as Device, dtype as DType, linspace, float32, sqrt, log, Generator
 from typing import TypeVar
 
 T = TypeVar("T", bound="Scheduler")
@@ -49,7 +49,7 @@ class Scheduler(ABC):
         self.timesteps = self._generate_timesteps()
 
     @abstractmethod
-    def __call__(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
+    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Applies a step of the diffusion process to the input tensor `x` using the provided `noise` and `timestep`.
 

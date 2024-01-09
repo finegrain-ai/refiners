@@ -59,7 +59,7 @@ def test_ddim_solver_diffusers():
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_euler_solver_diffusers():
+def test_euler_diffusers():
     from diffusers import EulerDiscreteScheduler
 
     manual_seed(0)
@@ -69,7 +69,7 @@ def test_euler_solver_diffusers():
         beta_start=0.00085,
         num_train_timesteps=1000,
         steps_offset=1,
-        timestep_spacing="leading",
+        timestep_spacing="linspace",
         use_karras_sigmas=False,
     )
     diffusers_scheduler.set_timesteps(30)
