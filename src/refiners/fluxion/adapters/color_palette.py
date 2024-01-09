@@ -7,7 +7,7 @@ from jaxtyping import Float, Int
 
 # T = TypeVar("T", bound=fl.Chain)
 # TLoraAdapter = TypeVar("TLoraAdapter", bound="LoraAdapter[Any]")  # Self (see PEP 673)
-from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, exp, float32, sin, tensor
+from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, exp, float32, sin, tensor, zeros
 from torch.nn import Parameter as TorchParameter
 from torch.nn.functional import pad
 from torch.nn.init import normal_, zeros_
@@ -69,7 +69,7 @@ class ColorPaletteEncoder(fl.Chain):
 
         if negative_color_palette is None:
             # a palette without any color in it
-            negative_color_palette = tensor(x.shape[0], 0, 3)
+            negative_color_palette = zeros(x.shape[0], 0, 3)
 
         negative_embedding = self(negative_color_palette)
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)

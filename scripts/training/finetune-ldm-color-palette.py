@@ -255,7 +255,7 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
                 # cfg means classifier-free guidance
                 cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
                 cfg_color_palette_embedding = self.color_palette_encoder.compute_cfg_color_palette_embedding(
-                    tensor(prompt.color_palette)
+                    tensor([prompt.color_palette])
                 ).to(device=self.device)
 
                 negative_text_embedding, conditional_text_embedding = cfg_clip_text_embedding.chunk(2)
