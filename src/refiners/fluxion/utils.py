@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Literal, TypeVar
+from typing import Any, Iterable, Literal, TypeVar
 
 import torch
 from jaxtyping import Float
@@ -7,7 +7,14 @@ from numpy import array, float32
 from PIL import Image
 from safetensors import safe_open as _safe_open  # type: ignore
 from safetensors.torch import save_file as _save_file  # type: ignore
-from torch import Tensor, device as Device, dtype as DType, manual_seed as _manual_seed, norm as _norm  # type: ignore
+from torch import (
+    Tensor,
+    device as Device,
+    dtype as DType,
+    manual_seed as _manual_seed,  # type: ignore
+    no_grad as _no_grad,  # type: ignore
+    norm as _norm,  # type: ignore
+)
 from torch.nn.functional import conv2d, interpolate as _interpolate, pad as _pad  # type: ignore
 
 T = TypeVar("T")
@@ -20,6 +27,11 @@ def norm(x: Tensor) -> Tensor:
 
 def manual_seed(seed: int) -> None:
     _manual_seed(seed)
+
+
+class no_grad(_no_grad):
+    def __new__(cls, orig_func: Any | None = None) -> "no_grad":  # type: ignore
+        return object.__new__(cls)
 
 
 def pad(x: Tensor, pad: Iterable[int], value: float = 0.0, mode: str = "constant") -> Tensor:

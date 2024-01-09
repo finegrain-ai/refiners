@@ -250,7 +250,7 @@ class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
         self.timestep_bins[bin_index].append(loss_value)
 
     def on_epoch_end(self, trainer: LatentDiffusionTrainer[Any]) -> None:
-        log_data = {}
+        log_data: dict[str, WandbLoggable] = {}
         for bin_index, losses in self.timestep_bins.items():
             if losses:
                 avg_loss = sum(losses) / len(losses)

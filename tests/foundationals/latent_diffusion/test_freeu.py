@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from refiners.fluxion import manual_seed
+from refiners.fluxion.utils import no_grad
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 from refiners.foundationals.latent_diffusion.freeu import FreeUResidualConcatenator, SDFreeUAdapter
 
@@ -52,14 +53,14 @@ def test_freeu_identity_scales() -> None:
     unet = SD1UNet(in_channels=4)
     unet.set_clip_text_embedding(clip_text_embedding=text_embedding)  # not flushed between forward-s
 
-    with torch.no_grad():
+    with no_grad():
         unet.set_timestep(timestep=timestep)
         y_1 = unet(x.clone())
 
     freeu = SDFreeUAdapter(unet, backbone_scales=[1.0, 1.0], skip_scales=[1.0, 1.0])
     freeu.inject()
 
-    with torch.no_grad():
+    with no_grad():
         unet.set_timestep(timestep=timestep)
         y_2 = unet(x.clone())
 

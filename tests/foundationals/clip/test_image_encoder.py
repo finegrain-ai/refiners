@@ -5,7 +5,7 @@ import pytest
 import torch
 from transformers import CLIPVisionModelWithProjection  # type: ignore
 
-from refiners.fluxion.utils import load_from_safetensors
+from refiners.fluxion.utils import load_from_safetensors, no_grad
 from refiners.foundationals.clip.image_encoder import CLIPImageEncoderH
 
 
@@ -44,7 +44,7 @@ def test_encoder(
 ):
     x = torch.randn(1, 3, 224, 224).to(test_device)
 
-    with torch.no_grad():
+    with no_grad():
         ref_embeddings = ref_encoder(x).image_embeds
         our_embeddings = our_encoder(x)
 

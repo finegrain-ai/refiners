@@ -7,7 +7,7 @@ import torch
 from transformers import AutoModel  # type: ignore
 from transformers.models.dinov2.modeling_dinov2 import Dinov2Model  # type: ignore
 
-from refiners.fluxion.utils import load_from_safetensors, manual_seed
+from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
 from refiners.foundationals.dinov2 import (
     DINOv2_base,
     DINOv2_base_reg,
@@ -124,7 +124,7 @@ def test_encoder(
 
     x = torch.randn(1, 3, 518, 518).to(test_device)
 
-    with torch.no_grad():
+    with no_grad():
         ref_features = ref_backbone(x).last_hidden_state
         our_features = our_backbone(x)
 

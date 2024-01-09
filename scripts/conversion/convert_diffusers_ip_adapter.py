@@ -133,24 +133,14 @@ def main() -> None:
     ip_adapter_weights: dict[str, torch.Tensor] = weights["ip_adapter"]
     assert len(ip_adapter.sub_adapters) == len(ip_adapter_weights.keys()) // 2
 
-    for i, cross_attn in enumerate(ip_adapter.sub_adapters):
+    for i, _ in enumerate(ip_adapter.sub_adapters):
         cross_attn_index = cross_attn_mapping[i]
         k_ip = f"{cross_attn_index}.to_k_ip.weight"
         v_ip = f"{cross_attn_index}.to_v_ip.weight"
 
-        # Ignore Wq, Wk, Wv and Proj (hence strict=False): at runtime, they will be part of the UNet original weights
-
-        names = [k for k, _ in cross_attn.named_parameters()]
-        assert len(names) == 2
-
-        cross_attn_state_dict: dict[str, Any] = {
-            names[0]: ip_adapter_weights[k_ip],
-            names[1]: ip_adapter_weights[v_ip],
-        }
-        cross_attn.load_state_dict(state_dict=cross_attn_state_dict, strict=False)
-
-        for k, v in cross_attn_state_dict.items():
-            state_dict[f"ip_adapter.{i:03d}.{k}"] = v
+        # the name of the key is not checked at runtime, so we keep the original name
+        state_dict[f"ip_adapter.{i:03d}.to_k_ip.weight"] = ip_adapter_weights[k_ip]
+        state_dict[f"ip_adapter.{i:03d}.to_v_ip.weight"] = ip_adapter_weights[v_ip]
 
     if args.half:
         state_dict = {key: value.half() for key, value in state_dict.items()}
