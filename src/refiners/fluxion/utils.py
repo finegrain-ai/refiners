@@ -187,20 +187,18 @@ def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: 
 
 
 def summarize_tensor(tensor: torch.Tensor, /) -> str:
-    return (
-        "Tensor("
-        + ", ".join(
-            [
-                f"shape=({', '.join(map(str, tensor.shape))})",
-                f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
-                f"device={tensor.device}",
-                f"min={tensor.min():.2f}",  # type: ignore
-                f"max={tensor.max():.2f}",  # type: ignore
-                f"mean={tensor.mean():.2f}",
-                f"std={tensor.std():.2f}",
-                f"norm={norm(x=tensor):.2f}",
-                f"grad={tensor.requires_grad}",
-            ]
-        )
-        + ")"
-    )
+    info_list = [
+        f"shape=({', '.join(map(str, tensor.shape))})",
+        f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
+        f"device={tensor.device}",
+        f"min={tensor.min():.2f}",  # type: ignore
+        f"max={tensor.max():.2f}",  # type: ignore
+    ]
+
+    # Only add mean, std, and norm for float and complex tensors
+    if tensor.dtype == torch.float or tensor.dtype == torch.double:
+        info_list.extend([f"mean={tensor.mean():.2f}", f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}"])
+
+    info_list.append(f"grad={tensor.requires_grad}")
+
+    return "Tensor(" + ", ".join(info_list) + ")"
