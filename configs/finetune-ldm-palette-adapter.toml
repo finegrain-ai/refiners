@@ -55,3 +55,16 @@ resize_image_max_size = 416               # (384 + 32, quick math)
 [checkpointing]
 # save_folder = "/path/to/ckpts"
 save_interval = "250:step"
+
+[test_ldm]
+num_inference_steps = 30
+prompts = [
+    "The Starry Night, Vincent van Gogh",
+    "Girl with a Pearl Earring, Johannes Vermeer, low poly",
+    "a cute cat, pointillism",
+]
+palettes = [
+    [[220, 20, 60]], # crimson
+    [[127, 0, 255]], # violet
+    [[0, 191, 255]], # deepskyblue
+]

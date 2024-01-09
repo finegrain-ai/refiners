@@ -23,6 +23,7 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.latent_diffusion import (
     LatentDiffusionConfig,
+    TestDiffusionConfig,
     resize_image,
     sample_noise,
 )
@@ -56,6 +57,12 @@ class DatasetConfig(BaseModel):
     random_crop_size: int = 512
 
 
+class TestPaletteDiffusionConfig(TestDiffusionConfig):
+    """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
+
+    palettes: list[list[tuple[int, int, int]]] = []
+
+
 class AdapterLatentDiffusionConfig(BaseConfig):
     """Finetunning configuration.
 
@@ -65,6 +72,7 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
     adapter: AdapterConfig
+    test_ldm: TestPaletteDiffusionConfig
 
 
 class PaletteBatch(TypedDict):
@@ -72,16 +80,7 @@ class PaletteBatch(TypedDict):
 
     latent: Tensor
     text_embedding: Tensor
-
-    # TODO: faire un dict ici ?
-    palette_1: Tensor
-    palette_2: Tensor
-    palette_3: Tensor
-    palette_4: Tensor
-    palette_5: Tensor
-    palette_6: Tensor
-    palette_7: Tensor
-    palette_8: Tensor
+    palettes: dict[str, Tensor]
 
 
 class PaletteDataset(Dataset[PaletteBatch]):
@@ -196,9 +195,9 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset.set_format(  # type: ignore
             type="torch",
             output_all_columns=True,
-            columns=[  # "image" column is ommited
+            columns=[
                 "text_embedding",
-                *[f"palette_{i}" for i in range(1, 9)],
+                "palettes",
             ],
         )
 
@@ -229,7 +228,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         ).squeeze(0)
         del data["image"]
 
-        # randomly drop the text embedding
+        # randomly drop the text conditionning (cfg)
         if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
             data["text_embedding"] = self.empty_text_embedding
 
@@ -248,7 +247,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         return len(self.dataset)
 
 
-class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, PaletteBatch]):  # TODO: change inherentance
+class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, PaletteBatch]):
     @cached_property
     def device(self) -> Device:  # TODO: remove, temporary
         selected_device = Device("cpu")
@@ -324,18 +323,25 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         # retreive data from batch
         clip_text_embedding = batch["text_embedding"]
         latents = batch["latent"]
-        # select a palette at random, biased towards the middle, by using a Β(2, 2) distribution
-        beta = Beta(2, 2)
-        i = int(beta.sample() * 8) + 1
-        colors = batch[f"palette_{i}"]  # type: ignore
+        batch_size = latents.shape[0]
 
-        # set unet clip context
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+        if random.random() < self.config.ldm.unconditional_sampling_probability:  # TODO: differentiate text and colors
+            # randomly drop the palettes conditionning (cfg)
+            # TODO: try to move this in the preprocessing above ?
+            colors = Tensor(size=(batch_size, 0, 3))  # empty palette
+        else:
+            # select a palette at random, biased towards the middle, by using a Β(2, 2) distribution
+            beta = Beta(2, 2)  # FIXME: harcoded value
+            i = int(beta.sample() * 8) + 1  # FIXME: harcoded value (max_colors)
+            colors = batch["palettes"][str(i)]  # type: ignore
 
-        # set unet palette context
+        # set unet color palette context
         self.unet.set_context("palette", {"colors": colors})
 
-        # sample timestep
+        # set unet text clip context
+        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+
+        # sample timestep and set unet timestep context
         timestep = self.sample_timestep()
         self.unet.set_timestep(timestep=timestep)
 
