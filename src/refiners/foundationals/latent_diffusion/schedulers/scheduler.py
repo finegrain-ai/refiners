@@ -45,16 +45,11 @@ class Scheduler(ABC):
         self.scale_factors = self.sample_noise_schedule()
         self.cumulative_scale_factors = sqrt(self.scale_factors.cumprod(dim=0))
         self.noise_std = sqrt(1.0 - self.scale_factors.cumprod(dim=0))
-        self.signal_to_noise_ratios = log(self.cumulative_scale_factors) - log(
-            self.noise_std)
+        self.signal_to_noise_ratios = log(self.cumulative_scale_factors) - log(self.noise_std)
         self.timesteps = self._generate_timesteps()
 
     @abstractmethod
-    def __call__(self,
-                 x: Tensor,
-                 noise: Tensor,
-                 step: int,
-                 generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Applies a step of the diffusion process to the input tensor `x` using the provided `noise` and `timestep`.
 
@@ -82,13 +77,16 @@ class Scheduler(ABC):
         return x
 
     def sample_power_distribution(self, power: float = 2, /) -> Tensor:
-        return (linspace(
-            start=self.initial_diffusion_rate**(1 / power),
-            end=self.final_diffusion_rate**(1 / power),
-            steps=self.num_train_timesteps,
-            device=self.device,
-            dtype=self.dtype,
-        )**power)
+        return (
+            linspace(
+                start=self.initial_diffusion_rate ** (1 / power),
+                end=self.final_diffusion_rate ** (1 / power),
+                steps=self.num_train_timesteps,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            ** power
+        )
 
     def sample_noise_schedule(self) -> Tensor:
         match self.noise_schedule:
@@ -99,8 +97,7 @@ class Scheduler(ABC):
             case "karras":
                 return 1 - self.sample_power_distribution(7)
             case _:
-                raise ValueError(
-                    f"Unknown noise schedule: {self.noise_schedule}")
+                raise ValueError(f"Unknown noise schedule: {self.noise_schedule}")
 
     def add_noise(
         self,
@@ -123,18 +120,14 @@ class Scheduler(ABC):
         denoised_x = (x - noise_stds * noise) / cumulative_scale_factors
         return denoised_x
 
-    def to(self: T,
-           device: Device | str | None = None,
-           dtype: DType | None = None) -> T:  # type: ignore
+    def to(self: T, device: Device | str | None = None, dtype: DType | None = None) -> T:  # type: ignore
         if device is not None:
             self.device = Device(device)
             self.timesteps = self.timesteps.to(device)
         if dtype is not None:
             self.dtype = dtype
         self.scale_factors = self.scale_factors.to(device, dtype=dtype)
-        self.cumulative_scale_factors = self.cumulative_scale_factors.to(
-            device, dtype=dtype)
+        self.cumulative_scale_factors = self.cumulative_scale_factors.to(device, dtype=dtype)
         self.noise_std = self.noise_std.to(device, dtype=dtype)
-        self.signal_to_noise_ratios = self.signal_to_noise_ratios.to(
-            device, dtype=dtype)
+        self.signal_to_noise_ratios = self.signal_to_noise_ratios.to(device, dtype=dtype)
         return self

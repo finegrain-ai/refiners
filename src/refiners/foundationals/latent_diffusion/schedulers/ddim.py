@@ -4,7 +4,6 @@ from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSc
 
 
 class DDIM(Scheduler):
-
     def __init__(
         self,
         num_inference_steps: int,
@@ -32,29 +31,25 @@ class DDIM(Scheduler):
         similar to diffusers settings for the DDIM scheduler in Stable Diffusion 1.5
         """
         step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = arange(
-            start=0, end=self.num_inference_steps, step=1,
-            device=self.device) * step_ratio + 1
+        timesteps = arange(start=0, end=self.num_inference_steps, step=1, device=self.device) * step_ratio + 1
         return timesteps.flip(0)
 
-    def __call__(self,
-                 x: Tensor,
-                 noise: Tensor,
-                 step: int,
-                 generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         timestep, previous_timestep = (
             self.timesteps[step],
-            (self.timesteps[step + 1] if step < self.num_inference_steps -
-             1 else tensor(data=[0], device=self.device, dtype=self.dtype)),
+            (
+                self.timesteps[step + 1]
+                if step < self.num_inference_steps - 1
+                else tensor(data=[0], device=self.device, dtype=self.dtype)
+            ),
         )
-        current_scale_factor, previous_scale_factor = self.cumulative_scale_factors[
-            timestep], (self.cumulative_scale_factors[previous_timestep]
-                        if previous_timestep > 0 else
-                        self.cumulative_scale_factors[0])
-        predicted_x = (x - sqrt(1 - current_scale_factor**2) *
-                       noise) / current_scale_factor
-        denoised_x = previous_scale_factor * predicted_x + sqrt(
-            1 - previous_scale_factor**2) * noise
+        current_scale_factor, previous_scale_factor = self.cumulative_scale_factors[timestep], (
+            self.cumulative_scale_factors[previous_timestep]
+            if previous_timestep > 0
+            else self.cumulative_scale_factors[0]
+        )
+        predicted_x = (x - sqrt(1 - current_scale_factor**2) * noise) / current_scale_factor
+        denoised_x = previous_scale_factor * predicted_x + sqrt(1 - previous_scale_factor**2) * noise
 
         self.previous_scale_factor = previous_scale_factor
 
