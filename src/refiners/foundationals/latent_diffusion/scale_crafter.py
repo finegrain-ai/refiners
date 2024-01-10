@@ -32,7 +32,7 @@ class ReDilatedConv(fl.Module):
         dilation_factor = self.dilation_factor
         inflated_timestep = timestep < self.inflate_timestep
         if self.progressive:
-            dilation_factor = max(math.ceil(dilation_factor * ((self.dilation_timestep - timestep) / self.dilation_timestep)), 2)
+            dilation_factor = max(math.ceil(dilation_factor * (((1000-self.dilation_timestep) - timestep) / (1000-self.dilation_timestep))), 2)
         if inflated_timestep and self.kernel_inflated:
              dilation_factor /= 2
         dilation = math.ceil(dilation_factor)
