@@ -221,7 +221,6 @@ class PaletteCrossAttention(fl.Chain):
         self.linear_input_dim = linear_input_dim
         self.linear_output_dim = linear_output_dim
         self.num_heads = num_heads
-        self.scale = scale
 
         super().__init__(
             fl.Distribute(
@@ -249,6 +248,16 @@ class PaletteCrossAttention(fl.Chain):
             fl.Multiply(scale=scale),
         )
 
+    @property
+    def scale(self) -> float:
+        multiply = self.ensure_find(fl.Multiply)
+        return multiply.scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        multiply = self.ensure_find(fl.Multiply)
+        multiply.scale = value
+
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     """Inject a PaletteCrossAttention module in a given Attention module."""
@@ -259,10 +268,19 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         palette_embeddings_dim: int,
         scale: float = 1.0,
     ) -> None:
-        self.scale = scale
-        self.palette_embeddings_dim = palette_embeddings_dim
         with self.setup_adapter(target):
             super().__init__(target)
+
+        self.palette_cross_attention = [
+            PaletteCrossAttention(
+                linear_input_dim=palette_embeddings_dim,
+                linear_output_dim=target.embedding_dim,
+                num_heads=target.num_heads,
+                scale=scale,
+                device=target.device,
+                dtype=target.dtype,
+            )
+        ]
 
     def inject(self, parent: fl.Chain | None = None) -> "CrossAttentionAdapter":
         # find the ScaledDotProductAttention
@@ -272,29 +290,30 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             old_module=scaled_dot_product_attention,
             new_module=fl.Sum(
                 scaled_dot_product_attention,
-                PaletteCrossAttention(
-                    linear_input_dim=self.palette_embeddings_dim,
-                    linear_output_dim=self.target.embedding_dim,
-                    num_heads=self.target.num_heads,
-                    scale=self.scale,
-                    device=self.target.device,
-                    dtype=self.target.dtype,
-                ),
+                self.palette_cross_attention[0],
             ),
         )
         return super().inject(parent)
 
     def eject(self) -> None:
-        # find the PaletteCrossAttention
-        palette_cross_attention = self.target.ensure_find(PaletteCrossAttention)
-        # find it's parent (Sum)
-        parent = self.target.ensure_find_parent(palette_cross_attention)
-        # extract the original ScaledDotProductAttention out of the Sum
+        # find the parent of the PaletteCrossAttention (fl.Sum)
+        parent = self.target.ensure_find_parent(self.palette_cross_attention[0])
+        # replace the fl.Sum by the original ScaledDotProductAttention
         self.target.replace(
             old_module=parent,
-            new_module=parent[0],
+            new_module=parent.pop(0),
         )
+        # also pop the PaletteCrossAttention, to unlink its parent
+        parent.pop()
         super().eject()
+
+    @property
+    def scale(self) -> float:
+        return self.palette_cross_attention[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self.palette_cross_attention[0].scale = value
 
 
 class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
@@ -338,6 +357,11 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
             adapter.eject()
         super().eject()
 
-    def set_scale(self, scale: float) -> None:
-        for cross_attn in self.sub_adapters:
-            cross_attn.scale = scale
+    @property
+    def scale(self) -> float:
+        return self.cross_attention_adapters[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        for adapter in self.cross_attention_adapters:
+            adapter.scale = value
