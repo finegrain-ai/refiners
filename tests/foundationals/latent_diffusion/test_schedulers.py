@@ -2,7 +2,7 @@ from typing import cast
 from warnings import warn
 
 import pytest
-from torch import Tensor, allclose, device as Device, equal, randn, isclose
+from torch import Tensor, allclose, device as Device, equal, isclose, randn
 
 from refiners.fluxion import manual_seed
 from refiners.foundationals.latent_diffusion.schedulers import DDIM, DDPM, DPMSolver, EulerScheduler
