@@ -67,7 +67,7 @@ class EulerScheduler(Scheduler):
 
         gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0
 
-        alt_noise = torch.randn(noise.shape, generator=generator)
+        alt_noise = torch.randn(noise.shape, generator=generator, device=noise.device, dtype=noise.dtype)
         eps = alt_noise * s_noise
         sigma_hat = sigma * (gamma + 1)
         if gamma > 0:
