@@ -112,9 +112,7 @@ def test_scheduler_remove_noise():
     noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        diffusers_output = cast(
-            Tensor, diffusers_scheduler.step(noise, timestep, sample).pred_original_sample
-        )  # type: ignore
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).pred_original_sample)  # type: ignore
         refiners_output = refiners_scheduler.remove_noise(x=sample, noise=noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
