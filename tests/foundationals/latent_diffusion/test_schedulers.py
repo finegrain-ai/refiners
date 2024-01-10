@@ -82,7 +82,9 @@ def test_euler_diffusers():
     sample = randn(1, 4, 32, 32)
     noise = randn(1, 4, 32, 32)
 
-    assert isclose(diffusers_scheduler.init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
+    ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
+    assert isinstance(ref_init_noise_sigma, Tensor)
+    assert isclose(ref_init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
