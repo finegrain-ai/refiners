@@ -72,10 +72,12 @@ def test_tensor_to_image() -> None:
 
 
 def test_summarize_tensor() -> None:
-    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).int())) == str
-    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).float())) == str
-    assert type(summarize_tensor(torch.zeros(1, 3, 512, 512).double())) == str
-    assert type(summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))) == str
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).int())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).float())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).double())
+    assert summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).bfloat16())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).bool())
 
 
 def test_no_grad() -> None:

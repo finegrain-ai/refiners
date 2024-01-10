@@ -200,9 +200,13 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
             ]
         )
 
-    if tensor.dtype == torch.float or tensor.is_complex():
-        info_list.extend([f"mean={tensor.mean():.2f}", f"std={tensor.std():.2f}", f"norm={norm(x=tensor):.2f}"])
-
-    info_list.extend([f"grad={tensor.requires_grad}"])
+    info_list.extend(
+        [
+            f"mean={tensor.float().mean():.2f}",
+            f"std={tensor.float().std():.2f}",
+            f"norm={norm(x=tensor.float()):.2f}",
+            f"grad={tensor.requires_grad}",
+        ]
+    )
 
     return "Tensor(" + ", ".join(info_list) + ")"
