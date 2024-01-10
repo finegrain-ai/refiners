@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from torch import Tensor, device as Device, dtype as DType, linspace, float32, sqrt, log, Generator
 from typing import TypeVar
+
+from torch import Generator, Tensor, device as Device, dtype as DType, float32, linspace, log, sqrt
 
 T = TypeVar("T", bound="Scheduler")
 

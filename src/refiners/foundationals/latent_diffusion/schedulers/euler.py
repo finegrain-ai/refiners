@@ -1,7 +1,8 @@
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
-from torch import Tensor, device as Device, dtype as Dtype, float32, tensor, Generator
-import torch
 import numpy as np
+import torch
+from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
+
+from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
 
 class EulerScheduler(Scheduler):

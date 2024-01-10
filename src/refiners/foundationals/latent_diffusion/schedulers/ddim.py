@@ -1,4 +1,4 @@
-from torch import Tensor, arange, device as Device, dtype as Dtype, float32, sqrt, tensor, Generator
+from torch import Generator, Tensor, arange, device as Device, dtype as Dtype, float32, sqrt, tensor
 
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
