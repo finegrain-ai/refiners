@@ -37,6 +37,7 @@ class ColorEncoderConfig(BaseModel):
 
     dim_sinusoids: int = 64
     dim_embeddings: int = 256
+    max_colors: int = 8
 
 
 class AdapterConfig(BaseModel):
@@ -282,6 +283,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         return ColorEncoder(
             dim_sinusoids=self.config.adapter.color_encoder.dim_sinusoids,
             dim_embeddings=self.config.adapter.color_encoder.dim_embeddings,
+            max_colors=self.config.adapter.color_encoder.max_colors,
             device=self.device,
         ).to(device=self.device)
 
@@ -332,7 +334,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         else:
             # select a palette at random, biased towards the middle, by using a Β(2, 2) distribution
             beta = Beta(2, 2)  # FIXME: harcoded value
-            i = int(beta.sample() * 8) + 1  # FIXME: harcoded value (max_colors)
+            max_colors = self.config.adapter.color_encoder.max_colors
+            i = int(beta.sample() * max_colors) + 1  # FIXME: harcoded value (max_colors)
             colors = batch["palettes"][str(i)]  # type: ignore
 
         # set unet color palette context

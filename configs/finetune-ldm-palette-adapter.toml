@@ -18,6 +18,7 @@ offset_noise = 0.1
 [adapter.color_encoder]
 dim_sinusoids = 64
 dim_hidden = 256
+max_colors = 8
 
 [training]
 duration = "2000:step"
