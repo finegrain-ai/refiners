@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 import torch.nn.functional as F
@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 T = TypeVar("T", bound="SD1UNet | SDXLUNet")
-TPaletteAdapter = TypeVar("TPaletteAdapter", bound="PaletteAdapter[Any]")
 
 
 class FillZeroRightPad(fl.Module):  # TODO: generalizable ?
@@ -100,8 +99,10 @@ class SinusoidalEmbedding(fl.Module):
     def __init__(
         self,
         dim_embedding: int,
+        dtype: torch.dtype | None = None,
     ) -> None:
         self.dim_embedding = dim_embedding
+        self.dtype = dtype
         super().__init__()
 
     def compute_sinusoidal_embedding(
@@ -125,8 +126,8 @@ class SinusoidalEmbedding(fl.Module):
         omega = omega * torch.arange(
             start=0,
             end=half_dim,
-            dtype=torch.float32,
             device=x.device,
+            dtype=self.dtype or torch.float32,
         )
         omega = omega / half_dim
         omega = omega.exp()
@@ -172,7 +173,10 @@ class ColorEncoder(fl.Passthrough):
             # (batch, n_colors, 3): uint8
             fl.Concatenate(
                 fl.Chain(
-                    SinusoidalEmbedding(dim_embedding=dim_sinusoids),
+                    SinusoidalEmbedding(
+                        dim_embedding=dim_sinusoids,
+                        dtype=dtype,
+                    ),
                     # (batch, n_colors, 3, dim_sinusoids): float32
                     fl.Reshape(-1, dim_sinusoids * 3),
                     # (batch, n_colors, 3 * dim_sinusoids)
@@ -211,6 +215,8 @@ class PaletteCrossAttention(fl.Chain):
         linear_output_dim: int,
         num_heads: int,
         scale: float = 1.0,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
     ) -> None:
         self.linear_input_dim = linear_input_dim
         self.linear_output_dim = linear_output_dim
@@ -222,11 +228,21 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Identity(),  # Q (from the original CrossAttention)
                 fl.Chain(  # K (palette)
                     fl.UseContext("palette", "embeddings"),
-                    fl.Linear(linear_input_dim, linear_output_dim),
+                    fl.Linear(
+                        in_features=linear_input_dim,
+                        out_features=linear_output_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
                 ),
                 fl.Chain(  # V (palette)
                     fl.UseContext("palette", "embeddings"),
-                    fl.Linear(linear_input_dim, linear_output_dim),
+                    fl.Linear(
+                        in_features=linear_input_dim,
+                        out_features=linear_output_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
                 ),
             ),
             ScaledDotProductAttention(num_heads=num_heads),
@@ -261,6 +277,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                     linear_output_dim=self.target.embedding_dim,
                     num_heads=self.target.num_heads,
                     scale=self.scale,
+                    device=self.target.device,
+                    dtype=self.target.dtype,
                 ),
             ),
         )
@@ -288,17 +306,22 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
         self,
         target: T,
         color_encoder: ColorEncoder,
+        scale: float = 1.0,
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
 
         self.color_encoder = [color_encoder]
         self.cross_attention_adapters = [
-            CrossAttentionAdapter(target=cross_attn, palette_embeddings_dim=color_encoder.dim_embeddings)
+            CrossAttentionAdapter(
+                target=cross_attn,
+                palette_embeddings_dim=color_encoder.dim_embeddings,
+                scale=scale,
+            )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
-    def inject(self: "TPaletteAdapter", parent: fl.Chain | None = None) -> "TPaletteAdapter":
+    def inject(self, parent: fl.Chain | None = None) -> "PaletteAdapter[T]":
         # prepend the color encoder
         self.target.insert(0, self.color_encoder[0])
         # inject all the cross attention adapters
@@ -314,3 +337,7 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
         for adapter in self.cross_attention_adapters:
             adapter.eject()
         super().eject()
+
+    def set_scale(self, scale: float) -> None:
+        for cross_attn in self.sub_adapters:
+            cross_attn.scale = scale
