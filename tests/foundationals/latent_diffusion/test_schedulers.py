@@ -64,7 +64,7 @@ def test_ddim_diffusers():
 
 
 def test_euler_diffusers():
-    from diffusers import EulerDiscreteScheduler
+    from diffusers import EulerDiscreteScheduler  # type: ignore
 
     manual_seed(0)
     diffusers_scheduler = EulerDiscreteScheduler(
