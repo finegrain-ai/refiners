@@ -164,6 +164,10 @@ class WeightedModule(Module):
     def dtype(self) -> DType:
         return self.weight.dtype
 
+    def __repr__(self) -> str:
+        str = super().__repr__()
+        return f"{str} [device={self.device}, dtype={self.dtype}]"
+
 
 class TreeNode(TypedDict):
     value: str
@@ -242,15 +246,6 @@ class ModuleTree:
                 value = f"({module._tag})"  # pyright: ignore[reportPrivateUsage]
             case (_, False):
                 value = f"({module._tag}) {module}"  # pyright: ignore[reportPrivateUsage]
-
-        dtype_str = getattr(module, "dtype", None).__repr__().replace("torch.", "")
-
-        if hasattr(module, "device") and module.device is not None:
-            device_str = f"{module.device.type}:{module.device.index}"
-        else:
-            device_str = "cpu"
-
-        value = f"{value} [dtype={dtype_str}, device={device_str}] "
 
         class_name = module.__class__.__name__
 
