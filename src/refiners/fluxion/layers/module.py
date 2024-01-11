@@ -243,6 +243,15 @@ class ModuleTree:
             case (_, False):
                 value = f"({module._tag}) {module}"  # pyright: ignore[reportPrivateUsage]
 
+        dtype_str = getattr(module, "dtype", None).__repr__().replace("torch.", "")
+
+        if hasattr(module, "device") and module.device is not None:
+            device_str = f"{module.device.type}:{module.device.index}"
+        else:
+            device_str = "cpu"
+
+        value = f"{value} [dtype={dtype_str}, device={device_str}] "
+
         class_name = module.__class__.__name__
 
         node: TreeNode = {"value": value, "class_name": class_name, "children": []}
