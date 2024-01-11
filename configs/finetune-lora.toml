@@ -1,5 +1,3 @@
-script = "finetune-ldm-lora.py" # not used for now
-
 [wandb]
 mode = "offline" # "online", "offline", "disabled"
 entity = "acme"
