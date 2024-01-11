@@ -6,7 +6,7 @@ import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, device as Device, dtype as DType
+from torch import Tensor, device as Device, dtype as DType, randn
 from torch.distributions import Beta
 from torch.nn.functional import mse_loss
 from torch.utils.data import Dataset
@@ -17,8 +17,8 @@ from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.palette_adapter import ColorEncoder, PaletteAdapter
 from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.latent_diffusion import (
@@ -28,6 +28,7 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
 )
 from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.wandb import WandbLoggable
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
@@ -360,6 +361,45 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         loss = mse_loss(input=prediction, target=noise)
 
         return loss
+
+    def compute_evaluation(self) -> None:
+        # initialize an SD1.5 pipeline using the trainer's models
+        sd = StableDiffusion_1(
+            unet=self.unet,
+            lda=self.lda,
+            clip_text_encoder=self.text_encoder,
+            scheduler=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
+            device=self.device,
+        )
+
+        # retreive data from config
+        prompts = self.config.test_ldm.prompts
+        palettes = Tensor(self.config.test_ldm.palettes)
+        num_images_per_prompt = self.config.test_ldm.num_images_per_prompt
+        if self.config.test_ldm.use_short_prompts:
+            prompts = [prompt.split(sep=",")[0] for prompt in prompts]
+
+        # for each prompt generate `num_images_per_prompt` images
+        images: dict[str, WandbLoggable] = {}
+        for prompt, palette in zip(prompts, palettes):
+            canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
+            for i in range(num_images_per_prompt):
+                logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
+                x = randn(1, 4, 64, 64, device=self.device)
+                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
+                sd.unet.set_context("palette", {"colors": palette.unsqueeze(0)})  # TODO: create a set_palette method ?
+                for step in sd.steps:
+                    print(step)
+                    x = sd(
+                        x=x,
+                        step=step,
+                        clip_text_embedding=clip_text_embedding,
+                    )
+                canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+            images[prompt] = canvas_image
+
+        # log images to wandb
+        self.log(data=images)
 
     def __init__(
         self,
