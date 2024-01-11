@@ -96,7 +96,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         self.dataset = self.load_huggingface_dataset()
 
     @staticmethod
-    def download_image(
+    def download_images(
         data: dict[str, list[Any]],  # "batched"
         dl_manager: datasets.DownloadManager,
     ) -> dict[str, list[str]]:
@@ -106,7 +106,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         return {"image": filenames}
 
     @staticmethod
-    def resize_image(
+    def resize_images(
         data: dict[str, list[Any]],  # "batched"
         min_size: int = 512,
         max_size: int = 576,
@@ -124,7 +124,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         }
 
     @staticmethod
-    def encode_caption(
+    def encode_captions(
         data: dict[str, list[Any]],  # "batched"
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
@@ -151,7 +151,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         # download images from urls
         dl_manager = datasets.DownloadManager()
         dataset = dataset.map(  # type: ignore
-            function=self.download_image,
+            function=self.download_images,
             batched=True,
             num_proc=8,  # FIXME: harcoded value
             remove_columns=["url"],
@@ -167,7 +167,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
 
         # limit max image size
         dataset = dataset.map(  # type: ignore
-            function=self.resize_image,
+            function=self.resize_images,
             batched=True,
             batch_size=10,  # FIXME: harcoded value
             num_proc=8,  # FIXME: harcoded value
@@ -182,7 +182,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         self.trainer.prepare_model("text_encoder")
         dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
         dataset = dataset.map(  # type: ignore
-            function=self.encode_caption,
+            function=self.encode_captions,
             batched=True,
             batch_size=50,  # FIXME: harcoded value
             remove_columns=["caption"],
