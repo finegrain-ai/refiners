@@ -219,7 +219,6 @@ T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
-    script: Path  # TODO not used for now, but will be used by the cli
     models: dict[str, ModelConfig]
     wandb: WandbConfig
     training: TrainingConfig
