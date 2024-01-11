@@ -5,7 +5,8 @@ repo_url: https://github.com/finegrain-ai/refiners
 edit_uri: edit/main/docs/
 copyright: © Lagon Technologies
 theme:
-  favicon: assets/favicon.png
+  favicon: assets/favicon.svg
+  logo: assets/favicon.svg
   name: material
   palette:
     primary: deep orange
