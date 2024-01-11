@@ -29,7 +29,8 @@ from refiners.training_utils.latent_diffusion import (
 )
 from refiners.training_utils.trainer import Trainer
 
-Image.MAX_IMAGE_PIXELS = None
+# some images of the unsplash lite dataset are bigger than the default limit
+Image.MAX_IMAGE_PIXELS = 200_000_000
 
 
 class ColorEncoderConfig(BaseModel):
