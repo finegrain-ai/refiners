@@ -1,59 +1,39 @@
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import torch
-import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.layers.activations import Activation
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
-
-if TYPE_CHECKING:
-    from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
-    from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 
 T = TypeVar("T", bound="SD1UNet | SDXLUNet")
 
 
-class FillZeroRightPad(fl.Module):  # TODO: generalizable ?
-    """Pad a tensor with zeros on the right to reach a given length."""
-
-    def __init__(
-        self,
-        max_length: int,
-        dim: int,
-    ) -> None:
-        self.max_length = max_length
-        self.dim = dim
-        super().__init__()
-
-    def forward(
-        self,
-        x: torch.Tensor,
-    ) -> torch.Tensor:
-        pad = [0] * 2 * x.ndim
-        dim_index = 1 + 2 * (x.ndim - 1) - 2 * self.dim
-        pad[dim_index] = self.max_length - x.size(self.dim)
-        return F.pad(x, pad, "constant", 0)
-
-
-class EOSToken(fl.Chain):
+class EOSToken(fl.Module):
     """Learnable token representing the class of the input."""
 
     def __init__(
         self,
         embedding_dim: int,
+        value: float,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
         self.embedding_dim = embedding_dim
+        self.value = value
+        self.device = device
+        self.dtype = dtype
+        super().__init__()
 
-        super().__init__(
-            fl.Parameter(
-                *(1, embedding_dim),
-                device=device,
-                dtype=dtype,
-            ),
+    def forward(self, _) -> torch.Tensor:
+        return torch.full(
+            size=(1, self.embedding_dim),
+            fill_value=self.value,
+            device=self.device,
+            dtype=self.dtype,
         )
 
 
@@ -99,9 +79,11 @@ class SinusoidalEmbedding(fl.Module):
     def __init__(
         self,
         dim_embedding: int,
+        period: int = 10_000,
         dtype: torch.dtype | None = None,
     ) -> None:
         self.dim_embedding = dim_embedding
+        self.period = period
         self.dtype = dtype
         super().__init__()
 
@@ -109,7 +91,7 @@ class SinusoidalEmbedding(fl.Module):
         self,
         x: torch.Tensor,
         dim_embedding: int,
-        period: int = 10_000,
+        period: int,
     ):
         """Compute sinusoidal embeddings for a given sequence of indices.
 
@@ -150,10 +132,11 @@ class SinusoidalEmbedding(fl.Module):
         return self.compute_sinusoidal_embedding(
             x=x,
             dim_embedding=self.dim_embedding,
+            period=self.period,
         )
 
 
-class ColorEncoder(fl.Passthrough):
+class ColorEncoder(fl.Chain):
     """Encode a sequence of (RGB) colors into a sequence of embeddings."""
 
     def __init__(
@@ -169,40 +152,32 @@ class ColorEncoder(fl.Passthrough):
         self.max_colors = max_colors
 
         super().__init__(
-            fl.UseContext("palette", "colors"),
-            # (batch, n_colors, 3): uint8
+            # (n_colors, 3)
             fl.Concatenate(
-                fl.Chain(
-                    SinusoidalEmbedding(
-                        dim_embedding=dim_sinusoids,
-                        dtype=dtype,
-                    ),
-                    # (batch, n_colors, 3, dim_sinusoids): float32
-                    fl.Reshape(-1, dim_sinusoids * 3),
-                    # (batch, n_colors, 3 * dim_sinusoids)
-                    FeedForward(
-                        input_dim=dim_sinusoids * 3,
-                        intermediate_dim=dim_sinusoids * 3,
-                        output_dim=dim_embeddings,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    # (batch, n_colors, dim_embeddings)
-                ),
+                fl.Identity(),
                 EOSToken(
-                    embedding_dim=dim_embeddings,
+                    value=-256,  # FIXME: hardcoded value
+                    embedding_dim=3,  # FIXME: hardcoded value
                     device=device,
                     dtype=dtype,
-                ),  # (batch, 1, dim_embeddings)
-                dim=1,
+                ),  # (1, 3)
             ),
-            # (batch, n_colors + 1, dim_embeddings)
-            FillZeroRightPad(
-                max_length=max_colors + 1,
-                dim=1,
+            # (n_colors + 1, 3)
+            SinusoidalEmbedding(
+                dim_embedding=dim_sinusoids,
+                dtype=dtype,
             ),
-            # (batch, max_colors + 1, dim_embeddings)
-            fl.SetContext("palette", "embeddings"),
+            # (n_colors + 1, 3, dim_sinusoids)
+            fl.Flatten(start_dim=1),
+            # (n_colors + 1, 3 * dim_sinusoids)
+            FeedForward(
+                input_dim=dim_sinusoids * 3,
+                intermediate_dim=dim_sinusoids * 3,
+                output_dim=dim_embeddings,
+                device=device,
+                dtype=dtype,
+            ),
+            # (n_colors + 1, dim_embeddings)
         )
 
 
@@ -330,7 +305,7 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
         with self.setup_adapter(target):
             super().__init__(target)
 
-        self.color_encoder = [color_encoder]
+        self._color_encoder = [color_encoder]
         self.cross_attention_adapters = [
             CrossAttentionAdapter(
                 target=cross_attn,
@@ -340,22 +315,36 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
+    @property
+    def color_encoder(self) -> ColorEncoder:
+        return self._color_encoder[0]
+
     def inject(self, parent: fl.Chain | None = None) -> "PaletteAdapter[T]":
-        # prepend the color encoder
-        self.target.insert(0, self.color_encoder[0])
-        # inject all the cross attention adapters
+        """Inject the PaletteCrossAttention modules."""
         for adapter in self.cross_attention_adapters:
             adapter.inject()
         return super().inject(parent)
 
     def eject(self) -> None:
-        # remove the color encoder
-        color_encoder = self.target.ensure_find(ColorEncoder)
-        self.target.remove(color_encoder)
-        # eject all the cross attention adapters
+        """Eject the PaletteCrossAttention modules."""
         for adapter in self.cross_attention_adapters:
             adapter.eject()
         super().eject()
+
+    def compute_palette_embeddings(self, palettes: torch.Tensor | list[torch.Tensor]) -> torch.Tensor:
+        """Compute the palette embeddings for a given batch of colors."""
+        embeddings: list[torch.Tensor] = []
+        for palette in palettes:
+            assert (
+                len(palette) <= self.color_encoder.max_colors
+            ), f"All palettes must have less than max_colors={self.color_encoder.max_colors} colors."
+            # TODO: add some other assertions
+            embeddings.append(self.color_encoder(palette))
+        return pad_sequence(embeddings, batch_first=True)
+
+    def set_palette_embeddings(self, embeddings: torch.Tensor) -> None:
+        """Set the palette embeddings."""
+        self.set_context("palette", {"embeddings": embeddings})
 
     @property
     def scale(self) -> float:
