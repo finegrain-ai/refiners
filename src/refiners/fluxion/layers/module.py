@@ -164,9 +164,8 @@ class WeightedModule(Module):
     def dtype(self) -> DType:
         return self.weight.dtype
 
-    def __repr__(self) -> str:
-        str = super().__repr__()
-        return f"{str} [device={self.device}, dtype={self.dtype}]"
+    def __str__(self) -> str:
+        return f"{super().__str__().removesuffix(')')}, device={self.device}, dtype={str(self.dtype).removeprefix('torch.')})"
 
 
 class TreeNode(TypedDict):
