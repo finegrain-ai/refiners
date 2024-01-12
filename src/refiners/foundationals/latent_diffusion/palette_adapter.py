@@ -1,6 +1,8 @@
 from typing import Generic, TypeVar
 
 import torch
+from jaxtyping import UInt8
+from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 
 import refiners.fluxion.layers as fl
@@ -28,7 +30,7 @@ class EOSToken(fl.Module):
         self.dtype = dtype
         super().__init__()
 
-    def forward(self, _) -> torch.Tensor:
+    def forward(self, _) -> Tensor:
         return torch.full(
             size=(1, self.embedding_dim),
             fill_value=self.value,
@@ -89,7 +91,7 @@ class SinusoidalEmbedding(fl.Module):
 
     def compute_sinusoidal_embedding(
         self,
-        x: torch.Tensor,
+        x: Tensor,
         dim_embedding: int,
         period: int,
     ):
@@ -127,8 +129,8 @@ class SinusoidalEmbedding(fl.Module):
 
     def forward(
         self,
-        x: torch.Tensor,
-    ) -> torch.Tensor:
+        x: Tensor,
+    ) -> Tensor:
         return self.compute_sinusoidal_embedding(
             x=x,
             dim_embedding=self.dim_embedding,
@@ -143,13 +145,11 @@ class ColorEncoder(fl.Chain):
         self,
         dim_sinusoids: int,
         dim_embeddings: int,
-        max_colors: int = 8,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
         self.dim_sinusoids = dim_sinusoids
         self.dim_embeddings = dim_embeddings
-        self.max_colors = max_colors
 
         super().__init__(
             # (n_colors, 3)
@@ -331,18 +331,15 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
             adapter.eject()
         super().eject()
 
-    def compute_palette_embeddings(self, palettes: torch.Tensor | list[torch.Tensor]) -> torch.Tensor:
+    def compute_palette_embeddings(
+        self,
+        palettes: UInt8[Tensor, "batch n_colors n_channels"] | list[UInt8[Tensor, "n_colors n_channels"]],
+    ) -> Tensor:
         """Compute the palette embeddings for a given batch of colors."""
-        embeddings: list[torch.Tensor] = []
-        for palette in palettes:
-            assert (
-                len(palette) <= self.color_encoder.max_colors
-            ), f"All palettes must have less than max_colors={self.color_encoder.max_colors} colors."
-            # TODO: add some other assertions
-            embeddings.append(self.color_encoder(palette))
+        embeddings = [self.color_encoder(palette) for palette in palettes]
         return pad_sequence(embeddings, batch_first=True)
 
-    def set_palette_embeddings(self, embeddings: torch.Tensor) -> None:
+    def set_palette_embeddings(self, embeddings: Tensor) -> None:
         """Set the palette embeddings."""
         self.set_context("palette", {"embeddings": embeddings})
 
