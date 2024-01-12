@@ -333,7 +333,7 @@ class PaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     def compute_palette_embeddings(
         self,
-        palettes: UInt8[Tensor, "batch n_colors n_channels"] | list[UInt8[Tensor, "n_colors n_channels"]],
+        palettes: list[UInt8[Tensor, "n_colors n_channels"]],
     ) -> Tensor:
         """Compute the palette embeddings for a given batch of colors."""
         embeddings = [self.color_encoder(palette) for palette in palettes]

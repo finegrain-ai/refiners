@@ -1,14 +1,17 @@
 import random
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, TypedDict
+from typing import Any
 
 import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, device as Device, dtype as DType, randn
+from torch import Tensor, cat, device as Device, dtype as DType, randn
 from torch.distributions import Beta
+from torch.nn import Module
 from torch.nn.functional import mse_loss
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
 
@@ -78,18 +81,20 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     test_ldm: TestPaletteDiffusionConfig
 
 
-class PaletteBatch(TypedDict):
+@dataclass
+class PaletteBatch:
     """Structure of the data in the PaletteDataset."""
 
     latent: Tensor
     text_embedding: Tensor
-    palettes: dict[str, Tensor]
+    palette_embedding: Tensor
 
 
 class PaletteDataset(Dataset[PaletteBatch]):
     """Dataset for the palette adapter.
 
-    Transforms the data from the Hugging Face dataset into PaletteBatches.
+    Transforms the data from the HuggingFace dataset into `PaletteBatch`.
+    The `collate_fn` is used by the trainer to batch the data.
     """
 
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
@@ -99,21 +104,21 @@ class PaletteDataset(Dataset[PaletteBatch]):
 
     @staticmethod
     def download_images(
-        data: dict[str, list[Any]],  # "batched"
+        urls: list[Any],
         dl_manager: datasets.DownloadManager,
     ) -> dict[str, list[str]]:
-        """Download the image from the url."""
-        urls = data["url"]
-        filenames: list[str] = dl_manager.download(urls)  # type: ignore
-        return {"image": filenames}
+        """Download the images from the urls."""
+        return {
+            "image": dl_manager.download(urls),  # type: ignore
+        }
 
     @staticmethod
     def resize_images(
-        data: dict[str, list[Any]],  # "batched"
+        images: list[Image.Image],
         min_size: int = 512,
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
-        """Resize the shortest side of the image between `min_size` and `max_size`."""
+        """Resize the images such that their shortest side is between `min_size` and `max_size`."""
         return {
             "image": [
                 resize_image(
@@ -121,18 +126,18 @@ class PaletteDataset(Dataset[PaletteBatch]):
                     min_size=min_size,
                     max_size=max_size,
                 )
-                for image in data["image"]
+                for image in images
             ],
         }
 
     @staticmethod
     def encode_captions(
-        data: dict[str, list[Any]],  # "batched"
+        captions: list[str],
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
-        """Encode the caption with the encoder."""
+        """Encode the captions with the text encoder."""
         return {
-            "text_embedding": [text_encoder(caption).squeeze(0) for caption in data["caption"]],
+            "text_embedding": [text_encoder(caption) for caption in captions],
         }
 
     def load_huggingface_dataset(self) -> datasets.Dataset:
@@ -151,13 +156,16 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.select(list(range(100)))  # type: ignore # FIXME: temporary
 
         # download images from urls
-        dl_manager = datasets.DownloadManager()
+        dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
         dataset = dataset.map(  # type: ignore
             function=self.download_images,
+            input_columns=["url"],
+            remove_columns=["url"],
             batched=True,
             num_proc=8,  # FIXME: harcoded value
-            remove_columns=["url"],
-            fn_kwargs={"dl_manager": dl_manager},
+            fn_kwargs={
+                "dl_manager": dl_manager,
+            },
             desc="Downloading images",  # type: ignore
         )
 
@@ -170,6 +178,7 @@ class PaletteDataset(Dataset[PaletteBatch]):
         # limit max image size
         dataset = dataset.map(  # type: ignore
             function=self.resize_images,
+            input_columns=["image"],
             batched=True,
             batch_size=10,  # FIXME: harcoded value
             num_proc=8,  # FIXME: harcoded value
@@ -185,9 +194,10 @@ class PaletteDataset(Dataset[PaletteBatch]):
         dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_captions,
+            input_columns=["caption"],
+            remove_columns=["caption"],
             batched=True,
             batch_size=50,  # FIXME: harcoded value
-            remove_columns=["caption"],
             fn_kwargs={
                 "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
             },
@@ -209,12 +219,12 @@ class PaletteDataset(Dataset[PaletteBatch]):
     @cached_property
     def empty_text_embedding(self) -> Tensor:
         """Return an empty text embedding."""
-        return self.trainer.text_encoder("").squeeze(0)
+        return self.trainer.text_encoder("")
 
-    def transform(self, data: dict[str, Any]) -> PaletteBatch:  # TODO: break into smaller chunks ?
+    def transform(self, data: dict[str, Any]) -> PaletteBatch:
         """Apply transforms to data."""
-        # create the image transform
-        image_transforms: list[Any] = []
+        # apply augmentation to the image
+        image_transforms: list[Module] = []
         if self.trainer.config.dataset.random_crop_size:
             image_transforms.append(
                 RandomCrop(size=self.trainer.config.dataset.random_crop_size),
@@ -224,27 +234,51 @@ class PaletteDataset(Dataset[PaletteBatch]):
                 RandomHorizontalFlip(p=self.trainer.config.dataset.horizontal_flip_probability),
             )
         image_compose = Compose(image_transforms)
+        image = image_compose(data["image"])  # type: ignore
 
         # encode the image into latent
-        data["latent"] = self.trainer.lda.encode_image(
-            image=image_compose(data["image"]),  # type: ignore
-        ).squeeze(0)
-        del data["image"]
+        latent = self.trainer.lda.encode_image(image=image)  # type: ignore
 
-        # randomly drop the text conditionning (cfg)
+        # randomly drop the text (cfg)
         if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
-            data["text_embedding"] = self.empty_text_embedding
+            text_embedding = self.empty_text_embedding
+        else:
+            text_embedding = data["text_embedding"]
 
-        return data  # type: ignore
+        # randomly select a palette size
+        beta = Beta(2, 2)  # FIXME: harcoded value (2, 2)
+        n = int(beta.sample() * 8) + 1  # FIXME: harcoded value (8)
+        palette = data["palettes"][str(n)]  # (n, 3) palette
+
+        # randomly drop the palette (cfg)
+        if random.random() < self.trainer.config.ldm.unconditional_sampling_probability:
+            palette = Tensor(size=(0, palette.size(1)))
+
+        # encoder palette colors to embeddings
+        palette_embedding = self.trainer.color_encoder(palette)
+
+        return PaletteBatch(
+            latent=latent,
+            text_embedding=text_embedding,
+            palette_embedding=palette_embedding,
+        )
 
     def __getitem__(self, index: int) -> PaletteBatch:
-        # retreive data from dataset
+        # retreive data from the huggingface dataset
         data = self.dataset[index]  # type: ignore
-
-        # transform data
+        # augment/transform into PaletteBatch
         data = self.transform(data)  # type: ignore
-
         return data
+
+    def collate_fn(self, batch: list[PaletteBatch]) -> PaletteBatch:
+        latents = cat(tensors=[item.latent for item in batch])
+        text_embeddings = cat(tensors=[item.text_embedding for item in batch])
+        palette_embeddings = pad_sequence([item.palette_embedding for item in batch], batch_first=True)
+        return PaletteBatch(
+            latent=latents,
+            text_embedding=text_embeddings,
+            palette_embedding=palette_embeddings,
+        )
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -334,27 +368,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
 
     def compute_loss(self, batch: PaletteBatch) -> Tensor:
         # retreive data from batch
-        clip_text_embedding = batch["text_embedding"]
-        latents = batch["latent"]
-        batch_size = latents.shape[0]
+        latents = batch.latent
+        text_embeddings = batch.text_embedding
+        palette_embeddings = batch.palette_embedding
 
-        # select palettes at random, by using a Beta distribution
-        beta = Beta(2, 2)  # FIXME: harcoded value
-        palettes: list[Tensor] = []
-        for i in range(batch_size):
-            n = int(beta.sample() * 8) + 1
-            if random.random() < self.config.ldm.unconditional_sampling_probability:
-                palette = Tensor(size=(0, 3))  # empty palette
-            else:
-                palette = batch["palettes"][str(n)][i]  # (n, 3) palette
-            palettes.append(palette)
+        # set palette embeddings context
+        self.adapter.set_palette_embeddings(embeddings=palette_embeddings)
 
-        # compute palette embeddings set unet embedding palette context
-        embeddings = self.adapter.compute_palette_embeddings(palettes=palettes)
-        self.adapter.set_palette_embeddings(embeddings=embeddings)
-
-        # set unet text clip context
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+        # set text embeddings context
+        self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
         # sample timestep and set unet timestep context
         timestep = self.sample_timestep()
