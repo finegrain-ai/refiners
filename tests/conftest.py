@@ -6,7 +6,6 @@ from pytest import fixture
 
 PARENT_PATH = Path(__file__).parent
 
-
 @fixture(scope="session")
 def test_device() -> torch.device:
     test_device = os.getenv("REFINERS_TEST_DEVICE")
@@ -14,6 +13,12 @@ def test_device() -> torch.device:
         return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return torch.device(test_device)
 
+@fixture(scope="session")
+def test_second_device() -> torch.device:
+    test_device = os.getenv("REFINERS_TEST_SECOND_DEVICE")
+    if not test_device and torch.cuda.device_count() > 1:
+        return torch.device("cuda:1")
+    return torch.device("cpu")
 
 @fixture(scope="session")
 def test_weights_path() -> Path:

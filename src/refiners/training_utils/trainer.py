@@ -480,12 +480,15 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def compute_evaluation(self) -> None:
         pass
-
+    
+    def _backward(self, tensors) -> None:
+        backward(tensors=tensors)
+        
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        backward(tensors=scaled_loss)
+        self._backward(scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
