@@ -10,10 +10,14 @@ unet = { checkpoint = "weights/unet.safetensors", train = false }
 text_encoder = { checkpoint = "weights/clip.safetensors", train = false }
 lda = { checkpoint = "weights/lda.safetensors", train = false }
 color_encoder = { train = true }
+adapter = { train = true }
 
 [ldm]
 unconditional_sampling_probability = 0.05
 offset_noise = 0.1
+
+[adapter]
+scale = 1.0
 
 [adapter.color_encoder]
 dim_sinusoids = 64

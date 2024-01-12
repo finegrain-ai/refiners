@@ -45,6 +45,7 @@ class AdapterConfig(BaseModel):
     """Configuration for the palette adapter."""
 
     color_encoder: ColorEncoderConfig
+    scale: float = 1.0
 
 
 class DatasetConfig(BaseModel):
@@ -288,6 +289,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         ).to(device=self.device)
 
     @cached_property
+    def adapter(self) -> PaletteAdapter[SD1UNet]:
+        assert self.config.models["adapter"] is not None, "The config must contain a adapter entry."
+        return PaletteAdapter(
+            target=self.unet,
+            color_encoder=self.color_encoder,
+            scale=self.config.adapter.scale,
+        )
+
+    @cached_property
     def ddpm_scheduler(self) -> DDPM:
         return DDPM(
             num_inference_steps=1000,  # FIXME: harcoded value
@@ -300,6 +310,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "color_encoder": self.color_encoder,
+            "adapter": self.adapter,
         }
 
     def load_dataset(self) -> PaletteDataset:
@@ -327,18 +338,20 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
         latents = batch["latent"]
         batch_size = latents.shape[0]
 
-        if random.random() < self.config.ldm.unconditional_sampling_probability:  # TODO: differentiate text and colors
-            # randomly drop the palettes conditionning (cfg)
-            # TODO: try to move this in the preprocessing above ?
-            colors = Tensor(size=(batch_size, 0, 3))  # empty palette
-        else:
-            # select a palette at random, biased towards the middle, by using a Β(2, 2) distribution
-            beta = Beta(2, 2)  # FIXME: harcoded value
-            i = int(beta.sample() * 8) + 1  # FIXME: harcoded value
-            colors = batch["palettes"][str(i)]  # type: ignore
+        # select palettes at random, by using a Beta distribution
+        beta = Beta(2, 2)  # FIXME: harcoded value
+        palettes: list[Tensor] = []
+        for i in range(batch_size):
+            n = int(beta.sample() * 8) + 1
+            if random.random() < self.config.ldm.unconditional_sampling_probability:
+                palette = Tensor(size=(0, 3))  # empty palette
+            else:
+                palette = batch["palettes"][str(n)][i]  # (n, 3) palette
+            palettes.append(palette)
 
-        # set unet color palette context
-        self.unet.set_context("palette", {"colors": colors})
+        # compute palette embeddings set unet embedding palette context
+        embeddings = self.adapter.compute_palette_embeddings(palettes=palettes)
+        self.adapter.set_palette_embeddings(embeddings=embeddings)
 
         # set unet text clip context
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
@@ -371,12 +384,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
 
         # retreive data from config
         prompts = self.config.test_ldm.prompts
-        palettes = Tensor(self.config.test_ldm.palettes)
+        palettes = [Tensor(palette) for palette in self.config.test_ldm.palettes]
         num_images_per_prompt = self.config.test_ldm.num_images_per_prompt
         if self.config.test_ldm.use_short_prompts:
             prompts = [prompt.split(sep=",")[0] for prompt in prompts]
 
         # for each prompt generate `num_images_per_prompt` images
+        # TODO: remove this for loop, batch things up
         images: dict[str, WandbLoggable] = {}
         for prompt, palette in zip(prompts, palettes):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
@@ -384,7 +398,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device)
                 clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
-                sd.unet.set_context("palette", {"colors": palette.unsqueeze(0)})  # TODO: create a set_palette method ?
+                palette_embedding = self.adapter.compute_palette_embeddings(palettes=[palette])
+                self.adapter.set_palette_embeddings(embeddings=palette_embedding)
                 for step in sd.steps:
                     print(step)
                     x = sd(
@@ -411,21 +426,15 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""
 
     def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        adapter = PaletteAdapter(
-            target=trainer.unet,
-            color_encoder=trainer.color_encoder,
-        )
-        adapter.inject()
+        trainer.adapter.inject()
 
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to save the adapter when a checkpoint is saved."""
 
     def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        unet = trainer.unet
-        adapter = unet.parent
-        color_encoder = adapter.color_encoder  # type: ignore
-        cross_attention_adapters = adapter.cross_attention_adapters  # type: ignore
+        color_encoder = trainer.color_encoder
+        cross_attention_adapters = trainer.adapter.cross_attention_adapters
 
         tensors: dict[str, Tensor] = {}
         tensors |= {f"ColorEncoder.{key}": value for key, value in color_encoder.state_dict().items()}
