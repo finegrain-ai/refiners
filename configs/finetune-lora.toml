@@ -50,8 +50,9 @@ dropout_probability = 0.2
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "acme/images"
+hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
+caption_key = "ai_description"
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"
