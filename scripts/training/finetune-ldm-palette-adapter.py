@@ -324,12 +324,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, Palett
 
     @cached_property
     def adapter(self) -> PaletteAdapter[SD1UNet]:
-        assert self.config.models["adapter"] is not None, "The config must contain a adapter entry."
+        assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
         return PaletteAdapter(
             target=self.unet,
             color_encoder=self.color_encoder,
             scale=self.config.adapter.scale,
-        )
+        ).to(device=self.device)
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
