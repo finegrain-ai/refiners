@@ -4,9 +4,9 @@ entity = "acme"
 project = "test-lora-training"
 
 [models]
-unet = {checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors"}
-text_encoder = {checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
-lda = {checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors"}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors"}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors"}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.05

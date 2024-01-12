@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, TypedDict, TypeVar
 
-from datasets import DownloadManager
+from datasets import DownloadManager # type: ignore
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
@@ -59,6 +59,7 @@ class TextEmbeddingLatentsBatch:
 class CaptionImage(TypedDict):
     caption: str
     image: Image.Image
+    url: str
 
 
 ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionConfig)
@@ -102,14 +103,14 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
         return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
 
     def get_caption(self, index: int, caption_key: str) -> str:
-        return self.dataset[index][caption_key]
+        return self.dataset[index][caption_key] # type: ignore
 
     def get_image(self, index: int) -> Image.Image:
         if "image" in self.dataset[index]:
             return self.dataset[index]["image"]
         elif "url" in self.dataset[index]:
-            url = self.dataset[index]["url"]
-            filename = self.download_manager.download(url)
+            url : str = self.dataset[index]["url"]
+            filename : str = self.download_manager.download(url) # type: ignore
             return Image.open(filename)
         else:
             raise RuntimeError(f"Dataset item at index [{index}] does not contain 'image' or 'url'")
