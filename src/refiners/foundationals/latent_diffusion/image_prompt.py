@@ -241,23 +241,17 @@ class PerceiverResampler(fl.Chain):
     def init_context(self) -> Contexts:
         return {"perceiver_resampler": {"x": None}}
 
-class IdentityLog(fl.Identity):
-    def forward(self, *args, **kwargs):
-        print("logging")
-        print(args, kwargs)
-        return super().forward(*args, **kwargs)
 class ImageCrossAttention(fl.Chain):
-    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0, index: int = 1) -> None:
+    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0, num_image_prompts: int = 1) -> None:
         self._scale = scale
         super().__init__(
             fl.Distribute(
-                fl.Identity(),
                 fl.Chain(
-                    fl.Chain(
-                        fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
-                        IdentityLog(),
-                        fl.Lambda(lambda *x: x[index])
-                    ),
+                    fl.Identity(),
+                    fl.Lambda(lambda x: x.repeat(num_image_prompts, 1, 1))
+                ),
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
                     fl.Linear(
                         in_features=text_cross_attention.key_embedding_dim,
                         out_features=text_cross_attention.inner_dim,
@@ -267,11 +261,7 @@ class ImageCrossAttention(fl.Chain):
                     ),
                 ),
                 fl.Chain(
-                    fl.Chain(
-                        fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
-                        IdentityLog(),
-                        fl.Lambda(lambda *x: x[index])
-                    ),
+                    fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
                     fl.Linear(
                         in_features=text_cross_attention.key_embedding_dim,
                         out_features=text_cross_attention.inner_dim,
@@ -279,19 +269,19 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
-                ),
-                fl.Chain(
-                    fl.UseContext("ip_adapter", "mask"),
-                    IdentityLog(),
-                    fl.Lambda(lambda *x: x[index])
                 ),
             ),
-            IdentityLog(),
+            fl.Parallel(
+                fl.Lambda(lambda q,k,v: (q, k, v)),
+                fl.UseContext("ip_adapter", "mask"),
+            ),
+            fl.Lambda(lambda qkv, mask: (qkv[0], qkv[1], qkv[2], mask)),
             IPScaledDotProductAttention(
                 ScaledDotProductAttention(
                     num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
                 )
             ),
+            fl.Lambda(lambda x: self.sum_across_images(x, num_image_prompts)),
             fl.Multiply(self.scale),
         )
 
@@ -303,6 +293,10 @@ class ImageCrossAttention(fl.Chain):
     def scale(self, value: float) -> None:
         self._scale = value
         self.ensure_find(fl.Multiply).scale = value
+    def sum_across_images(self, x: Float[Tensor, "batch num_queries embedding_dim"], num_image_prompts: int) -> Float[Tensor, "... num_queries embedding_dim"]:
+        batch, num_queries, embedding_dim = x.shape
+        x = x.reshape((num_image_prompts, batch // num_image_prompts, num_queries, embedding_dim))
+        return sum(x, dim=0)
 
 
 def find_closest_factors_to_goal(number: int, goal: float) -> int:
@@ -326,7 +320,6 @@ class IPScaledDotProductAttention(fl.Module):
         ip_attention_mask: Float[Tensor, "batch ..."],
         is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
-        print(query, key, value, ip_attention_mask)
         batch_size = query.shape[0]
         num_queries = query.shape[1]
         embedding_dim = query.shape[2]
@@ -360,20 +353,16 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         with self.setup_adapter(target):
             clone = target.structural_copy()
             scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
-            image_cross_attentions: List[ImageCrossAttention] = []
-            for i in range(num_image_prompts):
-                image_cross_attentions.append(
-                    ImageCrossAttention(
-                        text_cross_attention=clone,
-                        scale=self.scale,
-                        index = i
-                    )
-                )
+            image_cross_attention = ImageCrossAttention(
+                text_cross_attention=clone,
+                scale=self.scale,
+                num_image_prompts = num_image_prompts
+            )
             clone.replace(
                 old_module=scaled_dot_product,
                 new_module=fl.Sum(
                     scaled_dot_product,
-                    *image_cross_attentions,
+                    image_cross_attention,
                 ),
             )
             super().__init__(
@@ -496,10 +485,10 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             cross_attn.scale = scale
 
     def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
-        self.set_context("ip_adapter", {"clip_image_embedding": tuple([image_embedding])})
+        self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
 
     def set_clip_image_embedding_from_tuple(self, image_embedding:tuple[Tensor]) -> None:
-        self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
+        self.set_context("ip_adapter", {"clip_image_embedding": cat(image_embedding, dim=0)})
 
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_clip_image_embedding(self, image_prompt: Tensor) -> Tensor:
@@ -543,5 +532,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     def set_mask(self, mask: tuple[Tensor, ...] = tuple()) -> None:
         if mask is tuple():
-            mask = tuple([ones((2, 1, 1)).to(self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)])
-        self.set_context("ip_adapter", {"mask": mask})
+            mask_tensor = ones((self.num_image_prompts*2, 1, 1)).to(self.device, dtype=self.dtype)
+        else:
+            mask_tensor = cat(mask, dim=0)
+        self.set_context("ip_adapter", {"mask": mask_tensor})
