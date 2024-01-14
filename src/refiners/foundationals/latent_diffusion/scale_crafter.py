@@ -189,11 +189,13 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
                     inflate_adapter = InflatedConvAdapter(conv_switch, self.inflate_transform)
                     self.sub_adapters[name]["inflate_adapter"] = inflate_adapter
                     inflate_adapter.inject()
+                    print("inflate conv map", len(conv_switch.convs))
                 if name in self.dilation_settings:
                     dilation = self.dilation_settings[name]
                     redilated_conv_adapter = ReDilatedConvAdapter(conv_switch, dilation, kernel_inflated, self.progressive, self.inflate_timestep, self.dilation_timestep)
                     self.sub_adapters[name]["redilated_conv_adapter"] = redilated_conv_adapter
                     redilated_conv_adapter.inject()
+                    print("conv map", len(conv_switch.convs))
                 noise_damped_conv_switch = ConvMap([conv1])
                 noise_dampled_kernel_inflated = False
                 if name in self.noise_damped_inflate_settings:
@@ -203,11 +205,13 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
                     noise_damped_inflate_adapter = InflatedConvAdapter(noise_damped_conv_switch, self.inflate_transform)
                     self.sub_adapters[name]["noise_damped_inflate_adapter"] = noise_damped_inflate_adapter
                     noise_damped_inflate_adapter.inject()
+                    print("inflate noise damped conv map", len(noise_damped_conv_switch.convs))
                 if name in self.noise_damped_dilation_settings:
                     dilation = self.noise_damped_dilation_settings[name]
                     noise_damped_redilated_conv_adapter = ReDilatedConvAdapter(noise_damped_conv_switch, dilation, noise_dampled_kernel_inflated, self.progressive, self.inflate_timestep, self.dilation_timestep)
                     self.sub_adapters[name]["noise_damped_redilated_conv_adapter"] = noise_damped_redilated_conv_adapter
                     noise_damped_redilated_conv_adapter.inject()
+                    print("noise damped conv map", len(noise_damped_conv_switch.convs))
                 conv_node = ConvNode(conv_switch, noise_damped_conv_switch)
                 conv_chain.replace(conv1, ScaleCrafterRouter(conv_node, self.inflate_timestep, self.noise_damped_timestep))
         return super().inject(parent)
