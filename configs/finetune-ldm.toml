@@ -1,5 +1,3 @@
-script = "finetune-ldm.py" # not used for now
-
 [wandb]
 mode = "offline"
 entity = "acme"

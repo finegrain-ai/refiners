@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed
+from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
     SD1ControlnetAdapter,
@@ -23,7 +23,7 @@ from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.schedulers import DDIM
+from refiners.foundationals.latent_diffusion.schedulers import DDIM, EulerScheduler
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
@@ -63,6 +63,11 @@ def statue_image(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_std_random_init(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_std_random_init.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_image_std_random_init_euler(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_std_random_init_euler.png").convert("RGB")
 
 
 @pytest.fixture
@@ -439,6 +444,24 @@ def sd15_ddim_karras(
 
 
 @pytest.fixture
+def sd15_euler(
+    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+) -> StableDiffusion_1:
+    if test_device.type == "cpu":
+        warn("not running on CPU, skipping")
+        pytest.skip()
+
+    euler_scheduler = EulerScheduler(num_inference_steps=30)
+    sd15 = StableDiffusion_1(scheduler=euler_scheduler, device=test_device)
+
+    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
+    sd15.lda.load_from_safetensors(lda_weights)
+    sd15.unet.load_from_safetensors(unet_weights_std)
+
+    return sd15
+
+
+@pytest.fixture
 def sd15_ddim_lda_ft_mse(
     text_encoder_weights: Path, lda_ft_mse_weights: Path, unet_weights_std: Path, test_device: torch.device
 ) -> StableDiffusion_1:
@@ -501,7 +524,7 @@ def sdxl_ddim(
     return sdxl
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_std_random_init(
     sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
 ):
@@ -529,7 +552,38 @@ def test_diffusion_std_random_init(
     ensure_similar_images(predicted_image, expected_image_std_random_init)
 
 
-@torch.no_grad()
+@no_grad()
+def test_diffusion_std_random_init_euler(
+    sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_euler
+    euler_scheduler = sd15_euler.scheduler
+    assert isinstance(euler_scheduler, EulerScheduler)
+    n_steps = 30
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+    x = x * euler_scheduler.init_noise_sigma
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_std_random_init_euler)
+
+
+@no_grad()
 def test_diffusion_karras_random_init(
     sd15_ddim_karras: StableDiffusion_1, expected_karras_random_init: Image.Image, test_device: torch.device
 ):
@@ -554,7 +608,7 @@ def test_diffusion_karras_random_init(
     ensure_similar_images(predicted_image, expected_karras_random_init, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_std_random_init_float16(
     sd15_std_float16: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
 ):
@@ -583,7 +637,7 @@ def test_diffusion_std_random_init_float16(
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_std_random_init_sag(
     sd15_std: StableDiffusion_1, expected_image_std_random_init_sag: Image.Image, test_device: torch.device
 ):
@@ -612,7 +666,7 @@ def test_diffusion_std_random_init_sag(
     ensure_similar_images(predicted_image, expected_image_std_random_init_sag)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_std_init_image(
     sd15_std: StableDiffusion_1,
     cutecat_init: Image.Image,
@@ -643,7 +697,7 @@ def test_diffusion_std_init_image(
     ensure_similar_images(predicted_image, expected_image_std_init_image)
 
 
-@torch.no_grad()
+@no_grad()
 def test_rectangular_init_latents(
     sd15_std: StableDiffusion_1,
     cutecat_init: Image.Image,
@@ -658,7 +712,7 @@ def test_rectangular_init_latents(
     assert sd15.lda.decode_latents(x).size == (width, height)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_inpainting(
     sd15_inpainting: StableDiffusion_1_Inpainting,
     kitchen_dog: Image.Image,
@@ -692,7 +746,7 @@ def test_diffusion_inpainting(
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=25, min_ssim=0.95)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_inpainting_float16(
     sd15_inpainting_float16: StableDiffusion_1_Inpainting,
     kitchen_dog: Image.Image,
@@ -727,7 +781,7 @@ def test_diffusion_inpainting_float16(
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=20, min_ssim=0.92)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_controlnet(
     sd15_std: StableDiffusion_1,
     controlnet_data: tuple[str, Image.Image, Image.Image, Path],
@@ -770,7 +824,7 @@ def test_diffusion_controlnet(
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_controlnet_structural_copy(
     sd15_std: StableDiffusion_1,
     controlnet_data_canny: tuple[str, Image.Image, Image.Image, Path],
@@ -814,7 +868,7 @@ def test_diffusion_controlnet_structural_copy(
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_controlnet_float16(
     sd15_std_float16: StableDiffusion_1,
     controlnet_data_canny: tuple[str, Image.Image, Image.Image, Path],
@@ -857,7 +911,7 @@ def test_diffusion_controlnet_float16(
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_controlnet_stack(
     sd15_std: StableDiffusion_1,
     controlnet_data_depth: tuple[str, Image.Image, Image.Image, Path],
@@ -912,7 +966,7 @@ def test_diffusion_controlnet_stack(
     ensure_similar_images(predicted_image, expected_image_controlnet_stack, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_lora(
     sd15_std: StableDiffusion_1,
     lora_data_pokemon: tuple[Image.Image, Path],
@@ -949,7 +1003,7 @@ def test_diffusion_lora(
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_lora_float16(
     sd15_std_float16: StableDiffusion_1,
     lora_data_pokemon: tuple[Image.Image, Path],
@@ -986,7 +1040,7 @@ def test_diffusion_lora_float16(
     ensure_similar_images(predicted_image, expected_image, min_psnr=33, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_lora_twice(
     sd15_std: StableDiffusion_1,
     lora_data_pokemon: tuple[Image.Image, Path],
@@ -1025,7 +1079,7 @@ def test_diffusion_lora_twice(
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_refonly(
     sd15_ddim: StableDiffusion_1,
     condition_image_refonly: Image.Image,
@@ -1061,7 +1115,7 @@ def test_diffusion_refonly(
     ensure_similar_images(predicted_image, expected_image_refonly, min_psnr=35, min_ssim=0.99)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_inpainting_refonly(
     sd15_inpainting: StableDiffusion_1_Inpainting,
     scene_image_inpainting_refonly: Image.Image,
@@ -1106,7 +1160,7 @@ def test_diffusion_inpainting_refonly(
     ensure_similar_images(predicted_image, expected_image_inpainting_refonly, min_psnr=35, min_ssim=0.99)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_textual_inversion_random_init(
     sd15_std: StableDiffusion_1,
     expected_image_textual_inversion_random_init: Image.Image,
@@ -1141,7 +1195,7 @@ def test_diffusion_textual_inversion_random_init(
     ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_ip_adapter(
     sd15_ddim_lda_ft_mse: StableDiffusion_1,
     ip_adapter_weights: Path,
@@ -1168,16 +1222,7 @@ def test_diffusion_ip_adapter(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -1196,7 +1241,7 @@ def test_diffusion_ip_adapter(
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_sdxl_ip_adapter(
     sdxl_ddim: StableDiffusion_XL,
     sdxl_ip_adapter_weights: Path,
@@ -1215,28 +1260,20 @@ def test_diffusion_sdxl_ip_adapter(
     ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
     ip_adapter.inject()
 
-    with torch.no_grad():
+    with no_grad():
         clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
             text=prompt, negative_text=negative_prompt
         )
         clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+        ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-        negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-        negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-        clip_text_embedding = torch.cat(
-            (
-                torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-                torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-            )
-        )
     time_ids = sdxl.default_time_ids
     sdxl.set_num_inference_steps(n_steps)
 
     manual_seed(2)
     x = torch.randn(1, 4, 128, 128, device=test_device, dtype=torch.float16)
 
-    with torch.no_grad():
+    with no_grad():
         for step in sdxl.steps:
             x = sdxl(
                 x,
@@ -1254,7 +1291,7 @@ def test_diffusion_sdxl_ip_adapter(
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_woman)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_ip_adapter_controlnet(
     sd15_ddim: StableDiffusion_1,
     ip_adapter_weights: Path,
@@ -1285,16 +1322,7 @@ def test_diffusion_ip_adapter_controlnet(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(input_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     depth_cn_condition = image_to_tensor(
         depth_condition_image.convert("RGB"),
@@ -1320,7 +1348,7 @@ def test_diffusion_ip_adapter_controlnet(
     ensure_similar_images(predicted_image, expected_image_ip_adapter_controlnet)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_ip_adapter_plus(
     sd15_ddim_lda_ft_mse: StableDiffusion_1,
     ip_adapter_plus_weights: Path,
@@ -1343,16 +1371,7 @@ def test_diffusion_ip_adapter_plus(
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(statue_image))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
     sd15.set_num_inference_steps(n_steps)
 
@@ -1371,7 +1390,7 @@ def test_diffusion_ip_adapter_plus(
     ensure_similar_images(predicted_image, expected_image_ip_adapter_plus_statue, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_diffusion_sdxl_ip_adapter_plus(
     sdxl_ddim: StableDiffusion_XL,
     sdxl_ip_adapter_plus_weights: Path,
@@ -1396,16 +1415,8 @@ def test_diffusion_sdxl_ip_adapter_plus(
         text=prompt, negative_text=negative_prompt
     )
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
     time_ids = sdxl.default_time_ids
     sdxl.set_num_inference_steps(n_steps)
 
@@ -1427,7 +1438,7 @@ def test_diffusion_sdxl_ip_adapter_plus(
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman)
 
 
-@torch.no_grad()
+@no_grad()
 def test_sdxl_random_init(
     sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image, test_device: torch.device
 ) -> None:
@@ -1462,7 +1473,7 @@ def test_sdxl_random_init(
     ensure_similar_images(img_1=predicted_image, img_2=expected_image, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_sdxl_random_init_sag(
     sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init_sag: Image.Image, test_device: torch.device
 ) -> None:
@@ -1498,7 +1509,7 @@ def test_sdxl_random_init_sag(
     ensure_similar_images(img_1=predicted_image, img_2=expected_image)
 
 
-@torch.no_grad()
+@no_grad()
 def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion: Image.Image) -> None:
     manual_seed(seed=2)
     sd = sd15_ddim
@@ -1529,7 +1540,7 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
     ensure_similar_images(img_1=result, img_2=expected_multi_diffusion, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_t2i_adapter_depth(
     sd15_std: StableDiffusion_1,
     t2i_adapter_data_depth: tuple[str, Image.Image, Image.Image, Path],
@@ -1570,7 +1581,7 @@ def test_t2i_adapter_depth(
     ensure_similar_images(predicted_image, expected_image)
 
 
-@torch.no_grad()
+@no_grad()
 def test_t2i_adapter_xl_canny(
     sdxl_ddim: StableDiffusion_XL,
     t2i_adapter_xl_data_canny: tuple[str, Image.Image, Image.Image, Path],
@@ -1619,7 +1630,7 @@ def test_t2i_adapter_xl_canny(
     ensure_similar_images(predicted_image, expected_image)
 
 
-@torch.no_grad()
+@no_grad()
 def test_restart(
     sd15_ddim: StableDiffusion_1,
     expected_restart: Image.Image,
@@ -1659,7 +1670,7 @@ def test_restart(
     ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
 
 
-@torch.no_grad()
+@no_grad()
 def test_freeu(
     sd15_std: StableDiffusion_1,
     expected_freeu: Image.Image,

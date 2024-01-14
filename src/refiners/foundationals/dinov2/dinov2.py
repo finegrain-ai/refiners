@@ -2,6 +2,9 @@ import torch
 
 from refiners.foundationals.dinov2.vit import ViT
 
+# TODO: add preprocessing logic like
+# https://github.com/facebookresearch/dinov2/blob/2302b6b/dinov2/data/transforms.py#L77
+
 
 class DINOv2_small(ViT):
     def __init__(

@@ -5,7 +5,7 @@ import pytest
 import torch
 from PIL import Image
 
-from refiners.fluxion.utils import image_to_tensor, tensor_to_image
+from refiners.fluxion.utils import image_to_tensor, no_grad, tensor_to_image
 from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings import InformativeDrawings
 from tests.utils import ensure_similar_images
 
@@ -41,7 +41,7 @@ def informative_drawings_model(informative_drawings_weights: Path, test_device: 
     return model
 
 
-@torch.no_grad()
+@no_grad()
 def test_preprocessor_informative_drawing(
     informative_drawings_model: InformativeDrawings,
     cutecat_init: Image.Image,

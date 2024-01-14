@@ -1,5 +1,5 @@
 import math
-from typing import Any, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 import torch
 from torch import Tensor
@@ -54,9 +54,10 @@ class FreeUBackboneFeatures(fl.Module):
 
 class FreeUSkipFeatures(fl.Chain):
     def __init__(self, n: int, skip_scale: float) -> None:
+        apply_filter: Callable[[Tensor], Tensor] = lambda x: fourier_filter(x, scale=skip_scale)
         super().__init__(
             fl.UseContext(context="unet", key="residuals").compose(lambda residuals: residuals[n]),
-            fl.Lambda(lambda x: fourier_filter(x, scale=skip_scale)),
+            fl.Lambda(apply_filter),
         )
 
 

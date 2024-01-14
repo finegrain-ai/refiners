@@ -7,7 +7,14 @@ from PIL import Image
 from torch import device as Device, dtype as DType
 from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
 
-from refiners.fluxion.utils import gaussian_blur, image_to_tensor, manual_seed, tensor_to_image
+from refiners.fluxion.utils import (
+    gaussian_blur,
+    image_to_tensor,
+    manual_seed,
+    no_grad,
+    summarize_tensor,
+    tensor_to_image,
+)
 
 
 @dataclass
@@ -62,3 +69,27 @@ def test_tensor_to_image() -> None:
     assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"
     assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"
     assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"
+
+
+def test_summarize_tensor() -> None:
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).int())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).float())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).double())
+    assert summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).bfloat16())
+    assert summarize_tensor(torch.zeros(1, 3, 512, 512).bool())
+
+
+def test_no_grad() -> None:
+    x = torch.randn(1, 1, requires_grad=True)
+
+    with torch.no_grad():
+        y = x + 1
+        assert not y.requires_grad
+
+    with no_grad():
+        z = x + 1
+        assert not z.requires_grad
+
+    w = x + 1
+    assert w.requires_grad

@@ -10,6 +10,7 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion.lora import MODELS, LoraAdapter, LoraTarget, lora_targets
 from refiners.training_utils.callback import Callback
+from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
     LatentDiffusionConfig,
@@ -50,6 +51,7 @@ class TriggerPhraseDataset(TextEmbeddingLatentsDataset):
 
 
 class LoraLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
+    dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
     lora: LoraConfig
 

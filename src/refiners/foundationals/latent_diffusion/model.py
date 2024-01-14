@@ -10,7 +10,6 @@ from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusion
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
 T = TypeVar("T", bound="fl.Module")
 
-
 TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionModel")
 
 
@@ -95,6 +94,8 @@ class LatentDiffusionModel(fl.Module, ABC):
         timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
+        # scale latents for schedulers that need it
+        latents = self.scheduler.scale_model_input(latents, step=step)
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding[0][None], **kwargs)
         base_unconditional_prediction = self.compute_base_unconditional_prediction(unconditional_prediction, x)

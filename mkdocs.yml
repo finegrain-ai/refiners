@@ -1,0 +1,53 @@
+site_name: Refiners
+site_decription: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
+repo_name: Refiners
+repo_url: https://github.com/finegrain-ai/refiners
+edit_uri: edit/main/docs/
+copyright: © Lagon Technologies
+theme:
+  favicon: assets/favicon.svg
+  logo: assets/favicon.svg
+  name: material
+  palette:
+    primary: deep orange
+    accent: deep orange
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.expand
+    - navigation.path
+    - toc.follow
+    - toc.integrate
+    - navigation.tabs.sticky
+extra_css:
+  - stylesheets/extra.css
+nav:
+  - Home: 
+    - index.md
+  - Getting started: getting_started.md
+  - Models: 
+    - models/index.md
+    - models/latent_diffusion.md
+    - models/segment_anything.md
+  - Fluxion:
+    - fluxion/index.md
+    - fluxion/adapters.md
+  - Training utils: 
+    - training_utils/index.md
+  - Contributing:
+    - contributing/index.md
+extra:
+  social:
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/mCmjNUVV7d
+    - icon: fontawesome/brands/github
+      link: https://github.com/finegrain-ai/refiners   
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/finegrain_ai 
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/finegrain-ai/
+markdown_extensions:
+  - toc:
+      permalink: true

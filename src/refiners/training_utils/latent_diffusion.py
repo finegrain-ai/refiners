@@ -23,7 +23,7 @@ from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
-from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, load_hf_dataset
+from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 
@@ -44,6 +44,7 @@ class TestDiffusionConfig(BaseModel):
 
 
 class FinetuneLatentDiffusionConfig(BaseConfig):
+    dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
     test_diffusion: TestDiffusionConfig
 
@@ -249,7 +250,7 @@ class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
         self.timestep_bins[bin_index].append(loss_value)
 
     def on_epoch_end(self, trainer: LatentDiffusionTrainer[Any]) -> None:
-        log_data = {}
+        log_data: dict[str, WandbLoggable] = {}
         for bin_index, losses in self.timestep_bins.items():
             if losses:
                 avg_loss = sum(losses) / len(losses)

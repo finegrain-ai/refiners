@@ -37,13 +37,36 @@ class Args(argparse.Namespace):
 
 
 def convert_mask_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
+    manual_seed(seed=0)
+    refiners_mask_encoder = MaskEncoder()
+
+    converter = ModelConverter(
+        source_model=prompt_encoder.mask_downscaling,
+        target_model=refiners_mask_encoder,
+        custom_layer_mapping=custom_layers,  # type: ignore
+    )
+
+    x = torch.randn(1, 256, 256)
+    mapping = converter.map_state_dicts(source_args=(x,))
+    assert mapping
+
+    source_state_dict = prompt_encoder.mask_downscaling.state_dict()
+    target_state_dict = refiners_mask_encoder.state_dict()
+
+    # Mapping handled manually (see below) because nn.Parameter is a special case
+    del target_state_dict["no_mask_embedding"]
+
+    converted_source = converter._convert_state_dict(  # pyright: ignore[reportPrivateUsage]
+        source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
+    )
+
     state_dict: dict[str, Tensor] = {
         "no_mask_embedding": nn.Parameter(data=prompt_encoder.no_mask_embed.weight.clone()),  # type: ignore
     }
 
-    refiners_mask_encoder = MaskEncoder()
-    # TODO: handle other weights
-    refiners_mask_encoder.load_state_dict(state_dict=state_dict, strict=False)
+    state_dict.update(converted_source)
+
+    refiners_mask_encoder.load_state_dict(state_dict=state_dict)
 
     return state_dict
 
