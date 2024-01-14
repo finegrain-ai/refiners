@@ -59,6 +59,10 @@ class ConvMap(fl.Module):
         assert len(convs) > 0
         self.convs = convs
     def forward(self, x: Tensor, timestep: int, index: int = 0) -> Tensor:
+        # Accounts for when noise damped happens during inflated timestep
+        # where this particular convolution is not inflated
+        if index >= len(self.convs):
+            index = 0
         conv = self.convs[index]
         if isinstance(conv, fl.Conv2d):
             return conv(x)
@@ -175,7 +179,6 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
     def uses_noise_damped(self) -> bool:
         return self.noise_damped_timestep < 1000
     def inject(self: TSDScaleCrafterAdapter, parent: fl.Chain | None = None) -> TSDScaleCrafterAdapter:
-        print(self.inflate_settings)
         for name, module in self.target.named_modules():
             if isinstance(module, fl.Conv2d):
                 self.sub_adapters[name] = self.sub_adapters.get(name, {})
