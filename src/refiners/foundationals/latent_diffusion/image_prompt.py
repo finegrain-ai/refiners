@@ -244,6 +244,7 @@ class PerceiverResampler(fl.Chain):
 class ImageCrossAttention(fl.Chain):
     def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0, num_image_prompts: int = 1) -> None:
         self._scale = scale
+        # Can potentially change to a loop to save VRAM
         super().__init__(
             fl.Distribute(
                 fl.Chain(
