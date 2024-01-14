@@ -175,6 +175,7 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
     def uses_noise_damped(self) -> bool:
         return self.noise_damped_timestep < 1000
     def inject(self: TSDScaleCrafterAdapter, parent: fl.Chain | None = None) -> TSDScaleCrafterAdapter:
+        print(self.inflate_settings)
         for name, module in self.target.named_modules():
             if isinstance(module, fl.Conv2d):
                 self.sub_adapters[name] = self.sub_adapters.get(name, {})
@@ -182,6 +183,7 @@ class SDScaleCrafterAdapter(Generic[T], fl.Chain, Adapter[T]):
                 conv_chain = conv1._parent[0]
                 conv_switch = ConvMap([conv1])
                 kernel_inflated = False
+                print("conv", name)
                 if name in self.inflate_settings:
                     assert name in self.dilation_settings
                     assert self.inflate_transform is not None
