@@ -1,7 +1,7 @@
 from collections import deque
 
 import numpy as np
-from torch import Tensor, device as Device, dtype as Dtype, exp, float32, tensor
+from torch import Generator, Tensor, device as Device, dtype as Dtype, exp, float32, tensor
 
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
@@ -90,12 +90,7 @@ class DPMSolver(Scheduler):
         )
         return denoised_x
 
-    def __call__(
-        self,
-        x: Tensor,
-        noise: Tensor,
-        step: int,
-    ) -> Tensor:
+    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Represents one step of the backward diffusion process that iteratively denoises the input data `x`.
 

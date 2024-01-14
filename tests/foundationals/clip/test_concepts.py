@@ -7,7 +7,7 @@ import transformers  # type: ignore
 from diffusers import StableDiffusionPipeline  # type: ignore
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import load_from_safetensors
+from refiners.fluxion.utils import load_from_safetensors, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender, TokenExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
@@ -124,7 +124,7 @@ def test_encoder(
     our_tokens = tokenizer(prompt)
     assert torch.equal(our_tokens, ref_tokens)
 
-    with torch.no_grad():
+    with no_grad():
         ref_embeddings = ref_encoder_with_new_concepts(ref_tokens.to(test_device))[0]
         our_embeddings = our_encoder_with_new_concepts(prompt)
 

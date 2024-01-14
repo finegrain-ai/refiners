@@ -19,6 +19,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added [Euler's method](https://arxiv.org/abs/2206.00364) to schedulers (contributed by [@israfelsr](https://github.com/israfelsr))
 - Added [DINOv2](https://github.com/facebookresearch/dinov2) for high-performance visual features (contributed by [@Laurent2916](https://github.com/Laurent2916))
 - Added [FreeU](https://github.com/ChenyangSi/FreeU) for improved quality at no cost (contributed by [@isamu-isozaki](https://github.com/isamu-isozaki))
 - Added [Restart Sampling](https://github.com/Newbeeer/diffusion_restart_sampling) for improved image generation ([example](https://github.com/Newbeeer/diffusion_restart_sampling/issues/4))
@@ -92,7 +93,7 @@ from PIL import Image
 
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion import SDXLIPAdapter, SDXLT2IAdapter
-from refiners.fluxion.utils import manual_seed, image_to_tensor, load_from_safetensors
+from refiners.fluxion.utils import manual_seed, no_grad, image_to_tensor, load_from_safetensors
 
 # Load inputs
 init_image = Image.open("dropy_logo.png")
@@ -122,22 +123,13 @@ t2i_adapter.set_scale(0.8)
 sdxl.set_num_inference_steps(50)
 sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
-with torch.no_grad():
+with no_grad():
     # Note: default text prompts for IP-Adapter
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text="best quality, high quality", negative_text="monochrome, lowres, bad anatomy, worst quality, low quality"
     )
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(image_prompt))
-
-    negative_text_embedding, conditional_text_embedding = clip_text_embedding.chunk(2)
-    negative_image_embedding, conditional_image_embedding = clip_image_embedding.chunk(2)
-
-    clip_text_embedding = torch.cat(
-        (
-            torch.cat([negative_text_embedding, negative_image_embedding], dim=1),
-            torch.cat([conditional_text_embedding, conditional_image_embedding], dim=1),
-        )
-    )
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
     time_ids = sdxl.default_time_ids
 
     condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)

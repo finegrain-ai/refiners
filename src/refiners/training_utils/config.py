@@ -206,17 +206,6 @@ class WandbConfig(BaseModel):
     notes: str | None = None
 
 
-class HuggingfaceDatasetConfig(BaseModel):
-    hf_repo: str = "finegrain/unsplash-dummy"
-    revision: str = "main"
-    split: str = "train"
-    horizontal_flip: bool = False
-    random_crop: bool = True
-    use_verification: bool = False
-    resize_image_min_size: int = 512
-    resize_image_max_size: int = 576
-
-
 class CheckpointingConfig(BaseModel):
     save_folder: Path | None = None
     save_interval: TimeValue = {"number": 1, "unit": TimeUnit.EPOCH}
@@ -230,14 +219,12 @@ T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
-    script: Path  # TODO not used for now, but will be used by the cli
     models: dict[str, ModelConfig]
     wandb: WandbConfig
     training: TrainingConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     dropout: DropoutConfig
-    dataset: HuggingfaceDatasetConfig
     checkpointing: CheckpointingConfig
 
     @classmethod

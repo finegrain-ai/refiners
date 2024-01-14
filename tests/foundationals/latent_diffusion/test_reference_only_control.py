@@ -1,6 +1,6 @@
 import pytest
-import torch
 
+from refiners.fluxion.utils import no_grad
 from refiners.foundationals.latent_diffusion import SD1UNet
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock
 from refiners.foundationals.latent_diffusion.reference_only_control import (
@@ -11,7 +11,7 @@ from refiners.foundationals.latent_diffusion.reference_only_control import (
 )
 
 
-@torch.no_grad()
+@no_grad()
 def test_refonly_inject_eject() -> None:
     unet = SD1UNet(in_channels=9)
     adapter = ReferenceOnlyControlAdapter(unet)

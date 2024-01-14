@@ -1,14 +1,15 @@
 import math
-from enum import IntEnum
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generic, List, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, List
 
 import refiners.fluxion.layers as fl
 import torch.nn.functional as F
 from jaxtyping import Float
 from PIL import Image
+from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, zeros_like, sum
+
+import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.fluxion.adapters.lora import Lora
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, normalize
@@ -240,14 +241,68 @@ class PerceiverResampler(fl.Chain):
     def init_context(self) -> Contexts:
         return {"perceiver_resampler": {"x": None}}
 
+class IdentityLog(fl.Identity):
+    def forward(self, *args, **kwargs):
+        print("logging")
+        print(args, kwargs)
+        return super().forward(*args, **kwargs)
+class ImageCrossAttention(fl.Chain):
+    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0, index: int = 1) -> None:
+        self._scale = scale
+        super().__init__(
+            fl.Distribute(
+                fl.Identity(),
+                fl.Chain(
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
+                        IdentityLog(),
+                        fl.Lambda(lambda *x: x[index])
+                    ),
+                    fl.Linear(
+                        in_features=text_cross_attention.key_embedding_dim,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                ),
+                fl.Chain(
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
+                        IdentityLog(),
+                        fl.Lambda(lambda *x: x[index])
+                    ),
+                    fl.Linear(
+                        in_features=text_cross_attention.key_embedding_dim,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                ),
+                fl.Chain(
+                    fl.UseContext("ip_adapter", "mask"),
+                    IdentityLog(),
+                    fl.Lambda(lambda *x: x[index])
+                ),
+            ),
+            IdentityLog(),
+            IPScaledDotProductAttention(
+                ScaledDotProductAttention(
+                    num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
+                )
+            ),
+            fl.Multiply(self.scale),
+        )
 
-class _CrossAttnIndex(IntEnum):
-    TXT_CROSS_ATTN = 0  # text cross-attention
-    IMG_CROSS_ATTN = 1  # image cross-attention
+    @property
+    def scale(self) -> float:
+        return self._scale
 
-
-class InjectionPoint(fl.Chain):
-    pass
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._scale = value
+        self.ensure_find(fl.Multiply).scale = value
 
 
 def find_closest_factors_to_goal(number: int, goal: float) -> int:
@@ -271,6 +326,7 @@ class IPScaledDotProductAttention(fl.Module):
         ip_attention_mask: Float[Tensor, "batch ..."],
         is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
+        print(query, key, value, ip_attention_mask)
         batch_size = query.shape[0]
         num_queries = query.shape[1]
         embedding_dim = query.shape[2]
@@ -293,163 +349,62 @@ class IPScaledDotProductAttention(fl.Module):
         return output * ip_attention_mask  # type: ignore
 
 
-class ParallelizeIPScaledDotProductAttentionArguments(fl.Module):
-    def forward(self, qkv: List[Float[Tensor, "..."]], ip_attention_mask: Float[Tensor, "..."]) -> tuple[Tensor, ...]:
-        return (qkv[0], qkv[1], qkv[2], ip_attention_mask)
-
-
-class ParallelLinear(fl.Module):
-    def __init__(self, linear: fl.Linear):
-        super().__init__()
-        self.linear = linear
-
-    def forward(self, *xs: Float[Tensor, "batch in_features"]) -> tuple[Float[Tensor, "batch out_features"], ...]:
-        return tuple([self.linear(x) for x in xs])
-
-
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
         self,
         target: fl.Attention,
-        text_sequence_length: int = 77,
-        image_sequence_length: int = 4,
         scale: float = 1.0,
         num_image_prompts: int = 1,
     ) -> None:
-        self.text_sequence_length = text_sequence_length
-        self.image_sequence_length = image_sequence_length
-        self.scale = scale
-
+        self._scale = scale
         with self.setup_adapter(target):
-            ip_attentions: List[fl.Chain] = []
-            parallel_splits_k: List[fl.Slicing] = []
-            parallel_splits_v: List[fl.Slicing] = []
-
+            clone = target.structural_copy()
+            scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
+            image_cross_attentions: List[ImageCrossAttention] = []
             for i in range(num_image_prompts):
-                ip_attention_slice_start = text_sequence_length + image_sequence_length * i
-                ip_attention_slice_end = text_sequence_length + image_sequence_length * (i + 1)
-
-                ip_attentions.append(
-                    fl.Chain(
-                        fl.Parallel(
-                            fl.Lambda(
-                                func=partial(self.select_qkv, index=_CrossAttnIndex.IMG_CROSS_ATTN, index_offset=i)
-                            ),
-                            fl.Chain(fl.UseContext("ip_mask", "mask"), fl.Lambda(func=lambda *mask: mask[i])),
-                        ),
-                        ParallelizeIPScaledDotProductAttentionArguments(),
-                        IPScaledDotProductAttention(
-                            ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal)
-                        ),
-                        fl.Lambda(func=self.scale_outputs),
+                image_cross_attentions.append(
+                    ImageCrossAttention(
+                        text_cross_attention=clone,
+                        scale=self.scale,
+                        index = i
                     )
                 )
-                parallel_splits_k.append(
-                    fl.Slicing(dim=1, start=ip_attention_slice_start, end=ip_attention_slice_end),
-                )
-                parallel_splits_v.append(
-                    fl.Slicing(dim=1, start=ip_attention_slice_start, end=ip_attention_slice_end),
-                )
+            clone.replace(
+                old_module=scaled_dot_product,
+                new_module=fl.Sum(
+                    scaled_dot_product,
+                    *image_cross_attentions,
+                ),
+            )
             super().__init__(
-                fl.Distribute(
-                    # Note: the same query is used for image cross-attention as for text cross-attention
-                    InjectionPoint(),  # Wq
-                    fl.Parallel(
-                        fl.Chain(
-                            fl.Slicing(dim=1, start=0, end=text_sequence_length),
-                            InjectionPoint(),  # Wk
-                        ),
-                        fl.Chain(
-                            fl.Parallel(*parallel_splits_k),
-                            ParallelLinear(
-                                fl.Linear(
-                                    in_features=self.target.key_embedding_dim,
-                                    out_features=self.target.inner_dim,
-                                    bias=self.target.use_bias,
-                                    device=target.device,
-                                    dtype=target.dtype,
-                                )
-                            ),  # Wk'
-                        ),
-                    ),
-                    fl.Parallel(
-                        fl.Chain(
-                            fl.Slicing(dim=1, start=0, end=text_sequence_length),
-                            InjectionPoint(),  # Wv
-                        ),
-                        fl.Chain(
-                            fl.Parallel(*parallel_splits_v),
-                            ParallelLinear(
-                                fl.Linear(
-                                    in_features=self.target.key_embedding_dim,
-                                    out_features=self.target.inner_dim,
-                                    bias=self.target.use_bias,
-                                    device=target.device,
-                                    dtype=target.dtype,
-                                )
-                            ),  # Wv'
-                        ),
-                    ),
-                ),
-                fl.Sum(
-                    fl.Chain(
-                        fl.Lambda(func=partial(self.select_qkv, index=_CrossAttnIndex.TXT_CROSS_ATTN)),
-                        ScaledDotProductAttention(num_heads=target.num_heads, is_causal=target.is_causal),
-                    ),
-                    *ip_attentions,
-                ),
-                InjectionPoint(),  # proj
+                clone,
             )
 
-    def select_qkv(
-        self,
-        query: Tensor,
-        keys: tuple[Tensor, tuple[Tensor]],
-        values: tuple[Tensor, tuple[Tensor]],
-        index: _CrossAttnIndex,
-        index_offset: int = 0,
-    ) -> tuple[Tensor, Tensor, Tensor]:
-        if index.value == 0:
-            return (query, keys[index.value], values[index.value])
-        else:
-            return (query, keys[index.value][index_offset], values[index.value][index_offset])
+    @property
+    def image_cross_attention(self) -> ImageCrossAttention:
+        return self.ensure_find(ImageCrossAttention)
 
-    def scale_outputs(self, x: Tensor) -> Tensor:
-        return x * self.scale
+    @property
+    def image_key_projection(self) -> fl.Linear:
+        return self.image_cross_attention.Distribute[1].Linear
 
-    def _predicate(self, k: type[fl.Module]) -> Callable[[fl.Module, fl.Chain], bool]:
-        def f(m: fl.Module, _: fl.Chain) -> bool:
-            if isinstance(m, Lora):  # do not adapt LoRAs
-                raise StopIteration
-            return isinstance(m, k)
+    @property
+    def image_value_projection(self) -> fl.Linear:
+        return self.image_cross_attention.Distribute[2].Linear
 
-        return f
+    @property
+    def scale(self) -> float:
+        return self._scale
 
-    def _target_linears(self) -> list[fl.Linear]:
-        return [m for m, _ in self.target.walk(self._predicate(fl.Linear)) if isinstance(m, fl.Linear)]
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._scale = value
+        self.image_cross_attention.scale = value
 
-    def inject(self: "CrossAttentionAdapter", parent: fl.Chain | None = None) -> "CrossAttentionAdapter":
-        linears = self._target_linears()
-        assert len(linears) == 4  # Wq, Wk, Wv and Proj
-
-        injection_points = list(self.layers(InjectionPoint))
-        assert len(injection_points) == 4
-
-        for linear, ip in zip(linears, injection_points):
-            ip.append(linear)
-            assert len(ip) == 1
-
-        return super().inject(parent)
-
-    def eject(self) -> None:
-        injection_points = list(self.layers(InjectionPoint))
-        assert len(injection_points) == 4
-
-        for ip in injection_points:
-            ip.pop()
-            assert len(ip) == 0
-
-        super().eject()
+    def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
+        self.image_key_projection.weight = nn.Parameter(key_tensor)
+        self.image_value_projection.weight = nn.Parameter(value_tensor)
+        self.image_cross_attention.to(self.device, self.dtype)
 
 
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
@@ -466,7 +421,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
-        num_image_prompts: int = 1,
+        num_image_prompts: int = 1
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
@@ -478,12 +433,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._image_proj = [image_proj]
         self.num_image_prompts = num_image_prompts
         self.sub_adapters = [
-            CrossAttentionAdapter(
-                target=cross_attn,
-                scale=scale,
-                image_sequence_length=self.image_proj.num_tokens,
-                num_image_prompts=num_image_prompts,
-            )
+            CrossAttentionAdapter(target=cross_attn, scale=scale, num_image_prompts=num_image_prompts)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -494,18 +444,19 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             self.image_proj.load_state_dict(image_proj_state_dict)
 
             for i, cross_attn in enumerate(self.sub_adapters):
-                cross_attn_state_dict: dict[str, Tensor] = {}
+                cross_attention_weights: list[Tensor] = []
                 for k, v in weights.items():
                     prefix = f"ip_adapter.{i:03d}."
                     if not k.startswith(prefix):
                         continue
-                    cross_attn_state_dict[k.removeprefix(prefix)] = v
+                    cross_attention_weights.append(v)
 
-                cross_attn.load_state_dict(state_dict=cross_attn_state_dict)
+                assert len(cross_attention_weights) == 2
+                cross_attn.load_weights(*cross_attention_weights)
 
     def init_context(self) -> Contexts:
         return {
-            "ip_mask": {"mask": None},
+            "ip_adapter": {"mask": None, "clip_image_embedding": None},
         }
 
     @property
@@ -531,9 +482,24 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             adapter.eject()
         super().eject()
 
+    @property
+    def scale(self) -> float:
+        return self.sub_adapters[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        for cross_attn in self.sub_adapters:
+            cross_attn.scale = value
+
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
+
+    def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
+        self.set_context("ip_adapter", {"clip_image_embedding": tuple([image_embedding])})
+
+    def set_clip_image_embedding_from_tuple(self, image_embedding:tuple[Tensor]) -> None:
+        self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
 
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_clip_image_embedding(self, image_prompt: Tensor) -> Tensor:
@@ -578,4 +544,4 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def set_mask(self, mask: tuple[Tensor, ...] = tuple()) -> None:
         if mask is tuple():
             mask = tuple([ones((2, 1, 1)).to(self.device, dtype=self.dtype) for _ in range(self.num_image_prompts)])
-        self.set_context("ip_mask", {"mask": mask})
+        self.set_context("ip_adapter", {"mask": mask})

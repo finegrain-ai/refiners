@@ -2,10 +2,10 @@ from typing import cast
 from warnings import warn
 
 import pytest
-from torch import Tensor, allclose, device as Device, equal, randn
+from torch import Tensor, allclose, device as Device, equal, isclose, randn
 
 from refiners.fluxion import manual_seed
-from refiners.foundationals.latent_diffusion.schedulers import DDIM, DDPM, DPMSolver
+from refiners.foundationals.latent_diffusion.schedulers import DDIM, DDPM, DPMSolver, EulerScheduler
 
 
 def test_ddpm_diffusers():
@@ -55,6 +55,36 @@ def test_ddim_diffusers():
 
     sample = randn(1, 4, 32, 32)
     noise = randn(1, 4, 32, 32)
+
+    for step, timestep in enumerate(diffusers_scheduler.timesteps):
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
+        refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
+
+        assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
+
+
+def test_euler_diffusers():
+    from diffusers import EulerDiscreteScheduler  # type: ignore
+
+    manual_seed(0)
+    diffusers_scheduler = EulerDiscreteScheduler(
+        beta_end=0.012,
+        beta_schedule="scaled_linear",
+        beta_start=0.00085,
+        num_train_timesteps=1000,
+        steps_offset=1,
+        timestep_spacing="linspace",
+        use_karras_sigmas=False,
+    )
+    diffusers_scheduler.set_timesteps(30)
+    refiners_scheduler = EulerScheduler(num_inference_steps=30)
+
+    sample = randn(1, 4, 32, 32)
+    noise = randn(1, 4, 32, 32)
+
+    ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
+    assert isinstance(ref_init_noise_sigma, Tensor)
+    assert isclose(ref_init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore

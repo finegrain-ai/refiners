@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import manual_seed
+from refiners.fluxion.utils import manual_seed, no_grad
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 
 
@@ -65,7 +65,7 @@ def double_text_encoder(double_text_encoder_weights: Path) -> DoubleTextEncoder:
     return double_text_encoder
 
 
-@torch.no_grad()
+@no_grad()
 def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder: DoubleTextEncoder) -> None:
     manual_seed(seed=0)
     prompt = "A photo of a pizza."

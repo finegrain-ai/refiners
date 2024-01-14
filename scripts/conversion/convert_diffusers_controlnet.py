@@ -7,7 +7,7 @@ from diffusers import ControlNetModel  # type: ignore
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.utils import no_grad, save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     SD1ControlnetAdapter,
@@ -20,7 +20,7 @@ class Args(argparse.Namespace):
     output_path: str | None
 
 
-@torch.no_grad()
+@no_grad()
 def convert(args: Args) -> dict[str, torch.Tensor]:
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     controlnet_src: nn.Module = ControlNetModel.from_pretrained(  # type: ignore

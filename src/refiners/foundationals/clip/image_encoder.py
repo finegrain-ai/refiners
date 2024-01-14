@@ -1,4 +1,6 @@
-from torch import device as Device, dtype as DType
+from typing import Callable
+
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.common import FeedForward, PositionalEncoder
@@ -126,6 +128,7 @@ class CLIPImageEncoder(fl.Chain):
         self.num_layers = num_layers
         self.num_attention_heads = num_attention_heads
         self.feedforward_dim = feedforward_dim
+        cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
         super().__init__(
             ViTEmbeddings(
                 image_size=image_size, embedding_dim=embedding_dim, patch_size=patch_size, device=device, dtype=dtype
@@ -142,7 +145,7 @@ class CLIPImageEncoder(fl.Chain):
                 )
                 for _ in range(num_layers)
             ),
-            fl.Lambda(func=lambda x: x[:, 0, :]),
+            fl.Lambda(func=cls_token_pooling),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
             fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
