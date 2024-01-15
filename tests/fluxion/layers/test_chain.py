@@ -230,8 +230,8 @@ def test_setattr_dont_register() -> None:
 
 
 EXPECTED_TREE = (
-    "(CHAIN)\n    ├── Linear(in_features=1, out_features=1) (x2)\n    └── (CHAIN)\n        ├── Linear(in_features=1,"
-    " out_features=1) #1\n        └── Linear(in_features=2, out_features=1) #2"
+    "(CHAIN)\n    ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) (x2)\n    └── (CHAIN)\n        ├── Linear(in_features=1,"
+    " out_features=1, device=cpu, dtype=float32) #1\n        └── Linear(in_features=2, out_features=1, device=cpu, dtype=float32) #2"
 )
 
 

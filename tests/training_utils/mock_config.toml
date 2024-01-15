@@ -1,0 +1,32 @@
+[models.mock_model]
+train = true
+
+[training]
+duration = "100:epoch"
+seed = 0
+gpu_index = 0
+batch_size = 4
+gradient_accumulation = "4:step"
+clip_grad_norm = 1.0
+evaluation_interval = "5:epoch"
+evaluation_seed = 1
+
+[optimizer]
+optimizer = "SGD"
+learning_rate = 1
+momentum = 0.9
+
+[scheduler]
+scheduler_type = "ConstantLR"
+update_interval = "1:step"
+warmup = "20:step"
+
+[dropout]
+dropout = 0.0
+
+[checkpointing]
+save_interval = "10:epoch"
+
+[wandb]
+mode = "disabled"
+project = "mock_project"
