@@ -7,8 +7,8 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, float32, dtype as Dtype, device as Device, get_rng_state, set_rng_state, stack
-from torch.nn import Parameter, Module
+from torch import Tensor, cuda, device as Device, dtype as Dtype, float32, get_rng_state, set_rng_state, stack
+from torch.nn import Module, Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -35,11 +35,11 @@ from refiners.training_utils.callback import (
     GradientValueClipping,
     MonitorLoss,
 )
-from refiners.training_utils.config import ModelConfig, BaseConfig, SchedulerType, TimeUnit, TimeValue
+from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 
-from .sharding_manager import SimpleShardingManager, ShardingManager
+from .sharding_manager import ShardingManager, SimpleShardingManager
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -332,7 +332,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return compute_grad_norm(parameters=self.parameters, device= self.device)
+        return compute_grad_norm(parameters=self.parameters, device=self.device)
 
     @cached_property
     def optimizer(self) -> Optimizer:

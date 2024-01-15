@@ -1,10 +1,13 @@
-from .config import ModelConfig, TrainingConfig
-from torch.nn import Module
-from torch import Tensor, device as Device
-from torch.autograd import backward
 from abc import ABC, abstractmethod
 from functools import cached_property, partial, update_wrapper
-from typing import Any, List, Callable
+from typing import Any, Callable, List
+
+from torch import Tensor, device as Device
+from torch.autograd import backward
+from torch.nn import Module
+
+from .config import ModelConfig, TrainingConfig
+
 
 class ShardingManager(ABC):
     @abstractmethod
@@ -20,7 +23,9 @@ class ShardingManager(ABC):
     def device(self) -> Device:
         raise NotImplementedError("FabricTrainer does not support this property")
 
+
 from refiners.fluxion.context import ContextProvider
+
 
 class SimpleShardingManager(ShardingManager):
     def __init__(self, config: TrainingConfig) -> None:
@@ -43,20 +48,19 @@ class SimpleShardingManager(ShardingManager):
         method_list = []
         if hasattr(module, "forward") is True:
             method_list.append("forward")
-        
+
         if hasattr(module, "set_context") is True:
             method_list.append("set_context")
-        
+
         if hasattr(module, "encode") is True:
             method_list.append("encode")
-        
+
         if hasattr(module, "decode") is True:
-            method_list.append("decode")  
-        
+            method_list.append("decode")
+
         for method_name in method_list:
             self.add_device_hook(module, device, method_name)
 
-    
     def recursive_to(self, obj: Any, device: Device) -> Any:
         if hasattr(obj, "to"):
             return obj.to(device)
@@ -68,14 +72,13 @@ class SimpleShardingManager(ShardingManager):
             return tuple(self.recursive_to(v, device) for v in obj)
         else:
             return obj
-        
+
     def add_device_hook(self, module: Module, device: Device, method_name: str) -> None:
-        
         old_method = getattr(module, method_name)
 
         new_method = self.wrap_device(old_method, device)
         # new_method = update_wrapper(partial(new_method, module), old_method)
-        
+
         def new_method(module, *args, **kwargs):
             args = self.recursive_to(args, device)
             kwargs = self.recursive_to(kwargs, device)
@@ -85,16 +88,15 @@ class SimpleShardingManager(ShardingManager):
         new_method = update_wrapper(partial(new_method, module), old_method)
 
         setattr(module, method_name, new_method)
-    
+
     def wrap_device(self, method: Callable, device: Device) -> Callable:
         def new_method(*args, **kwargs):
             args = self.recursive_to(args, device)
             kwargs = self.recursive_to(kwargs, device)
             return method(*args, **kwargs)
-        
+
         return new_method
-        
-    
+
     @property
     def device(self) -> Device:
         return self.default_device

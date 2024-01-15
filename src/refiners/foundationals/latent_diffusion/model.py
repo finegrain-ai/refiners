@@ -28,7 +28,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         initial_diffusion_rate = self.scheduler.initial_diffusion_rate
         final_diffusion_rate = self.scheduler.final_diffusion_rate
         device, dtype = self.scheduler.device, self.scheduler.dtype
-        
+
         scheduler = self.scheduler.__class__(
             num_inference_steps,
             initial_diffusion_rate=initial_diffusion_rate,

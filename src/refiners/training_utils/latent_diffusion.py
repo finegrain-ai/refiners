@@ -23,10 +23,10 @@ from refiners.foundationals.latent_diffusion import (
 from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
+from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
-from refiners.training_utils.config import BaseConfig
 
 
 class LatentDiffusionConfig(BaseModel):
@@ -184,7 +184,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
-    
+
     @cached_property
     def mse_loss(self):
         return self.sharding_manager.wrap_device(mse_loss, self.device)
