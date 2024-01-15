@@ -49,14 +49,18 @@ class DPMSolver(Scheduler):
             self.timesteps[step],
             self.timesteps[step + 1 if step < len(self.timesteps) - 1 else 0],
         )
+        # Remark:
+        # We use noise.device as the target device
+        # Note: the scheduler here cannot be used with accelerate.prepare
+        # Cause it's not inherinting from torch.Module
         previous_ratio, current_ratio = (
-            self.signal_to_noise_ratios[previous_timestep],
-            self.signal_to_noise_ratios[timestep],
+            self.signal_to_noise_ratios[previous_timestep].to(device=noise.device, dtype=noise.dtype),
+            self.signal_to_noise_ratios[timestep].to(device=noise.device, dtype=noise.dtype),
         )
-        previous_scale_factor = self.cumulative_scale_factors[previous_timestep]
+        previous_scale_factor = self.cumulative_scale_factors[previous_timestep].to(device=noise.device, dtype=noise.dtype)
         previous_noise_std, current_noise_std = (
-            self.noise_std[previous_timestep],
-            self.noise_std[timestep],
+            self.noise_std[previous_timestep].to(device=noise.device, dtype=noise.dtype),
+            self.noise_std[timestep].to(device=noise.device, dtype=noise.dtype),
         )
         factor = exp(-(previous_ratio - current_ratio)) - 1.0
         denoised_x = (previous_noise_std / current_noise_std) * x - (factor * previous_scale_factor) * noise
@@ -70,14 +74,14 @@ class DPMSolver(Scheduler):
         )
         current_data_estimation, next_data_estimation = self.estimated_data[-1], self.estimated_data[-2]
         previous_ratio, current_ratio, next_ratio = (
-            self.signal_to_noise_ratios[previous_timestep],
-            self.signal_to_noise_ratios[current_timestep],
-            self.signal_to_noise_ratios[next_timestep],
+            self.signal_to_noise_ratios[previous_timestep].to(device=x.device, dtype=x.dtype),
+            self.signal_to_noise_ratios[current_timestep].to(device=x.device, dtype=x.dtype),
+            self.signal_to_noise_ratios[next_timestep].to(device=x.device, dtype=x.dtype),
         )
-        previous_scale_factor = self.cumulative_scale_factors[previous_timestep]
+        previous_scale_factor = self.cumulative_scale_factors[previous_timestep].to(device=x.device, dtype=x.dtype)
         previous_std, current_std = (
-            self.noise_std[previous_timestep],
-            self.noise_std[current_timestep],
+            self.noise_std[previous_timestep].to(device=x.device, dtype=x.dtype),
+            self.noise_std[current_timestep].to(device=x.device, dtype=x.dtype),
         )
         estimation_delta = (current_data_estimation - next_data_estimation) / (
             (current_ratio - next_ratio) / (previous_ratio - current_ratio)
@@ -100,12 +104,21 @@ class DPMSolver(Scheduler):
         """
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
-        estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
+        
+        # Remark:
+        # We use noise.device as the target device
+        # Note: the scheduler here cannot be used with accelerate.prepare
+        # Cause it's not inherinting from torch.Module
+        noise_ratio2 = noise_ratio.to(device=noise.device, dtype=noise.dtype)
+        x2 = x.to(device=noise.device, dtype=noise.dtype)
+        scale_factor2 = scale_factor.to(device=noise.device, dtype=noise.dtype)
+        
+        estimated_denoised_data = (x2 - noise_ratio2 * noise) / scale_factor2
         self.estimated_data.append(estimated_denoised_data)
         denoised_x = (
-            self.dpm_solver_first_order_update(x=x, noise=estimated_denoised_data, step=step)
+            self.dpm_solver_first_order_update(x=x2, noise=estimated_denoised_data, step=step)
             if (self.initial_steps == 0)
-            else self.multistep_dpm_solver_second_order_update(x=x, step=step)
+            else self.multistep_dpm_solver_second_order_update(x=x2, step=step)
         )
         if self.initial_steps < 2:
             self.initial_steps += 1

@@ -7,9 +7,8 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
-from torch.autograd import backward
-from torch.nn import Parameter
+from torch import Tensor, cuda, float32, dtype as Dtype, device as Device, get_rng_state, set_rng_state, stack
+from torch.nn import Parameter, Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -36,9 +35,11 @@ from refiners.training_utils.callback import (
     GradientValueClipping,
     MonitorLoss,
 )
-from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
+from refiners.training_utils.config import ModelConfig, BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
+
+from .sharding_manager import SimpleShardingManager, ShardingManager
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -298,9 +299,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def device(self) -> Device:
-        selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
-        logger.info(f"Using device: {selected_device}")
-        return selected_device
+        return self.sharding_manager.device
+        # selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
+        # logger.info(f"Using device: {selected_device}")
+        # return selected_device
 
     @property
     def parameters(self) -> list[Parameter]:
@@ -394,6 +396,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             )
 
         return lr_scheduler
+    
+    @cached_property
+    def sharding_manager(self) -> ShardingManager:
+        # TODO : implement accelerate and fabric sharding manager
+        return SimpleShardingManager(self.config.training)
 
     @cached_property
     def models(self) -> dict[str, fl.Module]:
@@ -421,9 +428,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         else:
             logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
-        model.to(self.device)
         model.zero_grad()
-
+        self.sharding_manager.setup_model(
+            model=model, 
+            config=self.config.models[model_name]
+        )
+    
     def prepare_models(self) -> None:
         assert self.models, "No models found."
         for model_name in self.models:
@@ -480,15 +490,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def compute_evaluation(self) -> None:
         pass
-    
-    def _backward(self, tensors) -> None:
-        backward(tensors=tensors)
         
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        self._backward(scaled_loss)
+        self.sharding_manager.backward(scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")

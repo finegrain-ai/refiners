@@ -7,7 +7,7 @@ from datasets import DownloadManager # type: ignore
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Generator, Tensor, cat, device as Device, dtype as DType, randn
+from torch import Generator, Tensor, cat, dtype as DType, randn
 from torch.nn import Module
 from torch.nn.functional import mse_loss
 from torch.utils.data import Dataset
@@ -23,10 +23,10 @@ from refiners.foundationals.latent_diffusion import (
 from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
+from refiners.training_utils.config import BaseConfig
 
 
 class LatentDiffusionConfig(BaseModel):
@@ -69,7 +69,6 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
     def __init__(self, trainer: "LatentDiffusionTrainer[Any]") -> None:
         self.trainer = trainer
         self.config = trainer.config
-        self.device = self.trainer.device
         self.lda = self.trainer.lda
         self.text_encoder = self.trainer.text_encoder
         self.dataset = self.load_huggingface_dataset()
@@ -124,9 +123,9 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
             max_size=self.config.dataset.resize_image_max_size,
         )
         processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image).to(device=self.device)
+        latents = self.lda.encode_image(image=processed_image)
         processed_caption = self.process_caption(caption=caption)
-        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.device)
+        clip_text_embedding = self.text_encoder(processed_caption)
         return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
 
     def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
@@ -142,19 +141,23 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
-        return SD1UNet(in_channels=4, device=self.device).to(device=self.device)
+        return SD1UNet(in_channels=4, device=self.device)
 
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:
         assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
-        return CLIPTextEncoderL(device=self.device).to(device=self.device)
+        return CLIPTextEncoderL(device=self.device)
 
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
-        return SD1Autoencoder(device=self.device).to(device=self.device)
+        lda = SD1Autoencoder(device=self.device)
+        #TODO: clean this up
+        lda._tensor_methods = ["encode", "decode"]
+        return lda
 
     def load_models(self) -> dict[str, fl.Module]:
+        
         return {"unet": self.unet, "text_encoder": self.text_encoder, "lda": self.lda}
 
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
@@ -162,11 +165,25 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
-        return DDPM(
+        ddpm_scheduler = DDPM(
             num_inference_steps=1000,
-            device=self.device,
-        ).to(device=self.device)
+            device=self.device
+        )
+        ddpm_scheduler._tensor_methods = ["add_noise"]
+        ddpm_scheduler = self.sharding_manager.add_execution_hooks(ddpm_scheduler, self.device)
+        return ddpm_scheduler
 
+    @cached_property
+    def sd(self) -> StableDiffusion_1:
+        
+        scheduler = DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps)
+        return StableDiffusion_1(
+            unet=self.unet,
+            lda=self.lda,
+            clip_text_encoder=self.text_encoder,
+            scheduler=scheduler
+        )
+        
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
@@ -174,7 +191,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
-            size=size, offset_noise=self.config.latent_diffusion.offset_noise, device=self.device, dtype=dtype
+            size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype
         )
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
@@ -182,20 +199,21 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-        self.unet.set_timestep(timestep=timestep)
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
+        
+        # Question :
+        # Can we do this as part of the SetContext Logic ?
+        self.unet.set_timestep(timestep=timestep.to(device=self.unet.device, dtype=self.unet.dtype))
+        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype))
+
         prediction = self.unet(noisy_latents)
-        loss = mse_loss(input=prediction, target=noise)
+        
+        # Question :
+        # Can we move this mse_loss device alignement outside of the compute_loss ?
+        loss = mse_loss(input=prediction, target=noise.to(device=prediction.device))
         return loss
 
-    def compute_evaluation(self) -> None:
-        sd = StableDiffusion_1(
-            unet=self.unet,
-            lda=self.lda,
-            clip_text_encoder=self.text_encoder,
-            scheduler=DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps),
-            device=self.device,
-        )
+    def compute_evaluation(self) -> None:        
+        sd = self.sd
         prompts = self.config.test_diffusion.prompts
         num_images_per_prompt = self.config.test_diffusion.num_images_per_prompt
         if self.config.test_diffusion.use_short_prompts:
@@ -205,8 +223,8 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
             canvas_image: Image.Image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
             for i in range(num_images_per_prompt):
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
-                x = randn(1, 4, 64, 64, device=self.device)
-                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
+                x = randn(1, 4, 64, 64)
+                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt)
                 for step in sd.steps:
                     x = sd(
                         x,
@@ -221,7 +239,6 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 def sample_noise(
     size: tuple[int, ...],
     offset_noise: float = 0.1,
-    device: Device | str = "cpu",
     dtype: DType | None = None,
     generator: Generator | None = None,
 ) -> Tensor:
@@ -230,9 +247,8 @@ def sample_noise(
     If `offset_noise` is more than 0, the noise will be offset by a small amount. It allows the model to generate
     images with a wider range of contrast https://www.crosslabs.org/blog/diffusion-with-offset-noise.
     """
-    device = Device(device)
-    noise = randn(*size, generator=generator, device=device, dtype=dtype)
-    return noise + offset_noise * randn(*size[:2], 1, 1, generator=generator, device=device, dtype=dtype)
+    noise = randn(*size, generator=generator, dtype=dtype)
+    return noise + offset_noise * randn(*size[:2], 1, 1, generator=generator, dtype=dtype)
 
 
 def resize_image(image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:

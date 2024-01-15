@@ -174,6 +174,7 @@ class ModelConfig(BaseModel):
     checkpoint: Path | None = None
     train: bool = True
     learning_rate: float | None = None  # TODO: Implement this
+    gpu_index: int | None = None
 
 
 class GyroDropoutConfig(BaseModel):

@@ -31,14 +31,17 @@ DEFAULT_LATENT_DICT = dict(
         lda = dict(
             checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors",
             train = False,
+            gpu_index= 0
         ),
         text_encoder = dict(
             checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors",
             train = True,
+            gpu_index= 0
         ),
         unet= dict(
             checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors",
-            train = True,
+            train = False,
+            gpu_index= 1
         ),
     ),
     training = dict(
@@ -52,6 +55,12 @@ DEFAULT_LATENT_DICT = dict(
     )
 )
 
+from lightning import Fabric
+from refiners.foundationals.latent_diffusion import (
+    SD1UNet
+)
+from lightning.fabric.strategies import FSDPStrategy
+from accelerate import Accelerator, DistributedType
 
 def test_ldm_trainer_text_encoder_on_two_devices(test_device: Device, test_second_device: Device):
     
@@ -66,8 +75,9 @@ def test_ldm_trainer_text_encoder_on_two_devices(test_device: Device, test_secon
     config = FinetuneLatentDiffusionConfig.load_from_dict(
         dict(DEFAULT_LATENT_DICT)
     )
-    
+
     trainer = LatentDiffusionTrainer(config=config)
     trainer.train()
+    
     assert trainer.lda.device == test_device
     assert trainer.text_encoder.device.type == test_second_device
