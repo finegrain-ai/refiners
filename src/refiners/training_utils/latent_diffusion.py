@@ -141,6 +141,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
+        print(f"self.device: {self.device}")
         return SD1UNet(in_channels=4, device=self.device)
 
     @cached_property
@@ -151,9 +152,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
-        lda = SD1Autoencoder(device=self.device)
-        # TODO: clean this up
-        lda._tensor_methods = ["encode", "decode"]
+        lda = SD1Autoencoder()
         return lda
 
     def load_models(self) -> dict[str, fl.Module]:
@@ -165,8 +164,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
         ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
-        ddpm_scheduler._tensor_methods = ["add_noise"]
-        self.sharding_manager.add_execution_hooks(ddpm_scheduler, self.device)
+        self.sharding_manager.add_execution_hook(ddpm_scheduler, self.device, "add_noise")
         return ddpm_scheduler
 
     @cached_property
@@ -176,7 +174,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
             num_inference_steps=self.config.test_diffusion.num_inference_steps,
         )
 
-        scheduler = self.sharding_manager.add_execution_hooks(scheduler, scheduler.device)
+        self.sharding_manager.add_execution_hooks(scheduler, scheduler.device)
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
 
@@ -187,6 +185,10 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
+    
+    @cached_property
+    def mse_loss(self):
+        return self.sharding_manager.bind_input_to_device(mse_loss, self.device)
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
@@ -194,18 +196,14 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
 
-        # Question :
-        # Can we do this as part of the SetContext Logic ?
-        self.unet.set_timestep(timestep=timestep.to(device=self.unet.device, dtype=self.unet.dtype))
-        self.unet.set_clip_text_embedding(
-            clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype)
-        )
+        self.unet.set_timestep(timestep=timestep)
+        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
         prediction = self.unet(noisy_latents)
 
         # Question :
         # Can we move this mse_loss device alignement outside of the compute_loss ?
-        loss = mse_loss(input=prediction, target=noise.to(device=prediction.device))
+        loss = self.mse_loss(input=prediction, target=noise)
         return loss
 
     def compute_evaluation(self) -> None:

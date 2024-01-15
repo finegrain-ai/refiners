@@ -4,7 +4,7 @@ from torch import Tensor, device as Device
 from torch.autograd import backward
 from abc import ABC, abstractmethod
 from functools import cached_property, partial, update_wrapper
-
+from typing import Any, List, Callable
 
 class ShardingManager(ABC):
     @abstractmethod
@@ -20,6 +20,7 @@ class ShardingManager(ABC):
     def device(self) -> Device:
         raise NotImplementedError("FabricTrainer does not support this property")
 
+from refiners.fluxion.context import ContextProvider
 
 class SimpleShardingManager(ShardingManager):
     def __init__(self, config: TrainingConfig) -> None:
@@ -39,29 +40,61 @@ class SimpleShardingManager(ShardingManager):
 
     # inspired from https://github.com/huggingface/accelerate/blob/6f05bbd41a179cc9a86238c7c6f3f4eded70fbd8/src/accelerate/hooks.py#L159C1-L170C18
     def add_execution_hooks(self, module: Module, device: Device) -> None:
-        if hasattr(module, "_tensor_methods") is False:
-            method_list = ["forward"]
-        else:
-            method_list = module._tensor_methods
-
+        method_list = []
+        if hasattr(module, "forward") is True:
+            method_list.append("forward")
+        
+        if hasattr(module, "set_context") is True:
+            method_list.append("set_context")
+        
+        if hasattr(module, "encode") is True:
+            method_list.append("encode")
+        
+        if hasattr(module, "decode") is True:
+            method_list.append("decode")  
+        
         for method_name in method_list:
-            module = self.add_execution_hook(module, device, method_name)
-        return module
+            self.add_execution_hook(module, device, method_name)
 
+    
+    def recursive_to(self, obj: Any, device: Device) -> Any:
+        if hasattr(obj, "to"):
+            return obj.to(device)
+        elif isinstance(obj, dict):
+            return {k: self.recursive_to(v, device) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.recursive_to(v, device) for v in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self.recursive_to(v, device) for v in obj)
+        else:
+            return obj
+        
     def add_execution_hook(self, module: Module, device: Device, method_name: str) -> None:
+        
         old_method = getattr(module, method_name)
 
+        new_method = self.bind_input_to_device(old_method, device)
+        # new_method = update_wrapper(partial(new_method, module), old_method)
+        
         def new_method(module, *args, **kwargs):
-            args = [arg.to(device) if hasattr(arg, "to") else arg for arg in args]
-            kwargs = {k: v.to(device) if hasattr(v, "to") else v for k, v in kwargs.items()}
+            args = self.recursive_to(args, device)
+            kwargs = self.recursive_to(kwargs, device)
             output = old_method(*args, **kwargs)
             return output
 
         new_method = update_wrapper(partial(new_method, module), old_method)
 
         setattr(module, method_name, new_method)
-        return module
-
+    
+    def bind_input_to_device(self, method: Callable, device: Device) -> Callable:
+        def new_method(*args, **kwargs):
+            args = self.recursive_to(args, device)
+            kwargs = self.recursive_to(kwargs, device)
+            return method(*args, **kwargs)
+        
+        return new_method
+        
+    
     @property
     def device(self) -> Device:
         return self.default_device

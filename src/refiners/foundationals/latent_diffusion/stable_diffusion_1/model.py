@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from PIL import Image
 from torch import Tensor, device as Device, dtype as DType
-from loguru import logger
 
 from refiners.fluxion.utils import image_to_tensor, interpolate
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
@@ -44,12 +43,8 @@ class StableDiffusion_1(LatentDiffusionModel):
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
-        # Question :
-        # Can we do this as part of the SetContext Logic ?
-        self.unet.set_timestep(timestep=timestep.to(device=self.unet.device, dtype=self.unet.dtype))
-        self.unet.set_clip_text_embedding(
-            clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype)
-        )
+        self.unet.set_timestep(timestep=timestep)
+        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
     def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
         if enable:
