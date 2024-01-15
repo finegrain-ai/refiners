@@ -27,18 +27,13 @@ class StableDiffusion_1(LatentDiffusionModel):
         unet: SD1UNet | None = None,
         lda: SD1Autoencoder | None = None,
         clip_text_encoder: CLIPTextEncoderL | None = None,
-        scheduler: Scheduler | None = None
+        scheduler: Scheduler | None = None,
     ) -> None:
         unet = unet or SD1UNet(in_channels=4)
         lda = lda or SD1Autoencoder()
         clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
         scheduler = scheduler or DPMSolver(num_inference_steps=30)
-        super().__init__(
-            unet=unet,
-            lda=lda,
-            clip_text_encoder=clip_text_encoder,
-            scheduler=scheduler
-        )
+        super().__init__(unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, scheduler=scheduler)
 
     def compute_clip_text_embedding(self, text: str, negative_text: str = "") -> Tensor:
         conditional_embedding = self.clip_text_encoder(text)
@@ -49,11 +44,12 @@ class StableDiffusion_1(LatentDiffusionModel):
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
-        
         # Question :
         # Can we do this as part of the SetContext Logic ?
         self.unet.set_timestep(timestep=timestep.to(device=self.unet.device, dtype=self.unet.dtype))
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype))
+        self.unet.set_clip_text_embedding(
+            clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype)
+        )
 
     def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
         if enable:

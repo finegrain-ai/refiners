@@ -16,11 +16,7 @@ TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionM
 
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
-        self,
-        unet: fl.Module,
-        lda: LatentDiffusionAutoencoder,
-        clip_text_encoder: fl.Module,
-        scheduler: Scheduler
+        self, unet: fl.Module, lda: LatentDiffusionAutoencoder, clip_text_encoder: fl.Module, scheduler: Scheduler
     ) -> None:
         super().__init__()
         self.unet = unet
@@ -31,13 +27,13 @@ class LatentDiffusionModel(fl.Module, ABC):
     def set_num_inference_steps(self, num_inference_steps: int) -> None:
         initial_diffusion_rate = self.scheduler.initial_diffusion_rate
         final_diffusion_rate = self.scheduler.final_diffusion_rate
-        
+        print(f"Setting num_inference_steps to {num_inference_steps}")
         scheduler = self.scheduler.__class__(
             num_inference_steps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
         )
-        
+
         self.scheduler = scheduler
 
     def init_latents(
@@ -108,5 +104,5 @@ class LatentDiffusionModel(fl.Module, ABC):
             unet=self.unet.structural_copy(),
             lda=self.lda.structural_copy(),
             clip_text_encoder=self.clip_text_encoder.structural_copy(),
-            scheduler=self.scheduler
+            scheduler=self.scheduler,
         )

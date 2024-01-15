@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, TypedDict, TypeVar
 
-from datasets import DownloadManager # type: ignore
+from datasets import DownloadManager  # type: ignore
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
@@ -102,14 +102,14 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
         return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
 
     def get_caption(self, index: int, caption_key: str) -> str:
-        return self.dataset[index][caption_key] # type: ignore
+        return self.dataset[index][caption_key]  # type: ignore
 
     def get_image(self, index: int) -> Image.Image:
         if "image" in self.dataset[index]:
             return self.dataset[index]["image"]
         elif "url" in self.dataset[index]:
-            url : str = self.dataset[index]["url"]
-            filename : str = self.download_manager.download(url) # type: ignore
+            url: str = self.dataset[index]["url"]
+            filename: str = self.download_manager.download(url)  # type: ignore
             return Image.open(filename)
         else:
             raise RuntimeError(f"Dataset item at index [{index}] does not contain 'image' or 'url'")
@@ -152,12 +152,11 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
         lda = SD1Autoencoder(device=self.device)
-        #TODO: clean this up
+        # TODO: clean this up
         lda._tensor_methods = ["encode", "decode"]
         return lda
 
     def load_models(self) -> dict[str, fl.Module]:
-        
         return {"unet": self.unet, "text_encoder": self.text_encoder, "lda": self.lda}
 
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
@@ -165,60 +164,51 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
-        ddpm_scheduler = DDPM(
-            num_inference_steps=1000,
-            device=self.device
-        )
+        ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
         ddpm_scheduler._tensor_methods = ["add_noise"]
         self.sharding_manager.add_execution_hooks(ddpm_scheduler, self.device)
         return ddpm_scheduler
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
-        
         scheduler = DPMSolver(
-            device=self.sharding_manager.default_device, 
-            num_inference_steps=self.config.test_diffusion.num_inference_steps
+            device=self.sharding_manager.default_device,
+            num_inference_steps=self.config.test_diffusion.num_inference_steps,
         )
-        
+
         scheduler = self.sharding_manager.add_execution_hooks(scheduler, scheduler.device)
-        
-        return StableDiffusion_1(
-            unet=self.unet,
-            lda=self.lda,
-            clip_text_encoder=self.text_encoder,
-            scheduler=scheduler
-        )
-        
+
+        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
         return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
-        return sample_noise(
-            size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype
-        )
+        return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-        
+
         # Question :
         # Can we do this as part of the SetContext Logic ?
         self.unet.set_timestep(timestep=timestep.to(device=self.unet.device, dtype=self.unet.dtype))
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype))
+        self.unet.set_clip_text_embedding(
+            clip_text_embedding=clip_text_embedding.to(device=self.unet.device, dtype=self.unet.dtype)
+        )
 
         prediction = self.unet(noisy_latents)
-        
+
         # Question :
         # Can we move this mse_loss device alignement outside of the compute_loss ?
         loss = mse_loss(input=prediction, target=noise.to(device=prediction.device))
         return loss
 
-    def compute_evaluation(self) -> None:        
+    def compute_evaluation(self) -> None:
         sd = self.sd
         prompts = self.config.test_diffusion.prompts
         num_images_per_prompt = self.config.test_diffusion.num_images_per_prompt

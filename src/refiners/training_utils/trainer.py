@@ -396,7 +396,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             )
 
         return lr_scheduler
-    
+
     @cached_property
     def sharding_manager(self) -> ShardingManager:
         # TODO : implement accelerate and fabric sharding manager
@@ -429,11 +429,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
         model.zero_grad()
-        self.sharding_manager.setup_model(
-            model=model, 
-            config=self.config.models[model_name]
-        )
-    
+        self.sharding_manager.setup_model(model=model, config=self.config.models[model_name])
+
     def prepare_models(self) -> None:
         assert self.models, "No models found."
         for model_name in self.models:
@@ -490,7 +487,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def compute_evaluation(self) -> None:
         pass
-        
+
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")

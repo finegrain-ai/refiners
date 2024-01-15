@@ -89,7 +89,7 @@ class DPMSolver(Scheduler):
             - 0.5 * (factor * previous_scale_factor) * estimation_delta
         )
         return denoised_x
-    
+
     def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         # We pass forward to give the ability to
         # dynamically change the behavior of the solver
@@ -107,7 +107,7 @@ class DPMSolver(Scheduler):
         """
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
-        
+
         estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
         denoised_x = (
