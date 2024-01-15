@@ -141,7 +141,6 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
-        print(f"self.device: {self.device}")
         return SD1UNet(in_channels=4, device=self.device)
 
     @cached_property
@@ -171,7 +170,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
             device=self.device,
-            num_inference_steps=self.config.test_diffusion.num_inference_steps,,
+            num_inference_steps=self.config.test_diffusion.num_inference_steps,
         )
 
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)

@@ -252,13 +252,13 @@ class TrainingClock:
         return self.step % self.checkpointing_save_interval_steps == 0
 
 
-def compute_grad_norm(parameters: Iterable[Parameter]) -> float:
+def compute_grad_norm(parameters: Iterable[Parameter], device: Device) -> float:
     """
     Computes the gradient norm of the parameters of a given model similar to `clip_grad_norm_` returned value.
     """
     gradients: list[Tensor] = [p.grad.detach() for p in parameters if p.grad is not None]
     assert gradients, "The model has no gradients to compute the norm."
-    total_norm = stack(tensors=[gradient.norm() for gradient in gradients]).norm().item()  # type: ignore
+    total_norm = stack(tensors=[gradient.norm().to(device=device) for gradient in gradients]).norm().item()  # type: ignore
     return total_norm  # type: ignore
 
 
@@ -332,7 +332,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return compute_grad_norm(parameters=self.parameters)
+        return compute_grad_norm(parameters=self.parameters, device= self.device)
 
     @cached_property
     def optimizer(self) -> Optimizer:

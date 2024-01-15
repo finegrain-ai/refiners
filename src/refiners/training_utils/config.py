@@ -229,12 +229,7 @@ class BaseConfig(BaseModel):
     checkpointing: CheckpointingConfig
 
     @classmethod
-    def load_from_dict(cls: Type[T], config_dict: dict[str, Any]) -> T:
-        return cls(**config_dict)
-
-    @classmethod
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:
         with open(file=toml_path, mode="rb") as f:
             config_dict = tomli.load(f)
-
-        return cls.load_from_dict(**config_dict)
+        return cls(**config_dict)
