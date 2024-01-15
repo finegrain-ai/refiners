@@ -7,8 +7,8 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, dtype as Dtype, float32, get_rng_state, set_rng_state, stack
-from torch.nn import Module, Parameter
+from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
+from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -35,7 +35,7 @@ from refiners.training_utils.callback import (
     GradientValueClipping,
     MonitorLoss,
 )
-from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType, TimeUnit, TimeValue
+from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 

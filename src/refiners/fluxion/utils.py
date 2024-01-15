@@ -121,9 +121,9 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
 
     Values are clamped to the range `[0, 1]`.
     """
-    if image.mode == 'P':
-        image = image.convert('RGB')
-    
+    if image.mode == "P":
+        image = image.convert("RGB")
+
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 
     match image.mode:

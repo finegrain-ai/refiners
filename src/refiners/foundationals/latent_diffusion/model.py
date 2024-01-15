@@ -3,7 +3,7 @@ from typing import TypeVar
 
 import torch
 from PIL import Image
-from torch import Tensor, device as Device, dtype as DType
+from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder

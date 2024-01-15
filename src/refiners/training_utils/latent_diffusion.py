@@ -186,7 +186,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
 
     @cached_property
-    def mse_loss(self):
+    def mse_loss(self) -> Callable[[Tensor, Tensor], Tensor]:
         return self.sharding_manager.wrap_device(mse_loss, self.device)
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
@@ -199,9 +199,8 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
         prediction = self.unet(noisy_latents)
-
-        loss = self.mse_loss(input=prediction, target=noise)
-        return loss
+        loss = self.mse_loss(input=prediction, target=noise)  # type: ignore
+        return loss  # type: ignore
 
     def compute_evaluation(self) -> None:
         sd = self.sd
