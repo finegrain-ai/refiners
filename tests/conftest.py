@@ -16,14 +16,6 @@ def test_device() -> torch.device:
 
 
 @fixture(scope="session")
-def test_second_device() -> torch.device:
-    test_device = os.getenv("REFINERS_TEST_SECOND_DEVICE")
-    if not test_device and torch.cuda.device_count() > 1:
-        return torch.device("cuda:1")
-    return torch.device("cpu")
-
-
-@fixture(scope="session")
 def test_weights_path() -> Path:
     from_env = os.getenv("REFINERS_TEST_WEIGHTS_DIR")
     return Path(from_env) if from_env else PARENT_PATH / "weights"
