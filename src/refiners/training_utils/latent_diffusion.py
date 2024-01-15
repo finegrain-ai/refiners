@@ -164,17 +164,17 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
         ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
-        self.sharding_manager.add_execution_hook(ddpm_scheduler, self.device, "add_noise")
+        self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
         return ddpm_scheduler
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
-            device=self.sharding_manager.default_device,
-            num_inference_steps=self.config.test_diffusion.num_inference_steps,
+            device=self.device,
+            num_inference_steps=self.config.test_diffusion.num_inference_steps,,
         )
 
-        self.sharding_manager.add_execution_hooks(scheduler, scheduler.device)
+        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
 
@@ -188,7 +188,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     
     @cached_property
     def mse_loss(self):
-        return self.sharding_manager.bind_input_to_device(mse_loss, self.device)
+        return self.sharding_manager.wrap_device(mse_loss, self.device)
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
@@ -201,8 +201,6 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
 
         prediction = self.unet(noisy_latents)
 
-        # Question :
-        # Can we move this mse_loss device alignement outside of the compute_loss ?
         loss = self.mse_loss(input=prediction, target=noise)
         return loss
 

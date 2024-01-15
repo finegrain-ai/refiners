@@ -107,8 +107,8 @@ class Scheduler(ABC):
         step: int,
     ) -> Tensor:
         timestep = self.timesteps[step]
-        cumulative_scale_factors = self.cumulative_scale_factors[timestep].to(device=x.device, dtype=x.dtype)
-        noise_stds = self.noise_std[timestep].to(device=x.device, dtype=x.dtype)
+        cumulative_scale_factors = self.cumulative_scale_factors[timestep]
+        noise_stds = self.noise_std[timestep]
         noised_x = cumulative_scale_factors * x + noise_stds * noise
         return noised_x
 

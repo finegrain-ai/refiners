@@ -27,13 +27,13 @@ class LatentDiffusionModel(fl.Module, ABC):
     def set_num_inference_steps(self, num_inference_steps: int) -> None:
         initial_diffusion_rate = self.scheduler.initial_diffusion_rate
         final_diffusion_rate = self.scheduler.final_diffusion_rate
-        print(f"Setting num_inference_steps to {num_inference_steps}")
-        raise NotImplementedError
+        device, dtype = self.scheduler.device, self.scheduler.dtype
+        
         scheduler = self.scheduler.__class__(
             num_inference_steps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
-        )
+        ).to(device=device, dtype=dtype)
 
         self.scheduler = scheduler
 

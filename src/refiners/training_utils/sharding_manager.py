@@ -35,11 +35,11 @@ class SimpleShardingManager(ShardingManager):
         else:
             device = self.default_device
         model = model.to(device=device)
-        model = self.add_execution_hooks(model, device)
+        model = self.add_device_hooks(model, device)
         return model
 
     # inspired from https://github.com/huggingface/accelerate/blob/6f05bbd41a179cc9a86238c7c6f3f4eded70fbd8/src/accelerate/hooks.py#L159C1-L170C18
-    def add_execution_hooks(self, module: Module, device: Device) -> None:
+    def add_device_hooks(self, module: Module, device: Device) -> None:
         method_list = []
         if hasattr(module, "forward") is True:
             method_list.append("forward")
@@ -54,7 +54,7 @@ class SimpleShardingManager(ShardingManager):
             method_list.append("decode")  
         
         for method_name in method_list:
-            self.add_execution_hook(module, device, method_name)
+            self.add_device_hook(module, device, method_name)
 
     
     def recursive_to(self, obj: Any, device: Device) -> Any:
@@ -69,11 +69,11 @@ class SimpleShardingManager(ShardingManager):
         else:
             return obj
         
-    def add_execution_hook(self, module: Module, device: Device, method_name: str) -> None:
+    def add_device_hook(self, module: Module, device: Device, method_name: str) -> None:
         
         old_method = getattr(module, method_name)
 
-        new_method = self.bind_input_to_device(old_method, device)
+        new_method = self.wrap_device(old_method, device)
         # new_method = update_wrapper(partial(new_method, module), old_method)
         
         def new_method(module, *args, **kwargs):
@@ -86,7 +86,7 @@ class SimpleShardingManager(ShardingManager):
 
         setattr(module, method_name, new_method)
     
-    def bind_input_to_device(self, method: Callable, device: Device) -> Callable:
+    def wrap_device(self, method: Callable, device: Device) -> Callable:
         def new_method(*args, **kwargs):
             args = self.recursive_to(args, device)
             kwargs = self.recursive_to(kwargs, device)
