@@ -170,13 +170,19 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
             device=self.device
         )
         ddpm_scheduler._tensor_methods = ["add_noise"]
-        ddpm_scheduler = self.sharding_manager.add_execution_hooks(ddpm_scheduler, self.device)
+        self.sharding_manager.add_execution_hooks(ddpm_scheduler, self.device)
         return ddpm_scheduler
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
         
-        scheduler = DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps)
+        scheduler = DPMSolver(
+            device=self.sharding_manager.default_device, 
+            num_inference_steps=self.config.test_diffusion.num_inference_steps
+        )
+        
+        scheduler = self.sharding_manager.add_execution_hooks(scheduler, scheduler.device)
+        
         return StableDiffusion_1(
             unet=self.unet,
             lda=self.lda,

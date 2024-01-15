@@ -32,16 +32,13 @@ class LatentDiffusionModel(fl.Module, ABC):
         initial_diffusion_rate = self.scheduler.initial_diffusion_rate
         final_diffusion_rate = self.scheduler.final_diffusion_rate
         
-        # Question : 
-        # Is there a better way to do this ?
-        # What is the purpose of this ?
-        device, dtype = self.scheduler.device, self.scheduler.dtype
-        print(f"set_num_inference_steps device: {device}, dtype: {dtype}")
-        self.scheduler = self.scheduler.__class__(
+        scheduler = self.scheduler.__class__(
             num_inference_steps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
-        ).to(device=device, dtype=dtype)
+        )
+        
+        self.scheduler = scheduler
 
     def init_latents(
         self,
