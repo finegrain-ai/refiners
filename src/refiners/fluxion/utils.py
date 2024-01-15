@@ -146,6 +146,7 @@ def tensor_to_image(tensor: Tensor) -> Image.Image:
     assert tensor.ndim == 4 and tensor.shape[0] == 1, f"Unsupported tensor shape: {tensor.shape}"
     num_channels = tensor.shape[1]
     tensor = tensor.clamp(0, 1).squeeze(0)
+    tensor = tensor.to(torch.float32)  # to avoid numpy error with bfloat16
 
     match num_channels:
         case 1:
