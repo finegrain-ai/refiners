@@ -15,6 +15,7 @@ class Args(argparse.Namespace):
     subfolder: str
     half: bool
     verbose: bool
+    skip_init_check: bool
 
 
 def setup_converter(args: Args) -> ModelConverter:
@@ -49,7 +50,13 @@ def setup_converter(args: Args) -> ModelConverter:
         "keyword": {"added_cond_kwargs": added_cond_kwargs} if source_has_time_ids else {},
     }
 
-    converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
+    converter = ModelConverter(
+        source_model=source,
+        target_model=target,
+        skip_init_check=args.skip_init_check,
+        skip_output_check=True,
+        verbose=args.verbose,
+    )
     if not converter.run(
         source_args=source_args,
         target_args=target_args,
@@ -83,6 +90,11 @@ def main() -> None:
         ),
     )
     parser.add_argument("--subfolder", type=str, default="unet", help="Subfolder. Default: unet.")
+    parser.add_argument(
+        "--skip-init-check",
+        action="store_true",
+        help="Skip check that source and target have the same layers count.",
+    )
     parser.add_argument("--half", action="store_true", help="Convert to half precision.")
     parser.add_argument(
         "--verbose",
