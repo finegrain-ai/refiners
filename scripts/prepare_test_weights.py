@@ -209,6 +209,16 @@ def download_sdxl(hf_repo_id: str = "stabilityai/stable-diffusion-xl-base-1.0"):
     download_sd_tokenizer(hf_repo_id, "tokenizer_2")
 
 
+def download_vae_fp16_fix():
+    download_files(
+        urls=[
+            "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/raw/main/config.json",
+            "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/diffusion_pytorch_model.safetensors",
+        ],
+        dest_folder=os.path.join(test_weights_dir, "madebyollin", "sdxl-vae-fp16-fix"),
+    )
+
+
 def download_vae_ft_mse():
     download_files(
         urls=[
@@ -433,6 +443,17 @@ def convert_vae_ft_mse():
     )
 
 
+def convert_vae_fp16_fix():
+    run_conversion_script(
+        "convert_diffusers_autoencoder_kl.py",
+        "tests/weights/madebyollin/sdxl-vae-fp16-fix",
+        "tests/weights/sdxl-lda-fp16-fix.safetensors",
+        additional_args=["--subfolder", "''"],
+        half=True,
+        expected_hash="98c7e998",
+    )
+
+
 def convert_lora():
     os.makedirs("tests/weights/loras", exist_ok=True)
     run_conversion_script(
@@ -610,6 +631,7 @@ def download_all():
     download_sd15("runwayml/stable-diffusion-inpainting")
     download_sdxl("stabilityai/stable-diffusion-xl-base-1.0")
     download_vae_ft_mse()
+    download_vae_fp16_fix()
     download_lora()
     download_preprocessors()
     download_controlnet()
@@ -624,6 +646,7 @@ def convert_all():
     convert_sd15()
     convert_sdxl()
     convert_vae_ft_mse()
+    convert_vae_fp16_fix()
     convert_lora()
     convert_preprocessors()
     convert_controlnet()
