@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed, no_grad
+from refiners.foundationals.clip.attention_emphasis import PromptEmphasisExtender
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
     SD1ControlnetAdapter,
@@ -240,6 +241,11 @@ def expected_restart(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_freeu(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_prompt_emphasis(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_prompt_emphasis.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -1702,3 +1708,37 @@ def test_freeu(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_freeu)
+
+
+@no_grad()
+def test_prompt_emphasis(
+    sd15_std: StableDiffusion_1,
+    expected_prompt_emphasis: Image.Image,
+):
+    sd15 = sd15_std
+    n_steps = 50
+    first_step = 1
+    cfg_scale = 7.5
+
+    prompt = "eggs, bacon and a (cute cat:2)"
+    negative_prompt = ""
+
+    PromptEmphasisExtender(sd15.clip_text_encoder).inject()
+
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_num_inference_steps(n_steps)
+
+    manual_seed(9752)
+    x = sd15.init_latents(size=(512, 512), first_step=first_step).to(device=sd15.device, dtype=sd15.dtype)
+
+    for step in sd15.steps[first_step:]:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=cfg_scale,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_prompt_emphasis)
