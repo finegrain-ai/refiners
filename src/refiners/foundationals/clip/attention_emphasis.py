@@ -101,9 +101,11 @@ def parse_prompt_attention(text: str):
 
 
 class TokenEmphasisExtender(fl.Chain, Adapter[CLIPTokenizer]):
-    def to_matrix(self, res: list[tuple[str, float]]) -> Tensor:
+    def parse_prompt(self, prompt: str) -> Tensor:
+        parsed_attention = parse_prompt_attention(prompt)
+
         result: list[Tensor] = []
-        for text, emphasis in res:
+        for text, emphasis in parsed_attention:
             token_length = self.target.encode(text).shape[1]
             result.append(tensor([emphasis] * token_length))
 
@@ -114,8 +116,7 @@ class TokenEmphasisExtender(fl.Chain, Adapter[CLIPTokenizer]):
             super().__init__(
                 target,
                 fl.Passthrough(
-                    fl.Lambda(parse_prompt_attention),
-                    fl.Lambda(self.to_matrix),
+                    fl.Lambda(self.parse_prompt),
                     fl.SetContext(
                         context="prompt_emphasis",
                         key="matrix",
