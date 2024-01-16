@@ -1,14 +1,12 @@
-script = "finetune-ldm-lora.py" # not used for now
-
 [wandb]
 mode = "offline" # "online", "offline", "disabled"
 entity = "acme"
 project = "test-lora-training"
 
 [models]
-unet = {checkpoint = "/path/to/stable-diffusion-1-5/unet.safetensors"}
-text_encoder = {checkpoint = "/path/to/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
-lda = {checkpoint = "/path/to/stable-diffusion-1-5/lda.safetensors"}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index = 1}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", gpu_index = 0}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", gpu_index = 0}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.05
@@ -26,8 +24,8 @@ lda_targets = []
 duration = "1000:epoch"
 seed = 0
 gpu_index = 0
-batch_size = 4
-gradient_accumulation = "4:step"
+batch_size = 1
+gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
 evaluation_interval = "5:epoch"
@@ -52,8 +50,9 @@ dropout_probability = 0.2
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "acme/images"
+hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
+caption_key = "ai_description"
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"

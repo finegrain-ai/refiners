@@ -3,7 +3,7 @@ from typing import TypeVar
 
 import torch
 from PIL import Image
-from torch import Tensor, device as Device, dtype as DType
+from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
@@ -11,37 +11,31 @@ from refiners.foundationals.latent_diffusion.schedulers.scheduler import Schedul
 
 T = TypeVar("T", bound="fl.Module")
 
-
 TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionModel")
 
 
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
-        self,
-        unet: fl.Module,
-        lda: LatentDiffusionAutoencoder,
-        clip_text_encoder: fl.Module,
-        scheduler: Scheduler,
-        device: Device | str = "cpu",
-        dtype: DType = torch.float32,
+        self, unet: fl.Module, lda: LatentDiffusionAutoencoder, clip_text_encoder: fl.Module, scheduler: Scheduler
     ) -> None:
         super().__init__()
-        self.device: Device = device if isinstance(device, Device) else Device(device=device)
-        self.dtype = dtype
-        self.unet = unet.to(device=self.device, dtype=self.dtype)
-        self.lda = lda.to(device=self.device, dtype=self.dtype)
-        self.clip_text_encoder = clip_text_encoder.to(device=self.device, dtype=self.dtype)
-        self.scheduler = scheduler.to(device=self.device, dtype=self.dtype)
+        self.unet = unet
+        self.lda = lda
+        self.clip_text_encoder = clip_text_encoder
+        self.scheduler = scheduler
 
     def set_num_inference_steps(self, num_inference_steps: int) -> None:
         initial_diffusion_rate = self.scheduler.initial_diffusion_rate
         final_diffusion_rate = self.scheduler.final_diffusion_rate
         device, dtype = self.scheduler.device, self.scheduler.dtype
-        self.scheduler = self.scheduler.__class__(
+
+        scheduler = self.scheduler.__class__(
             num_inference_steps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
         ).to(device=device, dtype=dtype)
+
+        self.scheduler = scheduler
 
     def init_latents(
         self,
@@ -52,7 +46,7 @@ class LatentDiffusionModel(fl.Module, ABC):
     ) -> Tensor:
         height, width = size
         if noise is None:
-            noise = torch.randn(1, 4, height // 8, width // 8, device=self.device)
+            noise = torch.randn(1, 4, height // 8, width // 8)
         assert list(noise.shape[2:]) == [
             height // 8,
             width // 8,
@@ -91,6 +85,9 @@ class LatentDiffusionModel(fl.Module, ABC):
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
 
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
+
+        # scale latents for schedulers that need it
+        latents = self.scheduler.scale_model_input(latents, step=step)
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 
         # classifier-free guidance
@@ -101,7 +98,6 @@ class LatentDiffusionModel(fl.Module, ABC):
             noise += self.compute_self_attention_guidance(
                 x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
             )
-
         return self.scheduler(x, noise=noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:
@@ -110,6 +106,4 @@ class LatentDiffusionModel(fl.Module, ABC):
             lda=self.lda.structural_copy(),
             clip_text_encoder=self.clip_text_encoder.structural_copy(),
             scheduler=self.scheduler,
-            device=self.device,
-            dtype=self.dtype,
         )

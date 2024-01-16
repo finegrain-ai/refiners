@@ -1,7 +1,7 @@
 from collections import deque
 
 import numpy as np
-from torch import Tensor, device as Device, dtype as Dtype, exp, float32, tensor
+from torch import Generator, Tensor, device as Device, dtype as Dtype, exp, float32, tensor
 
 from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
 
@@ -90,12 +90,14 @@ class DPMSolver(Scheduler):
         )
         return denoised_x
 
-    def __call__(
-        self,
-        x: Tensor,
-        noise: Tensor,
-        step: int,
-    ) -> Tensor:
+    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+        # We pass forward to give the ability to
+        # dynamically change the behavior of the solver
+        # using the sharding_manager
+        # TODO: change the Scheduler abstract class
+        return self.forward(x, noise, step, generator)
+
+    def forward(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Represents one step of the backward diffusion process that iteratively denoises the input data `x`.
 
@@ -105,6 +107,7 @@ class DPMSolver(Scheduler):
         """
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
+
         estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
         denoised_x = (

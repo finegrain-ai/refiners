@@ -174,6 +174,7 @@ class ModelConfig(BaseModel):
     checkpoint: Path | None = None
     train: bool = True
     learning_rate: float | None = None  # TODO: Implement this
+    gpu_index: int | None = None
 
 
 class GyroDropoutConfig(BaseModel):
@@ -219,7 +220,6 @@ T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
-    script: Path  # TODO not used for now, but will be used by the cli
     models: dict[str, ModelConfig]
     wandb: WandbConfig
     training: TrainingConfig
@@ -232,5 +232,4 @@ class BaseConfig(BaseModel):
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:
         with open(file=toml_path, mode="rb") as f:
             config_dict = tomli.load(f)
-
         return cls(**config_dict)

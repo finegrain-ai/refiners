@@ -84,7 +84,7 @@ class TextualInversionDataset(TextEmbeddingLatentsDataset):
         )
         self.placeholder_token = self.config.textual_inversion.placeholder_token
 
-    def get_caption(self, index: int) -> str:
+    def get_caption(self, index: int, caption_key: str) -> str:
         # Ignore the dataset caption, if any: use a template instead
         return random.choice(self.templates).format(self.placeholder_token)
 

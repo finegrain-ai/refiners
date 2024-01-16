@@ -1,5 +1,6 @@
 import random
 import time
+from abc import ABC, abstractmethod
 from functools import cached_property, wraps
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
@@ -7,7 +8,6 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 import numpy as np
 from loguru import logger
 from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
-from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -38,6 +38,8 @@ from refiners.training_utils.callback import (
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
+
+from .sharding_manager import ShardingManager, SimpleShardingManager
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -250,13 +252,13 @@ class TrainingClock:
         return self.step % self.checkpointing_save_interval_steps == 0
 
 
-def compute_grad_norm(parameters: Iterable[Parameter]) -> float:
+def compute_grad_norm(parameters: Iterable[Parameter], device: Device) -> float:
     """
     Computes the gradient norm of the parameters of a given model similar to `clip_grad_norm_` returned value.
     """
     gradients: list[Tensor] = [p.grad.detach() for p in parameters if p.grad is not None]
     assert gradients, "The model has no gradients to compute the norm."
-    total_norm = stack(tensors=[gradient.norm() for gradient in gradients]).norm().item()  # type: ignore
+    total_norm = stack(tensors=[gradient.norm().to(device=device) for gradient in gradients]).norm().item()  # type: ignore
     return total_norm  # type: ignore
 
 
@@ -264,7 +266,7 @@ Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
-class Trainer(Generic[ConfigType, Batch]):
+class Trainer(Generic[ConfigType, Batch], ABC):
     def __init__(self, config: ConfigType, callbacks: list[Callback[Any]] | None = None) -> None:
         self.config = config
         self.clock = TrainingClock(
@@ -297,9 +299,10 @@ class Trainer(Generic[ConfigType, Batch]):
 
     @cached_property
     def device(self) -> Device:
-        selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
-        logger.info(f"Using device: {selected_device}")
-        return selected_device
+        return self.sharding_manager.device
+        # selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
+        # logger.info(f"Using device: {selected_device}")
+        # return selected_device
 
     @property
     def parameters(self) -> list[Parameter]:
@@ -329,7 +332,7 @@ class Trainer(Generic[ConfigType, Batch]):
     @property
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return compute_grad_norm(parameters=self.parameters)
+        return compute_grad_norm(parameters=self.parameters, device=self.device)
 
     @cached_property
     def optimizer(self) -> Optimizer:
@@ -395,6 +398,11 @@ class Trainer(Generic[ConfigType, Batch]):
         return lr_scheduler
 
     @cached_property
+    def sharding_manager(self) -> ShardingManager:
+        # TODO : implement accelerate and fabric sharding manager
+        return SimpleShardingManager(self.config.training)
+
+    @cached_property
     def models(self) -> dict[str, fl.Module]:
         return self.load_models()
 
@@ -420,8 +428,8 @@ class Trainer(Generic[ConfigType, Batch]):
         else:
             logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
-        model.to(self.device)
         model.zero_grad()
+        self.sharding_manager.setup_model(model=model, config=self.config.models[model_name])
 
     def prepare_models(self) -> None:
         assert self.models, "No models found."
@@ -440,11 +448,13 @@ class Trainer(Generic[ConfigType, Batch]):
             self.checkpoints_save_folder = None
             logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")
 
+    @abstractmethod
     def load_models(self) -> dict[str, fl.Module]:
-        raise NotImplementedError("The `load_models` method must be implemented in the subclass.")
+        ...
 
+    @abstractmethod
     def load_dataset(self) -> Dataset[Batch]:
-        raise NotImplementedError("The `load_dataset` method must be implemented in the subclass.")
+        ...
 
     @cached_property
     def dataset(self) -> Dataset[Batch]:
@@ -471,8 +481,9 @@ class Trainer(Generic[ConfigType, Batch]):
         assert self.checkpoints_save_folder is not None
         return self.checkpoints_save_folder
 
+    @abstractmethod
     def compute_loss(self, batch: Batch) -> Tensor:
-        raise NotImplementedError("The `compute_loss` method must be implemented in the subclass.")
+        ...
 
     def compute_evaluation(self) -> None:
         pass
@@ -481,7 +492,7 @@ class Trainer(Generic[ConfigType, Batch]):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        backward(tensors=scaled_loss)
+        self.sharding_manager.backward(scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")

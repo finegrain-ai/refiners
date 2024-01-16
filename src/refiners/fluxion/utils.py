@@ -121,6 +121,9 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
 
     Values are clamped to the range `[0, 1]`.
     """
+    if image.mode == "P":
+        image = image.convert("RGB")
+
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 
     match image.mode:
@@ -187,20 +190,26 @@ def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: 
 
 
 def summarize_tensor(tensor: torch.Tensor, /) -> str:
-    return (
-        "Tensor("
-        + ", ".join(
+    info_list = [
+        f"shape=({', '.join(map(str, tensor.shape))})",
+        f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
+        f"device={tensor.device}",
+    ]
+    if not tensor.is_complex():
+        info_list.extend(
             [
-                f"shape=({', '.join(map(str, tensor.shape))})",
-                f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
-                f"device={tensor.device}",
                 f"min={tensor.min():.2f}",  # type: ignore
                 f"max={tensor.max():.2f}",  # type: ignore
-                f"mean={tensor.mean():.2f}",
-                f"std={tensor.std():.2f}",
-                f"norm={norm(x=tensor):.2f}",
-                f"grad={tensor.requires_grad}",
             ]
         )
-        + ")"
+
+    info_list.extend(
+        [
+            f"mean={tensor.float().mean():.2f}",
+            f"std={tensor.float().std():.2f}",
+            f"norm={norm(x=tensor.float()):.2f}",
+            f"grad={tensor.requires_grad}",
+        ]
     )
+
+    return "Tensor(" + ", ".join(info_list) + ")"
