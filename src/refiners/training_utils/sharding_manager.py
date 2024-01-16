@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from functools import partial, update_wrapper
 from typing import Any, Callable, Dict, List
 
 from torch import Tensor, device as Device
@@ -89,14 +88,7 @@ class SimpleShardingManager(ShardingManager):
 
     def add_device_hook(self, module: Hookable, device: Device, method_name: str) -> None:
         old_method = getattr(module, method_name)
-
         new_method = self.wrap_device(old_method, device)
-        # new_method = update_wrapper(partial(new_method, module), old_method)
-
-        new_method = self.wrap_device(old_method, device)
-
-        new_method = update_wrapper(partial(new_method, module), old_method)
-
         setattr(module, method_name, new_method)
 
     def wrap_device(self, method: WrappableMethod, device: Device) -> WrappableMethod:
