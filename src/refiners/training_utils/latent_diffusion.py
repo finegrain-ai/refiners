@@ -37,19 +37,27 @@ class LatentDiffusionConfig(BaseModel):
     max_step: int = 999
 
 
-class TestDiffusionConfig(BaseModel):
+class TestDiffusionBaseConfig(BaseModel):
     seed: int = 0
     num_inference_steps: int = 30
     use_short_prompts: bool = False
-    prompts: list[str] = []
+    prompts: list[Any] = []
     num_images_per_prompt: int = 1
 
+class TestDiffusionConfig(TestDiffusionBaseConfig):
+    prompts: list[str]
 
-class FinetuneLatentDiffusionConfig(BaseConfig):
+class FinetuneLatentDiffusionBaseConfig(BaseConfig):
     dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
+
+class FinetuneLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     test_diffusion: TestDiffusionConfig
 
+
+ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionBaseConfig)
+BatchType = TypeVar("BatchType", bound=Any)
+DiffusionConfigType = TypeVar("DiffusionConfigType", bound=FinetuneLatentDiffusionConfig)
 
 @dataclass
 class TextEmbeddingLatentsBatch:
@@ -63,8 +71,7 @@ class CaptionImage(TypedDict):
     url: str
 
 
-ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionConfig)
-BatchType = TypeVar("BatchType", bound=Any)
+
 
 
 class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
@@ -180,16 +187,6 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
         self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
         return ddpm_scheduler
 
-    @cached_property
-    def sd(self) -> StableDiffusion_1:
-        scheduler = DPMSolver(
-            device=self.device,
-            num_inference_steps=self.config.test_diffusion.num_inference_steps,
-        )
-
-        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
-
-        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
 
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
@@ -212,7 +209,7 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
         ...
 
 
-class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[ConfigType, TextEmbeddingLatentsBatch]):
+class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, TextEmbeddingLatentsBatch]):
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
         return TextEmbeddingLatentsDataset(trainer=self)
     
@@ -252,6 +249,17 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[ConfigType, TextEmbeddin
             images[prompt] = canvas_image
         self.log(data=images)
     
+    @cached_property
+    def sd(self) -> StableDiffusion_1:
+        scheduler = DPMSolver(
+            device=self.device,
+            num_inference_steps=self.config.test_diffusion.num_inference_steps,
+        )
+
+        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
+
+        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+    
 def sample_noise(
     size: tuple[int, ...],
     offset_noise: float = 0.1,
@@ -282,17 +290,17 @@ def resize_image(image: Image.Image, min_size: int = 512, max_size: int = 576) -
     return image
 
 
-class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
-    def on_train_begin(self, trainer: LatentDiffusionTrainer[Any]) -> None:
+class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[FinetuneLatentDiffusionConfig]]):
+    def on_train_begin(self, trainer: LatentDiffusionTrainer[FinetuneLatentDiffusionConfig]) -> None:
         self.timestep_bins: dict[int, list[float]] = {i: [] for i in range(10)}
 
-    def on_compute_loss_end(self, trainer: LatentDiffusionTrainer[Any]) -> None:
+    def on_compute_loss_end(self, trainer: LatentDiffusionTrainer[FinetuneLatentDiffusionConfig]) -> None:
         loss_value = trainer.loss.detach().cpu().item()
         current_step = trainer.current_step
         bin_index = min(current_step // 100, 9)
         self.timestep_bins[bin_index].append(loss_value)
 
-    def on_epoch_end(self, trainer: LatentDiffusionTrainer[Any]) -> None:
+    def on_epoch_end(self, trainer: LatentDiffusionTrainer[FinetuneLatentDiffusionConfig]) -> None:
         log_data: dict[str, WandbLoggable] = {}
         for bin_index, losses in self.timestep_bins.items():
             if losses:

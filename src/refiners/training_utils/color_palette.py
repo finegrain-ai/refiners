@@ -20,11 +20,12 @@ from refiners.foundationals.latent_diffusion import (
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
-    FinetuneLatentDiffusionConfig,
+    FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
     TextEmbeddingLatentsBaseDataset,
     TextEmbeddingLatentsBatch,
-    CaptionImage
+    CaptionImage,
+    TestDiffusionBaseConfig
 )
 
 class ColorPaletteConfig(BaseModel):
@@ -40,6 +41,9 @@ class ColorPalettePromptConfig(BaseModel):
 
 class ColorPaletteDatasetConfig(HuggingfaceDatasetConfig):
     local_folder: str = "data/color-palette"
+
+class TestColorPaletteConfig(TestDiffusionBaseConfig):
+    prompts: list[ColorPalettePromptConfig]
 
 @dataclass
 class TextEmbeddingColorPaletteLatentsBatch (TextEmbeddingLatentsBatch):
@@ -96,11 +100,9 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
 
 
-class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
+class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
-    # TODO : find a way to move this to FinetuneLatentDiffusionConfig.test_diffusion
-    # without breaking the pyright type checking
-    color_palette_prompts: list[ColorPalettePromptConfig]
+    test_color_palette: TestColorPaletteConfig
 
     def model_post_init(self, __context: Any) -> None:
         """Pydantic v2 does post init differently, so we need to override this method too."""
@@ -177,11 +179,11 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionBaseTrainer[ColorPalette
             unet=self.unet,
             lda=self.lda,
             clip_text_encoder=self.text_encoder,
-            scheduler=DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps),
+            scheduler=DPMSolver(num_inference_steps=self.config.test_color_palette.num_inference_steps),
             device=self.device,
         )
-        prompts = self.config.color_palette_prompts
-        num_images_per_prompt = self.config.test_diffusion.num_images_per_prompt
+        prompts = self.config.test_color_palette.prompts
+        num_images_per_prompt = self.config.test_color_palette.num_images_per_prompt
         images: dict[str, WandbLoggable] = {}
         for prompt in prompts:
             canvas_image: Image.Image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
