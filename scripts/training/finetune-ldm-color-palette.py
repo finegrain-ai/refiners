@@ -21,8 +21,8 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
-    LatentDiffusionTrainer,
-    TextEmbeddingLatentsDataset,
+    LatentDiffusionBaseTrainer,
+    TextEmbeddingLatentsBaseDataset,
     TextEmbeddingLatentsBatch,
     CaptionImage
 )
@@ -50,7 +50,7 @@ class TextEmbeddingColorPaletteLatentsBatch (TextEmbeddingLatentsBatch):
 class CaptionPaletteImage(CaptionImage):
     palette_8: list[list[float]]
 
-class ColorPaletteDataset(TextEmbeddingLatentsDataset[TextEmbeddingColorPaletteLatentsBatch]):
+class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
     def __init__(
         self,
         trainer: "ColorPaletteLatentDiffusionTrainer",
@@ -114,7 +114,7 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
         self.models["unet"].train = False
 
 
-class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]):
+class ColorPaletteLatentDiffusionTrainer(LatentDiffusionBaseTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
