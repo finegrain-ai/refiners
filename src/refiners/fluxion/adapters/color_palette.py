@@ -3,7 +3,6 @@ from typing import Any, TypeVar
 import numpy as np
 import torch
 from jaxtyping import Float, Int
-
 from torch import Tensor, arange, device as Device, dtype as DType, float32, tensor, zeros
 from torch.nn.functional import pad
 
@@ -16,6 +15,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 TColorPaletteAdapter = TypeVar("TColorPaletteAdapter", bound="SD1ColorPaletteAdapter[Any]")  # Self (see PEP 673)
+
 
 class ColorPaletteEncoder(fl.Chain):
     def __init__(
@@ -110,10 +110,8 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
 
         self._color_palette_encoder = [color_palette_encoder]
 
-        self.sub_adapters : list[CrossAttentionAdapter] = [
-            CrossAttentionAdapter(
-                target=cross_attn, scale=scale
-            )
+        self.sub_adapters: list[CrossAttentionAdapter] = [
+            CrossAttentionAdapter(target=cross_attn, scale=scale)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 

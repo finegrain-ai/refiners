@@ -7,8 +7,6 @@ from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, cat, randn, tensor
 from torch.utils.data import Dataset
-from pydantic import BaseModel
-from refiners.training_utils.wandb import WandbLoggable
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
@@ -20,19 +18,22 @@ from refiners.foundationals.latent_diffusion import (
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
+    CaptionImage,
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
+    TestDiffusionBaseConfig,
     TextEmbeddingLatentsBaseDataset,
     TextEmbeddingLatentsBatch,
-    CaptionImage,
-    TestDiffusionBaseConfig
 )
+from refiners.training_utils.wandb import WandbLoggable
+
 
 class ColorPaletteConfig(BaseModel):
     model_dim: int
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
+
 
 class ColorPalettePromptConfig(BaseModel):
     text: str
@@ -42,17 +43,21 @@ class ColorPalettePromptConfig(BaseModel):
 class ColorPaletteDatasetConfig(HuggingfaceDatasetConfig):
     local_folder: str = "data/color-palette"
 
+
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     prompts: list[ColorPalettePromptConfig]
 
+
 @dataclass
-class TextEmbeddingColorPaletteLatentsBatch (TextEmbeddingLatentsBatch):
+class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
     text_embeddings: Tensor
     latents: Tensor
     color_palette_embeddings: Tensor
 
+
 class CaptionPaletteImage(CaptionImage):
     palette_8: list[list[float]]
+
 
 class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
     def __init__(
@@ -85,9 +90,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         clip_text_embedding = self.text_encoder(processed_caption).to(device=self.trainer.device)
         color_palette_embedding = self.color_palette_encoder(color_palette).to(device=self.trainer.device)
         return TextEmbeddingColorPaletteLatentsBatch(
-            text_embeddings=clip_text_embedding, 
-            latents=latents, 
-            color_palette_embeddings=color_palette_embedding
+            text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
         )
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
@@ -97,7 +100,6 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         return TextEmbeddingColorPaletteLatentsBatch(
             text_embeddings=text_embeddings, latents=latents, color_palette_embeddings=color_palette_embeddings
         )
-
 
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
@@ -116,7 +118,9 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
         self.models["unet"].train = False
 
 
-class ColorPaletteLatentDiffusionTrainer(LatentDiffusionBaseTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]):
+class ColorPaletteLatentDiffusionTrainer(
+    LatentDiffusionBaseTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]
+):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
@@ -248,4 +252,3 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
             tensors=tensors,
             metadata=metadata,
         )
-

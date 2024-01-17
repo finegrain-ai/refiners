@@ -1,7 +1,7 @@
 import random
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from abc import abstractmethod
 from typing import Any, Callable, TypedDict, TypeVar
 
 from datasets import DownloadManager  # type: ignore
@@ -44,12 +44,15 @@ class TestDiffusionBaseConfig(BaseModel):
     prompts: list[Any] = []
     num_images_per_prompt: int = 1
 
+
 class TestDiffusionConfig(TestDiffusionBaseConfig):
     prompts: list[str]
+
 
 class FinetuneLatentDiffusionBaseConfig(BaseConfig):
     dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
+
 
 class FinetuneLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     test_diffusion: TestDiffusionConfig
@@ -58,6 +61,7 @@ class FinetuneLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
 ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionBaseConfig)
 BatchType = TypeVar("BatchType", bound=Any)
 DiffusionConfigType = TypeVar("DiffusionConfigType", bound=FinetuneLatentDiffusionConfig)
+
 
 @dataclass
 class TextEmbeddingLatentsBatch:
@@ -69,9 +73,6 @@ class CaptionImage(TypedDict):
     caption: str
     image: Image.Image
     url: str
-
-
-
 
 
 class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
@@ -113,7 +114,9 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
     def get_caption(self, index: int, caption_key: str) -> str:
         caption = self.dataset[index][caption_key]
         if not isinstance(caption, str):
-            raise RuntimeError(f"Dataset item at index [{index}] and caption_key [{caption_key}] does not contain a string caption")
+            raise RuntimeError(
+                f"Dataset item at index [{index}] and caption_key [{caption_key}] does not contain a string caption"
+            )
         return caption
 
     def get_image(self, index: int) -> Image.Image:
@@ -125,17 +128,18 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
             return Image.open(filename)
         else:
             raise RuntimeError(f"Dataset item at index [{index}] does not contain 'image' or 'url'")
-    
+
     @abstractmethod
     def __getitem__(self, index: int) -> BatchType:
         ...
-    
+
     @abstractmethod
     def collate_fn(self, batch: list[BatchType]) -> BatchType:
         ...
 
     def __len__(self) -> int:
         return len(self.dataset)
+
 
 class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingLatentsBatch]):
     def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
@@ -156,6 +160,7 @@ class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingL
         text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
         latents = cat(tensors=[item.latents for item in batch])
         return TextEmbeddingLatentsBatch(text_embeddings=text_embeddings, latents=latents)
+
 
 class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
     @cached_property
@@ -187,7 +192,6 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
         self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
         return ddpm_scheduler
 
-
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
@@ -199,11 +203,11 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
     @cached_property
     def mse_loss(self) -> Callable[[Tensor, Tensor], Tensor]:
         return self.sharding_manager.wrap_device(mse_loss, self.device)
-    
+
     @abstractmethod
     def compute_loss(self, batch: BatchType) -> Tensor:
         ...
-    
+
     @abstractmethod
     def compute_evaluation(self) -> None:
         ...
@@ -212,7 +216,7 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
 class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, TextEmbeddingLatentsBatch]):
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
         return TextEmbeddingLatentsDataset(trainer=self)
-    
+
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
         timestep = self.sample_timestep()
@@ -248,7 +252,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         self.log(data=images)
-    
+
     @cached_property
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
@@ -259,7 +263,8 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
-    
+
+
 def sample_noise(
     size: tuple[int, ...],
     offset_noise: float = 0.1,
