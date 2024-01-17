@@ -128,7 +128,10 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-
+    
+    def set_color_palette_embedding(self, color_palette_embedding: Tensor) -> None:
+        self.set_context("ip_adapter", {"color_palette_embedding": color_palette_embedding})
+    
     @property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         return self._color_palette_encoder[0]

@@ -178,14 +178,20 @@ class ColorPaletteLatentDiffusionTrainer(
         loss = self.mse_loss(prediction, noise)
         return loss
 
-    def compute_evaluation(self) -> None:
-        sd = StableDiffusion_1(
-            unet=self.unet,
-            lda=self.lda,
-            clip_text_encoder=self.text_encoder,
-            scheduler=DPMSolver(num_inference_steps=self.config.test_color_palette.num_inference_steps),
+    @cached_property
+    def sd(self) -> StableDiffusion_1:
+        scheduler = DPMSolver(
             device=self.device,
+            num_inference_steps=self.config.test_color_palette.num_inference_steps,
         )
+
+        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
+
+        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+
+
+    def compute_evaluation(self) -> None:
+        sd = self.sd
         prompts = self.config.test_color_palette.prompts
         num_images_per_prompt = self.config.test_color_palette.num_images_per_prompt
         images: dict[str, WandbLoggable] = {}
@@ -204,11 +210,11 @@ class ColorPaletteLatentDiffusionTrainer(
                     tensor([prompt.color_palette])
                 )
 
-                negative_text_embedding, conditional_text_embedding = cfg_clip_text_embedding.chunk(2)
+                negative_text_embedding, conditional_text_embedding = cfg_clip_text_embedding.to(device= self.device).chunk(2)
                 (
                     negative_color_palette_embedding,
                     conditional_color_palette_embedding,
-                ) = cfg_color_palette_embedding.chunk(2)
+                ) = cfg_color_palette_embedding.to(device= self.device).chunk(2)
 
                 cfg_merged_clip_text_embedding = cat(
                     (
@@ -232,6 +238,7 @@ class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = SD1ColorPaletteAdapter(target=trainer.unet, color_palette_encoder=trainer.color_palette_encoder)
         adapter.inject()
+        trainer.set_adapter(adapter=adapter)
 
 
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):

@@ -59,7 +59,7 @@ resize_image_max_size = 512
 # save_folder = "/path/to/ckpts"
 save_interval = "1:step"
 
-[test_diffusion]
+[test_color_palette]
 num_inference_steps = 30
 use_short_prompts = false
 prompts = [
