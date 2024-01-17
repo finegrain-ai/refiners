@@ -1,7 +1,6 @@
 import torch
 
-import refiners.fluxion.layers as fl
-from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
+from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1UNet
 
@@ -14,7 +13,7 @@ def test_color_palette_encoder() -> None:
 
     color_palette_encoder = ColorPaletteEncoder(
         model_dim=in_channels, max_colors=max_colors, embedding_dim=cross_attn_2d.context_embedding_dim
-    ).to(device=0)
+    ).to(device="cuda:0")
 
     batch_size = 5
     color_size = 4

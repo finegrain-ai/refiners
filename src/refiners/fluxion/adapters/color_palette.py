@@ -1,26 +1,21 @@
-import math
-from typing import Any, Generic, Iterable, TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 import torch
 from jaxtyping import Float, Int
 
-# T = TypeVar("T", bound=fl.Chain)
-# TLoraAdapter = TypeVar("TLoraAdapter", bound="LoraAdapter[Any]")  # Self (see PEP 673)
-from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, exp, float32, sin, tensor, zeros
-from torch.nn import Parameter as TorchParameter
+from torch import Tensor, arange, device as Device, dtype as DType, float32, tensor, zeros
 from torch.nn.functional import pad
-from torch.nn.init import normal_, zeros_
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
-from refiners.foundationals.latent_diffusion.range_adapter import RangeEncoder, compute_sinusoidal_embedding
+from refiners.foundationals.latent_diffusion.range_adapter import compute_sinusoidal_embedding
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
-T = TypeVar("T", bound="SD1UNet | SDXLUNet")
-
+TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
+TColorPaletteAdapter = TypeVar("TColorPaletteAdapter", bound="SD1ColorPaletteAdapter[Any]")  # Self (see PEP 673)
 
 class ColorPaletteEncoder(fl.Chain):
     def __init__(
@@ -98,14 +93,14 @@ class ColorPaletteEncoder(fl.Chain):
         return pad(x, (0, 0, 0, padding_width))
 
 
-class SD1ColorPaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
+class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     # Prevent PyTorch module registration
     _color_palette_encoder: list[ColorPaletteEncoder]
 
     def __init__(
         self,
-        target: T,
-        color_palette_encoder: ColorPaletteEncoder | None = None,
+        target: TSDNet,
+        color_palette_encoder: ColorPaletteEncoder,
         scale: float = 1.0,
         device: Device | str | None = None,
         dtype: DType | None = None,
@@ -115,14 +110,14 @@ class SD1ColorPaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
 
         self._color_palette_encoder = [color_palette_encoder]
 
-        self.sub_adapters = [
+        self.sub_adapters : list[CrossAttentionAdapter] = [
             CrossAttentionAdapter(
-                target=cross_attn, scale=scale, image_sequence_length=color_palette_encoder.max_colors
+                target=cross_attn, scale=scale
             )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
-    def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter":
+    def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter[Any]":
         for adapter in self.sub_adapters:
             adapter.inject()
         return super().inject(parent)
@@ -139,6 +134,3 @@ class SD1ColorPaletteAdapter(Generic[T], fl.Chain, Adapter[T]):
     @property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         return self._color_palette_encoder[0]
-
-    def encode_colors(self, x: Int[Tensor, "*batch n 3"]) -> Float[Tensor, "*batch max_colors model_dim"]:
-        encoded = self.color_palette_encoder[0](x)

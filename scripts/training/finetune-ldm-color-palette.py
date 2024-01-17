@@ -1,17 +1,14 @@
-import hashlib
-import os
 from dataclasses import dataclass
 from functools import cached_property
-from random import random
 from typing import Any
 
-import requests
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, cat, float32, randn, tensor
+from torch import Tensor, cat, randn, tensor
 from torch.utils.data import Dataset
-from tqdm import tqdm
+from pydantic import BaseModel
+from refiners.training_utils.wandb import WandbLoggable
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
@@ -24,12 +21,11 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionConfig,
-    LatentDiffusionConfig,
     LatentDiffusionTrainer,
-    TestDiffusionConfig,
     TextEmbeddingLatentsDataset,
+    TextEmbeddingLatentsBatch,
+    CaptionImage
 )
-
 
 class ColorPaletteConfig(BaseModel):
     model_dim: int
@@ -37,28 +33,24 @@ class ColorPaletteConfig(BaseModel):
     use_only_trigger_probability: float = 0.0
     max_colors: int
 
-
 class ColorPalettePromptConfig(BaseModel):
     text: str
     color_palette: list[list[float]]
 
 
-class TestColorPaletteConfig(TestDiffusionConfig):
-    prompts: list[ColorPalettePromptConfig] = []
-
-
 class ColorPaletteDatasetConfig(HuggingfaceDatasetConfig):
     local_folder: str = "data/color-palette"
 
-
 @dataclass
-class TextEmbeddingColorPaletteLatentsBatch:
+class TextEmbeddingColorPaletteLatentsBatch (TextEmbeddingLatentsBatch):
     text_embeddings: Tensor
     latents: Tensor
     color_palette_embeddings: Tensor
 
+class CaptionPaletteImage(CaptionImage):
+    palette_8: list[list[float]]
 
-class ColorPaletteDataset(TextEmbeddingLatentsDataset):
+class ColorPaletteDataset(TextEmbeddingLatentsDataset[TextEmbeddingColorPaletteLatentsBatch]):
     def __init__(
         self,
         trainer: "ColorPaletteLatentDiffusionTrainer",
@@ -69,65 +61,12 @@ class ColorPaletteDataset(TextEmbeddingLatentsDataset):
         logger.info(f"Trigger phrase: {self.trigger_phrase}")
         self.color_palette_encoder = trainer.color_palette_encoder
 
-        self.local_folder = trainer.config.dataset.local_folder
-
-        # Download images
-        # Question : there might be a more efficient way to do this
-        # I didn't find the way to do this easily with hugging face
-        # dataset library
-        for item in tqdm(self.dataset, desc="Downloading images"):
-            self.download_image(item)
-
-    def get_image_path_from_url(self, url: str) -> str:
-        hash_md5 = hashlib.md5()
-        hash_md5.update(url.encode())
-        filename = hash_md5.hexdigest()
-        return self.local_folder + f"/{filename}"
-
-    def download_image(self, item: dict[str, Any]) -> None:
-        url = item["url"]
-        image_path = self.get_image_path_from_url(url)
-        if not os.path.exists(image_path):
-            # download image from url
-            logger.info(f"Downloading image {image_path} from {url}")
-            response = requests.get(url)
-
-            # Check if the request was successful
-            if response.status_code == 200:
-                # Save the image bytes to the image_path
-                with open(image_path, "wb") as file:
-                    file.write(response.content)
-            else:
-                print(f"Failed to download image from {url}")
-                return None
-
-    def get_caption(self, index: int) -> str:
-        return self.dataset[index]["ai_description"]
-
-    def get_image(self, index: int) -> str:
-        url = self.dataset[index]["url"]
-        image_path = self.get_image_path_from_url(url)
-
-        if not os.path.exists(image_path):
-            raise Exception(f"Image {image_path} does not exist")
-        return Image.open(image_path)
-
-    def process_caption(self, caption: str) -> str:
-        caption = super().process_caption(caption=caption)
-        if self.trigger_phrase:
-            caption = (
-                f"{self.trigger_phrase} {caption}"
-                if random() < self.use_only_trigger_probability
-                else self.trigger_phrase
-            )
-        return caption
-
     def get_color_palette(self, index: int) -> Tensor:
         # TO IMPLEMENT : use other palettes
         return tensor([self.dataset[index]["palette_8"]])
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
-        caption = self.get_caption(index=index)
+        caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
         color_palette = self.get_color_palette(index=index)
         image = self.get_image(index=index)
         resized_image = self.resize_image(
@@ -136,13 +75,15 @@ class ColorPaletteDataset(TextEmbeddingLatentsDataset):
             max_size=self.config.dataset.resize_image_max_size,
         )
         processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image).to(device=self.device)
+        latents = self.lda.encode_image(image=processed_image).to(device=self.trainer.device)
         processed_caption = self.process_caption(caption=caption)
 
-        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.device)
-        color_palette_embedding = self.color_palette_encoder(color_palette).to(device=self.device)
+        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.trainer.device)
+        color_palette_embedding = self.color_palette_encoder(color_palette).to(device=self.trainer.device)
         return TextEmbeddingColorPaletteLatentsBatch(
-            text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
+            text_embeddings=clip_text_embedding, 
+            latents=latents, 
+            color_palette_embeddings=color_palette_embedding
         )
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
@@ -154,11 +95,12 @@ class ColorPaletteDataset(TextEmbeddingLatentsDataset):
         )
 
 
+
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
-    dataset: ColorPaletteDatasetConfig
-    latent_diffusion: LatentDiffusionConfig
     color_palette: ColorPaletteConfig
-    test_diffusion: TestColorPaletteConfig
+    # TODO : find a way to move this to FinetuneLatentDiffusionConfig.test_diffusion
+    # without breaking the pyright type checking
+    color_palette_prompts: list[ColorPalettePromptConfig]
 
     def model_post_init(self, __context: Any) -> None:
         """Pydantic v2 does post init differently, so we need to override this method too."""
@@ -172,7 +114,7 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionConfig):
         self.models["unet"].train = False
 
 
-class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLatentDiffusionConfig]):
+class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
@@ -208,7 +150,7 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
             "color_palette_encoder": self.color_palette_encoder,
         }
 
-    def set_adapter(self, adapter) -> None:
+    def set_adapter(self, adapter: SD1ColorPaletteAdapter[Any]) -> None:
         self.adapter = adapter
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
@@ -227,7 +169,7 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
 
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
         prediction = self.unet(noisy_latents)
-        loss = mse_loss(input=prediction, target=noise)
+        loss = self.mse_loss(prediction, noise)
         return loss
 
     def compute_evaluation(self) -> None:
@@ -238,10 +180,8 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
             scheduler=DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps),
             device=self.device,
         )
-        prompts = self.config.test_diffusion.prompts
+        prompts = self.config.color_palette_prompts
         num_images_per_prompt = self.config.test_diffusion.num_images_per_prompt
-        if self.config.test_diffusion.use_short_prompts:
-            prompts = [prompt.split(sep=",")[0] for prompt in prompts]
         images: dict[str, WandbLoggable] = {}
         for prompt in prompts:
             canvas_image: Image.Image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
@@ -250,13 +190,13 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
                 logger.info(
                     f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt.text} and palette {prompt.color_palette}"
                 )
-                x = randn(1, 4, 64, 64, device=self.device)
+                x = randn(1, 4, 64, 64)
 
                 # cfg means classifier-free guidance
-                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
+                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text)
                 cfg_color_palette_embedding = self.color_palette_encoder.compute_cfg_color_palette_embedding(
                     tensor([prompt.color_palette])
-                ).to(device=self.device)
+                )
 
                 negative_text_embedding, conditional_text_embedding = cfg_clip_text_embedding.chunk(2)
                 (
@@ -284,12 +224,7 @@ class ColorPaletteLatentDiffusionTrainer(LatentDiffusionTrainer[ColorPaletteLate
 
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
-        color_palette_config = trainer.config.color_palette
-
         adapter = SD1ColorPaletteAdapter(target=trainer.unet, color_palette_encoder=trainer.color_palette_encoder)
-
-        trainer.set_adapter(adapter)
-
         adapter.inject()
 
 
@@ -299,6 +234,8 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
         metadata: dict[str, str] = {}
 
         model = trainer.unet
+        if model.parent is None:
+            raise ValueError("The model must have a parent.")
         adapter = model.parent
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
