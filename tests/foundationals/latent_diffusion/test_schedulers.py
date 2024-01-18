@@ -46,7 +46,6 @@ def test_ddim_diffusers():
         beta_schedule="scaled_linear",
         beta_start=0.00085,
         num_train_timesteps=1000,
-        set_alpha_to_one=False,
         steps_offset=1,
         clip_sample=False,
     )
@@ -103,7 +102,6 @@ def test_scheduler_remove_noise():
         beta_schedule="scaled_linear",
         beta_start=0.00085,
         num_train_timesteps=1000,
-        set_alpha_to_one=False,
         steps_offset=1,
         clip_sample=False,
     )
