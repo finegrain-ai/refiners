@@ -229,9 +229,14 @@ def download_vae_ft_mse():
     )
 
 
-def download_lora():
-    dest_folder = os.path.join(test_weights_dir, "pcuenq", "pokemon-lora")
+def download_loras():
+    dest_folder = os.path.join(test_weights_dir, "loras", "pokemon-lora")
     download_file("https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin", dest_folder)
+
+    dest_folder = os.path.join(test_weights_dir, "loras", "dpo-lora")
+    download_file(
+        "https://huggingface.co/radames/sdxl-DPO-LoRA/resolve/main/pytorch_lora_weights.safetensors", dest_folder
+    )
 
 
 def download_preprocessors():
@@ -454,17 +459,6 @@ def convert_vae_fp16_fix():
     )
 
 
-def convert_lora():
-    os.makedirs("tests/weights/loras", exist_ok=True)
-    run_conversion_script(
-        "convert_diffusers_lora.py",
-        "tests/weights/pcuenq/pokemon-lora/pytorch_lora_weights.bin",
-        "tests/weights/loras/pcuenq_pokemon_lora.safetensors",
-        additional_args=["--base-model", "tests/weights/runwayml/stable-diffusion-v1-5"],
-        expected_hash="a9d7e08e",
-    )
-
-
 def convert_preprocessors():
     subprocess.run(
         [
@@ -632,7 +626,7 @@ def download_all():
     download_sdxl("stabilityai/stable-diffusion-xl-base-1.0")
     download_vae_ft_mse()
     download_vae_fp16_fix()
-    download_lora()
+    download_loras()
     download_preprocessors()
     download_controlnet()
     download_unclip()
@@ -647,7 +641,7 @@ def convert_all():
     convert_sdxl()
     convert_vae_ft_mse()
     convert_vae_fp16_fix()
-    convert_lora()
+    # Note: no convert loras: this is done at runtime by `SDLoraManager`
     convert_preprocessors()
     convert_controlnet()
     convert_unclip()

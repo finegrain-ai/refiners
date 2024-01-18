@@ -48,6 +48,7 @@ Special cases:
     - `expected_restart.png`
     - `expected_freeu.png`
     - `expected_dropy_slime_9752.png`
+    - `expected_sdxl_dpo_lora.png`
 
 ## Other images
 
