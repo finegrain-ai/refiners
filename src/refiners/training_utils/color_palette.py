@@ -157,7 +157,7 @@ class ColorPaletteLatentDiffusionTrainer(
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "lda": self.lda,
-            "color_palette_encoder": self.color_palette_encoder
+            "color_palette_encoder": self.color_palette_encoder,
         }
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
