@@ -93,7 +93,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         # [original_height, original_width, crop_top, crop_left, target_height, target_width]
         # See https://arxiv.org/abs/2307.01952 > 2.2 Micro-Conditioning
         time_ids = torch.tensor(data=[1024, 1024, 0, 0, 1024, 1024], device=self.device)
-        return time_ids.repeat(2, 1)
+        return time_ids.repeat(2 if self.classifier_free_guidance else 1, 1)
 
     def set_unet_context(
         self,
