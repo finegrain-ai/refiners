@@ -158,16 +158,6 @@ You should get:
 
 ![dropy slime output](https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/dropy_slime_9752.png)
 
-### Training
-
-Refiners has a built-in training utils library and provides scripts that can be used as a starting point.
-
-E.g. to train a LoRA on top of Stable Diffusion, copy and edit `configs/finetune-lora.toml` to suit your needs and launch the training as follows:
-
-```bash
-python scripts/training/finetune-ldm-lora.py configs/finetune-lora.toml
-```
-
 ## Adapter Zoo
 
 For now, given [finegrain](https://finegrain.ai)'s mission, we are focusing on image edition tasks. We support:
