@@ -1,4 +1,4 @@
-from typing import Any, TypeVar
+from typing import Any, List, TypeVar
 
 import numpy as np
 import torch
@@ -53,18 +53,19 @@ class ColorPaletteEncoder(fl.Chain):
         embedding = compute_sinusoidal_embedding(range, embedding_dim=self.model_dim)
         return embedding.squeeze(1).unsqueeze(0).repeat(x.shape[0], 1, 1)
 
-    def compute_cfg_color_palette_embedding(
+    def compute_color_palette_embedding(
         self,
-        x: Int[Tensor, "*batch n_colors 3"],
+        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[Int]]],
         negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
-        conditional_embedding = self(x)
+        tensor_x = tensor(x, device=self.device, dtype=self.dtype)
+        conditional_embedding = self(tensor_x)
         if x == negative_color_palette:
             return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
         if negative_color_palette is None:
             # a palette without any color in it
-            negative_color_palette = zeros(x.shape[0], 0, 3)
+            negative_color_palette = zeros(tensor_x.shape[0], 0, 3)
 
         negative_embedding = self(negative_color_palette)
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
@@ -128,10 +129,10 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-    
+
     def set_color_palette_embedding(self, color_palette_embedding: Tensor) -> None:
-        self.set_context("ip_adapter", {"color_palette_embedding": color_palette_embedding})
-    
+        self.set_context("ip_adapter", {"clip_image_embedding": color_palette_embedding})
+
     @property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         return self._color_palette_encoder[0]

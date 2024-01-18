@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+from random import randint
 from typing import Any
 
 from loguru import logger
@@ -56,6 +57,13 @@ class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
 
 
 class CaptionPaletteImage(CaptionImage):
+    palette_1: list[list[float]]
+    palette_2: list[list[float]]
+    palette_3: list[list[float]]
+    palette_4: list[list[float]]
+    palette_5: list[list[float]]
+    palette_6: list[list[float]]
+    palette_7: list[list[float]]
     palette_8: list[list[float]]
 
 
@@ -71,8 +79,9 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         self.color_palette_encoder = trainer.color_palette_encoder
 
     def get_color_palette(self, index: int) -> Tensor:
-        # TO IMPLEMENT : use other palettes
-        return tensor([self.dataset[index]["palette_8"]])
+        # Randomly pick a palette between 1 and 8
+        palette_index = randint(1, 8)
+        return tensor([self.dataset[index][f"palette_{palette_index}"]])
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
@@ -84,11 +93,11 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
             max_size=self.config.dataset.resize_image_max_size,
         )
         processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image).to(device=self.trainer.device)
+        latents = self.lda.encode_image(image=processed_image)
         processed_caption = self.process_caption(caption=caption)
 
-        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.trainer.device)
-        color_palette_embedding = self.color_palette_encoder(color_palette).to(device=self.trainer.device)
+        clip_text_embedding = self.text_encoder(processed_caption)
+        color_palette_embedding = self.color_palette_encoder(color_palette)
         return TextEmbeddingColorPaletteLatentsBatch(
             text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
         )
@@ -105,17 +114,6 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     test_color_palette: TestColorPaletteConfig
-
-    def model_post_init(self, __context: Any) -> None:
-        """Pydantic v2 does post init differently, so we need to override this method too."""
-        logger.info("Freezing models to train only the color palette.")
-        self.models["text_encoder"].train = False
-        self.models["lda"].train = False
-        self.models["color_palette_encoder"].train = True
-
-        # Question : Here I should not freeze the CrossAttentionBlock2d
-        # But what is the unfreeze only this block ?
-        self.models["unet"].train = False
 
 
 class ColorPaletteLatentDiffusionTrainer(
@@ -137,6 +135,12 @@ class ColorPaletteLatentDiffusionTrainer(
             device=self.device,
         )
 
+    @cached_property
+    def color_palette_adapter(self) -> ColorPaletteEncoder:
+        adapter = SD1ColorPaletteAdapter(target=self.unet, color_palette_encoder=self.color_palette_encoder)
+
+        return adapter
+
     def __init__(
         self,
         config: ColorPaletteLatentDiffusionConfig,
@@ -153,11 +157,8 @@ class ColorPaletteLatentDiffusionTrainer(
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "lda": self.lda,
-            "color_palette_encoder": self.color_palette_encoder,
+            "color_palette_encoder": self.color_palette_encoder
         }
-
-    def set_adapter(self, adapter: SD1ColorPaletteAdapter[Any]) -> None:
-        self.adapter = adapter
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
         text_embeddings, latents, color_palette_embeddings = (
@@ -168,12 +169,11 @@ class ColorPaletteLatentDiffusionTrainer(
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-
         self.unet.set_timestep(timestep=timestep)
 
-        clip_text_embedding = cat([text_embeddings, color_palette_embeddings], dim=1)
+        self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
+        self.color_palette_adapter.set_color_palette_embedding(color_palette_embeddings)
 
-        self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
         prediction = self.unet(noisy_latents)
         loss = self.mse_loss(prediction, noise)
         return loss
@@ -189,7 +189,6 @@ class ColorPaletteLatentDiffusionTrainer(
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
 
-
     def compute_evaluation(self) -> None:
         sd = self.sd
         prompts = self.config.test_color_palette.prompts
@@ -204,41 +203,28 @@ class ColorPaletteLatentDiffusionTrainer(
                 )
                 x = randn(1, 4, 64, 64)
 
-                # cfg means classifier-free guidance
-                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text)
-                cfg_color_palette_embedding = self.color_palette_encoder.compute_cfg_color_palette_embedding(
-                    tensor([prompt.color_palette])
+                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
+                cfg_color_palette_embedding = self.color_palette_encoder.compute_color_palette_embedding(
+                    [prompt.color_palette]
                 )
 
-                negative_text_embedding, conditional_text_embedding = cfg_clip_text_embedding.to(device= self.device).chunk(2)
-                (
-                    negative_color_palette_embedding,
-                    conditional_color_palette_embedding,
-                ) = cfg_color_palette_embedding.to(device= self.device).chunk(2)
-
-                cfg_merged_clip_text_embedding = cat(
-                    (
-                        cat([negative_text_embedding, negative_color_palette_embedding], dim=1),
-                        cat([conditional_text_embedding, conditional_color_palette_embedding], dim=1),
-                    )
-                )
+                self.color_palette_adapter.set_color_palette_embedding(cfg_color_palette_embedding)
 
                 for step in sd.steps:
                     x = sd(
                         x,
                         step=step,
-                        clip_text_embedding=cfg_merged_clip_text_embedding,
+                        clip_text_embedding=cfg_clip_text_embedding,
                     )
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+
             images[image_name] = canvas_image
         self.log(data=images)
 
 
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
-        adapter = SD1ColorPaletteAdapter(target=trainer.unet, color_palette_encoder=trainer.color_palette_encoder)
-        adapter.inject()
-        trainer.set_adapter(adapter=adapter)
+        trainer.color_palette_adapter.inject()
 
 
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
