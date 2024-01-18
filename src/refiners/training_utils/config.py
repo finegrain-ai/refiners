@@ -174,6 +174,7 @@ class ModelConfig(BaseModel):
     checkpoint: Path | None = None
     train: bool = True
     learning_rate: float | None = None  # TODO: Implement this
+    gpu_index: int | None = None
 
 
 class GyroDropoutConfig(BaseModel):
@@ -231,5 +232,4 @@ class BaseConfig(BaseModel):
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:
         with open(file=toml_path, mode="rb") as f:
             config_dict = tomli.load(f)
-
         return cls(**config_dict)

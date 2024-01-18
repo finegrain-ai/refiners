@@ -27,19 +27,12 @@ class StableDiffusion_XL(LatentDiffusionModel):
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
-        unet = unet or SDXLUNet(in_channels=4)
-        lda = lda or SDXLAutoencoder()
-        clip_text_encoder = clip_text_encoder or DoubleTextEncoder()
-        scheduler = scheduler or DDIM(num_inference_steps=30)
+        unet = unet or SDXLUNet(in_channels=4, device=device, dtype=dtype)
+        lda = lda or SDXLAutoencoder(device=device, dtype=dtype)
+        clip_text_encoder = clip_text_encoder or DoubleTextEncoder(device=device, dtype=dtype)
+        scheduler = scheduler or DDIM(num_inference_steps=30, device=device, dtype=dtype)
 
-        super().__init__(
-            unet=unet,
-            lda=lda,
-            clip_text_encoder=clip_text_encoder,
-            scheduler=scheduler,
-            device=device,
-            dtype=dtype,
-        )
+        super().__init__(unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, scheduler=scheduler)
 
     def compute_clip_text_embedding(self, text: str, negative_text: str | None = None) -> tuple[Tensor, Tensor]:
         conditional_embedding, conditional_pooled_embedding = self.clip_text_encoder(text)
