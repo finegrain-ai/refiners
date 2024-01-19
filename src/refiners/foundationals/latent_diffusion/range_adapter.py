@@ -32,14 +32,14 @@ class RangeEncoder(fl.Chain):
         self.sinusoidal_embedding_dim = sinusoidal_embedding_dim
         self.embedding_dim = embedding_dim
         super().__init__(
-            fl.Lambda(self.compute_sinuosoidal_embedding),
+            fl.Lambda(self.compute_sinusoidal_embedding),
             fl.Converter(set_device=False, set_dtype=True),
             fl.Linear(in_features=sinusoidal_embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
             fl.SiLU(),
             fl.Linear(in_features=embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
         )
 
-    def compute_sinuosoidal_embedding(self, x: Int[Tensor, "*batch 1"]) -> Float[Tensor, "*batch 1 embedding_dim"]:
+    def compute_sinusoidal_embedding(self, x: Int[Tensor, "*batch 1"]) -> Float[Tensor, "*batch 1 embedding_dim"]:
         return compute_sinusoidal_embedding(x, embedding_dim=self.sinusoidal_embedding_dim)
 
 
