@@ -7,7 +7,7 @@ import transformers  # type: ignore
 from diffusers import StableDiffusionPipeline  # type: ignore
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import load_from_safetensors, no_grad
+from refiners.fluxion.utils import load_from_safetensors, load_tensors, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender, TokenExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
@@ -76,12 +76,12 @@ def prompt(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="module")
 def gta5_artwork_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
-    return torch.load(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]  # type: ignore
+    return load_tensors(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]
 
 
 @pytest.fixture(scope="module")
 def cat_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
-    return torch.load(test_textual_inversion_path / "cat-toy" / "learned_embeds.bin")["<cat-toy>"]  # type: ignore
+    return load_tensors(test_textual_inversion_path / "cat-toy" / "learned_embeds.bin")["<cat-toy>"]
 
 
 def test_tokenizer_with_special_character():

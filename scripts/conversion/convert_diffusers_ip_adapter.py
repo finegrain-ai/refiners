@@ -4,7 +4,7 @@ from typing import Any
 
 import torch
 
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.utils import load_tensors, save_to_safetensors
 from refiners.foundationals.latent_diffusion import SD1IPAdapter, SD1UNet, SDXLIPAdapter, SDXLUNet
 
 # Running:
@@ -66,7 +66,7 @@ def main() -> None:
     if args.output_path is None:
         args.output_path = f"{Path(args.source_path).stem}.safetensors"
 
-    weights: dict[str, Any] = torch.load(f=args.source_path, map_location="cpu")  # type: ignore
+    weights: dict[str, Any] = load_tensors(args.source_path, device="cpu")
     assert isinstance(weights, dict)
     assert sorted(weights.keys()) == ["image_proj", "ip_adapter"]
 
