@@ -5,8 +5,9 @@ from refiners.foundationals.latent_diffusion.schedulers.scheduler import Schedul
 
 class DDPM(Scheduler):
     """
-    The Denoising Diffusion Probabilistic Models (DDPM) is a specific type of diffusion model,
-    which uses a specific strategy to generate the timesteps and applies the diffusion process in a specific way.
+    Denoising Diffusion Probabilistic Model
+
+    Only used for training Latent Diffusion models. Cannot be called.
     """
 
     def __init__(
