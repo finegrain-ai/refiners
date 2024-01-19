@@ -18,7 +18,7 @@ from torch import Tensor
 
 from refiners.fluxion import manual_seed
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.fluxion.utils import image_to_tensor, no_grad
+from refiners.fluxion.utils import image_to_tensor, load_tensors, no_grad
 from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
 from refiners.foundationals.segment_anything.model import SegmentAnythingH
 from refiners.foundationals.segment_anything.transformer import TwoWayTranformerLayer
@@ -69,7 +69,7 @@ def facebook_sam_h(facebook_sam_h_weights: Path, test_device: torch.device) -> F
     from segment_anything import build_sam_vit_h  # type: ignore
 
     sam_h = cast(FacebookSAM, build_sam_vit_h())
-    sam_h.load_state_dict(state_dict=torch.load(f=facebook_sam_h_weights))  # type: ignore
+    sam_h.load_state_dict(state_dict=load_tensors(facebook_sam_h_weights))
     return sam_h.to(device=test_device)
 
 

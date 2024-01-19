@@ -1,5 +1,6 @@
+import warnings
 from pathlib import Path
-from typing import Any, Iterable, Literal, TypeVar
+from typing import Any, Iterable, Literal, TypeVar, cast
 
 import torch
 from jaxtyping import Float
@@ -171,6 +172,25 @@ def safe_open(
         "numpy": "numpy",
     }
     return _safe_open(str(path), framework=framework_mapping[framework], device=str(device))  # type: ignore
+
+
+def load_tensors(path: Path | str, /, device: Device | str = "cpu") -> dict[str, Tensor]:
+    """
+    Load tensors from a file saved with `torch.save` from disk using the `weights_only` mode
+    for additional safety (see `torch.load` for more details). Still, *only load data you trust* and
+    favor using `load_from_safetensors`.
+    """
+    # see https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, message="TypedStorage is deprecated")
+        tensors = torch.load(path, map_location=device, weights_only=True)  # type: ignore
+
+    assert isinstance(tensors, dict) and all(
+        isinstance(key, str) and isinstance(value, Tensor)
+        for key, value in tensors.items()  # type: ignore
+    ), "Invalid tensor file, expected a dict[str, Tensor]"
+
+    return cast(dict[str, Tensor], tensors)
 
 
 def load_from_safetensors(path: Path | str, device: Device | str = "cpu") -> dict[str, Tensor]:

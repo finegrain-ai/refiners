@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, manual_seed, no_grad
+from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
     SD1ControlnetAdapter,
@@ -199,7 +199,7 @@ def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Im
         warn(f"could not find weights at {weights_path}, skipping")
         pytest.skip(allow_module_level=True)
 
-    tensors = torch.load(weights_path)  # type: ignore
+    tensors = load_tensors(weights_path)
     return expected_image, tensors
 
 
@@ -282,7 +282,7 @@ def hello_world_assets(ref_path: Path) -> tuple[Image.Image, Image.Image, Image.
 
 @pytest.fixture
 def text_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
-    return torch.load(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]  # type: ignore
+    return load_tensors(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]
 
 
 @pytest.fixture(scope="module")

@@ -1,4 +1,6 @@
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from warnings import warn
 
 import pytest
@@ -7,9 +9,11 @@ from PIL import Image
 from torch import device as Device, dtype as DType
 from torchvision.transforms.functional import gaussian_blur as torch_gaussian_blur  # type: ignore
 
+from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import (
     gaussian_blur,
     image_to_tensor,
+    load_tensors,
     manual_seed,
     no_grad,
     summarize_tensor,
@@ -95,3 +99,28 @@ def test_no_grad() -> None:
 
     w = x + 1
     assert w.requires_grad
+
+
+def test_load_tensors_valid_pickle(tmp_path: Path) -> None:
+    pickle_path = tmp_path / "valid.pickle"
+
+    tensors = {"easy-as.weight": torch.tensor([1.0, 2.0, 3.0])}
+    torch.save(tensors, pickle_path)  # type: ignore
+    loaded_tensor = load_tensors(pickle_path)
+    assert torch.equal(loaded_tensor["easy-as.weight"], tensors["easy-as.weight"])
+
+    tensors = {"easy-as.weight": torch.tensor([1, 2, 3]), "hello": "world"}
+    torch.save(tensors, pickle_path)  # type: ignore
+
+    with pytest.raises(AssertionError):
+        loaded_tensor = load_tensors(pickle_path)
+
+
+def test_load_tensors_invalid_pickle(tmp_path: Path) -> None:
+    invalid_pickle_path = tmp_path / "invalid.pickle"
+    model = fl.Chain(fl.Linear(1, 1))
+    torch.save(model, invalid_pickle_path)  # type: ignore
+    with pytest.raises(
+        pickle.UnpicklingError,
+    ):
+        load_tensors(invalid_pickle_path)
