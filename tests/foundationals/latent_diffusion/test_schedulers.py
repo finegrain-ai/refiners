@@ -133,5 +133,5 @@ def test_scheduler_device(test_device: Device):
     scheduler = DDIM(num_inference_steps=30, device=test_device)
     x = randn(1, 4, 32, 32, device=test_device)
     noise = randn(1, 4, 32, 32, device=test_device)
-    noised = scheduler.add_noise(x, noise, scheduler.steps[0])
+    noised = scheduler.add_noise(x, noise, scheduler.first_inference_step)
     assert noised.device == test_device
