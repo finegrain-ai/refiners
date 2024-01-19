@@ -93,7 +93,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
-        color_palette = tensor([self.get_color_palette(index=index)])
+        color_palette = tensor([self.get_color_palette(index=index)], dtype=self.trainer.dtype)
         image = self.get_image(index=index)
         resized_image = self.resize_image(
             image=image,
@@ -191,6 +191,7 @@ class ColorPaletteLatentDiffusionTrainer(
         scheduler = DPMSolver(
             device=self.device,
             num_inference_steps=self.config.test_color_palette.num_inference_steps,
+            dtype=self.dtype
         )
 
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
@@ -205,7 +206,7 @@ class ColorPaletteLatentDiffusionTrainer(
             logger.info(
                 f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt.text} and palette {prompt.color_palette}"
             )
-            x = randn(1, 4, 64, 64)
+            x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
 
             cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
             cfg_color_palette_embedding = self.color_palette_encoder.compute_color_palette_embedding(
@@ -229,15 +230,15 @@ class ColorPaletteLatentDiffusionTrainer(
     
     def compute_edge_case_evaluation(self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int) -> List[ImageAndPalette]:
         images: dict[str, WandbLoggable] = {}
-        imageAndPalettes: List[ImageAndPalette] = []
+        images_and_palettes: List[ImageAndPalette] = []
         for prompt in prompts:
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : {str(prompt.color_palette)}"
-            imageAndPalette = self.compute_prompt_evaluation(prompt, num_images_per_prompt)
-            images[image_name] = imageAndPalette['image']
-            imageAndPalettes.append(imageAndPalette)
+            image_and_palette = self.compute_prompt_evaluation(prompt, num_images_per_prompt)
+            images[image_name] = image_and_palette['image']
+            images_and_palettes.append(image_and_palette)
         
         self.log(data=images)
-        return imageAndPalettes
+        return images_and_palettes
         
     
     @cached_property
@@ -279,12 +280,12 @@ class ColorPaletteLatentDiffusionTrainer(
                 
         return ([y_true_ranking], [counts], distances_list)
     
-    def batch_image_palette_metrics(self, imageAndPalettes: List[ImageAndPalette]):
+    def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
 
         per_num : dict[int, Any] = {}
-        for imageAndPalette in imageAndPalettes:
-            palette = imageAndPalette['palette']
-            image = imageAndPalette['image']
+        for image_and_palette in images_and_palettes:
+            palette = image_and_palette['palette']
+            image = image_and_palette['image']
             num = len(palette)
             
             (y_true_ranking, counts, distances_list) = self.image_palette_metrics(image, palette)
@@ -300,20 +301,19 @@ class ColorPaletteLatentDiffusionTrainer(
                 per_num[num]["distances"] += distances_list
 
         for num in per_num:
-            print('num', num, per_num)
             if num > 1:
                 self.log({
-                    f"palette-img/ndcg_{num}": ndcg_score(per_num[num]["y_true_ranking"], per_num[num]["counts"]),
-                    f"palette-img/std_dev_{num}": np.std(per_num[num]["distances"])
+                    f"{prefix}/ndcg_{num}": ndcg_score(per_num[num]["y_true_ranking"], per_num[num]["counts"]),
+                    f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"])
                 })
             else:
                 self.log({
-                    f"palette-img/std_dev_{num}": np.std(per_num[num]["distances"])
+                    f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"])
                 })
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> None:
         sd = self.sd
         images: dict[str, WandbLoggable] = {}
-        imageAndPalettes : List[ImageAndPalette] = []
+        images_and_palettes : List[ImageAndPalette] = []
         palette_img_size = img_size//self.config.color_palette.max_colors
 
         for eval_index, db_index in enumerate(self.eval_indices):
@@ -322,33 +322,34 @@ class ColorPaletteLatentDiffusionTrainer(
             caption = self.dataset.get_caption(db_index, self.config.dataset.caption_key)
             
             prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
-            imageAndPalette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
+            image_and_palette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
             
             image = self.dataset.get_image(db_index)
             resized_image = image.resize((img_size, img_size))
             join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size*2+palette_img_size))
-            join_canvas_image.paste(imageAndPalette['image'], box=(0, 0))
+            join_canvas_image.paste(image_and_palette['image'], box=(0, 0))
             join_canvas_image.paste(resized_image, box=(0, img_size+palette_img_size))
             image_name = f"db_samples/{db_index}_{caption}"
 
             images[image_name] = join_canvas_image
+            images_and_palettes.append(image_and_palette)
             
         self.log(data=images)
-        return imageAndPalettes
+        return images_and_palettes
     
     def compute_evaluation(self) -> None:
         prompts = self.config.test_color_palette.prompts
         num_images_per_prompt = self.config.test_color_palette.num_images_per_prompt
-        imageAndPalettes : List[ImageAndPalette] = []
+        images_and_palettes : List[ImageAndPalette] = []
         if len(prompts) > 0:
-            imageAndPalettes += self.compute_edge_case_evaluation(prompts, num_images_per_prompt)
-        
+            images_and_palettes = self.compute_edge_case_evaluation(prompts, num_images_per_prompt)
+            self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-edge")
+
         num_palette_sample = self.config.test_color_palette.num_palette_sample
         if num_palette_sample > 0:
-            imageAndPalettes += self.compute_db_samples_evaluation(num_images_per_prompt)
-            
-        self.batch_image_palette_metrics(imageAndPalettes)
-
+            images_and_palettes += self.compute_db_samples_evaluation(num_images_per_prompt)
+            self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-samples")
+        
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = trainer.color_palette_adapter

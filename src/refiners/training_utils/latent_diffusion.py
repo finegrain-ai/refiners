@@ -260,6 +260,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
             device=self.device,
+            dtype=self.dtype,
             num_inference_steps=self.config.test_diffusion.num_inference_steps,
         )
 

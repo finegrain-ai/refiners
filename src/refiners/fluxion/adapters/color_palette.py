@@ -55,14 +55,13 @@ class ColorPaletteEncoder(fl.Chain):
         negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
-        print(tensor_x.dtype, self.dtype)
         conditional_embedding = self(tensor_x)
         if tensor_x == negative_color_palette:
             return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
         if negative_color_palette is None:
             # a palette without any color in it
-            negative_color_palette = zeros(tensor_x.shape[0], 0, 3)
+            negative_color_palette = zeros(tensor_x.shape[0], 0, 3, dtype=self.dtype, device=self.device)
 
         negative_embedding = self(negative_color_palette)
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)

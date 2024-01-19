@@ -110,10 +110,8 @@ class SimpleShardingManager(ShardingManager):
 
     def wrap_device(self, method: WrappableMethod, device: Device) -> WrappableMethod:
         def new_method(*args: List[Any], **kwargs: Dict[Any, Any]) -> Any:
-            print(f"in new method {args}")
             args = self.recursive_to(args, device)
             kwargs = self.recursive_to(kwargs, device)
-            print(f"in new method after {args}")
             return method(*args, **kwargs)
 
         return new_method
