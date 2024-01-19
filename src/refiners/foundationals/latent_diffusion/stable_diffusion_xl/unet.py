@@ -61,7 +61,7 @@ class TimestepEncoder(fl.Passthrough):
                 fl.Chain(
                     fl.UseContext(context="diffusion", key="timestep"),
                     RangeEncoder(
-                        sinuosidal_embedding_dim=320,
+                        sinusoidal_embedding_dim=320,
                         embedding_dim=self.timestep_embedding_dim,
                         device=device,
                         dtype=dtype,
