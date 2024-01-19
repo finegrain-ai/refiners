@@ -266,6 +266,9 @@ class ColorPaletteLatentDiffusionTrainer(
         
         distances_list = []
         
+        def distance(a, b):
+            return np.linalg.norm(a - b) 
+        
         for i in range(len(centroids)):
             cluster_points = points[np.where(indices == i)]
             distances = [distance(p, centroids[i]) for p in cluster_points]
@@ -297,11 +300,11 @@ class ColorPaletteLatentDiffusionTrainer(
             if num > 1:
                 self.log({
                     f"palette-img/ndcg_{num}": ndcg_score(per_num[num]["y_true_ranking"], per_num[num]["counts"]),
-                    f"palette-img/std_dev_{num}": calculate_std_dev()
+                    f"palette-img/std_dev_{num}": np.std(per_num[num]["distances"])
                 })
             else:
                 self.log({
-                    f"palette-img/std_dev_{num}": calculate_std_dev()
+                    f"palette-img/std_dev_{num}": np.std(per_num[num]["distances"])
                 })
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> None:
         sd = self.sd
