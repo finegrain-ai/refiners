@@ -79,6 +79,7 @@ def test_summarize_tensor() -> None:
     assert summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))
     assert summarize_tensor(torch.zeros(1, 3, 512, 512).bfloat16())
     assert summarize_tensor(torch.zeros(1, 3, 512, 512).bool())
+    assert summarize_tensor(torch.zeros(1, 0, 512, 512).int())
 
 
 def test_no_grad() -> None:
