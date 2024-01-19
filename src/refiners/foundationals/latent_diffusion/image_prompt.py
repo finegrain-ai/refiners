@@ -274,8 +274,7 @@ class ImageCrossAttention(fl.Chain):
     def scale(self, value: float) -> None:
         self._scale = value
         self.ensure_find(fl.Multiply).scale = value
-
-
+    
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
         self,
@@ -326,6 +325,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_key_projection.weight = nn.Parameter(key_tensor)
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.image_cross_attention.to(self.device, self.dtype)
+    
+    @property
+    def weights(self) -> list[Tensor]:
+        return [self.image_key_projection.weight, self.image_value_projection.weight]
 
 
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):

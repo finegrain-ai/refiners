@@ -60,7 +60,7 @@ class ColorPaletteEncoder(fl.Chain):
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
         conditional_embedding = self(tensor_x)
-        if x == negative_color_palette:
+        if tensor_x == negative_color_palette:
             return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
         if negative_color_palette is None:
@@ -84,14 +84,17 @@ class ColorPaletteEncoder(fl.Chain):
             .repeat(x.shape[0], 1, 1)
         )
 
-        return torch.cat((x, end_of_sequence_tensor), dim=1)
+        with_eos = torch.cat((x, end_of_sequence_tensor), dim=1)
+        return with_eos[:, : self.max_colors, :]
 
     def zero_right_padding(
         self, x: Float[Tensor, "*batch colors_with_end embedding_dim"]
     ) -> Float[Tensor, "*batch max_colors model_dim"]:
         # Zero padding for the right side
         padding_width = (self.max_colors - x.shape[1] % self.max_colors) % self.max_colors
-        return pad(x, (0, 0, 0, padding_width))
+
+        result = pad(x, (0, 0, 0, padding_width))
+        return result
 
 
 class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
@@ -115,7 +118,14 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
             CrossAttentionAdapter(target=cross_attn, scale=scale)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
-
+    
+    @property
+    def weights(self) -> List[Tensor]:
+        weights = []
+        for adapter in self.sub_adapters:
+            weights += adapter.weights
+        return weights
+            
     def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter[Any]":
         for adapter in self.sub_adapters:
             adapter.inject()

@@ -101,9 +101,12 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
     def load_huggingface_dataset(self) -> HuggingfaceDataset[Any]:
         dataset_config = self.config.dataset
         logger.info(f"Loading dataset from {dataset_config.hf_repo} revision {dataset_config.revision}")
-        return load_hf_dataset(
+        dataset = load_hf_dataset(
             path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
         )
+        if dataset_config.n_samples is not None:
+            dataset = dataset[:dataset_config.n_samples]
+        return dataset
 
     def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
         return resize_image(image=image, min_size=min_size, max_size=max_size)

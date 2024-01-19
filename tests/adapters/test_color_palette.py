@@ -26,6 +26,12 @@ def test_color_palette_encoder() -> None:
     assert encoded.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
 
     # test with 0-colors palette
-    encodeded_empty = color_palette_encoder(torch.zeros(batch_size, 0, 3))
-    assert isinstance(encodeded_empty.shape, torch.Size)
-    assert encodeded_empty.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+    encoded_empty = color_palette_encoder(torch.zeros(batch_size, 0, 3))
+    assert isinstance(encoded_empty.shape, torch.Size)
+    assert encoded_empty.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+    
+    # test with 10-colors palette
+    encoded_full = color_palette_encoder(torch.zeros(batch_size, max_colors, 3))
+    assert isinstance(encoded_full.shape, torch.Size)
+    assert encoded_full.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+
