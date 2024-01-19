@@ -12,15 +12,17 @@ from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 class Args(argparse.Namespace):
     source_path: str
     output_path: str | None
+    subfolder: str
     half: bool
     verbose: bool
+    skip_init_check: bool
 
 
 def setup_converter(args: Args) -> ModelConverter:
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     source: nn.Module = UNet2DConditionModel.from_pretrained(  # type: ignore
         pretrained_model_name_or_path=args.source_path,
-        subfolder="unet",
+        subfolder=args.subfolder,
         low_cpu_mem_usage=False,
     )
     source_in_channels: int = source.config.in_channels  # type: ignore
@@ -48,7 +50,13 @@ def setup_converter(args: Args) -> ModelConverter:
         "keyword": {"added_cond_kwargs": added_cond_kwargs} if source_has_time_ids else {},
     }
 
-    converter = ModelConverter(source_model=source, target_model=target, skip_output_check=True, verbose=args.verbose)
+    converter = ModelConverter(
+        source_model=source,
+        target_model=target,
+        skip_init_check=args.skip_init_check,
+        skip_output_check=True,
+        verbose=args.verbose,
+    )
     if not converter.run(
         source_args=source_args,
         target_args=target_args,
@@ -81,7 +89,13 @@ def main() -> None:
             " source path."
         ),
     )
-    parser.add_argument("--half", action="store_true", help="Convert to half precision. Default: True")
+    parser.add_argument("--subfolder", type=str, default="unet", help="Subfolder. Default: unet.")
+    parser.add_argument(
+        "--skip-init-check",
+        action="store_true",
+        help="Skip check that source and target have the same layers count.",
+    )
+    parser.add_argument("--half", action="store_true", help="Convert to half precision.")
     parser.add_argument(
         "--verbose",
         action="store_true",

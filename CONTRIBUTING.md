@@ -42,7 +42,7 @@ Running end-to-end tests is pretty compute-intensive, and you must convert all t
 First, install test dependencies with:
 
 ```bash
-rye sync --features test,conversion
+rye sync --all-features
 ```
 
 Then, download and convert all the necessary weights. Be aware that this will use around 50 GB of disk space:

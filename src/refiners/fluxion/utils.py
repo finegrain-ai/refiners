@@ -149,6 +149,7 @@ def tensor_to_image(tensor: Tensor) -> Image.Image:
     assert tensor.ndim == 4 and tensor.shape[0] == 1, f"Unsupported tensor shape: {tensor.shape}"
     num_channels = tensor.shape[1]
     tensor = tensor.clamp(0, 1).squeeze(0)
+    tensor = tensor.to(torch.float32)  # to avoid numpy error with bfloat16
 
     match num_channels:
         case 1:
@@ -195,19 +196,23 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
         f"dtype={str(object=tensor.dtype).removeprefix('torch.')}",
         f"device={tensor.device}",
     ]
-    if not tensor.is_complex():
-        info_list.extend(
-            [
-                f"min={tensor.min():.2f}",  # type: ignore
-                f"max={tensor.max():.2f}",  # type: ignore
-            ]
-        )
+    if tensor.is_complex():
+        tensor_f = tensor.real.float()
+    else:
+        if tensor.numel() > 0:
+            info_list.extend(
+                [
+                    f"min={tensor.min():.2f}",  # type: ignore
+                    f"max={tensor.max():.2f}",  # type: ignore
+                ]
+            )
+        tensor_f = tensor.float()
 
     info_list.extend(
         [
-            f"mean={tensor.float().mean():.2f}",
-            f"std={tensor.float().std():.2f}",
-            f"norm={norm(x=tensor.float()):.2f}",
+            f"mean={tensor_f.mean():.2f}",
+            f"std={tensor_f.std():.2f}",
+            f"norm={norm(x=tensor_f):.2f}",
             f"grad={tensor.requires_grad}",
         ]
     )

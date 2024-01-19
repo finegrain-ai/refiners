@@ -19,7 +19,7 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
     StableDiffusion_1_Inpainting,
 )
-from refiners.foundationals.latent_diffusion.lora import SD1LoraAdapter
+from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
@@ -182,14 +182,38 @@ def t2i_adapter_xl_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[
     condition_image = Image.open(ref_path / f"fairy_guide_{name}.png").convert("RGB")
     expected_image = Image.open(ref_path / f"expected_t2i_adapter_xl_{name}.png").convert("RGB")
     weights_path = test_weights_path / "T2I-Adapter" / "t2i-adapter-canny-sdxl-1.0.safetensors"
+
+    if not weights_path.is_file():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
     return name, condition_image, expected_image, weights_path
 
 
 @pytest.fixture(scope="module")
-def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, Path]:
+def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
     expected_image = Image.open(ref_path / "expected_lora_pokemon.png").convert("RGB")
-    weights_path = test_weights_path / "loras" / "pcuenq_pokemon_lora.safetensors"
-    return expected_image, weights_path
+    weights_path = test_weights_path / "loras" / "pokemon-lora" / "pytorch_lora_weights.bin"
+
+    if not weights_path.is_file():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    tensors = torch.load(weights_path)  # type: ignore
+    return expected_image, tensors
+
+
+@pytest.fixture(scope="module")
+def lora_data_dpo(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
+    expected_image = Image.open(ref_path / "expected_sdxl_dpo_lora.png").convert("RGB")
+    weights_path = test_weights_path / "loras" / "dpo-lora" / "pytorch_lora_weights.safetensors"
+
+    if not weights_path.is_file():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    tensors = load_from_safetensors(weights_path)
+    return expected_image, tensors
 
 
 @pytest.fixture
@@ -240,6 +264,20 @@ def expected_restart(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_freeu(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def hello_world_assets(ref_path: Path) -> tuple[Image.Image, Image.Image, Image.Image, Image.Image]:
+    assets = Path(__file__).parent.parent.parent / "assets"
+    dropy = assets / "dropy_logo.png"
+    image_prompt = assets / "dragon_quest_slime.jpg"
+    condition_image = assets / "dropy_canny.png"
+    return (
+        Image.open(fp=dropy).convert(mode="RGB"),
+        Image.open(fp=image_prompt).convert(mode="RGB"),
+        Image.open(fp=condition_image).convert(mode="RGB"),
+        Image.open(fp=ref_path / "expected_dropy_slime_9752.png").convert(mode="RGB"),
+    )
 
 
 @pytest.fixture
@@ -489,6 +527,15 @@ def sdxl_lda_weights(test_weights_path: Path) -> Path:
 
 
 @pytest.fixture
+def sdxl_lda_fp16_fix_weights(test_weights_path: Path) -> Path:
+    sdxl_lda_weights = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
+    if not sdxl_lda_weights.is_file():
+        warn(message=f"could not find weights at {sdxl_lda_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    return sdxl_lda_weights
+
+
+@pytest.fixture
 def sdxl_unet_weights(test_weights_path: Path) -> Path:
     sdxl_unet_weights = test_weights_path / "sdxl-unet.safetensors"
     if not sdxl_unet_weights.is_file():
@@ -519,6 +566,24 @@ def sdxl_ddim(
 
     sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_weights)
+    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
+
+    return sdxl
+
+
+@pytest.fixture
+def sdxl_ddim_lda_fp16_fix(
+    sdxl_text_encoder_weights: Path, sdxl_lda_fp16_fix_weights: Path, sdxl_unet_weights: Path, test_device: torch.device
+) -> StableDiffusion_XL:
+    if test_device.type == "cpu":
+        warn(message="not running on CPU, skipping")
+        pytest.skip()
+
+    scheduler = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+
+    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
+    sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_fp16_fix_weights)
     sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
 
     return sdxl
@@ -969,24 +1034,20 @@ def test_diffusion_controlnet_stack(
 @no_grad()
 def test_diffusion_lora(
     sd15_std: StableDiffusion_1,
-    lora_data_pokemon: tuple[Image.Image, Path],
+    lora_data_pokemon: tuple[Image.Image, dict[str, torch.Tensor]],
     test_device: torch.device,
-):
+) -> None:
     sd15 = sd15_std
     n_steps = 30
 
-    expected_image, lora_weights_path = lora_data_pokemon
-
-    if not lora_weights_path.is_file():
-        warn(f"could not find weights at {lora_weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
+    expected_image, lora_weights = lora_data_pokemon
 
     prompt = "a cute cat"
     clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
 
     sd15.set_num_inference_steps(n_steps)
 
-    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=1.0).inject()
+    SDLoraManager(sd15).load(lora_weights, scale=1)
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
@@ -1004,77 +1065,45 @@ def test_diffusion_lora(
 
 
 @no_grad()
-def test_diffusion_lora_float16(
-    sd15_std_float16: StableDiffusion_1,
-    lora_data_pokemon: tuple[Image.Image, Path],
-    test_device: torch.device,
-):
-    sd15 = sd15_std_float16
-    n_steps = 30
+def test_diffusion_sdxl_lora(
+    sdxl_ddim: StableDiffusion_XL,
+    lora_data_dpo: tuple[Image.Image, dict[str, torch.Tensor]],
+) -> None:
+    sdxl = sdxl_ddim
+    expected_image, lora_weights = lora_data_dpo
 
-    expected_image, lora_weights_path = lora_data_pokemon
+    # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
+    # except that we are using DDIM instead of sde-dpmsolver++
+    n_steps = 40
+    seed = 12341234123
+    guidance_scale = 7.5
+    lora_scale = 1.4
+    prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
+    negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
 
-    if not lora_weights_path.is_file():
-        warn(f"could not find weights at {lora_weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
+    SDLoraManager(sdxl).load(lora_weights, scale=lora_scale)
 
-    prompt = "a cute cat"
-    clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
 
-    sd15.set_num_inference_steps(n_steps)
+    time_ids = sdxl.default_time_ids
+    sdxl.set_num_inference_steps(n_steps)
 
-    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=1.0).inject()
+    manual_seed(seed=seed)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
 
-    manual_seed(2)
-    x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
-
-    for step in sd15.steps:
-        x = sd15(
+    for step in sdxl.steps:
+        x = sdxl(
             x,
             step=step,
             clip_text_embedding=clip_text_embedding,
-            condition_scale=7.5,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=guidance_scale,
         )
-    predicted_image = sd15.lda.decode_latents(x)
 
-    ensure_similar_images(predicted_image, expected_image, min_psnr=33, min_ssim=0.98)
-
-
-@no_grad()
-def test_diffusion_lora_twice(
-    sd15_std: StableDiffusion_1,
-    lora_data_pokemon: tuple[Image.Image, Path],
-    test_device: torch.device,
-):
-    sd15 = sd15_std
-    n_steps = 30
-
-    expected_image, lora_weights_path = lora_data_pokemon
-
-    if not lora_weights_path.is_file():
-        warn(f"could not find weights at {lora_weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    prompt = "a cute cat"
-    clip_text_embedding = sd15.compute_clip_text_embedding(prompt)
-
-    sd15.set_num_inference_steps(n_steps)
-
-    # The same LoRA is used twice which is not a common use case: this is purely for testing purpose
-    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=0.4).inject()
-    SD1LoraAdapter.from_safetensors(target=sd15, checkpoint_path=lora_weights_path, scale=0.6).inject()
-
-    manual_seed(2)
-    x = torch.randn(1, 4, 64, 64, device=test_device)
-
-    for step in sd15.steps:
-        x = sd15(
-            x,
-            step=step,
-            clip_text_embedding=clip_text_embedding,
-            condition_scale=7.5,
-        )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sdxl.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1112,7 +1141,8 @@ def test_diffusion_refonly(
         torch.randn(2, 4, 64, 64, device=test_device)  # for SD Web UI reproductibility only
     predicted_image = sd15.lda.decode_latents(x)
 
-    ensure_similar_images(predicted_image, expected_image_refonly, min_psnr=35, min_ssim=0.99)
+    # min_psnr lowered to 33 because this reference image was generated without noise removal (see #192)
+    ensure_similar_images(predicted_image, expected_image_refonly, min_psnr=33, min_ssim=0.99)
 
 
 @no_grad()
@@ -1702,3 +1732,62 @@ def test_freeu(
     predicted_image = sd15.lda.decode_latents(x)
 
     ensure_similar_images(predicted_image, expected_freeu)
+
+
+@no_grad()
+def test_hello_world(
+    sdxl_ddim_lda_fp16_fix: StableDiffusion_XL,
+    t2i_adapter_xl_data_canny: tuple[str, Image.Image, Image.Image, Path],
+    sdxl_ip_adapter_weights: Path,
+    image_encoder_weights: Path,
+    hello_world_assets: tuple[Image.Image, Image.Image, Image.Image, Image.Image],
+) -> None:
+    sdxl = sdxl_ddim_lda_fp16_fix.to(dtype=torch.float16)
+    sdxl.dtype = torch.float16  # FIXME: should not be necessary
+
+    name, _, _, weights_path = t2i_adapter_xl_data_canny
+    init_image, image_prompt, condition_image, expected_image = hello_world_assets
+
+    if not weights_path.is_file():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(sdxl_ip_adapter_weights))
+    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.inject()
+
+    image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(image_prompt))
+    ip_adapter.set_clip_image_embedding(image_embedding)
+
+    # Note: default text prompts for IP-Adapter
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text="best quality, high quality", negative_text="monochrome, lowres, bad anatomy, worst quality, low quality"
+    )
+    time_ids = sdxl.default_time_ids
+
+    t2i_adapter = SDXLT2IAdapter(target=sdxl.unet, name=name, weights=load_from_safetensors(weights_path)).inject()
+
+    condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
+    t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
+
+    first_step = 1
+    ip_adapter.set_scale(0.85)
+    t2i_adapter.set_scale(0.8)
+    sdxl.set_num_inference_steps(50)
+    sdxl.set_self_attention_guidance(enable=True, scale=0.75)
+
+    manual_seed(9752)
+    x = sdxl.init_latents(size=(1024, 1024), init_image=init_image, first_step=first_step).to(
+        device=sdxl.device, dtype=sdxl.dtype
+    )
+    for step in sdxl.steps[first_step:]:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+        )
+    predicted_image = sdxl.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image)

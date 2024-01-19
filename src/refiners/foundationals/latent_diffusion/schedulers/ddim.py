@@ -52,6 +52,12 @@ class DDIM(Scheduler):
             ),
         )
         predicted_x = (x - sqrt(1 - current_scale_factor**2) * noise) / current_scale_factor
-        denoised_x = previous_scale_factor * predicted_x + sqrt(1 - previous_scale_factor**2) * noise
+        noise_factor = sqrt(1 - previous_scale_factor**2)
+
+        # Do not add noise at the last step to avoid visual artifacts.
+        if step == self.num_inference_steps - 1:
+            noise_factor = 0
+
+        denoised_x = previous_scale_factor * predicted_x + noise_factor * noise
 
         return denoised_x

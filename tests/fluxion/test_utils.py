@@ -69,6 +69,7 @@ def test_tensor_to_image() -> None:
     assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"
     assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"
     assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"
+    assert tensor_to_image(torch.zeros(1, 3, 512, 512, dtype=torch.bfloat16)).mode == "RGB"
 
 
 def test_summarize_tensor() -> None:
@@ -78,6 +79,7 @@ def test_summarize_tensor() -> None:
     assert summarize_tensor(torch.complex(torch.zeros(1, 3, 512, 512), torch.zeros(1, 3, 512, 512)))
     assert summarize_tensor(torch.zeros(1, 3, 512, 512).bfloat16())
     assert summarize_tensor(torch.zeros(1, 3, 512, 512).bool())
+    assert summarize_tensor(torch.zeros(1, 0, 512, 512).int())
 
 
 def test_no_grad() -> None:
