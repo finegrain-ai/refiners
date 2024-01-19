@@ -4,12 +4,15 @@ from random import randint
 from typing import Any, List, TypedDict, Tuple
 from pydantic import BaseModel
 
+
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, cat, randn, tensor
 from torch.utils.data import Dataset
 from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import ndcg_score
+
 from torch.nn import init
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
@@ -297,6 +300,7 @@ class ColorPaletteLatentDiffusionTrainer(
                 per_num[num]["distances"] += distances_list
 
         for num in per_num:
+            print('num', num, per_num)
             if num > 1:
                 self.log({
                     f"palette-img/ndcg_{num}": ndcg_score(per_num[num]["y_true_ranking"], per_num[num]["counts"]),

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List
 
-from torch import Tensor, device as Device
+from torch import Tensor, device as Device, dtype as DType, float32, float16, bfloat16
 from torch.autograd import backward
 from torch.nn import Module
 
@@ -40,10 +40,21 @@ class ShardingManager(ABC):
         raise NotImplementedError("FabricTrainer does not support this property")
 
 
+def str_to_dtype(dtype_str: str) -> DType:
+    if dtype_str == "float32":
+        return float32
+    elif dtype_str == "float16":
+        return float16
+    elif dtype_str == "bfloat16":
+        return bfloat16
+    else:
+        raise ValueError(f"Unknown dtype {dtype_str}")
+
 class SimpleShardingManager(ShardingManager):
     def __init__(self, config: TrainingConfig) -> None:
         device_str = config.gpu_index if config.gpu_index >= 0 else "cpu"
         self.default_device = Device(device_str)
+        self.default_dtype = str_to_dtype(config.dtype)
 
     def backward(self, tensor: Tensor):
         backward(tensor)
@@ -53,7 +64,13 @@ class SimpleShardingManager(ShardingManager):
             device = Device(f"cuda:{config.gpu_index}")
         else:
             device = self.default_device
-        model = model.to(device=device)
+        
+        if config.dtype is not None:
+            dtype = str_to_dtype(config.dtype)
+        else:
+            dtype = self.default_dtype
+        
+        model = model.to(device=device, dtype=dtype)
         self.add_device_hooks(model, device)
 
     # inspired from https://github.com/huggingface/accelerate/blob/6f05bbd41a179cc9a86238c7c6f3f4eded70fbd8/src/accelerate/hooks.py#L159C1-L170C18
@@ -93,8 +110,10 @@ class SimpleShardingManager(ShardingManager):
 
     def wrap_device(self, method: WrappableMethod, device: Device) -> WrappableMethod:
         def new_method(*args: List[Any], **kwargs: Dict[Any, Any]) -> Any:
+            print(f"in new method {args}")
             args = self.recursive_to(args, device)
             kwargs = self.recursive_to(kwargs, device)
+            print(f"in new method after {args}")
             return method(*args, **kwargs)
 
         return new_method
@@ -102,3 +121,7 @@ class SimpleShardingManager(ShardingManager):
     @property
     def device(self) -> Device:
         return self.default_device
+
+    @property
+    def dtype(self) -> Device:
+        return self.default_dtype

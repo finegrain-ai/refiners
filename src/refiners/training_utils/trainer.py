@@ -300,9 +300,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @cached_property
     def device(self) -> Device:
         return self.sharding_manager.device
-        # selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
-        # logger.info(f"Using device: {selected_device}")
-        # return selected_device
+
+    @cached_property
+    def dtype(self) -> Device:
+        return self.sharding_manager.dtype
 
     @property
     def parameters(self) -> list[Parameter]:

@@ -25,7 +25,7 @@ class ColorPaletteEncoder(fl.Chain):
         model_dim: int = 256,
         sinuosidal_embedding_dim: int = 32,
         device: Device | str | None = None,
-        dtype: DType | None = None,
+        dtype: DType = float32,
         context_key: str = "color_palette_embedding",
     ) -> None:
         self.embedding_dim = embedding_dim
@@ -33,11 +33,7 @@ class ColorPaletteEncoder(fl.Chain):
         self.max_colors = max_colors
 
         super().__init__(
-            fl.Converter(set_device=True, set_dtype=True),
             fl.Linear(in_features=3, out_features=model_dim, device=device, dtype=dtype),
-            # Question : I used compute_sinuosoidal_embedding as
-            # a positionnal embedding for the color 'rank' (1st color, 2nd color ...)
-            # It's not exactly the same as the TimestepEncoder
             fl.Residual(fl.Lambda(self.compute_sinuosoidal_embedding)),
             fl.Linear(in_features=model_dim, out_features=model_dim, device=device, dtype=dtype),
             fl.GeLU(),
@@ -49,9 +45,9 @@ class ColorPaletteEncoder(fl.Chain):
     def compute_sinuosoidal_embedding(
         self, x: Int[Tensor, "*batch n_colors 3"]
     ) -> Float[Tensor, "*batch n_colors 3 model_dim"]:
-        range = arange(start=0, end=x.shape[1], dtype=float32, device=x.device).unsqueeze(1)
+        range = arange(start=0, end=x.shape[1], dtype=self.dtype, device=x.device).unsqueeze(1)
         embedding = compute_sinusoidal_embedding(range, embedding_dim=self.model_dim)
-        return embedding.squeeze(1).unsqueeze(0).repeat(x.shape[0], 1, 1)
+        return embedding.squeeze(1).unsqueeze(0).repeat(x.shape[0], 1, 1).to(dtype=self.dtype)
 
     def compute_color_palette_embedding(
         self,
@@ -59,6 +55,7 @@ class ColorPaletteEncoder(fl.Chain):
         negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
+        print(tensor_x.dtype, self.dtype)
         conditional_embedding = self(tensor_x)
         if tensor_x == negative_color_palette:
             return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)

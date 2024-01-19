@@ -53,6 +53,7 @@ class TrainingConfig(BaseModel):
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
     gpu_index: int = 0
+    dtype: str = "float32"
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
     clip_grad_norm: float | None = None
@@ -175,6 +176,7 @@ class ModelConfig(BaseModel):
     train: bool = True
     learning_rate: float | None = None  # TODO: Implement this
     gpu_index: int | None = None
+    dtype: str | None = None
 
 
 class GyroDropoutConfig(BaseModel):
