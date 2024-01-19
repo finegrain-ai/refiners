@@ -15,6 +15,7 @@ class DDPM(Scheduler):
         num_train_timesteps: int = 1_000,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
+        first_inference_step: int = 0,
         device: Device | str = "cpu",
     ) -> None:
         super().__init__(
@@ -22,6 +23,7 @@ class DDPM(Scheduler):
             num_train_timesteps=num_train_timesteps,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
+            first_inference_step=first_inference_step,
             device=device,
         )
 

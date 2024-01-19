@@ -24,6 +24,7 @@ class DPMSolver(Scheduler):
         final_diffusion_rate: float = 1.2e-2,
         last_step_first_order: bool = False,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
+        first_inference_step: int = 0,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
@@ -33,6 +34,7 @@ class DPMSolver(Scheduler):
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
+            first_inference_step=first_inference_step,
             device=device,
             dtype=dtype,
         )
@@ -100,12 +102,14 @@ class DPMSolver(Scheduler):
         backward Euler update, which is a numerical method commonly used to solve ordinary differential equations
         (ODEs).
         """
+        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
         estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
 
-        if step == 0 or (self.last_step_first_order and step == self.num_inference_steps - 1):
+        if step == self.first_inference_step or (self.last_step_first_order and step == self.num_inference_steps - 1):
             return self.dpm_solver_first_order_update(x=x, noise=estimated_denoised_data, step=step)
 
         return self.multistep_dpm_solver_second_order_update(x=x, step=step)
