@@ -196,12 +196,13 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
     if tensor.is_complex():
         tensor_f = tensor.real.float()
     else:
-        info_list.extend(
-            [
-                f"min={tensor.min():.2f}",  # type: ignore
-                f"max={tensor.max():.2f}",  # type: ignore
-            ]
-        )
+        if tensor.numel() > 0:
+            info_list.extend(
+                [
+                    f"min={tensor.min():.2f}",  # type: ignore
+                    f"max={tensor.max():.2f}",  # type: ignore
+                ]
+            )
         tensor_f = tensor.float()
 
     info_list.extend(
