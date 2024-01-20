@@ -106,7 +106,7 @@ class DPMSolver(Scheduler):
         )
         return denoised_x
 
-    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Represents one step of the backward diffusion process that iteratively denoises the input data `x`.
 
@@ -118,7 +118,7 @@ class DPMSolver(Scheduler):
 
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
-        estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
+        estimated_denoised_data = (x - noise_ratio * predicted_noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
 
         if step == self.first_inference_step or (self.last_step_first_order and step == self.num_inference_steps - 1):

@@ -36,7 +36,7 @@ class DDIM(Scheduler):
         timesteps = arange(start=0, end=self.num_inference_steps, step=1, device=self.device) * step_ratio + 1
         return timesteps.flip(0)
 
-    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
 
         timestep, previous_timestep = (
@@ -55,13 +55,13 @@ class DDIM(Scheduler):
                 else self.cumulative_scale_factors[0]
             ),
         )
-        predicted_x = (x - sqrt(1 - current_scale_factor**2) * noise) / current_scale_factor
+        predicted_x = (x - sqrt(1 - current_scale_factor**2) * predicted_noise) / current_scale_factor
         noise_factor = sqrt(1 - previous_scale_factor**2)
 
         # Do not add noise at the last step to avoid visual artifacts.
         if step == self.num_inference_steps - 1:
             noise_factor = 0
 
-        denoised_x = previous_scale_factor * predicted_x + noise_factor * noise
+        denoised_x = previous_scale_factor * predicted_x + noise_factor * predicted_noise
 
         return denoised_x

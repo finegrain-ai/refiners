@@ -52,9 +52,9 @@ class Scheduler(ABC):
         self.timesteps = self._generate_timesteps()
 
     @abstractmethod
-    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
-        Applies a step of the diffusion process to the input tensor `x` using the provided `noise` and `timestep`.
+        Applies a step of the diffusion process to the input tensor `x` using the provided `predicted_noise` and `timestep`.
 
         This method should be overridden by subclasses to implement the specific diffusion process.
         """

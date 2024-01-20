@@ -91,15 +91,17 @@ class LatentDiffusionModel(fl.Module, ABC):
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 
         # classifier-free guidance
-        noise = unconditional_prediction + condition_scale * (conditional_prediction - unconditional_prediction)
+        predicted_noise = unconditional_prediction + condition_scale * (
+            conditional_prediction - unconditional_prediction
+        )
         x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
 
         if self.has_self_attention_guidance():
-            noise += self.compute_self_attention_guidance(
+            predicted_noise += self.compute_self_attention_guidance(
                 x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
             )
 
-        return self.scheduler(x, noise=noise, step=step)
+        return self.scheduler(x, predicted_noise=predicted_noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:
         return self.__class__(
