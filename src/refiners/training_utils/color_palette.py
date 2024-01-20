@@ -146,7 +146,6 @@ class ColorPaletteLatentDiffusionTrainer(
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
         adapter = SD1ColorPaletteAdapter(target=self.unet, color_palette_encoder=self.color_palette_encoder)
-
         return adapter
 
     def __init__(

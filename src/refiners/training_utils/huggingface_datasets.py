@@ -35,4 +35,3 @@ class HuggingfaceDatasetConfig(BaseModel):
     resize_image_min_size: int = 512
     resize_image_max_size: int = 576
     caption_key: str = "caption"
-    n_samples: int | None = None

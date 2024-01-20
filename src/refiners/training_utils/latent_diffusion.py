@@ -104,8 +104,6 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
         dataset = load_hf_dataset(
             path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
         )
-        if dataset_config.n_samples is not None:
-            dataset = dataset[:dataset_config.n_samples]
         return dataset
 
     def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
