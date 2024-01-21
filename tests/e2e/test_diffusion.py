@@ -1236,7 +1236,7 @@ def test_diffusion_ip_adapter(
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(woman_image))
     ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-    sd15.set_inference_steps(30)
+    sd15.set_inference_steps(50)
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
@@ -1382,7 +1382,7 @@ def test_diffusion_ip_adapter_plus(
     clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(statue_image))
     ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-    sd15.set_inference_steps(30)
+    sd15.set_inference_steps(50)
 
     manual_seed(42)  # seed=42 is used in the official IP-Adapter demo
     x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
