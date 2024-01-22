@@ -216,6 +216,26 @@ def lora_data_dpo(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image,
     return expected_image, tensors
 
 
+@pytest.fixture(scope="module")
+def lora_sliders(test_weights_path: Path) -> tuple[dict[str, dict[str, torch.Tensor]], dict[str, float]]:
+    weights_path = test_weights_path / "loras" / "sliders"
+
+    if not weights_path.is_dir():
+        warn(f"could not find weights at {weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    return {
+        "age": load_tensors(weights_path / "age.pt"),  # type: ignore
+        "cartoon_style": load_tensors(weights_path / "cartoon_style.pt"),  # type: ignore
+        "eyesize": load_tensors(weights_path / "eyesize.pt"),  # type: ignore
+    }, {
+        "age": 0.3,
+        "cartoon_style": -0.2,
+        "dpo": 1.4,
+        "eyesize": -0.2,
+    }
+
+
 @pytest.fixture
 def scene_image_inpainting_refonly(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "inpainting-scene.png").convert("RGB")
@@ -264,6 +284,11 @@ def expected_restart(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_freeu(ref_path: Path) -> Image.Image:
     return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
+
+
+@pytest.fixture
+def expected_sdxl_multi_loras(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_sdxl_multi_loras.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -1034,7 +1059,7 @@ def test_diffusion_lora(
 
     sd15.set_inference_steps(30)
 
-    SDLoraManager(sd15).load(lora_weights, scale=1)
+    SDLoraManager(sd15).add_loras("pokemon", lora_weights, scale=1)
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
@@ -1067,7 +1092,7 @@ def test_diffusion_sdxl_lora(
     prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
     negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
 
-    SDLoraManager(sdxl).load(lora_weights, scale=lora_scale)
+    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale)
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt, negative_text=negative_prompt
@@ -1075,6 +1100,54 @@ def test_diffusion_sdxl_lora(
 
     time_ids = sdxl.default_time_ids
     sdxl.set_inference_steps(40)
+
+    manual_seed(seed=seed)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=guidance_scale,
+        )
+
+    predicted_image = sdxl.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_multiple_loras(
+    sdxl_ddim: StableDiffusion_XL,
+    lora_data_dpo: tuple[Image.Image, dict[str, torch.Tensor]],
+    lora_sliders: tuple[dict[str, dict[str, torch.Tensor]], dict[str, float]],
+    expected_sdxl_multi_loras: Image.Image,
+) -> None:
+    sdxl = sdxl_ddim
+    expected_image = expected_sdxl_multi_loras
+    _, dpo = lora_data_dpo
+    loras, scales = lora_sliders
+    loras["dpo"] = dpo
+
+    SDLoraManager(sdxl).add_multiple_loras(loras, scales)
+
+    # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
+    # except that we are using DDIM instead of sde-dpmsolver++
+    n_steps = 40
+    seed = 12341234123
+    guidance_scale = 4
+    prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
+    negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+
+    time_ids = sdxl.default_time_ids
+    sdxl.set_inference_steps(n_steps)
 
     manual_seed(seed=seed)
     x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
