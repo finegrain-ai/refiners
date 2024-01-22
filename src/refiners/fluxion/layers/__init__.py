@@ -35,7 +35,7 @@ from refiners.fluxion.layers.chain import (
     Sum,
     UseContext,
 )
-from refiners.fluxion.layers.conv import Conv2d, ConvTranspose2d
+from refiners.fluxion.layers.conv import Conv2d, ConvTranspose2d, Conv3d
 from refiners.fluxion.layers.converter import Converter
 from refiners.fluxion.layers.embedding import Embedding
 from refiners.fluxion.layers.linear import Linear, MultiLinear
@@ -93,6 +93,7 @@ __all__ = [
     "Breakpoint",
     "Concatenate",
     "Conv2d",
+    "Conv3d",
     "ConvTranspose2d",
     "Linear",
     "MultiLinear",

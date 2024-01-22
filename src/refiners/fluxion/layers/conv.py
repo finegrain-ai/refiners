@@ -2,6 +2,37 @@ from torch import device as Device, dtype as DType, nn
 
 from refiners.fluxion.layers.module import WeightedModule
 
+class Conv3d(nn.Conv3d, WeightedModule):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int | tuple[int, int, int],
+        stride: int | tuple[int, int, int] = (1, 1, 1),
+        padding: int | tuple[int, int, int] | str = (0, 0, 0),
+        groups: int = 1,
+        use_bias: bool = True,
+        dilation: int | tuple[int, int, int] = (1, 1, 1),
+        padding_mode: str = "zeros",
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(  # type: ignore
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            use_bias,
+            padding_mode,
+            device,
+            dtype,
+        )
+        self.use_bias = use_bias
+
+
 
 class Conv2d(nn.Conv2d, WeightedModule):
     def __init__(
