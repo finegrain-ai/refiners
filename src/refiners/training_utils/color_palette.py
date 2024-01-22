@@ -352,11 +352,9 @@ class ColorPaletteLatentDiffusionTrainer(
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = trainer.color_palette_adapter
-        weights = adapter.weights
-        for weight in weights:
-            init.zeros_(weight)
-        
+        adapter.zero_init()      
         adapter.inject()
+        
 
 
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):

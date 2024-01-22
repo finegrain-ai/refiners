@@ -5,6 +5,7 @@ import torch
 from jaxtyping import Float, Int
 from torch import Tensor, arange, device as Device, dtype as DType, float32, tensor, zeros
 from torch.nn.functional import pad
+from torch.nn import init
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -121,6 +122,11 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         for adapter in self.sub_adapters:
             weights += adapter.weights
         return weights
+    
+    def zero_init(self) -> None:
+        weights = self.weights
+        for weight in weights:
+            init.zeros_(weight)
             
     def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter[Any]":
         for adapter in self.sub_adapters:
