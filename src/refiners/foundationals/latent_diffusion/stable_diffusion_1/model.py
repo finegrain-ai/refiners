@@ -4,7 +4,7 @@ from PIL import Image
 from torch import Tensor, device as Device, dtype as DType
 
 from refiners.fluxion.utils import image_to_tensor, interpolate
-from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
@@ -19,20 +19,20 @@ class SD1Autoencoder(LatentDiffusionAutoencoder):
 
 class StableDiffusion_1(LatentDiffusionModel):
     unet: SD1UNet
-    clip_text_encoder: CLIPTextEncoderL
+    clip_text_encoder: DoubleTextEncoder
 
     def __init__(
         self,
         unet: SD1UNet | None = None,
         lda: SD1Autoencoder | None = None,
-        clip_text_encoder: CLIPTextEncoderL | None = None,
+        clip_text_encoder: DoubleTextEncoder | None = None,
         scheduler: Scheduler | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
         unet = unet or SD1UNet(in_channels=4)
         lda = lda or SD1Autoencoder()
-        clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
+        clip_text_encoder = clip_text_encoder or DoubleTextEncoder()
         scheduler = scheduler or DPMSolver(num_inference_steps=30)
 
         super().__init__(
@@ -44,13 +44,21 @@ class StableDiffusion_1(LatentDiffusionModel):
             dtype=dtype,
         )
 
-    def compute_clip_text_embedding(self, text: str, negative_text: str = "") -> Tensor:
-        conditional_embedding = self.clip_text_encoder(text)
+    def compute_clip_text_embedding(self, text: str, negative_text: str | None = None, return_pooled=False) -> Tensor | tuple[Tensor, Tensor]:
+        conditional_embedding, conditional_pooled_embedding = self.clip_text_encoder(text)
         if text == negative_text:
-            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
+            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0), torch.cat(
+                tensors=(conditional_pooled_embedding, conditional_pooled_embedding), dim=0
+            )
 
-        negative_embedding = self.clip_text_encoder(negative_text or "")
-        return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+        # TODO: when negative_text is None, use zero tensor?
+        negative_embedding, negative_pooled_embedding = self.clip_text_encoder(negative_text or "")
+        if return_pooled:
+            return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0), torch.cat(
+                tensors=(negative_pooled_embedding, conditional_pooled_embedding), dim=0
+            )
+        else:
+            return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         self.unet.set_timestep(timestep=timestep)
@@ -110,7 +118,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         self,
         unet: SD1UNet | None = None,
         lda: SD1Autoencoder | None = None,
-        clip_text_encoder: CLIPTextEncoderL | None = None,
+        clip_text_encoder: DoubleTextEncoder | None = None,
         scheduler: Scheduler | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,

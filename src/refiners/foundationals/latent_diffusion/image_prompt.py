@@ -1,5 +1,5 @@
 import math
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, List
 
 from jaxtyping import Float
 from PIL import Image
@@ -235,31 +235,64 @@ class PerceiverResampler(fl.Chain):
 
 
 class ImageCrossAttention(fl.Chain):
-    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
+    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0, use_timestep_embedding: bool = False, use_pooled_text_embedding: bool = False) -> None:
         self._scale = scale
+        contexts: List[fl.Chain] = []
+        if use_timestep_embedding:
+            contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="range_adapter", key="timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
+        if use_pooled_text_embedding:
+            contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
         super().__init__(
             fl.Distribute(
                 fl.Identity(),
-                fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="image_embedding"),
-                    fl.Linear(
-                        in_features=text_cross_attention.key_embedding_dim,
-                        out_features=text_cross_attention.inner_dim,
-                        bias=text_cross_attention.use_bias,
-                        device=text_cross_attention.device,
-                        dtype=text_cross_attention.dtype,
+                fl.Sum(
+                    *contexts,
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="image_embedding"),
+                        fl.Linear(
+                            in_features=text_cross_attention.key_embedding_dim,
+                            out_features=text_cross_attention.inner_dim,
+                            bias=text_cross_attention.use_bias,
+                            device=text_cross_attention.device,
+                            dtype=text_cross_attention.dtype,
+                        ),
                     ),
                 ),
-                fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="image_embedding"),
-                    fl.Linear(
-                        in_features=text_cross_attention.value_embedding_dim,
-                        out_features=text_cross_attention.inner_dim,
-                        bias=text_cross_attention.use_bias,
-                        device=text_cross_attention.device,
-                        dtype=text_cross_attention.dtype,
+                fl.Sum(
+                    *contexts,
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="image_embedding"),
+                        fl.Linear(
+                            in_features=text_cross_attention.value_embedding_dim,
+                            out_features=text_cross_attention.inner_dim,
+                            bias=text_cross_attention.use_bias,
+                            device=text_cross_attention.device,
+                            dtype=text_cross_attention.dtype,
+                        ),
                     ),
-                ),
+                )
             ),
             ScaledDotProductAttention(
                 num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
@@ -282,6 +315,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self,
         target: fl.Attention,
         scale: float = 1.0,
+        use_timestep_embedding: bool = False,
+        use_pooled_text_embedding: bool = False
     ) -> None:
         self._scale = scale
         with self.setup_adapter(target):
@@ -290,6 +325,8 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             image_cross_attention = ImageCrossAttention(
                 text_cross_attention=clone,
                 scale=self.scale,
+                use_timestep_embedding=use_timestep_embedding,
+                use_pooled_text_embedding=use_pooled_text_embedding
             )
             clone.replace(
                 old_module=scaled_dot_product,
@@ -328,6 +365,17 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.image_cross_attention.to(self.device, self.dtype)
 
+class PooledTextEmbeddingTimestepEncoder(fl.Passthrough):
+    def __init__(
+        self,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(
+            fl.UseContext("ip_adapter", "pooled_text_embedding"),
+            fl.Linear(768, 1280, device=device, dtype=dtype),
+            fl.SetContext("ip_adapter", "pooled_text_timestep_embedding"),
+        )
 
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     # Prevent PyTorch module registration
@@ -343,10 +391,14 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
+        use_timestep_embedding: bool = False,
+        use_pooled_text_embedding: bool = False
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
-
+        self.use_pooled_text_embedding = use_pooled_text_embedding
+        if use_pooled_text_embedding:
+            self.pooled_text_embedding_proj = PooledTextEmbeddingTimestepEncoder(self.target.device, self.target.dtype)
         self.fine_grained = fine_grained
         self._image_encoder = [image_encoder]
         if fine_grained:
@@ -354,7 +406,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._image_proj = [image_proj]
 
         self.sub_adapters = [
-            CrossAttentionAdapter(target=cross_attn, scale=scale)
+            CrossAttentionAdapter(target=cross_attn, scale=scale, use_timestep_embedding=use_timestep_embedding, use_pooled_text_embedding=use_pooled_text_embedding)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -374,6 +426,11 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
                 assert len(cross_attention_weights) == 2
                 cross_attn.load_weights(*cross_attention_weights)
+            if use_pooled_text_embedding:
+                pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
+                    k.removeprefix("pooled_text_embedding_proj."): v for k, v in weights.items() if k.startswith("pooled_text_embedding_proj.")
+                }
+                self.pooled_text_embedding_proj.load_state_dict(pooled_text_embedding_proj_state_dict)
 
     @property
     def image_encoder(self) -> CLIPImageEncoderH | ViT:
@@ -391,11 +448,15 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def inject(self: "TIPAdapter", parent: fl.Chain | None = None) -> "TIPAdapter":
         for adapter in self.sub_adapters:
             adapter.inject()
+        if self.use_pooled_text_embedding:
+            self.target.insert(0, self.pooled_text_embedding_proj)
         return super().inject(parent)
 
     def eject(self) -> None:
         for adapter in self.sub_adapters:
             adapter.eject()
+        if self.use_pooled_text_embedding:
+            self.target.pop(0)
         super().eject()
 
     @property
@@ -413,7 +474,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     def set_image_embedding(self, image_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"image_embedding": image_embedding})
-
+    def set_pooled_text_embedding(self, pooled_text_embedding: Tensor) -> None:
+        self.set_context("ip_adapter", {"pooled_text_embedding": pooled_text_embedding})
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_image_embedding(self, image_prompt: Tensor) -> Tensor:
         image_encoder = self.image_encoder if not self.fine_grained else self.grid_image_encoder

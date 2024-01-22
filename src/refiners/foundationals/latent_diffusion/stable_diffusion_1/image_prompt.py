@@ -15,6 +15,8 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
+        use_timestep_embedding: bool = False,
+        use_pooled_text_embedding: bool = False
     ) -> None:
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
@@ -50,4 +52,6 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             scale=scale,
             fine_grained=fine_grained,
             weights=weights,
+            use_timestep_embedding=use_timestep_embedding,
+            use_pooled_text_embedding=use_pooled_text_embedding
         )

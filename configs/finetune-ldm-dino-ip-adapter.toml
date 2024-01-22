@@ -1,27 +1,28 @@
-script = "finetune-ldm-palette-adapter.py" # not used for now
+script = "finetune-ldm-ip-adapter.py" # not used for now
 
 [wandb]
 mode = "offline"                         # "online", "offline", "disabled"
 entity = "acme"
-project = "finetune-ldm-palette-adapter"
+project = "finetune-ldm-ip-adapter"
 
 [models]
-unet = { checkpoint = "weights/unet.safetensors", train = false }
-text_encoder = { checkpoint = "weights/clip.safetensors", train = false }
-lda = { checkpoint = "weights/lda.safetensors", train = false }
-color_encoder = { train = true }
+unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
+text_encoder = { checkpoint = "tests/weights/clip_text.safetensors", train = false }
+lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
 adapter = { train = true }
 
 [ldm]
-unconditional_sampling_probability = 0.05
-offset_noise = 0.1
+offset_noise = 0.0
 
 [adapter]
+seed = 9752
+image_encoder_path = "tests/weights/dinov2_vits14_reg4_pretrain.safetensors"
 scale = 1.0
+inference_scale = 1.0
+use_pooled_text_embedding = false
+use_timestep_embedding = false
+fine_grained = false
 
-[adapter.color_encoder]
-dim_sinusoids = 64
-dim_hidden = 256
 
 [training]
 duration = "2000:step"
@@ -40,7 +41,7 @@ eps = 1e-8
 weight_decay = 1e-2
 
 [scheduler]
-scheduler_type = "ConstantLR"
+scheduler_type = "CosineAnnealingLR"
 update_interval = "1:step"
 
 [dropout]
@@ -52,9 +53,17 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 split = "train"
 horizontal_flip_probability = 0.5
-random_crop_size = 384                    # (256 + 128, quick math)
-resize_image_min_size = 384
-resize_image_max_size = 416               # (384 + 32, quick math)
+resize_image_min_size = 512
+resize_image_max_size = 576
+random_crop_size: int = 512
+filter_min_image_size = true
+horizontal_flip_probability = 0.5
+image_drop_rate = 0.05
+text_drop_rate = 0.05
+text_and_image_drop_rate = 0.05
+to_wds = false
+pre_encode =  false
+
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"
@@ -63,12 +72,8 @@ save_interval = "250:step"
 [test_ldm]
 num_inference_steps = 30
 prompts = [
-    "The Starry Night, Vincent van Gogh",
-    "Girl with a Pearl Earring, Johannes Vermeer, low poly",
-    "a cute cat, pointillism",
+    "A cat flying over a castle",
 ]
-palettes = [
-    [[220, 20, 60]], # crimson
-    [[127, 0, 255]], # violet
-    [[0, 191, 255]], # deepskyblue
+validation_image_paths = [
+    "tests/weights/cat.jpg"
 ]

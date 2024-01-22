@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any
+from typing import Any, List
 
 import datasets
 from loguru import logger
@@ -34,19 +34,18 @@ from refiners.training_utils.latent_diffusion import (
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
-from refiners.foundationals.dinov2 import DINOv2_large_reg
-
+from refiners.fluxion.utils import manual_seed
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
 class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
-
+    seed: int = 9752
     image_encoder_path: str
     scale: float = 1.0
-    pooled_text_emb: bool = False
-    timestep_emb: bool = False
-    pre_encode: bool = False # TODO: Implement if there is demand.
+    inference_scale: float = 0.75
+    use_pooled_text_embedding: bool = False
+    use_timestep_embedding: bool = False
     fine_grained: bool = False
 
 
@@ -65,12 +64,15 @@ class DatasetConfig(BaseModel):
     text_drop_rate: float = 0.05
     text_and_image_drop_rate: float = 0.05
     to_wds: bool = False # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
+    pre_encode: bool = False # TODO
 
 
 class TestIPDiffusionConfig(TestDiffusionConfig):
     """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
 
-    IPs: list[list[tuple[int, int, int]]] = []
+    validation_image_paths: List[str]
+
+
 
 
 class AdapterLatentDiffusionConfig(BaseConfig):
@@ -342,17 +344,17 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ).to(device=self.device)
 
     @cached_property
-    def image_encoder(self) -> DINOv2_large_reg:
-        assert self.config.models["image_encoder"] is not None, "The config must contain a image_encoder entry."
-        return DINOv2_large_reg(
-            device=self.device
-        ).to(device=self.device)
-    @cached_property
     def adapter(self) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
-        ip_adapter = SD1IPAdapter(target=self.unet, fine_grained=self.config.adapter.fine_grained)
-        ip_adapter.image_encoder.load_state_dict(self.image_encoder.state_dict())
-        return ip_adapter
+        ip_adapter = SD1IPAdapter(
+            target=self.unet,
+            fine_grained=self.config.adapter.fine_grained,
+            scale=self.config.adapter.scale,
+            use_timestep_embedding=self.config.adapter.use_timestep_embedding,
+            use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
+        )
+        ip_adapter.image_encoder.load_from_safetensors(self.config.models["adapter"].image_encoder_path)
+        return ip_adapter.to(device=self.device)
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
@@ -449,27 +451,30 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             scheduler=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
         )
-
+        self.adapter.scale = self.config.adapter.inference_scale
         # retreive data from config
         prompts = self.config.test_ldm.prompts
-        IPs = [Tensor(IP) for IP in self.config.test_ldm.IPs]
+        validation_image_paths = self.config.test_ldm.validation_image_paths
+        assert len(prompts) == len(validation_image_paths)
         num_images_per_prompt = self.config.test_ldm.num_images_per_prompt
         if self.config.test_ldm.use_short_prompts:
             prompts = [prompt.split(sep=",")[0] for prompt in prompts]
+        cond_images = [Image.open(validation_image_path) for validation_image_path in validation_image_paths]
 
         # for each prompt generate `num_images_per_prompt` images
         # TODO: remove this for loop, batch things up
         images: dict[str, WandbLoggable] = {}
-        for prompt, IP in zip(prompts, IPs):
+        images["condition images"] = cond_images
+        for prompt, cond_image in zip(prompts, cond_images):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
+            clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
+            image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image))
             for i in range(num_images_per_prompt):
+                manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device)
-                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
-                IP_embedding = self.adapter.compute_IP_embeddings(IPs=[IP])
-                self.adapter.set_IP_embeddings(embeddings=IP_embedding)
+                self.adapter.set_image_embedding(embeddings=image_embedding)
                 for step in sd.steps:
-                    print(step)
                     x = sd(
                         x=x,
                         step=step,
@@ -477,9 +482,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                     )
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
-
         # log images to wandb
         self.log(data=images)
+        self.adapter.scale = self.config.adapter.scale
 
     def __init__(
         self,
@@ -501,17 +506,21 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to save the adapter when a checkpoint is saved."""
 
     def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        color_encoder = trainer.color_encoder
+        adapter = trainer.adapter
         cross_attention_adapters = trainer.adapter.cross_attention_adapters
 
         tensors: dict[str, Tensor] = {}
-        tensors |= {f"ColorEncoder.{key}": value for key, value in color_encoder.state_dict().items()}
+        tensors |= {f"SD1IPAdapter.{key}": value for key, value in adapter.state_dict().items()}
         for i, cross_attention_adapter in enumerate(cross_attention_adapters):
             tensors |= {
                 f"CrossAttentionAdapter_{i+1}.{key}": value
                 for key, value in cross_attention_adapter.state_dict().items()
             }
-
+        if trainer.config.adapter.use_pooled_text_embedding:
+            tensors |= {
+                f"pooled_text_embedding_proj.{key}": value
+                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
+            }
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
             tensors=tensors,
