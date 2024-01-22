@@ -34,7 +34,7 @@ from refiners.training_utils.wandb import WandbLoggable
 import numpy as np
 
 class ColorPaletteConfig(BaseModel):
-    model_dim: int
+    feedforward_dim: int
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
@@ -140,12 +140,13 @@ class ColorPaletteLatentDiffusionTrainer(
         # TO FIX : connect this to unet cross attention embedding dim
         EMBEDDING_DIM = 768
 
-        return ColorPaletteEncoder(
+        encoder = ColorPaletteEncoder(
             max_colors=self.config.color_palette.max_colors,
             embedding_dim=EMBEDDING_DIM,
-            model_dim=self.config.color_palette.model_dim,
+            feedforward_dim=self.config.color_palette.feedforward_dim,
             device=self.device,
         )
+        return encoder
 
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:

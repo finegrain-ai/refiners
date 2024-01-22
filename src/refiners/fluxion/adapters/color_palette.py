@@ -13,42 +13,107 @@ from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionA
 from refiners.foundationals.latent_diffusion.range_adapter import compute_sinusoidal_embedding
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.foundationals.clip.common import FeedForward, PositionalEncoder
+from refiners.foundationals.clip.text_encoder import TransformerLayer
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 TColorPaletteAdapter = TypeVar("TColorPaletteAdapter", bound="SD1ColorPaletteAdapter[Any]")  # Self (see PEP 673)
 
 
-class ColorPaletteEncoder(fl.Chain):
+
+class ColorsTokenizer(fl.Module):
+    def __init__(
+        self,
+        max_colors: int = 8,
+    ) -> None:
+        super().__init__()
+        self.max_colors = max_colors
+    
+    def forward(self, colors):        
+        colors = self.add_channel(colors)
+        colors = self.zero_right_padding(colors)
+        return colors
+    
+    def add_channel(
+        self, x: Float[Tensor, "*batch colors 3"]
+    ) -> Float[Tensor, "*batch colors_with_end 4"]:
+        return torch.cat((x, torch.ones(x.shape[0], x.shape[1], 1, dtype=x.dtype, device=x.device)), dim=2)
+
+    def zero_right_padding(
+        self, x: Float[Tensor, "*batch colors_with_end embedding_dim"]
+    ) -> Float[Tensor, "*batch max_colors feedforward_dim"]:
+        # Zero padding for the right side
+        padding_width = (self.max_colors - x.shape[1] % self.max_colors) % self.max_colors
+        if x.shape[1] == 0:
+            padding_width = self.max_colors
+        result = pad(x, (0, 0, 0, padding_width))
+        return result
+
+
+class ColorEncoder(fl.Chain):
     def __init__(
         self,
         embedding_dim: int,
-        max_colors: int,
-        model_dim: int = 256,
-        sinuosidal_embedding_dim: int = 32,
         device: Device | str | None = None,
-        dtype: DType = float32,
-        context_key: str = "color_palette_embedding",
+        dtype: DType | None = None,
     ) -> None:
-        self.embedding_dim = embedding_dim
-        self.model_dim = model_dim
-        self.max_colors = max_colors
-
         super().__init__(
-            fl.Linear(in_features=3, out_features=model_dim, device=device, dtype=dtype),
-            fl.Residual(fl.Lambda(self.compute_sinuosoidal_embedding)),
-            fl.Linear(in_features=model_dim, out_features=model_dim, device=device, dtype=dtype),
-            fl.GeLU(),
-            fl.Linear(in_features=model_dim, out_features=embedding_dim, device=device, dtype=dtype),
-            fl.Lambda(self.end_of_sequence_token),
-            fl.Lambda(self.zero_right_padding),
+            fl.Linear(in_features=4, out_features=embedding_dim, device=device, dtype=dtype),
         )
 
-    def compute_sinuosoidal_embedding(
-        self, x: Int[Tensor, "*batch n_colors 3"]
-    ) -> Float[Tensor, "*batch n_colors 3 model_dim"]:
-        range = arange(start=0, end=x.shape[1], dtype=self.dtype, device=x.device).unsqueeze(1)
-        embedding = compute_sinusoidal_embedding(range, embedding_dim=self.model_dim)
-        return embedding.squeeze(1).unsqueeze(0).repeat(x.shape[0], 1, 1).to(dtype=self.dtype)
+class ColorPaletteEncoder(fl.Chain):
+    def __init__(
+        self,
+        embedding_dim: int = 768,
+        max_colors: int = 8,
+        num_layers: int = 3,
+        num_attention_heads: int = 6,
+        feedforward_dim: int = 512,
+        layer_norm_eps: float = 1e-5,
+        use_quick_gelu: bool = False,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        self.embedding_dim = embedding_dim
+        self.max_colors = max_colors
+        self.num_layers = num_layers
+        self.num_attention_heads = num_attention_heads
+        self.feedforward_dim = feedforward_dim
+        self.layer_norm_eps = layer_norm_eps
+        self.use_quick_gelu = use_quick_gelu
+        super().__init__(
+            ColorsTokenizer(
+                max_colors=max_colors
+            ),
+            fl.Sum(
+                ColorEncoder(
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    dtype=dtype,
+                ),
+                PositionalEncoder(
+                    max_sequence_length=max_colors,
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    dtype=dtype,
+                ),
+            ),
+            *(
+                TransformerLayer(
+                    embedding_dim=embedding_dim,
+                    num_attention_heads=num_attention_heads,
+                    feedforward_dim=feedforward_dim,
+                    layer_norm_eps=layer_norm_eps,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ),
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+        )
+        if use_quick_gelu:
+            for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
+                parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
 
     def compute_color_palette_embedding(
         self,
@@ -66,33 +131,6 @@ class ColorPaletteEncoder(fl.Chain):
 
         negative_embedding = self(negative_color_palette)
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
-
-    def end_of_sequence_token(
-        self, x: Float[Tensor, "*batch colors embedding_dim"]
-    ) -> Float[Tensor, "*batch colors_with_end embedding_dim"]:
-        # Build a tensor of size (batch_size, 1, embedding_dim) with the end of string token
-        # end _of string token is a dim_model vector with 1 in the last position
-        numpy_end_of_sequence_token = np.zeros((1, self.embedding_dim))
-        numpy_end_of_sequence_token[-1] = 1
-
-        end_of_sequence_tensor: Float[Tensor, "*batch 1 embedding_dim"] = (
-            tensor(numpy_end_of_sequence_token, device=x.device, dtype=x.dtype)
-            .reshape(1, 1, -1)
-            .repeat(x.shape[0], 1, 1)
-        )
-
-        with_eos = torch.cat((x, end_of_sequence_tensor), dim=1)
-        return with_eos[:, : self.max_colors, :]
-
-    def zero_right_padding(
-        self, x: Float[Tensor, "*batch colors_with_end embedding_dim"]
-    ) -> Float[Tensor, "*batch max_colors model_dim"]:
-        # Zero padding for the right side
-        padding_width = (self.max_colors - x.shape[1] % self.max_colors) % self.max_colors
-
-        result = pad(x, (0, 0, 0, padding_width))
-        return result
-
 
 class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     # Prevent PyTorch module registration
@@ -114,7 +152,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         self.sub_adapters: list[CrossAttentionAdapter] = [
             CrossAttentionAdapter(target=cross_attn, scale=scale)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
-        ]
+        ]        
     
     @property
     def weights(self) -> List[Tensor]:
