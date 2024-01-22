@@ -33,6 +33,13 @@ class LatentDiffusionConfig(BaseModel):
     offset_noise: float = 0.1
     min_step: int = 0
     max_step: int = 999
+    snr_gamma: float | None = None
+    input_perturbation: float = 0
+    # timestep_bias_strategy: str = "none" # TODO: Implement this later
+    # timestep_bias_multiplier: float = 1.0
+    # timestep_bias_begin: int = 0
+    # timestep_bias_end: int = 1000
+    # timestep_bias_portion: float = 0.25
 
 
 class TestDiffusionConfig(BaseModel):
@@ -238,6 +245,9 @@ def resize_image(image: Image.Image, min_size: int = 512, max_size: int = 576) -
             image = image.resize(size=(int(min_size * image.size[0] / image.size[1]), min_size))
     return image
 
+def filter_image(image: Image.Image, min_size: int = 512) -> bool:
+    image_min_size = min(image.size)
+    return image_min_size >= min_size
 
 class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
     def on_train_begin(self, trainer: LatentDiffusionTrainer[Any]) -> None:

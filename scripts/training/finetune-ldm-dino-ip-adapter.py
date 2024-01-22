@@ -1,0 +1,527 @@
+import random
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Any
+
+import datasets
+from loguru import logger
+from PIL import Image
+from pydantic import BaseModel
+from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like
+from torch.distributions import Beta
+from torch.nn import Module
+from torch.nn.functional import mse_loss
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Dataset
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import save_to_safetensors
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter
+from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
+from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
+from refiners.training_utils.callback import Callback
+from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.latent_diffusion import (
+    LatentDiffusionConfig,
+    TestDiffusionConfig,
+    resize_image,
+    sample_noise,
+    filter_image,
+)
+from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.wandb import WandbLoggable
+import webdataset as wds
+from refiners.foundationals.dinov2 import DINOv2_large_reg
+
+# some images of the unsplash lite dataset are bigger than the default limit
+Image.MAX_IMAGE_PIXELS = 200_000_000
+
+class AdapterConfig(BaseModel):
+    """Configuration for the IP adapter."""
+
+    image_encoder_path: str
+    scale: float = 1.0
+    pooled_text_emb: bool = False
+    timestep_emb: bool = False
+    pre_encode: bool = False # TODO: Implement if there is demand.
+    fine_grained: bool = False
+
+
+class DatasetConfig(BaseModel):
+    """Configuration for the dataset."""
+
+    hf_repo: str
+    revision: str = "main"
+    split: str = "train"
+    horizontal_flip_probability: float = 0.5
+    resize_image_min_size: int = 512
+    resize_image_max_size: int = 576
+    filter_min_image_size: bool = False
+    random_crop_size: int = 512
+    image_drop_rate: float = 0.05
+    text_drop_rate: float = 0.05
+    text_and_image_drop_rate: float = 0.05
+    to_wds: bool = False # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
+
+
+class TestIPDiffusionConfig(TestDiffusionConfig):
+    """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
+
+    IPs: list[list[tuple[int, int, int]]] = []
+
+
+class AdapterLatentDiffusionConfig(BaseConfig):
+    """Finetunning configuration.
+
+    Contains the configs of the dataset, the latent diffusion model and the adapter.
+    """
+
+    dataset: DatasetConfig
+    ldm: LatentDiffusionConfig
+    adapter: AdapterConfig
+    test_ldm: TestIPDiffusionConfig
+
+
+@dataclass
+class IPBatch:
+    """Structure of the data in the IPDataset."""
+
+    latent: Tensor
+    text_embedding: Tensor
+    cond_image: Tensor
+
+
+class IPDataset(Dataset[IPBatch]):
+    """Dataset for the IP adapter.
+
+    Transforms the data from the HuggingFace dataset into `IPBatch`.
+    The `collate_fn` is used by the trainer to batch the data.
+    """
+
+    def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        super().__init__()
+        self.trainer = trainer
+        self.dataset = self.load_huggingface_dataset()
+        self.image_encoder_transform = trainer.image_encoder_transform
+
+    @staticmethod
+    def download_images(
+        urls: list[Any],
+        dl_manager: datasets.DownloadManager,
+    ) -> dict[str, list[str]]:
+        """Download the images from the urls."""
+        return {
+            "image": dl_manager.download(urls),  # type: ignore
+        }
+
+    @staticmethod
+    def resize_images(
+        images: list[Image.Image],
+        min_size: int = 512,
+        max_size: int = 576,
+    ) -> dict[str, list[Image.Image]]:
+        """Resize the images such that their shortest side is between `min_size` and `max_size`."""
+        return {
+            "image": [
+                resize_image(
+                    image=image,
+                    min_size=min_size,
+                    max_size=max_size,
+                )
+                for image in images
+            ],
+        }
+    @staticmethod
+    def filter_images(
+        images: list[Image.Image],
+        min_size: int = 512,
+    ) -> dict[str, list[bool]]:
+        """Resize the images such that their shortest side is between `min_size` and `max_size`."""
+        return {
+            "image": [
+                filter_image(
+                    image=image,
+                    min_size=min_size,
+                )
+                for image in images
+            ],
+        }
+
+    @staticmethod
+    def encode_captions(
+        captions: list[str],
+        text_encoder: CLIPTextEncoderL,
+    ) -> dict[str, list[Tensor]]:
+        """Encode the captions with the text encoder."""
+        return {
+            "text_embedding": [text_encoder(caption) for caption in captions],
+        }
+
+    def load_huggingface_dataset(self) -> datasets.Dataset:
+        """Load the dataset from Hugging Face and apply some pre-processing."""
+        dataset_config = self.trainer.config.dataset
+        logger.info(
+            f"Loading dataset from {dataset_config.hf_repo}, "
+            f"revision {dataset_config.revision}, "
+            f"split {dataset_config.split}"
+        )
+        dataset = datasets.load_dataset(  # type: ignore
+            path=dataset_config.hf_repo,
+            revision=dataset_config.revision,
+            split=dataset_config.split,
+        )
+        dataset = dataset.select(list(range(100)))  # type: ignore # FIXME: temporary
+
+        # download images from urls
+        dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
+        dataset = dataset.map(  # type: ignore
+            function=self.download_images,
+            input_columns=["url"],
+            remove_columns=["url"],
+            batched=True,
+            num_proc=8,  # FIXME: harcoded value
+            fn_kwargs={
+                "dl_manager": dl_manager,
+            },
+            desc="Downloading images",  # type: ignore
+        )
+
+        # cast the "image" column to Image feature type
+        dataset = dataset.cast_column(  # type: ignore
+            column="image",
+            feature=datasets.Image(),
+        )
+        # remove min size images
+        if dataset_config.filter_min_image_size:
+            dataset = dataset.filter( # type: ignore
+                function=self.filter_images,
+                input_columns=["image"],
+                batched=True,
+                batch_size=10,  # FIXME: harcoded value
+                num_proc=8,  # FIXME: harcoded value
+                fn_kwargs={
+                    "min_size": dataset_config.resize_image_min_size,
+                },
+                desc="Capping image sizes",  # type: ignore
+            )
+
+        # limit max image size
+        dataset = dataset.map(  # type: ignore
+            function=self.resize_images,
+            input_columns=["image"],
+            batched=True,
+            batch_size=10,  # FIXME: harcoded value
+            num_proc=8,  # FIXME: harcoded value
+            fn_kwargs={
+                "min_size": dataset_config.resize_image_min_size,
+                "max_size": dataset_config.resize_image_max_size,
+            },
+            desc="Capping image sizes",  # type: ignore
+        )
+
+        # encode the captions into text embedding
+        self.trainer.prepare_model("text_encoder")
+        dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
+        dataset = dataset.map(  # type: ignore
+            function=self.encode_captions,
+            input_columns=["caption"],
+            remove_columns=["caption"],
+            batched=True,
+            batch_size=50,  # FIXME: harcoded value
+            fn_kwargs={
+                "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
+            },
+            desc="Encoding captions into embeddings",  # type: ignore
+        )
+
+        # convert entries to torch tensors, except the image
+        dataset.set_format(  # type: ignore
+            type="torch",
+            output_all_columns=True,
+            columns=[
+                "text_embedding",
+                "IPs",
+            ],
+        )
+
+        return dataset  # type: ignore
+
+    @cached_property
+    def empty_text_embedding(self) -> Tensor:
+        """Return an empty text embedding."""
+        return self.trainer.text_encoder("")
+
+    def transform(self, data: dict[str, Any]) -> IPBatch:
+        """Apply transforms to data."""
+        dataset_config = self.trainer.config.dataset
+        image = data["image"]
+        cond_image = self.image_encoder_transform(image)
+        # apply augmentation to the image
+        image_transforms: list[Module] = []
+        if self.trainer.config.dataset.random_crop_size:
+            image_transforms.append(
+                RandomCrop(size=self.trainer.config.dataset.random_crop_size),
+            )
+        if self.trainer.config.dataset.horizontal_flip_probability:
+            image_transforms.append(
+                RandomHorizontalFlip(p=self.trainer.config.dataset.horizontal_flip_probability),
+            )
+        image_compose = Compose(image_transforms)
+        image = image_compose(image)  # type: ignore
+
+        # encode the image into latent
+        latent = self.trainer.lda.encode_image(image=image)  # type: ignore
+
+        text_embedding = data["text_embedding"]
+        rand_num = random.random()
+        if rand_num < dataset_config.image_drop_rate:
+            cond_image = zeros_like(cond_image)
+        elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
+            text_embedding = self.empty_text_embedding
+        elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate):
+            text_embedding = self.empty_text_embedding
+            cond_image = zeros_like(cond_image)
+
+        return IPBatch(
+            latent=latent,
+            text_embedding=text_embedding,
+            cond_image=cond_image,
+        )
+
+    def __getitem__(self, index: int) -> IPBatch:
+        # retreive data from the huggingface dataset
+        data = self.dataset[index]  # type: ignore
+        # augment/transform into IPBatch
+        data = self.transform(data)  # type: ignore
+        return data
+
+    def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
+        latents = cat(tensors=[item.latent for item in batch])
+        text_embeddings = cat(tensors=[item.text_embedding for item in batch])
+        cond_images = pad_sequence([item.cond_image for item in batch], batch_first=True)
+        return IPBatch(
+            latent=latents,
+            text_embedding=text_embeddings,
+            cond_image=cond_images,
+        )
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+
+class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
+    @cached_property
+    def device(self) -> Device:  # TODO: remove, temporary
+        selected_device = Device("cpu")
+        logger.info(f"Using device: {selected_device}")
+        return selected_device
+
+    @cached_property
+    def lda(self) -> SD1Autoencoder:
+        assert self.config.models["lda"] is not None, "The config must contain a lda entry."
+        return SD1Autoencoder(
+            device=self.device,
+        ).to(device=self.device)
+
+    @cached_property
+    def unet(self) -> SD1UNet:
+        assert self.config.models["unet"] is not None, "The config must contain a unet entry."
+        return SD1UNet(
+            in_channels=4,  # FIXME: harcoded value
+            device=self.device,
+        ).to(device=self.device)
+
+    @cached_property
+    def text_encoder(self) -> CLIPTextEncoderL:
+        assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
+        return CLIPTextEncoderL(
+            device=self.device,
+        ).to(device=self.device)
+
+    @cached_property
+    def image_encoder(self) -> DINOv2_large_reg:
+        assert self.config.models["image_encoder"] is not None, "The config must contain a image_encoder entry."
+        return DINOv2_large_reg(
+            device=self.device
+        ).to(device=self.device)
+    @cached_property
+    def adapter(self) -> SD1IPAdapter:
+        assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
+        ip_adapter = SD1IPAdapter(target=self.unet, fine_grained=self.config.adapter.fine_grained)
+        ip_adapter.image_encoder.load_state_dict(self.image_encoder.state_dict())
+        return ip_adapter
+
+    @cached_property
+    def ddpm_scheduler(self) -> DDPM:
+        return DDPM(
+            num_inference_steps=1000,  # FIXME: harcoded value
+            device=self.device,
+        ).to(device=self.device)
+
+    @cached_property
+    def signal_to_noise_ratios(self) -> Tensor:
+        return  exp(self.ddpm_scheduler.signal_to_noise_ratios)**2
+    def load_models(self) -> dict[str, fl.Module]:
+        return {
+            "lda": self.lda,
+            "unet": self.unet,
+            "text_encoder": self.text_encoder,
+            "adapter": self.adapter,
+        }
+
+    def load_dataset(self) -> IPDataset:
+        return IPDataset(trainer=self)
+
+    def sample_timestep(self) -> Tensor:
+        random_step = random.randint(
+            a=self.config.ldm.min_step,
+            b=self.config.ldm.max_step,
+        )
+        self.current_step = random_step
+        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+
+    def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
+        return sample_noise(
+            size=size,
+            offset_noise=self.config.ldm.offset_noise,
+            device=self.device,
+            dtype=dtype,
+        )
+
+    def compute_loss(self, batch: IPBatch) -> Tensor:
+        # retreive data from batch
+        latents = batch.latent
+        text_embeddings = batch.text_embedding
+        cond_image = batch.cond_image
+
+        # set IP embeddings context
+        self.adapter.set_cond_image_embedding(cond_image)
+
+        # set text embeddings context
+        self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
+
+        # sample timestep and set unet timestep context
+        timestep = self.sample_timestep()
+        self.unet.set_timestep(timestep=timestep)
+
+        # sample noise and noisify the latents
+        noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
+        input_perturbation = self.config.ldm.input_perturbation
+        if input_perturbation > 0:
+            new_noise = noise + input_perturbation * randn_like(noise)
+        if input_perturbation > 0:
+            noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=new_noise, step=self.current_step)
+        else:
+            noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+
+        # get prediction from unet
+        prediction = self.unet(noisy_latents)
+
+        # compute mse loss
+        snr_gamma = self.config.ldm.snr_gamma
+        if snr_gamma is None:
+            loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
+        else:
+            # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+            # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+            # This is discussed in Section 4.2 of the same paper.
+            signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
+
+            mse_loss_weights = (
+                stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0] / signal_to_noise_ratios
+            )
+
+            loss = mse_loss(prediction.float(), noise.float(), reduction="none")
+            loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+            loss = loss.mean()
+
+        return loss
+
+    def compute_evaluation(self) -> None:
+        # initialize an SD1.5 pipeline using the trainer's models
+        sd = StableDiffusion_1(
+            unet=self.unet,
+            lda=self.lda,
+            clip_text_encoder=self.text_encoder,
+            scheduler=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
+            device=self.device,
+        )
+
+        # retreive data from config
+        prompts = self.config.test_ldm.prompts
+        IPs = [Tensor(IP) for IP in self.config.test_ldm.IPs]
+        num_images_per_prompt = self.config.test_ldm.num_images_per_prompt
+        if self.config.test_ldm.use_short_prompts:
+            prompts = [prompt.split(sep=",")[0] for prompt in prompts]
+
+        # for each prompt generate `num_images_per_prompt` images
+        # TODO: remove this for loop, batch things up
+        images: dict[str, WandbLoggable] = {}
+        for prompt, IP in zip(prompts, IPs):
+            canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
+            for i in range(num_images_per_prompt):
+                logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
+                x = randn(1, 4, 64, 64, device=self.device)
+                clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
+                IP_embedding = self.adapter.compute_IP_embeddings(IPs=[IP])
+                self.adapter.set_IP_embeddings(embeddings=IP_embedding)
+                for step in sd.steps:
+                    print(step)
+                    x = sd(
+                        x=x,
+                        step=step,
+                        clip_text_embedding=clip_text_embedding,
+                    )
+                canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+            images[prompt] = canvas_image
+
+        # log images to wandb
+        self.log(data=images)
+
+    def __init__(
+        self,
+        config: AdapterLatentDiffusionConfig,
+        callbacks: "list[Callback[Any]] | None" = None,
+    ) -> None:
+        super().__init__(config=config, callbacks=callbacks)
+        self.callbacks.extend((LoadAdapter(), SaveAdapter()))
+
+
+class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
+    """Callback to load the adapter at the beginning of the training."""
+
+    def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        trainer.adapter.inject()
+
+
+class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
+    """Callback to save the adapter when a checkpoint is saved."""
+
+    def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        color_encoder = trainer.color_encoder
+        cross_attention_adapters = trainer.adapter.cross_attention_adapters
+
+        tensors: dict[str, Tensor] = {}
+        tensors |= {f"ColorEncoder.{key}": value for key, value in color_encoder.state_dict().items()}
+        for i, cross_attention_adapter in enumerate(cross_attention_adapters):
+            tensors |= {
+                f"CrossAttentionAdapter_{i+1}.{key}": value
+                for key, value in cross_attention_adapter.state_dict().items()
+            }
+
+        save_to_safetensors(
+            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
+            tensors=tensors,
+        )
+
+
+if __name__ == "__main__":
+    import sys
+
+    config_path = sys.argv[1]
+    config = AdapterLatentDiffusionConfig.load_from_toml(toml_path=config_path)
+    trainer = AdapterLatentDiffusionTrainer(config=config)
+    trainer.train()
