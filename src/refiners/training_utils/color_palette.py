@@ -13,7 +13,6 @@ from torch.utils.data import Dataset
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import ndcg_score
 
-from torch.nn import init
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
 from refiners.fluxion.utils import save_to_safetensors
@@ -54,6 +53,7 @@ class ColorPaletteDatasetConfig(HuggingfaceDatasetConfig):
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     prompts: list[ColorPalettePromptConfig]
     num_palette_sample: int = 0
+    condition_scale: float = 7.5
 
 @dataclass
 class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):

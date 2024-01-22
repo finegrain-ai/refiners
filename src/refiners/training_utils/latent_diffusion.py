@@ -235,6 +235,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
         sd = self.sd
         prompts = self.config.test_diffusion.prompts
         num_images_per_prompt = self.config.test_diffusion.num_images_per_prompt
+        condition_scale = self.config.test_diffusion.condition_scale
         if self.config.test_diffusion.use_short_prompts:
             prompts = [prompt.split(sep=",")[0] for prompt in prompts]
         images: dict[str, WandbLoggable] = {}
@@ -249,6 +250,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                         x,
                         step=step,
                         clip_text_embedding=clip_text_embedding,
+                        condition_scale=condition_scale
                     )
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
