@@ -86,10 +86,14 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         logger.info(f"Trigger phrase: {self.trigger_phrase}")
         self.color_palette_encoder = trainer.color_palette_encoder
 
+
     def get_color_palette(self, index: int) -> ColorPalette:
         # Randomly pick a palette between 1 and 8
-        palette_index = randint(1, 8)
-        return self.dataset[index][f"palette_{palette_index}"]
+        # palette_index = randint(1, 8)
+        # return self.dataset[index][f"palette_{palette_index}"]
+        
+        # Pick color palette 8
+        return self.dataset[index][f"palette_8"]
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
