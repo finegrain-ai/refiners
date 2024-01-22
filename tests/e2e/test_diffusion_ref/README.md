@@ -49,6 +49,7 @@ Special cases:
     - `expected_freeu.png`
     - `expected_dropy_slime_9752.png`
     - `expected_sdxl_dpo_lora.png`
+    - `expected_sdxl_multi_loras.png`
 
 ## Other images
 
