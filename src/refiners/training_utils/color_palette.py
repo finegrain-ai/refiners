@@ -322,7 +322,7 @@ class ColorPaletteLatentDiffusionTrainer(
 
         for eval_index, db_index in enumerate(self.eval_indices):
             # we only eval on palette_8 here
-            palette = self.dataset[db_index][f"palette_8"]
+            palette = self.dataset.dataset[db_index][f"palette_8"]
             caption = self.dataset.get_caption(db_index, self.config.dataset.caption_key)
             
             prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
