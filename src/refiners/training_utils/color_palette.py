@@ -346,7 +346,7 @@ class ColorPaletteLatentDiffusionTrainer(
 
         num_palette_sample = self.config.test_color_palette.num_palette_sample
         if num_palette_sample > 0:
-            images_and_palettes += self.compute_db_samples_evaluation(num_images_per_prompt)
+            images_and_palettes = self.compute_db_samples_evaluation(num_images_per_prompt)
             self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-samples")
         
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
