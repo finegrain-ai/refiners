@@ -44,7 +44,9 @@ class SamplingByPaletteConfig(BaseModel):
     palette_8: float = 8.0
 
 class ColorPaletteConfig(BaseModel):
-    feedforward_dim: int
+    feedforward_dim: int = 3072
+    num_attention_heads: int = 12
+    num_layers: int = 12
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
@@ -168,6 +170,8 @@ class ColorPaletteLatentDiffusionTrainer(
         encoder = ColorPaletteEncoder(
             max_colors=self.config.color_palette.max_colors,
             embedding_dim=EMBEDDING_DIM,
+            num_layers=self.config.color_palette.num_layers,
+            num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
             device=self.device,
         )

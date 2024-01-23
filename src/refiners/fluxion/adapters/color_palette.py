@@ -73,9 +73,12 @@ class ColorPaletteEncoder(fl.Chain):
         self,
         embedding_dim: int = 768,
         max_colors: int = 8,
-        num_layers: int = 3,
-        num_attention_heads: int = 6,
-        feedforward_dim: int = 512,
+        # Remark : 
+        # I have followed the CLIPTextEncoderL parameters
+        # as default parameters here, might require some testing
+        num_layers: int = 12,
+        num_attention_heads: int = 12,
+        feedforward_dim: int = 3072,
         layer_norm_eps: float = 1e-5,
         use_quick_gelu: bool = False,
         device: Device | str | None = None,
@@ -106,6 +109,9 @@ class ColorPaletteEncoder(fl.Chain):
                 ),
             ),
             *(
+                # Remark : 
+                # The current transformer layer has a causal self-attention
+                # It would be fair to test non-causal self-attention
                 TransformerLayer(
                     embedding_dim=embedding_dim,
                     num_attention_heads=num_attention_heads,
@@ -193,8 +199,16 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-
+    
     def set_color_palette_embedding(self, color_palette_embedding: Tensor) -> None:
+        # Remark : 
+        # I've not renamed clip_image_embedding here
+        # I feel we should not create a new naming for color_palette since it's the exact same component
+        #
+        # But rather one would just rename clip_image_embedding and ImageCrossAttention
+        # 
+        # Naming proposals could be : GenericCrossAttention, NonTextCrossAttention, MediaCrossAttention
+        
         self.set_context("ip_adapter", {"clip_image_embedding": color_palette_embedding})
 
     @property
