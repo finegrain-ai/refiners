@@ -3,7 +3,7 @@ from functools import cached_property
 from random import randint
 from typing import Any, List, TypedDict, Tuple
 from pydantic import BaseModel
-
+import random
 
 from loguru import logger
 from PIL import Image
@@ -33,12 +33,23 @@ from refiners.training_utils.latent_diffusion import (
 from refiners.training_utils.wandb import WandbLoggable
 import numpy as np
 
+class SamplingByPaletteConfig(BaseModel):
+    palette_1: float = 1.0
+    palette_2: float = 2.0
+    palette_3: float = 3.0
+    palette_4: float = 4.0
+    palette_5: float = 5.0
+    palette_6: float = 6.0
+    palette_7: float = 7.0
+    palette_8: float = 8.0
+
 class ColorPaletteConfig(BaseModel):
     feedforward_dim: int
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
-    
+    without_caption_probability: float = 0.17
+    sampling_by_palette: SamplingByPaletteConfig = SamplingByPaletteConfig()
 
 Color = Tuple[int, int, int]
 ColorPalette = List[Color]
@@ -89,11 +100,25 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
     def get_color_palette(self, index: int) -> ColorPalette:
         # Randomly pick a palette between 1 and 8
-        palette_index = randint(1, 8)
+        choices = range(1, 9)
+        weights = np.array([
+            getattr(self.trainer.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
+        ])
+        sum = weights.sum()
+        probabilities = weights / sum
+        palette_index = int(random.choices(choices, probabilities, k=1)[0])
+        item = self.dataset[index]
         return self.dataset[index][f"palette_{palette_index}"]
         
         # Pick color palette 8
         #return self.dataset[index][f"palette_8"]
+    
+    def process_caption_and_palette(self, caption: str, color_palette: ColorPalette) -> tuple[str, ColorPalette]:
+        if random.random() < self.trainer.config.latent_diffusion.unconditional_sampling_probability:
+            return ("", color_palette[:,0:0,:])
+        if random.random() < self.trainer.config.color_palette.without_caption_probability:
+            return ("", color_palette)
+        return (caption, color_palette)
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
@@ -106,10 +131,10 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         )
         processed_image = self.process_image(resized_image)
         latents = self.lda.encode_image(image=processed_image)
-        processed_caption = self.process_caption(caption=caption)
+        (processed_caption, processed_palette) = self.process_caption_and_palette(caption=caption, color_palette=color_palette)
 
         clip_text_embedding = self.text_encoder(processed_caption)
-        color_palette_embedding = self.color_palette_encoder(color_palette)
+        color_palette_embedding = self.color_palette_encoder(processed_palette)
         return TextEmbeddingColorPaletteLatentsBatch(
             text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
         )
@@ -250,7 +275,10 @@ class ColorPaletteLatentDiffusionTrainer(
         l = self.dataset_length
         size = self.config.test_color_palette.num_palette_sample
         indices = list(np.random.choice(l, size=size, replace=False))
-        return list(map(int, indices))
+        indices = list(map(int, indices))
+        palettes = [self.dataset.get_color_palette(i) for i in indices]
+        captions = [self.dataset.get_caption(i, self.config.dataset.caption_key) for i in indices]
+        return list(zip(indices, palettes, captions))
     
     def image_palette_metrics(self, image: Image.Image, palette: ColorPalette, img_size : Tuple[int, int]=(256,256), sampling_size :int = 1000):
         resized_img = image.resize(img_size)
@@ -314,17 +342,14 @@ class ColorPaletteLatentDiffusionTrainer(
                 self.log({
                     f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"])
                 })
+            
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> None:
         sd = self.sd
         images: dict[str, WandbLoggable] = {}
         images_and_palettes : List[ImageAndPalette] = []
         palette_img_size = img_size//self.config.color_palette.max_colors
-
-        for eval_index, db_index in enumerate(self.eval_indices):
-            # we only eval on palette_8 here
-            palette = self.dataset.dataset[db_index][f"palette_8"]
-            caption = self.dataset.get_caption(db_index, self.config.dataset.caption_key)
-            
+        
+        for eval_index, (db_index, palette, caption) in enumerate(self.eval_indices):            
             prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
             image_and_palette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
             
@@ -373,10 +398,13 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
         adapter = model.parent
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
-        metadata = {f"unet_targets": ",".join(adapter.sub_targets)}
+        encoder = trainer.color_palette_encoder
+            
+        state_dict = encoder.state_dict()
+        for i in state_dict:
+            tensors.update({f"color_palette_encoder.{i}": state_dict[i]})
 
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors,
-            metadata=metadata,
+            tensors=tensors
         )

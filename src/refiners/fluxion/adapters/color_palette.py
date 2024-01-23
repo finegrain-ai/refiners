@@ -121,6 +121,13 @@ class ColorPaletteEncoder(fl.Chain):
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
+    
+    def get_weights(self) -> List[Tensor]:
+        weights = {}
+        for module_name in self._modules:
+            if hasattr(self._modules[module_name], "weights"):
+                weights[module_name] = self._modules[module_name].weights
+        return weights
 
     def compute_color_palette_embedding(
         self,
