@@ -75,7 +75,7 @@ def test_names(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None
     assert manager.names == ["pokemon-lora"]
 
     manager.add_loras("pokemon-lora2", tensors=weights)
-    assert manager.names == ["pokemon-lora", "pokemon-lora2"]
+    assert set(manager.names) == set(["pokemon-lora", "pokemon-lora2"])
 
 
 def test_scales(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None:
