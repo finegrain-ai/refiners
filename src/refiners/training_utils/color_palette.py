@@ -21,7 +21,6 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
 )
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.latent_diffusion import (
     CaptionImage,
     FinetuneLatentDiffusionBaseConfig,
@@ -59,9 +58,6 @@ ColorPalette = List[Color]
 class ColorPalettePromptConfig(BaseModel):
     text: str
     color_palette: ColorPalette
-
-class ColorPaletteDatasetConfig(HuggingfaceDatasetConfig):
-    local_folder: str = "data/color-palette"
 
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     prompts: list[ColorPalettePromptConfig]

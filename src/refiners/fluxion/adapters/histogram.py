@@ -1,10 +1,14 @@
-from typing import Iterable
+from typing import Callable, List, TypeVar, Any
 import refiners.fluxion.layers as fl
-from src.refiners.fluxion.layers.module import Module
 from torch import device as Device, dtype as DType, Tensor, histogramdd, stack
-from torch.nn.functional import kl_div as _kl_div, mse_loss as _mse_loss
+from torch.nn.functional import mse_loss as _mse_loss
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.fluxion.adapters.adapter import Adapter
+from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
+from torch.nn import init
 
-from src.refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
+from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
 
 class HistogramDistance(fl.Chain):
     def __init__(
@@ -32,7 +36,7 @@ class HistogramExtractor(fl.Chain):
     def histogramdd(self, x: Tensor) -> Tensor:
         batch_size = x.shape[0]
         num_pixels = (x.shape[1]*x.shape[2])
-        histograms = []
+        histograms : List[Tensor] = []
         for i in range(batch_size):
             hist_dd = histogramdd(
                 x[i], 
@@ -140,6 +144,7 @@ class HistogramEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
         super().__init__(
+            
             ViT3dEmbeddings(
                 cube_size=cube_size, embedding_dim=embedding_dim, patch_size=patch_size, device=device, dtype=dtype
             ),
@@ -159,3 +164,69 @@ class HistogramEncoder(fl.Chain):
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
             fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
+
+
+TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
+
+class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
+    # Prevent PyTorch module registration
+    _histogram_encoder: list[HistogramEncoder]
+
+    def __init__(
+        self,
+        target: TSDNet,
+        histogram_encoder: HistogramEncoder,
+        scale: float = 1.0,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        with self.setup_adapter(target):
+            super().__init__(target)
+
+        self._histogram_encoder = [histogram_encoder]
+
+        self.sub_adapters: list[CrossAttentionAdapter] = [
+            CrossAttentionAdapter(target=cross_attn, scale=scale)
+            for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
+        ]        
+    
+    @property
+    def weights(self) -> List[Tensor]:
+        weights : List[Tensor] = []
+        for adapter in self.sub_adapters:
+            weights += adapter.weights
+        return weights
+    
+    def zero_init(self) -> None:
+        weights = self.weights
+        for weight in weights:
+            init.zeros_(weight)
+            
+    def inject(self, parent: fl.Chain | None = None) -> "SD1HistogramAdapter[Any]":
+        for adapter in self.sub_adapters:
+            adapter.inject()
+        return super().inject(parent)
+
+    def eject(self) -> None:
+        for adapter in self.sub_adapters:
+            adapter.eject()
+        super().eject()
+
+    def set_scale(self, scale: float) -> None:
+        for cross_attn in self.sub_adapters:
+            cross_attn.scale = scale
+    
+    def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
+        # Remark : 
+        # I've not renamed clip_image_embedding here
+        # I feel we should not create a new naming for color_palette since it's the exact same component
+        #
+        # But rather one would just rename clip_image_embedding and ImageCrossAttention
+        # 
+        # Naming proposals could be : GenericCrossAttention, NonTextCrossAttention, MediaCrossAttention
+        
+        self.set_context("ip_adapter", {"clip_image_embedding": histogram_embedding})
+
+    @property
+    def histogram_encoder(self) -> HistogramEncoder:
+        return self._histogram_encoder[0]
