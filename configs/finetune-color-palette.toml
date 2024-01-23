@@ -18,6 +18,9 @@ offset_noise = 0.1
 [color_palette]
 max_colors = 8
 feedforward_dim = 512
+feedforward_dim = 512
+num_attention_heads = 6
+num_layers = 3
 
 [training]
 duration = "1000:epoch"
@@ -44,7 +47,7 @@ warmup = "500:step"
 
 
 [dropout]
-dropout_probability = 0.2
+dropout_probability = 0.0
 use_gyro_dropout = false
 
 [dataset]

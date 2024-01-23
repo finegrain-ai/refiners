@@ -27,6 +27,7 @@ training = [
     "scipy>=1.11.4",
     "datasets>=2.15.0",
     "tomli>=2.0.1",
+    "scikit-learn>=1.4.0"
 ]
 test = [
     "diffusers>=0.24.0",

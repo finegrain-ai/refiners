@@ -86,6 +86,7 @@ class ColorPaletteEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
+        self.out_sequence_size = 512
         super().__init__(
             ColorsTokenizer(
                 max_colors=max_colors
@@ -118,6 +119,11 @@ class ColorPaletteEncoder(fl.Chain):
                 for _ in range(num_layers)
             ),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+            fl.Permute(0,2,1),
+            fl.Linear(in_features=max_colors, out_features=self.out_sequence_size, bias=True, device=device, dtype=dtype),
+            fl.GeLU(),
+            fl.Linear(in_features=self.out_sequence_size, out_features=self.out_sequence_size, bias=True, device=device, dtype=dtype),
+            fl.Permute(0,2,1)
         )
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
