@@ -33,15 +33,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         self.scheduler = scheduler.to(device=self.device, dtype=self.dtype)
 
     def set_inference_steps(self, num_steps: int, first_step: int = 0) -> None:
-        initial_diffusion_rate = self.scheduler.initial_diffusion_rate
-        final_diffusion_rate = self.scheduler.final_diffusion_rate
-        device, dtype = self.scheduler.device, self.scheduler.dtype
-        self.scheduler = self.scheduler.__class__(
-            num_inference_steps=num_steps,
-            initial_diffusion_rate=initial_diffusion_rate,
-            final_diffusion_rate=final_diffusion_rate,
-            first_inference_step=first_step,
-        ).to(device=device, dtype=dtype)
+        self.scheduler = self.scheduler.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
 
     def init_latents(
         self,
