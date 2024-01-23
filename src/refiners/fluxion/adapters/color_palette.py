@@ -1,25 +1,20 @@
 from typing import Any, List, TypeVar
 
-import numpy as np
 import torch
 from jaxtyping import Float, Int
-from torch import Tensor, arange, device as Device, dtype as DType, float32, tensor, zeros
+from torch import Tensor, device as Device, dtype as DType, tensor, zeros
 from torch.nn.functional import pad
 from torch.nn import init
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
-from refiners.foundationals.latent_diffusion.range_adapter import compute_sinusoidal_embedding
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from refiners.foundationals.clip.common import FeedForward, PositionalEncoder
+from refiners.foundationals.clip.common import PositionalEncoder
 from refiners.foundationals.clip.text_encoder import TransformerLayer
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
-TColorPaletteAdapter = TypeVar("TColorPaletteAdapter", bound="SD1ColorPaletteAdapter[Any]")  # Self (see PEP 673)
-
-
 
 class ColorsTokenizer(fl.Module):
     def __init__(
@@ -29,7 +24,7 @@ class ColorsTokenizer(fl.Module):
         super().__init__()
         self.max_colors = max_colors
     
-    def forward(self, colors):        
+    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:        
         colors = self.add_channel(colors)
         colors = self.zero_right_padding(colors)
         return colors
@@ -127,17 +122,10 @@ class ColorPaletteEncoder(fl.Chain):
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
-    
-    def get_weights(self) -> List[Tensor]:
-        weights = {}
-        for module_name in self._modules:
-            if hasattr(self._modules[module_name], "weights"):
-                weights[module_name] = self._modules[module_name].weights
-        return weights
 
     def compute_color_palette_embedding(
         self,
-        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[Int]]],
+        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[int]]],
         negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
@@ -176,7 +164,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     
     @property
     def weights(self) -> List[Tensor]:
-        weights = []
+        weights : List[Tensor] = []
         for adapter in self.sub_adapters:
             weights += adapter.weights
         return weights
