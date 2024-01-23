@@ -51,6 +51,18 @@ class DPMSolver(Scheduler):
             device=self.device,
         ).flip(0)
 
+    def rebuild(
+        self: "DPMSolver",
+        num_inference_steps: int | None,
+        first_inference_step: int | None = None,
+    ) -> "DPMSolver":
+        r = super().rebuild(
+            num_inference_steps=num_inference_steps,
+            first_inference_step=first_inference_step,
+        )
+        r.last_step_first_order = self.last_step_first_order
+        return r
+
     def dpm_solver_first_order_update(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         current_timestep = self.timesteps[step]
         previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else tensor([0])

@@ -77,6 +77,20 @@ class Scheduler(ABC):
     def inference_steps(self) -> list[int]:
         return self.all_steps[self.first_inference_step :]
 
+    def rebuild(self: T, num_inference_steps: int | None, first_inference_step: int | None = None) -> T:
+        num_inference_steps = self.num_inference_steps if num_inference_steps is None else num_inference_steps
+        first_inference_step = self.first_inference_step if first_inference_step is None else first_inference_step
+        return self.__class__(
+            num_inference_steps=num_inference_steps,
+            num_train_timesteps=self.num_train_timesteps,
+            initial_diffusion_rate=self.initial_diffusion_rate,
+            final_diffusion_rate=self.final_diffusion_rate,
+            noise_schedule=self.noise_schedule,
+            first_inference_step=first_inference_step,
+            device=self.device,
+            dtype=self.dtype,
+        )
+
     def scale_model_input(self, x: Tensor, step: int) -> Tensor:
         """
         For compatibility with schedulers that need to scale the input according to the current timestep.
