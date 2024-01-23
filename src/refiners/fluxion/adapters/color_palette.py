@@ -1,25 +1,20 @@
 from typing import Any, List, TypeVar
 
-import numpy as np
 import torch
 from jaxtyping import Float, Int
-from torch import Tensor, arange, device as Device, dtype as DType, float32, tensor, zeros
+from torch import Tensor, device as Device, dtype as DType, tensor, zeros
 from torch.nn.functional import pad
 from torch.nn import init
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
-from refiners.foundationals.latent_diffusion.range_adapter import compute_sinusoidal_embedding
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from refiners.foundationals.clip.common import FeedForward, PositionalEncoder
+from refiners.foundationals.clip.common import PositionalEncoder
 from refiners.foundationals.clip.text_encoder import TransformerLayer
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
-TColorPaletteAdapter = TypeVar("TColorPaletteAdapter", bound="SD1ColorPaletteAdapter[Any]")  # Self (see PEP 673)
-
-
 
 class ColorsTokenizer(fl.Module):
     def __init__(
@@ -29,7 +24,7 @@ class ColorsTokenizer(fl.Module):
         super().__init__()
         self.max_colors = max_colors
     
-    def forward(self, colors):        
+    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:        
         colors = self.add_channel(colors)
         colors = self.zero_right_padding(colors)
         return colors
@@ -73,9 +68,12 @@ class ColorPaletteEncoder(fl.Chain):
         self,
         embedding_dim: int = 768,
         max_colors: int = 8,
-        num_layers: int = 3,
-        num_attention_heads: int = 6,
-        feedforward_dim: int = 512,
+        # Remark : 
+        # I have followed the CLIPTextEncoderL parameters
+        # as default parameters here, might require some testing
+        num_layers: int = 12,
+        num_attention_heads: int = 12,
+        feedforward_dim: int = 3072,
         layer_norm_eps: float = 1e-5,
         use_quick_gelu: bool = False,
         device: Device | str | None = None,
@@ -88,6 +86,7 @@ class ColorPaletteEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
+        self.out_sequence_size = 512
         super().__init__(
             ColorsTokenizer(
                 max_colors=max_colors
@@ -106,6 +105,9 @@ class ColorPaletteEncoder(fl.Chain):
                 ),
             ),
             *(
+                # Remark : 
+                # The current transformer layer has a causal self-attention
+                # It would be fair to test non-causal self-attention
                 TransformerLayer(
                     embedding_dim=embedding_dim,
                     num_attention_heads=num_attention_heads,
@@ -117,6 +119,11 @@ class ColorPaletteEncoder(fl.Chain):
                 for _ in range(num_layers)
             ),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+            fl.Permute(0,2,1),
+            fl.Linear(in_features=max_colors, out_features=self.out_sequence_size, bias=True, device=device, dtype=dtype),
+            fl.GeLU(),
+            fl.Linear(in_features=self.out_sequence_size, out_features=self.out_sequence_size, bias=True, device=device, dtype=dtype),
+            fl.Permute(0,2,1)
         )
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
@@ -124,7 +131,7 @@ class ColorPaletteEncoder(fl.Chain):
 
     def compute_color_palette_embedding(
         self,
-        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[Int]]],
+        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[int]]],
         negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
@@ -163,7 +170,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     
     @property
     def weights(self) -> List[Tensor]:
-        weights = []
+        weights : List[Tensor] = []
         for adapter in self.sub_adapters:
             weights += adapter.weights
         return weights
@@ -186,8 +193,16 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-
+    
     def set_color_palette_embedding(self, color_palette_embedding: Tensor) -> None:
+        # Remark : 
+        # I've not renamed clip_image_embedding here
+        # I feel we should not create a new naming for color_palette since it's the exact same component
+        #
+        # But rather one would just rename clip_image_embedding and ImageCrossAttention
+        # 
+        # Naming proposals could be : GenericCrossAttention, NonTextCrossAttention, MediaCrossAttention
+        
         self.set_context("ip_adapter", {"clip_image_embedding": color_palette_embedding})
 
     @property

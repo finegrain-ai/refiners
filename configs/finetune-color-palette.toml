@@ -3,23 +3,24 @@ script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
 mode = "offline" # "online", "offline", "disabled"
 entity = "acme"
-project = "test-color-palette-training"
+project = "color-palette-training"
 
 [models]
-unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors"}
-text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors"}
-lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors"}
-color_palette_encoder = {}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
+color_palette_encoder = {train = true}
 
 [latent_diffusion]
-unconditional_sampling_probability = 0.05
+unconditional_sampling_probability = 0.1
 offset_noise = 0.1
 
 [color_palette]
 max_colors = 8
-model_dim = 256
-trigger_phrase = "a spsh photo,"
-use_only_trigger_probability = 1.0
+feedforward_dim = 512
+feedforward_dim = 512
+num_attention_heads = 6
+num_layers = 3
 
 [training]
 duration = "1000:epoch"
@@ -46,7 +47,7 @@ warmup = "500:step"
 
 
 [dropout]
-dropout_probability = 0.2
+dropout_probability = 0.0
 use_gyro_dropout = false
 
 [dataset]
@@ -54,14 +55,21 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 local_folder = "data/1aurent/unsplash-lite-palette"
 resize_image_max_size = 512
+caption_key = "ai_description"
+split = "train"
 
 [checkpointing]
 # save_folder = "/path/to/ckpts"
-save_interval = "1:step"
+save_interval = "1:epoch"
 
 [test_color_palette]
 num_inference_steps = 30
 use_short_prompts = false
 prompts = [
-        {"text" = "a cute cat", "color_palette" = [[0,0,255]]}
+        {"text" = "a cute cat", "color_palette" = [[0,0,255]]},
+        {"text" = "a cute cat", "color_palette" = [[255,0,0]]},
+        {"text" = "a cute cat", "color_palette" = [[0,0,255], [255,255,255], [255,0,0]]},
+        {"text" = "a cute cat", "color_palette" = [[255,0,0], [255,255,255], [0,0,255]]}
 ]
+num_palette_sample = 8
+condition_scale = 7.5

@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
+from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -302,14 +302,23 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return self.sharding_manager.device
 
     @cached_property
-    def dtype(self) -> Device:
+    def dtype(self) -> DType:
         return self.sharding_manager.dtype
-
+    
     @property
     def parameters(self) -> list[Parameter]:
         """Returns a list of all parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters()]
-
+    
+    @property
+    def named_parameters(self) -> list[tuple[str, Parameter]]:
+        """Returns a list of all parameters in all models"""
+        return [(f"{model_name}.{param[0]}", param[1]) for model_name in self.models for param in self.models[model_name].named_parameters()]
+    
+    @property
+    def named_learnable_parameters(self) -> list[tuple[str, Parameter]]:
+        return [named_param for named_param in self.named_parameters if named_param[1].requires_grad]
+    
     @property
     def learnable_parameters(self) -> list[Parameter]:
         """Returns a list of learnable parameters in all models"""
@@ -334,7 +343,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
         return compute_grad_norm(parameters=self.parameters, device=self.device)
-
+    
+    @property
+    def named_gradient_norm(self) -> list[tuple[str, float]]:
+        """Returns the total gradient norm for all learnable parameters in all models"""
+        return [(param[0], compute_grad_norm(parameters=[param[1]], device=self.device)) for param in self.named_learnable_parameters]
+    
     @cached_property
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)

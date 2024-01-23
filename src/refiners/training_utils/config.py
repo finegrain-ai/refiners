@@ -118,6 +118,7 @@ class OptimizerConfig(BaseModel):
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
     weight_decay: float = 0.0
+    d_coef: float = 1.0
 
     def get(self, model_parameters: Iterable[Parameter]) -> Optimizer:
         match self.optimizer:
@@ -167,6 +168,7 @@ class OptimizerConfig(BaseModel):
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
                     safeguard_warmup=True,
+                    d_coef=self.d_coef,
                     use_bias_correction=True,  # recommended for diffusion models
                 )
 
