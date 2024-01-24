@@ -84,7 +84,7 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
         image = item['image']
         clip_text_embedding = item['clip_text_embedding']
         histogram = self.histogram_extractor(image)
-        histogram_embeddings=self.histogram_encoder.compute_histogram_embedding(processed_image)
+        histogram_embedding = self.histogram_encoder(histogram)
         
         if random.random() > self.config.latent_diffusion.unconditional_sampling_probability:
             clip_text_embedding = empty_clip_text_embedding
