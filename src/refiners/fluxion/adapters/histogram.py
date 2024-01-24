@@ -166,6 +166,113 @@ class HistogramEncoder(fl.Chain):
         )
 
 
+class HistogramCrossAttention(fl.Chain):
+    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
+        self._scale = scale
+        super().__init__(
+            fl.Distribute(
+                fl.Identity(),
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="palette_embedding"),
+                    fl.Linear(
+                        in_features=4,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                ),
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="palette_embedding"),
+                    fl.Linear(
+                        in_features=4,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                ),
+            ),
+            ScaledDotProductAttention(
+                num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
+            ),
+            fl.Multiply(self.scale),
+        )
+
+    @property
+    def scale(self) -> float:
+        return self._scale
+    
+    def log_shapes(self, query: Tensor, key: Tensor, value: Tensor) -> None:
+        print("query", query.shape)
+        print("key", key.shape)
+        print("value", value.shape)
+        return query, key, value
+        
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._scale = value
+        self.ensure_find(fl.Multiply).scale = value
+
+class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
+    def __init__(
+        self,
+        target: fl.Attention,
+        scale: float = 1.0,
+    ) -> None:
+        self._scale = scale
+        with self.setup_adapter(target):
+            clone = target.structural_copy()
+            scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
+            histogram_cross_attention = HistogramCrossAttention(
+                text_cross_attention=clone,
+                scale=self.scale,
+            )
+            clone.replace(
+                old_module=scaled_dot_product,
+                new_module=fl.Sum(
+                    scaled_dot_product,
+                    histogram_cross_attention,
+                ),
+            )
+            super().__init__(
+                clone,
+            )
+
+    @property
+    def histogram_cross_attention(self) -> HistogramCrossAttention:
+        return self.ensure_find(HistogramCrossAttention)
+
+    @property
+    def image_key_projection(self) -> fl.Linear:
+        return self.histogram_cross_attention.Distribute[1].Linear
+
+    @property
+    def image_value_projection(self) -> fl.Linear:
+        return self.histogram_cross_attention.Distribute[2].Linear
+
+    @property
+    def scale(self) -> float:
+        return self._scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._scale = value
+        self.histogram_cross_attention.scale = value
+
+    def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
+        self.image_key_projection.weight = nn.Parameter(key_tensor)
+        self.image_value_projection.weight = nn.Parameter(value_tensor)
+        self.histogram_cross_attention.to(self.device, self.dtype)
+    
+    @property
+    def weights(self) -> list[Tensor]:
+        return [self.image_key_projection.weight, self.image_value_projection.weight]
+
+
+
+
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
