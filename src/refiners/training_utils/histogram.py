@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pydantic import BaseModel
-from typing import Any, List, Tuple, TypedDict
+from typing import Any, List, Tuple, TypedDict, Callable
 
 from loguru import logger
 from PIL import Image
@@ -20,7 +20,6 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
-    TextEmbeddingLatentsBaseDataset,
     TestDiffusionBaseConfig,
     TextEmbeddingLatentsBatch,
 )
@@ -28,6 +27,8 @@ from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.color_palette import ColorPalette
 from refiners.fluxion.adapters.histogram import HistogramEncoder, HistogramExtractor, HistogramDistance, SD1HistogramAdapter
+from torch.utils.data import Dataset
+from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, load_hf_dataset
 
 from refiners.training_utils.wandb import WandbLoggable
 import numpy as np
@@ -77,8 +78,8 @@ class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
             trainer.log(data={f"layer_grad_norm/{layer_name}": norm})
 
 
-class HistogramLatentsDataset(Dataset[BatchType]):
-    def __init__(self, trainer: "HistogramLatentDiffusionTrainer[Any, Any]") -> None:
+class HistogramLatentsDataset(Dataset[TextEmbeddingHistogramLatentsBatch]):
+    def __init__(self, trainer: "HistogramLatentDiffusionTrainer") -> None:
         self.trainer = trainer
         self.config = trainer.config
         self.lda = self.trainer.lda
@@ -96,6 +97,17 @@ class HistogramLatentsDataset(Dataset[BatchType]):
         )
         return dataset
 
+    def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
+        # TODO: make this configurable and add other transforms
+        transforms: list[Module] = []
+        if self.config.dataset.random_crop:
+            transforms.append(RandomCrop(size=512))
+        if self.config.dataset.horizontal_flip:
+            transforms.append(RandomHorizontalFlip(p=0.5))
+        if not transforms:
+            return lambda image: image
+        return Compose(transforms)
+    
     def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
         return resize_image(image=image, min_size=min_size, max_size=max_size)
 
