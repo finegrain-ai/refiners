@@ -33,23 +33,25 @@ def test_color_palette_encoder() -> None:
 
     batch_size = 5
     color_size = 4
+    #embedding_dim = cross_attn_2d.context_embedding_dim
+    embedding_dim = 4
 
     palettes = torch.zeros(batch_size, color_size, 3, device=device)
 
     encoded = color_palette_encoder(palettes)
 
     assert isinstance(encoded.shape, torch.Size)
-    assert encoded.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+    assert encoded.shape == torch.Size([batch_size, max_colors, embedding_dim])
 
     # test with 0-colors palette
     encoded_empty = color_palette_encoder(torch.zeros(batch_size, 0, 3, device=device))
     assert isinstance(encoded_empty.shape, torch.Size)
-    assert encoded_empty.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+    assert encoded_empty.shape == torch.Size([batch_size, max_colors, embedding_dim])
     
     # test with 10-colors palette
     encoded_full = color_palette_encoder(torch.zeros(batch_size, max_colors, 3, device=device))
     assert isinstance(encoded_full.shape, torch.Size)
-    assert encoded_full.shape == torch.Size([batch_size, max_colors, cross_attn_2d.context_embedding_dim])
+    assert encoded_full.shape == torch.Size([batch_size, max_colors, embedding_dim])
     
     color_palette_encoder.to(dtype=torch.float16)
     palette = torch.zeros(batch_size, max_colors, 3, dtype=torch.float16, device=device)

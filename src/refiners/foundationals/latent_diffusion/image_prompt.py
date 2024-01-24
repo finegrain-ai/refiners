@@ -242,7 +242,7 @@ class ImageCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
                     fl.Linear(
-                        in_features=text_cross_attention.key_embedding_dim,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -252,7 +252,7 @@ class ImageCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
                     fl.Linear(
-                        in_features=text_cross_attention.value_embedding_dim,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
