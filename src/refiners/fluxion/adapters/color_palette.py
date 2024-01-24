@@ -25,10 +25,7 @@ class ColorsTokenizer(fl.Module):
         super().__init__()
         self.max_colors = max_colors
     
-    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:        
-        
-        colors = colors/128.0 - 1.0 # normalize to [-1, 1]
-        
+    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:                
         colors = self.add_channel(colors)
         colors = self.zero_right_padding(colors)
         return colors
@@ -155,7 +152,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=5,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -165,7 +162,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=5,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -182,14 +179,7 @@ class PaletteCrossAttention(fl.Chain):
     @property
     def scale(self) -> float:
         return self._scale
-    
-    def log_shapes(self, query: Tensor, key: Tensor, value: Tensor) -> None:
-        print("query", query.shape)
-        print("key", key.shape)
-        print("value", value.shape)
-        return query, key, value
         
-
     @scale.setter
     def scale(self, value: float) -> None:
         self._scale = value

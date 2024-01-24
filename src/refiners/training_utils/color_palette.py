@@ -134,6 +134,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
         clip_text_embedding = self.text_encoder(processed_caption)
         color_palette_embedding = self.color_palette_encoder(processed_palette)
+
         return TextEmbeddingColorPaletteLatentsBatch(
             text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
         )
@@ -218,6 +219,7 @@ class ColorPaletteLatentDiffusionTrainer(
             batch.latents,
             batch.color_palette_embeddings,
         )
+        
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
