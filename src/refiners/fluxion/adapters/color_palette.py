@@ -55,7 +55,7 @@ class ColorEncoder(fl.Chain):
         dtype: DType | None = None,
     ) -> None:
         super().__init__(
-            fl.Linear(in_features=4, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
+            fl.Linear(in_features=4, out_features=embedding_dim, device=device, dtype=dtype),
             fl.LayerNorm(
                 normalized_shape=embedding_dim,
                 eps=eps,
@@ -74,15 +74,14 @@ class ColorPaletteEncoder(fl.Chain):
     def __init__(
         self,
         # lda: SD1Autoencoder,
-        embedding_dim: int = 4,
-        hidden_dim: int = 10,
+        embedding_dim: int = 768,
         max_colors: int = 8,
         # Remark : 
         # I have followed the CLIPTextEncoderL parameters
         # as default parameters here, might require some testing
-        num_layers: int = 12,
-        num_attention_heads: int = 12,
-        feedforward_dim: int = 3072,
+        num_layers: int = 2,
+        num_attention_heads: int = 2,
+        feedforward_dim: int = 20,
         layer_norm_eps: float = 1e-5,
         use_quick_gelu: bool = False,
         device: Device | str | None = None,
@@ -96,15 +95,38 @@ class ColorPaletteEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
-        self.out_sequence_size = 512
         super().__init__(
-           # fl.Lambda(self.lda_encode),
             ColorsTokenizer(
                 max_colors=max_colors
             ),
-            fl.Linear(in_features=4, out_features=hidden_dim, bias=True, device=device, dtype=dtype),
-            fl.GeLU(),
-            fl.Linear(in_features=hidden_dim, out_features=embedding_dim, bias=True, device=device, dtype=dtype)
+            fl.Sum(
+                ColorEncoder(
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    dtype=dtype,
+                ),
+                PositionalEncoder(
+                    max_sequence_length=max_colors,
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    dtype=dtype,
+                ),
+            ),
+            *(
+                # Remark : 
+                # The current transformer layer has a causal self-attention
+                # It would be fair to test non-causal self-attention
+                TransformerLayer(
+                    embedding_dim=embedding_dim,
+                    num_attention_heads=num_attention_heads,
+                    feedforward_dim=feedforward_dim,
+                    layer_norm_eps=layer_norm_eps,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ),
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
@@ -144,7 +166,7 @@ class ColorPaletteEncoder(fl.Chain):
 
 
 class PaletteCrossAttention(fl.Chain):
-    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
+    def __init__(self, text_cross_attention: fl.Attention, embedding_dim: float = 768, scale: float = 1.0) -> None:
         self._scale = scale
         super().__init__(
             fl.Distribute(
@@ -152,7 +174,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=embedding_dim,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -162,7 +184,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=embedding_dim,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -190,6 +212,7 @@ class PaletteCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self,
         target: fl.Attention,
         scale: float = 1.0,
+        embedding_dim: int = 768
     ) -> None:
         self._scale = scale
         with self.setup_adapter(target):
@@ -197,6 +220,7 @@ class PaletteCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
             palette_cross_attention = PaletteCrossAttention(
                 text_cross_attention=clone,
+                embedding_dim=embedding_dim,
                 scale=self.scale,
             )
             clone.replace(
@@ -259,7 +283,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         self._color_palette_encoder = [color_palette_encoder]
 
         self.sub_adapters: list[PaletteCrossAttentionAdapter] = [
-            PaletteCrossAttentionAdapter(target=cross_attn, scale=scale)
+            PaletteCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=color_palette_encoder.embedding_dim)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]        
     

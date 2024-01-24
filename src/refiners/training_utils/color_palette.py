@@ -47,6 +47,7 @@ class ColorPaletteConfig(BaseModel):
     feedforward_dim: int = 3072
     num_attention_heads: int = 12
     num_layers: int = 12
+    embedding_dim: int = 768
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
@@ -167,13 +168,9 @@ class ColorPaletteLatentDiffusionTrainer(
             self.config.models["color_palette_encoder"] is not None
         ), "The config must contain a color_palette_encoder entry."
 
-        # TO FIX : connect this to unet cross attention embedding dim
-        EMBEDDING_DIM = 768
-
         encoder = ColorPaletteEncoder(
             max_colors=self.config.color_palette.max_colors,
-            embedding_dim=4,
-            hidden_dim=10,
+            embedding_dim=self.config.color_palette.embedding_dim,
             num_layers=self.config.color_palette.num_layers,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
