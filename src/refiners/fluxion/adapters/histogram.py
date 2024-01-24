@@ -7,8 +7,10 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
 from torch.nn import init
+from torch import nn
 
 from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 
 class HistogramDistance(fl.Chain):
     def __init__(
@@ -202,13 +204,6 @@ class HistogramCrossAttention(fl.Chain):
     @property
     def scale(self) -> float:
         return self._scale
-    
-    def log_shapes(self, query: Tensor, key: Tensor, value: Tensor) -> None:
-        print("query", query.shape)
-        print("key", key.shape)
-        print("value", value.shape)
-        return query, key, value
-        
 
     @scale.setter
     def scale(self, value: float) -> None:

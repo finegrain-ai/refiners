@@ -77,14 +77,49 @@ class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
             trainer.log(data={f"layer_grad_norm/{layer_name}": norm})
 
 
-class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHistogramLatentsBatch]):
-    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
+class HistogramLatentsDataset(Dataset[BatchType]):
+    def __init__(self, trainer: "HistogramLatentDiffusionTrainer[Any, Any]") -> None:
+        self.trainer = trainer
+        self.config = trainer.config
+        self.lda = self.trainer.lda
+        self.text_encoder = self.trainer.text_encoder
+        self.dataset = self.load_huggingface_dataset()
+        self.process_image = self.build_image_processor()
+        self.download_manager = DownloadManager()
+        logger.info(f"Loaded {len(self.dataset)} samples from dataset")
+
+    def load_huggingface_dataset(self) -> HuggingfaceDataset[Any]:
+        dataset_config = self.config.dataset
+        logger.info(f"Loading dataset from {dataset_config.hf_repo} revision {dataset_config.revision}")
+        dataset = load_hf_dataset(
+            path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
+        )
+        return dataset
+
+    def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
+        return resize_image(image=image, min_size=min_size, max_size=max_size)
+
+    def process_caption(self, caption: str) -> str:
+        return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
+
+    def get_caption(self, index: int, caption_key: str) -> str:
+        caption = self.dataset[index][caption_key]
+        if not isinstance(caption, str):
+            raise RuntimeError(
+                f"Dataset item at index [{index}] and caption_key [{caption_key}] does not contain a string caption"
+            )
+        return caption
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+    
+    def __getitem__(self, index: int) -> TextEmbeddingHistogramLatentsBatch:
         item = self.dataset[index]
         latents = item['latents']
         image = item['image']
         clip_text_embedding = item['clip_text_embedding']
-        histogram = self.histogram_extractor(image)
-        histogram_embedding = self.histogram_encoder(histogram)
+        histogram = self.trainer.histogram_extractor(image)
+        histogram_embedding = self.trainer.histogram_encoder(histogram)
         
         if random.random() > self.config.latent_diffusion.unconditional_sampling_probability:
             clip_text_embedding = empty_clip_text_embedding
@@ -110,7 +145,6 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
             latents=latents,
             histogram_embeddings=histogram_embeddings
         )
-
 
 class HistogramLatentDiffusionTrainer(
     LatentDiffusionBaseTrainer[HistogramLatentDiffusionConfig, TextEmbeddingHistogramLatentsBatch]
@@ -273,7 +307,15 @@ class HistogramLatentDiffusionTrainer(
         self.log({
             f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))
         })
-            
+    
+    def batch_image_histogram_metrics(self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img") -> None:
+        expected_histograms : List[Histogram] = [image_and_histogram['histogram'] for image_and_histogram in images_and_histograms]
+        actual_histograms : List[Histogram] = [self.histogram_extractor(image_and_histogram['image']) for image_and_histogram in images_and_histograms]
+        
+        self.log({
+            f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))
+        })
+      
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndHistogram]:
         images: dict[str, WandbLoggable] = {}
         images_and_histograms : List[ImageAndHistogram] = []
