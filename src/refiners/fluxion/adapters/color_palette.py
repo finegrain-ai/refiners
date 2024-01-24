@@ -13,6 +13,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.foundationals.clip.common import PositionalEncoder
 from refiners.foundationals.clip.text_encoder import TransformerLayer
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
@@ -33,8 +34,8 @@ class ColorsTokenizer(fl.Module):
         return colors
     
     def add_channel(
-        self, x: Float[Tensor, "*batch colors 3"]
-    ) -> Float[Tensor, "*batch colors_with_end 4"]:
+        self, x: Float[Tensor, "*batch colors 4"]
+    ) -> Float[Tensor, "*batch colors_with_end 5"]:
         return torch.cat((x, torch.ones(x.shape[0], x.shape[1], 1, dtype=x.dtype, device=x.device)), dim=2)
 
     def zero_right_padding(
@@ -67,9 +68,17 @@ class ColorEncoder(fl.Chain):
         )
 
 class ColorPaletteEncoder(fl.Chain):
+    # _lda: list[SD1Autoencoder]
+    
+    @property
+    def lda(self):
+        return self._lda[0]
+    
     def __init__(
         self,
-        embedding_dim: int = 768,
+        # lda: SD1Autoencoder,
+        embedding_dim: int = 4,
+        hidden_dim: int = 10,
         max_colors: int = 8,
         # Remark : 
         # I have followed the CLIPTextEncoderL parameters
@@ -82,6 +91,7 @@ class ColorPaletteEncoder(fl.Chain):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
+        # self._lda = [lda]
         self.embedding_dim = embedding_dim
         self.max_colors = max_colors
         self.num_layers = num_layers
@@ -91,14 +101,33 @@ class ColorPaletteEncoder(fl.Chain):
         self.use_quick_gelu = use_quick_gelu
         self.out_sequence_size = 512
         super().__init__(
+           # fl.Lambda(self.lda_encode),
             ColorsTokenizer(
                 max_colors=max_colors
-            )
+            ),
+            fl.Linear(in_features=4, out_features=hidden_dim, bias=True, device=device, dtype=dtype),
+            fl.GeLU(),
+            fl.Linear(in_features=hidden_dim, out_features=embedding_dim, bias=True, device=device, dtype=dtype)
         )
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
-
+    def lda_encode(self, x: Float[Tensor, "*batch num_colors 3"]) -> Float[Tensor, "*batch num_colors 4"]:
+        device = x.device
+        dtype = x.dtype
+        batch_size = x.shape[0]
+        num_colors = x.shape[1]
+        if num_colors == 0:
+            return x.reshape(batch_size, 0, 4)
+        
+        x = x.reshape(batch_size * num_colors, 3, 1, 1)
+        x = x.repeat(1, 1, 8, 8).to(self.lda.device, self.lda.dtype)
+        
+        out = self.lda.encode(x).to(device, dtype)
+        
+        out = out.reshape(batch_size, num_colors, 4)
+        return out
+    
     def compute_color_palette_embedding(
         self,
         x: Int[Tensor, "*batch n_colors 3"] | List[List[List[int]]],
@@ -126,7 +155,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=5,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -136,7 +165,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=5,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,

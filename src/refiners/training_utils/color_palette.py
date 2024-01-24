@@ -171,11 +171,12 @@ class ColorPaletteLatentDiffusionTrainer(
 
         encoder = ColorPaletteEncoder(
             max_colors=self.config.color_palette.max_colors,
-            embedding_dim=EMBEDDING_DIM,
+            embedding_dim=4,
+            hidden_dim=10,
             num_layers=self.config.color_palette.num_layers,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
-            device=self.device,
+            device=self.device
         )
         return encoder
 
