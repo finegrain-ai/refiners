@@ -155,7 +155,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=5,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -165,7 +165,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-                        in_features=5,
+                        in_features=4,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
