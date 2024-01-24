@@ -26,6 +26,7 @@ from refiners.training_utils.latent_diffusion import (
 )
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.color_palette import ColorPalette
 from refiners.fluxion.adapters.histogram import HistogramEncoder, HistogramExtractor, HistogramDistance, SD1HistogramAdapter
 
 from refiners.training_utils.wandb import WandbLoggable
@@ -57,6 +58,7 @@ class TestHistogramConfig(TestDiffusionBaseConfig):
 class ImageAndHistogram(TypedDict):
     image: Image.Image
     histogram: Histogram
+    palette: ColorPalette
 
 @dataclass
 class TextEmbeddingHistogramLatentsBatch(TextEmbeddingLatentsBatch):
@@ -77,23 +79,26 @@ class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
 
 class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHistogramLatentsBatch]):
     def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
-        caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
-        image = self.get_image(index=index)
-        resized_image = self.resize_image(
-            image=image,
-            min_size=self.config.dataset.resize_image_min_size,
-            max_size=self.config.dataset.resize_image_max_size,
-        )
-        processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image)
-        processed_caption = self.process_caption(caption=caption)
-        clip_text_embedding = self.text_encoder(processed_caption)
+        item = self.dataset[index]
+        latents = item['latents']
+        image = item['image']
+        clip_text_embedding = item['clip_text_embedding']
+        histogram = self.histogram_extractor(image)
+        histogram_embeddings=self.histogram_encoder.compute_histogram_embedding(processed_image)
+        
+        if random.random() > self.config.latent_diffusion.unconditional_sampling_probability:
+            clip_text_embedding = empty_clip_text_embedding
+            # TODO: empty histogram embedding
         
         return TextEmbeddingHistogramLatentsBatch(
             text_embeddings=clip_text_embedding, 
             latents=latents,
-            histogram_embeddings=self.histogram_encoder.compute_histogram_embedding(processed_image)
+            histogram_embeddings=histogram_embeddings
         )
+    
+    @cached_property
+    def empty_clip_text_embedding(self) -> Tensor:
+        return self.text_encoder.encode_text("")
 
     def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
         text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
@@ -214,7 +219,7 @@ class HistogramLatentDiffusionTrainer(
                 )
             canvas_image.paste(sd.lda.decode_latents(x=x), box=(img_size * i, 0))
 
-        return ImageAndHistogram(image=canvas_image, histogram=prompt.histogram)
+        return ImageAndHistogram(image=canvas_image, histogram=prompt.histogram, palette=prompt.palette)
     
     def compute_edge_case_evaluation(self, 
             prompts: List[HistogramDbIndexPromptConfig], 
@@ -224,9 +229,9 @@ class HistogramLatentDiffusionTrainer(
         images: dict[str, WandbLoggable] = {}
         images_and_histograms: List[ImageAndHistogram] = []
         for prompt in prompts:
-            db_image = self.dataset.get_image(prompt.histogram_db_index)
+            (db_image) = self.dataset[prompt.histogram_db_index]
             histogram = self.histogram_extractor(db_image)
-            prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram)
+            prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram, palette=palette)
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : with colors from {prompt.histogram_db_index}"
             image_and_histogram = self.compute_prompt_evaluation(prompt_histo, num_images_per_prompt)
             top_image = image_and_histogram['image']
