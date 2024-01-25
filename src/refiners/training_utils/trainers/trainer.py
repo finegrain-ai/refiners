@@ -38,8 +38,7 @@ from refiners.training_utils.callback import (
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
-
-from .sharding_manager import ShardingManager, SimpleShardingManager
+from refiners.training_utils.sharding_manager import ShardingManager, SimpleShardingManager
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 

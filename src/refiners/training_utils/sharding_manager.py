@@ -37,8 +37,12 @@ class ShardingManager(ABC):
     @property
     @abstractmethod
     def device(self) -> Device:
-        raise NotImplementedError("FabricTrainer does not support this property")
+        ...
 
+    @property
+    @abstractmethod
+    def dtype(self) -> DType:
+        ...
 
 def str_to_dtype(dtype_str: str) -> DType:
     if dtype_str == "float32":
@@ -121,5 +125,5 @@ class SimpleShardingManager(ShardingManager):
         return self.default_device
 
     @property
-    def dtype(self) -> Device:
+    def dtype(self) -> DType:
         return self.default_dtype

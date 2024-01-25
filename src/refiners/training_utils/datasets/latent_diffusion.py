@@ -64,10 +64,12 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 	def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
 		return resize_image(image=image, min_size=min_size, max_size=max_size)
 
-	def process_caption(self, caption: str, rand_num: float | None = None) -> str:
-		if rand_num is None:
-			rand_num = random.random()
-		return caption if rand_num > self.unconditional_sampling_probability else ""
+	def process_caption(self, caption: str) -> tuple[str, bool]:
+		conditional_flag = random.random() > self.unconditional_sampling_probability
+		if conditional_flag:
+			return (caption, conditional_flag)
+		else:
+			return ("", conditional_flag)
 
 	def get_caption(self, index: int) -> str:
 		caption_key=self.config.caption_key or "caption"
@@ -88,21 +90,25 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 			return Image.open(filename)
 		else:
 			raise RuntimeError(f"Dataset item at index [{index}] does not contain 'image' or 'url'")
-	
+
+	@abstractmethod
+	def get_hf_item(self, index: int) -> Any:
+		return self.hf_dataset[index]
+  
 	@abstractmethod
 	def __getitem__(self, index: int) -> BatchType:
 		...
 	
 	@abstractmethod
-	def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> BatchType:
+	def collate_fn(self, batch: list[BatchType]) -> BatchType:
 		...
 	
 	def get_processed_text_embedding(self, index: int) -> Tensor:
 		caption = self.get_caption(index=index)
-		processed_caption = self.process_caption(caption=caption)
+		(processed_caption, _) = self.process_caption(caption=caption)
 		return self.text_encoder(processed_caption)
 
-	def get_processed_latents(self, index: int) -> Tensor:
+	def get_processed_latents(self, index: int) -> tuple[Tensor, Image.Image]:
 		image = self.get_image(index=index)
 		resized_image = self.resize_image(
 			image=image,
@@ -111,7 +117,7 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 		)
 		processed_image = self.process_image(resized_image)
 		encoded_image = self.lda.encode_image(image=processed_image)
-		return encoded_image
+		return (encoded_image, processed_image)
 
 	def __len__(self) -> int:
 		return len(self.hf_dataset)
@@ -119,7 +125,7 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingLatentsBatch]):
 	def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
 		clip_text_embedding = self.get_processed_text_embedding(index)
-		latents = self.get_processed_latents(index)
+		(latents, _) = self.get_processed_latents(index)
 		return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
 
 	def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:

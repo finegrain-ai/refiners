@@ -2,36 +2,32 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, List, TypedDict, Tuple
 from pydantic import BaseModel
-import random
 
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, cat, randn, tensor
-from torch.utils.data import Dataset
+from torch import Tensor, randn, tensor
 from sklearn.neighbors import NearestNeighbors # type: ignore
 from sklearn.metrics import ndcg_score # type: ignore
-import numpy.typing as npt
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
 from refiners.fluxion.utils import save_to_safetensors
+from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
 )
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.latent_diffusion import (
-    CaptionImage,
+from src.refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
     TestDiffusionBaseConfig,
-    TextEmbeddingLatentsBaseDataset,
     TextEmbeddingLatentsBatch,
 )
+from refiners.training_utils.metrics.color_palette import image_palette_metrics, ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.wandb import WandbLoggable
-import numpy as np
-
+from refiners.training_utils.trainers.trainer import Trainer
 
 
 class ColorPaletteConfig(BaseModel):
@@ -43,8 +39,7 @@ class ColorPaletteConfig(BaseModel):
     max_colors: int
     without_caption_probability: float = 0.17
 
-Color = Tuple[int, int, int]
-ColorPalette = List[Color]
+
 
 class ColorPalettePromptConfig(BaseModel):
     text: str
@@ -60,86 +55,6 @@ class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
     latents: Tensor
     color_palette_embeddings: Tensor
 
-class CaptionPaletteImage(CaptionImage):
-    palette_1: ColorPalette
-    palette_2: ColorPalette
-    palette_3: ColorPalette
-    palette_4: ColorPalette
-    palette_5: ColorPalette
-    palette_6: ColorPalette
-    palette_7: ColorPalette
-    palette_8: ColorPalette
-
-class ImageAndPalette(TypedDict):
-    image: Image.Image
-    palette: ColorPalette
-
-class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
-    def __init__(
-        self,
-        trainer: "ColorPaletteLatentDiffusionTrainer",
-    ) -> None:
-        super().__init__(trainer=trainer)
-        self.trigger_phrase = trainer.config.color_palette.trigger_phrase
-        self.use_only_trigger_probability = trainer.config.color_palette.use_only_trigger_probability
-        logger.info(f"Trigger phrase: {self.trigger_phrase}")
-        self.color_palette_encoder = trainer.color_palette_encoder
-    
-    def get_color_palette(self, index: int) -> ColorPalette:
-        # Randomly pick a palette between 1 and 8
-        return self.dataset[index][f"palettes"][f"8"]
-        # choices = range(1, 9)
-        # weights = np.array([
-        #     getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
-        # ])
-        # sum = weights.sum()
-        # probabilities = weights / sum
-        # palette_index = int(random.choices(choices, probabilities, k=1)[0])
-        # item = self.dataset[index]
-        # return self.dataset[index][f"palette_{palette_index}"]
-    
-    def process_text_embedding_and_palette(self, clip_text_embedding: Tensor, color_palette: Tensor) -> tuple[Tensor, Tensor]:
-        if random.random() < self.config.latent_diffusion.unconditional_sampling_probability:
-            empty = color_palette[:,0:0,:]
-            return (self.empty_text_embedding, empty)
-        if random.random() < self.config.color_palette.without_caption_probability:
-            return (self.empty_text_embedding, color_palette)
-        return (clip_text_embedding, color_palette)
-    
-    @cached_property
-    def empty_text_embedding(self):
-        return self.text_encoder("")
-    
-    def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
-        color_palette = tensor([self.get_color_palette(index=index)], dtype=self.trainer.dtype)
-        # image = self.get_image(index=index)
-        # resized_image = self.resize_image(
-        #     image=image,
-        #     min_size=self.config.dataset.resize_image_min_size,
-        #     max_size=self.config.dataset.resize_image_max_size,
-        # )
-        # processed_image = self.process_image(resized_image)
-        item = self.dataset[index]
-        latents = tensor(item["latents"])
-        clip_text_embedding = tensor(item["clip_text_embedding"])
-
-        (processed_caption, processed_palette) = self.process_text_embedding_and_palette(clip_text_embedding=clip_text_embedding, color_palette=color_palette)
-
-        color_palette_embedding = self.color_palette_encoder(processed_palette)
-        
-        return TextEmbeddingColorPaletteLatentsBatch(
-            text_embeddings=clip_text_embedding, 
-            latents=latents, 
-            color_palette_embeddings=color_palette_embedding
-        )
-
-    def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
-        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
-        latents = cat(tensors=[item.latents for item in batch])
-        color_palette_embeddings = cat(tensors=[item.color_palette_embeddings for item in batch])
-        return TextEmbeddingColorPaletteLatentsBatch(
-            text_embeddings=text_embeddings, latents=latents, color_palette_embeddings=color_palette_embeddings
-        )
 
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
@@ -291,74 +206,9 @@ class ColorPaletteLatentDiffusionTrainer(
         captions = [self.dataset.get_caption(i, self.config.dataset.caption_key) for i in indices]
         return list(zip(indices, palettes, captions))
     
-    def image_palette_metrics(self, image: Image.Image, palette: ColorPalette, img_size : Tuple[int, int]=(256,256), sampling_size :int = 1000):
-        resized_img = image.resize(img_size)
-        Point = npt.NDArray[np.float64]
-        all_points : List[Point] = np.array(resized_img.getdata(), dtype=np.float64) # type: ignore
-        choices = np.random.choice(len(all_points), sampling_size)
-        points = all_points[choices]
-        
-        num = len(palette)
-        
-        centroids = np.stack(palette) 
-        
-        nn = NearestNeighbors(n_neighbors=num)
-        nn.fit(centroids) # type: ignore
-        
-        indices : npt.NDArray[np.int8] = nn.kneighbors(points, return_distance=False) # type: ignore
-        indices = indices[:, 0]
-        
-        counts = np.bincount(indices) # type: ignore
-        counts = np.pad(counts, (0, num - len(counts)), 'constant') # type: ignore
-        y_true_ranking = list(range(num, 0, -1))
-        
-        distances_list : List[float] = []
-        
-        def distance(a: Point, b: Point) -> float:
-            return np.linalg.norm(a - b).item()
-        
-        for i in range(len(centroids)):
-            
-            condition = np.where(indices == i)
-            
-            cluster_points = points[condition]
-            distances = [distance(p, centroids[i]) for p in cluster_points]
-            distances_list.extend(distances)
-                
-        return ([y_true_ranking], [counts], distances_list)
-    
     def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
 
-        per_num : dict[int, Any] = {}
-        for image_and_palette in images_and_palettes:
-            palette = image_and_palette['palette']
-            image = image_and_palette['image']
-            num = len(palette)
-            
-            (y_true_ranking, counts, distances_list) = self.image_palette_metrics(image, palette)
-            if not num in per_num:
-                per_num[num] = {
-                    "y_true_ranking": y_true_ranking,
-                    "counts": counts,
-                    "distances": distances_list,
-                }
-            else: 
-                per_num[num]["y_true_ranking"] += y_true_ranking
-                per_num[num]["counts"] += counts
-                per_num[num]["distances"] += distances_list
-
-        for num in per_num:
-            if num > 1:
-                score: float = ndcg_score(per_num[num]["y_true_ranking"], per_num[num]["counts"]).item()
-                self.log({
-                    f"{prefix}/ndcg_{num}": score,
-                    f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"]).item()
-                })
-            else:
-                self.log({
-                    f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"]).item()
-                })
-            
+        batch_image_palette_metrics(self.log, images_and_palettes, prefix)
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndPalette]:
         sd = self.sd
         images: dict[str, WandbLoggable] = {}
