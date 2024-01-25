@@ -55,7 +55,7 @@ class ColorEncoder(fl.Chain):
         dtype: DType | None = None,
     ) -> None:
         super().__init__(
-            fl.Linear(in_features=4, out_features=embedding_dim, device=device, dtype=dtype),
+            fl.Linear(in_features=4, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
             fl.LayerNorm(
                 normalized_shape=embedding_dim,
                 eps=eps,
