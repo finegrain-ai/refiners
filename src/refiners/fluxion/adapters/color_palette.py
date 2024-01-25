@@ -3,7 +3,7 @@ from typing import Any, List, TypeVar
 import torch
 from jaxtyping import Float, Int
 from torch import Tensor, device as Device, dtype as DType, tensor, zeros
-from torch.nn import init
+from torch.nn import init, Parameter
 from torch.nn.functional import pad
 
 import refiners.fluxion.layers as fl
@@ -11,7 +11,6 @@ from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.foundationals.clip.common import PositionalEncoder
 from refiners.foundationals.clip.text_encoder import TransformerLayer
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
@@ -165,7 +164,7 @@ class ColorPaletteEncoder(fl.Chain):
 
 
 class PaletteCrossAttention(fl.Chain):
-    def __init__(self, text_cross_attention: fl.Attention, embedding_dim: float = 768, scale: float = 1.0) -> None:
+    def __init__(self, text_cross_attention: fl.Attention, embedding_dim: int = 768, scale: float = 1.0) -> None:
         self._scale = scale
         super().__init__(
             fl.Distribute(
@@ -251,8 +250,8 @@ class PaletteCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.palette_cross_attention.scale = value
 
     def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
-        self.image_key_projection.weight = nn.Parameter(key_tensor)
-        self.image_value_projection.weight = nn.Parameter(value_tensor)
+        self.image_key_projection.weight = Parameter(key_tensor)
+        self.image_value_projection.weight = Parameter(value_tensor)
         self.palette_cross_attention.to(self.device, self.dtype)
 
     @property

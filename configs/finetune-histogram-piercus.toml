@@ -55,6 +55,7 @@ revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
 split = "train"
+random_crop = false
 
 [checkpointing]
 #save_folder = "ckpts"

@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, TypeVar
+from typing import Any, List, TypeVar
 
 from torch import Tensor, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
 from torch.nn import init
@@ -142,7 +142,6 @@ class HistogramEncoder(fl.Chain):
         self.num_layers = num_layers
         self.num_attention_heads = num_attention_heads
         self.feedforward_dim = feedforward_dim
-        cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
         super().__init__(
             fl.Reshape(1, cube_size, cube_size, cube_size),
             ViT3dEmbeddings(
