@@ -28,7 +28,7 @@ from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
-
+from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsDataset, TextEmbeddingLatentsBatch
 
 class LatentDiffusionConfig(BaseModel):
     unconditional_sampling_probability: float = 0.2
@@ -64,160 +64,20 @@ BatchType = TypeVar("BatchType", bound=Any)
 DiffusionConfigType = TypeVar("DiffusionConfigType", bound=FinetuneLatentDiffusionConfig)
 
 
-@dataclass
-class TextEmbeddingLatentsBatch:
-    text_embeddings: Tensor
-    latents: Tensor
-
-
 class CaptionImage(TypedDict):
     caption: str
     image: Image.Image
     url: str
 
 
-class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
-    def __init__(self, trainer: "LatentDiffusionBaseTrainer[Any, Any]") -> None:
-        self.trainer = trainer
-        self.config = trainer.config
-        self.lda = self.trainer.lda
-        self.text_encoder = self.trainer.text_encoder
-        self.dataset = self.load_huggingface_dataset()
-        self.process_image = self.build_image_processor()
-        self.download_manager = DownloadManager()
-
-        logger.info(f"Loaded {len(self.dataset)} samples from dataset")
-
-    def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
-        # TODO: make this configurable and add other transforms
-        transforms: list[Module] = []
-        if self.config.dataset.random_crop:
-            transforms.append(RandomCrop(size=512))
-        if self.config.dataset.horizontal_flip:
-            transforms.append(RandomHorizontalFlip(p=0.5))
-        if not transforms:
-            return lambda image: image
-        return Compose(transforms)
-
-    def load_huggingface_dataset(self) -> HuggingfaceDataset[Any]:
-        dataset_config = self.config.dataset
-        logger.info(f"Loading dataset from {dataset_config.hf_repo} revision {dataset_config.revision}")
-        dataset = load_hf_dataset(
-            path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
-        )
-        return dataset
-
-    def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
-        return resize_image(image=image, min_size=min_size, max_size=max_size)
-
-    def process_caption(self, caption: str) -> str:
-        return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
-
-    def get_caption(self, index: int, caption_key: str) -> str:
-        caption = self.dataset[index][caption_key]
-        if not isinstance(caption, str):
-            raise RuntimeError(
-                f"Dataset item at index [{index}] and caption_key [{caption_key}] does not contain a string caption"
-            )
-        return caption
-
-    def get_image(self, index: int) -> Image.Image:
-        if "image" in self.dataset[index]:
-            return self.dataset[index]["image"]
-        elif "url" in self.dataset[index]:
-            url: str = self.dataset[index]["url"]
-            filename: str = self.download_manager.download(url)  # type: ignore
-            return Image.open(filename)
-        else:
-            raise RuntimeError(f"Dataset item at index [{index}] does not contain 'image' or 'url'")
-
-    @abstractmethod
-    def __getitem__(self, index: int) -> BatchType:
-        ...
-
-    @abstractmethod
-    def collate_fn(self, batch: list[BatchType]) -> BatchType:
-        ...
-
-    def __len__(self) -> int:
-        return len(self.dataset)
-
-
-class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingLatentsBatch]):
-    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
-        caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
-        image = self.get_image(index=index)
-        resized_image = self.resize_image(
-            image=image,
-            min_size=self.config.dataset.resize_image_min_size,
-            max_size=self.config.dataset.resize_image_max_size,
-        )
-        processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image)
-        processed_caption = self.process_caption(caption=caption)
-        clip_text_embedding = self.text_encoder(processed_caption)
-        return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
-
-    def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
-        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
-        latents = cat(tensors=[item.latents for item in batch])
-        return TextEmbeddingLatentsBatch(text_embeddings=text_embeddings, latents=latents)
-
-
-class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
-    @cached_property
-    def unet(self) -> SD1UNet:
-        assert self.config.models["unet"] is not None, "The config must contain a unet entry."
-        return SD1UNet(in_channels=4, device=self.device)
-
-    @cached_property
-    def text_encoder(self) -> CLIPTextEncoderL:
-        assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
-        return CLIPTextEncoderL(device=self.device)
-
-    @cached_property
-    def lda(self) -> SD1Autoencoder:
-        assert self.config.models["lda"] is not None, "The config must contain a lda entry."
-        lda = SD1Autoencoder()
-        return lda
-
-    def load_models(self) -> dict[str, fl.Module]:
-        return {"unet": self.unet, "text_encoder": self.text_encoder, "lda": self.lda}
-
-    @abstractmethod
-    def load_dataset(self) -> Dataset[BatchType]:
-        ...
-
-    @cached_property
-    def ddpm_scheduler(self) -> DDPM:
-        ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
-        self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
-        return ddpm_scheduler
-
-    def sample_timestep(self) -> Tensor:
-        random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
-        self.current_step = random_step
-        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
-
-    def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
-        return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
-
-    @cached_property
-    def mse_loss(self) -> Callable[[Tensor, Tensor], Tensor]:
-        return self.sharding_manager.wrap_device(mse_loss, self.device)
-
-    @abstractmethod
-    def compute_loss(self, batch: BatchType) -> Tensor:
-        ...
-
-    @abstractmethod
-    def compute_evaluation(self) -> None:
-        ...
-
-
 class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, TextEmbeddingLatentsBatch]):
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
-        return TextEmbeddingLatentsDataset(trainer=self)
+        return TextEmbeddingLatentsDataset(
+            config=self.config.dataset,
+            lda=self.lda,
+            text_encoder=self.text_encoder,
+            unconditional_sampling_probability=self.config.latent_diffusion.unconditional_sampling_probability,
+        )
 
     def compute_loss(self, batch: TextEmbeddingLatentsBatch) -> Tensor:
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
