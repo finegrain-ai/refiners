@@ -155,9 +155,12 @@ class HistogramLatentDiffusionTrainer(
 
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
-
+    
     def compute_prompt_evaluation(
-        self, prompt: HistogramPrompt, num_images_per_prompt: int, img_size: int = 512
+        self, 
+        prompt: HistogramPrompt, 
+        num_images_per_prompt: int, 
+        img_size: int = 512
     ) -> ImageAndHistogram:
         sd = self.sd
         canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size * num_images_per_prompt, img_size))

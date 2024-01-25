@@ -5,6 +5,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, randn, tensor
+import numpy as np
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter

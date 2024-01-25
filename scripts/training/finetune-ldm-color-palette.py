@@ -1,4 +1,4 @@
-from refiners.training_utils.color_palette import ColorPaletteLatentDiffusionConfig, ColorPaletteLatentDiffusionTrainer
+from refiners.training_utils.trainers.color_palette import ColorPaletteLatentDiffusionConfig, ColorPaletteLatentDiffusionTrainer
 
 if __name__ == "__main__":
     import sys
