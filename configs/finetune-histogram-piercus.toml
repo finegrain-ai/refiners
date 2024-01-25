@@ -69,5 +69,5 @@ prompts = [
         {"text" = "a cute cat", "histogram_db_index" = 2},
         {"text" = "a cute cat", "histogram_db_index" = 3}
 ]
-n_samples = 8
-condition_scale = 7.5
+num_samples = 8
+condition_scale = 1.0 # deactivate cause negative sampling not well defined

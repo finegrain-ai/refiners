@@ -211,7 +211,7 @@ class HistogramLatentDiffusionTrainer(
         indices = list(np.random.choice(l, size=size, replace=False))
         indices = list(map(int, indices))
         palette = [dataset.get_palette(i) for i in indices]
-        histograms = [self.histogram_extractor(dataset.get_image(i)) for i in indices]
+        histograms = [self.histogram_extractor(image_to_tensor(dataset.get_image(i))) for i in indices]
         captions = [self.dataset.get_caption(i) for i in indices]
         return list(zip(indices, histograms, captions, palette))
     

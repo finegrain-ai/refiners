@@ -34,6 +34,7 @@ class ColorPaletteConfig(BaseModel):
     feedforward_dim: int = 3072
     num_attention_heads: int = 12
     num_layers: int = 12
+    embedding_dim: int = 768
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
@@ -55,6 +56,84 @@ class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
     latents: Tensor
     color_palette_embeddings: Tensor
 
+<<<<<<< HEAD:src/refiners/training_utils/trainers/color_palette.py
+=======
+class CaptionPaletteImage(CaptionImage):
+    palette_1: ColorPalette
+    palette_2: ColorPalette
+    palette_3: ColorPalette
+    palette_4: ColorPalette
+    palette_5: ColorPalette
+    palette_6: ColorPalette
+    palette_7: ColorPalette
+    palette_8: ColorPalette
+
+class ImageAndPalette(TypedDict):
+    image: Image.Image
+    palette: ColorPalette
+
+class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
+    def __init__(
+        self,
+        trainer: "ColorPaletteLatentDiffusionTrainer",
+    ) -> None:
+        super().__init__(trainer=trainer)
+        self.trigger_phrase = trainer.config.color_palette.trigger_phrase
+        self.use_only_trigger_probability = trainer.config.color_palette.use_only_trigger_probability
+        logger.info(f"Trigger phrase: {self.trigger_phrase}")
+        self.color_palette_encoder = trainer.color_palette_encoder
+    
+    def get_color_palette(self, index: int) -> ColorPalette:
+        # Randomly pick a palette between 1 and 8
+        choices = range(1, 9)
+        weights = np.array([
+            getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
+        ])
+        sum = weights.sum()
+        probabilities = weights / sum
+        palette_index = int(random.choices(choices, probabilities, k=1)[0])
+        item = self.dataset[index]
+        return self.dataset[index][f"palette_{palette_index}"]
+        # Pick color palette 8
+        # return self.dataset[index][f"palette_8"]
+
+    def process_caption_and_palette(self, caption: str, color_palette: Tensor) -> tuple[str, Tensor]:
+        if random.random() < self.config.latent_diffusion.unconditional_sampling_probability:
+            empty = color_palette[:,0:0,:]
+            return ("", empty)
+        if random.random() < self.config.color_palette.without_caption_probability:
+            return ("", color_palette)
+        return (caption, color_palette)
+    
+    
+    def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
+        caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
+        color_palette = tensor([self.get_color_palette(index=index)], dtype=self.trainer.dtype)
+        image = self.get_image(index=index)
+        resized_image = self.resize_image(
+            image=image,
+            min_size=self.config.dataset.resize_image_min_size,
+            max_size=self.config.dataset.resize_image_max_size,
+        )
+        processed_image = self.process_image(resized_image)
+        latents = self.lda.encode_image(image=processed_image)
+        (processed_caption, processed_palette) = self.process_caption_and_palette(caption=caption, color_palette=color_palette)
+
+        clip_text_embedding = self.text_encoder(processed_caption)
+        color_palette_embedding = self.color_palette_encoder(processed_palette)
+
+        return TextEmbeddingColorPaletteLatentsBatch(
+            text_embeddings=clip_text_embedding, latents=latents, color_palette_embeddings=color_palette_embedding
+        )
+
+    def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
+        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
+        latents = cat(tensors=[item.latents for item in batch])
+        color_palette_embeddings = cat(tensors=[item.color_palette_embeddings for item in batch])
+        return TextEmbeddingColorPaletteLatentsBatch(
+            text_embeddings=text_embeddings, latents=latents, color_palette_embeddings=color_palette_embeddings
+        )
+>>>>>>> TransformerM:src/refiners/training_utils/color_palette.py
 
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
@@ -76,25 +155,15 @@ class ColorPaletteLatentDiffusionTrainer(
             self.config.models["color_palette_encoder"] is not None
         ), "The config must contain a color_palette_encoder entry."
 
-        # TO FIX : connect this to unet cross attention embedding dim
-        EMBEDDING_DIM = 768
-
         encoder = ColorPaletteEncoder(
             max_colors=self.config.color_palette.max_colors,
-            embedding_dim=4,
-            hidden_dim=10,
+            embedding_dim=self.config.color_palette.embedding_dim,
             num_layers=self.config.color_palette.num_layers,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
             device=self.device
         )
         return encoder
-
-    def encoder_grad_norm(self) -> float:
-        return self.color_palette_encoder.grad_norm()
-    
-    def cross_attention_grad_norm(self) -> float:
-        return self.unet.cross_attention_grad_norm()
     
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
@@ -128,6 +197,7 @@ class ColorPaletteLatentDiffusionTrainer(
             batch.latents,
             batch.color_palette_embeddings,
         )
+        
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)

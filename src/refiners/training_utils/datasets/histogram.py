@@ -35,7 +35,9 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
         if conditionnal_flag:
             histogram_embedding = self.histogram_encoder(self.histogram_extractor(image_to_tensor(image)))
         else: 
-            histogram_embedding = self.histogram_encoder([])
+            # TODO we should do something better here
+            # like empty histogram of something
+            histogram_embedding = self.histogram_encoder(self.histogram_extractor(image_to_tensor(image)))
         
         clip_text_embedding = self.text_encoder(processed_caption)
         return TextEmbeddingHistogramLatentsBatch(

@@ -319,6 +319,16 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return [named_param for named_param in self.named_parameters if named_param[1].requires_grad]
     
     @property
+    def model_learnable_parameters(self) -> list[tuple[str, list[Parameter]]]:
+        """Returns a list of learnable parameters with the model name"""
+        results : list[tuple[str, list[Parameter]]] = []
+        for model_name in self.models:
+            params : list[Parameter] = [param for param in self.models[model_name].parameters() if param.requires_grad]
+            if len(params) > 0:
+                results.append((model_name, params))
+        return results
+
+    @property
     def learnable_parameters(self) -> list[Parameter]:
         """Returns a list of learnable parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters() if param.requires_grad]
@@ -352,6 +362,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
+        model_learnable_parameters = self.model_learnable_parameters
+        model_formatted_param_count = [(model_name, human_readable_number(count_learnable_parameters(parameters=param_list))) for model_name, param_list in model_learnable_parameters]
+        for model_name, param_count in model_formatted_param_count:
+            logger.info(f"Number of learnable parameters in model `{model_name}`: {param_count}")
         optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
         return optimizer
 
