@@ -64,8 +64,10 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 	def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
 		return resize_image(image=image, min_size=min_size, max_size=max_size)
 
-	def process_caption(self, caption: str) -> str:
-		return caption if random.random() > self.unconditional_sampling_probability else ""
+	def process_caption(self, caption: str, rand_num: float | None = None) -> str:
+		if rand_num is None:
+			rand_num = random.random()
+		return caption if rand_num > self.unconditional_sampling_probability else ""
 
 	def get_caption(self, index: int) -> str:
 		caption_key=self.config.caption_key or "caption"

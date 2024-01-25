@@ -32,15 +32,7 @@ from refiners.training_utils.latent_diffusion import (
 from refiners.training_utils.wandb import WandbLoggable
 import numpy as np
 
-class SamplingByPaletteConfig(BaseModel):
-    palette_1: float = 1.0
-    palette_2: float = 2.0
-    palette_3: float = 3.0
-    palette_4: float = 4.0
-    palette_5: float = 5.0
-    palette_6: float = 6.0
-    palette_7: float = 7.0
-    palette_8: float = 8.0
+
 
 class ColorPaletteConfig(BaseModel):
     feedforward_dim: int = 3072
@@ -50,7 +42,6 @@ class ColorPaletteConfig(BaseModel):
     use_only_trigger_probability: float = 0.0
     max_colors: int
     without_caption_probability: float = 0.17
-    sampling_by_palette: SamplingByPaletteConfig = SamplingByPaletteConfig()
 
 Color = Tuple[int, int, int]
 ColorPalette = List[Color]
