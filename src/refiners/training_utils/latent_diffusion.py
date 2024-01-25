@@ -1,6 +1,5 @@
 import random
 from abc import abstractmethod
-from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Callable, TypedDict, TypeVar
 
@@ -8,11 +7,9 @@ from datasets import DownloadManager  # type: ignore
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Generator, Tensor, cat, dtype as DType, randn
-from torch.nn import Module
+from torch import Generator, Tensor, dtype as DType, randn
 from torch.nn.functional import mse_loss
 from torch.utils.data import Dataset
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
@@ -25,7 +22,7 @@ from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
-from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
+from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsDataset, TextEmbeddingLatentsBatch
@@ -69,6 +66,56 @@ class CaptionImage(TypedDict):
     image: Image.Image
     url: str
 
+
+class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
+    @cached_property
+    def unet(self) -> SD1UNet:
+        assert self.config.models["unet"] is not None, "The config must contain a unet entry."
+        return SD1UNet(in_channels=4, device=self.device)
+
+    @cached_property
+    def text_encoder(self) -> CLIPTextEncoderL:
+        assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
+        return CLIPTextEncoderL(device=self.device)
+
+    @cached_property
+    def lda(self) -> SD1Autoencoder:
+        assert self.config.models["lda"] is not None, "The config must contain a lda entry."
+        lda = SD1Autoencoder()
+        return lda
+
+    def load_models(self) -> dict[str, fl.Module]:
+        return {"unet": self.unet, "text_encoder": self.text_encoder, "lda": self.lda}
+
+    @abstractmethod
+    def load_dataset(self) -> Dataset[BatchType]:
+        ...
+
+    @cached_property
+    def ddpm_scheduler(self) -> DDPM:
+        ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
+        self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
+        return ddpm_scheduler
+
+    def sample_timestep(self) -> Tensor:
+        random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
+        self.current_step = random_step
+        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+
+    def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
+        return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
+
+    @cached_property
+    def mse_loss(self) -> Callable[[Tensor, Tensor], Tensor]:
+        return self.sharding_manager.wrap_device(mse_loss, self.device)
+
+    @abstractmethod
+    def compute_loss(self, batch: BatchType) -> Tensor:
+        ...
+
+    @abstractmethod
+    def compute_evaluation(self) -> None:
+        ...
 
 class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, TextEmbeddingLatentsBatch]):
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
