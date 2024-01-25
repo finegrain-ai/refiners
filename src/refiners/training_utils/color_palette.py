@@ -101,17 +101,17 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
     
     def get_color_palette(self, index: int) -> ColorPalette:
         # Randomly pick a palette between 1 and 8
-        # choices = range(1, 9)
-        # weights = np.array([
-        #     getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
-        # ])
-        # sum = weights.sum()
-        # probabilities = weights / sum
-        # palette_index = int(random.choices(choices, probabilities, k=1)[0])
-        # item = self.dataset[index]
-        # return self.dataset[index][f"palette_{palette_index}"]
+        choices = range(1, 9)
+        weights = np.array([
+            getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
+        ])
+        sum = weights.sum()
+        probabilities = weights / sum
+        palette_index = int(random.choices(choices, probabilities, k=1)[0])
+        item = self.dataset[index]
+        return self.dataset[index][f"palette_{palette_index}"]
         # Pick color palette 8
-        return self.dataset[index][f"palette_8"]
+        # return self.dataset[index][f"palette_8"]
 
     def process_caption_and_palette(self, caption: str, color_palette: Tensor) -> tuple[str, Tensor]:
         if random.random() < self.config.latent_diffusion.unconditional_sampling_probability:
@@ -179,12 +179,6 @@ class ColorPaletteLatentDiffusionTrainer(
             device=self.device
         )
         return encoder
-
-    def encoder_grad_norm(self) -> float:
-        return self.color_palette_encoder.grad_norm()
-    
-    def cross_attention_grad_norm(self) -> float:
-        return self.unet.cross_attention_grad_norm()
     
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
