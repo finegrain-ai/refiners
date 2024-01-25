@@ -3,19 +3,20 @@ from typing import Any, List, TypeVar
 import torch
 from jaxtyping import Float, Int
 from torch import Tensor, device as Device, dtype as DType, tensor, zeros
-from torch.nn.functional import pad
 from torch.nn import init
+from torch.nn.functional import pad
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.foundationals.clip.common import PositionalEncoder
 from refiners.foundationals.clip.text_encoder import TransformerLayer
-from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
+
 
 class ColorsTokenizer(fl.Module):
     def __init__(
@@ -24,15 +25,13 @@ class ColorsTokenizer(fl.Module):
     ) -> None:
         super().__init__()
         self.max_colors = max_colors
-    
-    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:                
+
+    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:
         colors = self.add_channel(colors)
         colors = self.zero_right_padding(colors)
         return colors
-    
-    def add_channel(
-        self, x: Float[Tensor, "*batch colors 4"]
-    ) -> Float[Tensor, "*batch colors_with_end 5"]:
+
+    def add_channel(self, x: Float[Tensor, "*batch colors 4"]) -> Float[Tensor, "*batch colors_with_end 5"]:
         return torch.cat((x, torch.ones(x.shape[0], x.shape[1], 1, dtype=x.dtype, device=x.device)), dim=2)
 
     def zero_right_padding(
@@ -61,22 +60,23 @@ class ColorEncoder(fl.Chain):
                 eps=eps,
                 device=device,
                 dtype=dtype,
-            )
+            ),
         )
+
 
 class ColorPaletteEncoder(fl.Chain):
     # _lda: list[SD1Autoencoder]
-    
+
     @property
     def lda(self):
         return self._lda[0]
-    
+
     def __init__(
         self,
         # lda: SD1Autoencoder,
         embedding_dim: int = 768,
         max_colors: int = 8,
-        # Remark : 
+        # Remark :
         # I have followed the CLIPTextEncoderL parameters
         # as default parameters here, might require some testing
         num_layers: int = 2,
@@ -96,9 +96,7 @@ class ColorPaletteEncoder(fl.Chain):
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
         super().__init__(
-            ColorsTokenizer(
-                max_colors=max_colors
-            ),
+            ColorsTokenizer(max_colors=max_colors),
             fl.Sum(
                 ColorEncoder(
                     embedding_dim=embedding_dim,
@@ -113,7 +111,7 @@ class ColorPaletteEncoder(fl.Chain):
                 ),
             ),
             *(
-                # Remark : 
+                # Remark :
                 # The current transformer layer has a causal self-attention
                 # It would be fair to test non-causal self-attention
                 TransformerLayer(
@@ -131,6 +129,7 @@ class ColorPaletteEncoder(fl.Chain):
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
                 parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
+
     def lda_encode(self, x: Float[Tensor, "*batch num_colors 3"]) -> Float[Tensor, "*batch num_colors 4"]:
         device = x.device
         dtype = x.dtype
@@ -138,15 +137,15 @@ class ColorPaletteEncoder(fl.Chain):
         num_colors = x.shape[1]
         if num_colors == 0:
             return x.reshape(batch_size, 0, 4)
-        
+
         x = x.reshape(batch_size * num_colors, 3, 1, 1)
         x = x.repeat(1, 1, 8, 8).to(self.lda.device, self.lda.dtype)
-        
+
         out = self.lda.encode(x).to(device, dtype)
-        
+
         out = out.reshape(batch_size, num_colors, 4)
         return out
-    
+
     def compute_color_palette_embedding(
         self,
         x: Int[Tensor, "*batch n_colors 3"] | List[List[List[int]]],
@@ -174,11 +173,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-<<<<<<< HEAD
-                        in_features=4,
-=======
                         in_features=embedding_dim,
->>>>>>> TransformerM
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -188,11 +183,7 @@ class PaletteCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="palette_embedding"),
                     fl.Linear(
-<<<<<<< HEAD
-                        in_features=4,
-=======
                         in_features=embedding_dim,
->>>>>>> TransformerM
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -209,23 +200,15 @@ class PaletteCrossAttention(fl.Chain):
     @property
     def scale(self) -> float:
         return self._scale
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> TransformerM
     @scale.setter
     def scale(self, value: float) -> None:
         self._scale = value
         self.ensure_find(fl.Multiply).scale = value
 
+
 class PaletteCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
-    def __init__(
-        self,
-        target: fl.Attention,
-        scale: float = 1.0,
-        embedding_dim: int = 768
-    ) -> None:
+    def __init__(self, target: fl.Attention, scale: float = 1.0, embedding_dim: int = 768) -> None:
         self._scale = scale
         with self.setup_adapter(target):
             clone = target.structural_copy()
@@ -271,7 +254,7 @@ class PaletteCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_key_projection.weight = nn.Parameter(key_tensor)
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.palette_cross_attention.to(self.device, self.dtype)
-    
+
     @property
     def weights(self) -> list[Tensor]:
         return [self.image_key_projection.weight, self.image_value_projection.weight]
@@ -295,22 +278,24 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         self._color_palette_encoder = [color_palette_encoder]
 
         self.sub_adapters: list[PaletteCrossAttentionAdapter] = [
-            PaletteCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=color_palette_encoder.embedding_dim)
+            PaletteCrossAttentionAdapter(
+                target=cross_attn, scale=scale, embedding_dim=color_palette_encoder.embedding_dim
+            )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
-        ]        
-    
+        ]
+
     @property
     def weights(self) -> List[Tensor]:
-        weights : List[Tensor] = []
+        weights: List[Tensor] = []
         for adapter in self.sub_adapters:
             weights += adapter.weights
         return weights
-    
+
     def zero_init(self) -> None:
         weights = self.weights
         for weight in weights:
             init.zeros_(weight)
-            
+
     def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter[Any]":
         for adapter in self.sub_adapters:
             adapter.inject()
@@ -324,12 +309,10 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-    
+
     def set_color_palette_embedding(self, color_palette_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"palette_embedding": color_palette_embedding})
 
     @property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         return self._color_palette_encoder[0]
-
-

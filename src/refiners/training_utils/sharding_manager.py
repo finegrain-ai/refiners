@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List
 
-from torch import Tensor, device as Device, dtype as DType, float32, float16, bfloat16
+from torch import Tensor, bfloat16, device as Device, dtype as DType, float16, float32
 from torch.autograd import backward
 from torch.nn import Module
 
@@ -44,6 +44,7 @@ class ShardingManager(ABC):
     def dtype(self) -> DType:
         ...
 
+
 def str_to_dtype(dtype_str: str) -> DType:
     if dtype_str == "float32":
         return float32
@@ -53,6 +54,7 @@ def str_to_dtype(dtype_str: str) -> DType:
         return bfloat16
     else:
         raise ValueError(f"Unknown dtype {dtype_str}")
+
 
 class SimpleShardingManager(ShardingManager):
     def __init__(self, config: TrainingConfig) -> None:
@@ -68,12 +70,12 @@ class SimpleShardingManager(ShardingManager):
             device = Device(f"cuda:{config.gpu_index}")
         else:
             device = self.default_device
-        
+
         if config.dtype is not None:
             dtype = str_to_dtype(config.dtype)
         else:
             dtype = self.default_dtype
-        
+
         model = model.to(device=device, dtype=dtype)
         self.add_device_hooks(model, device)
 

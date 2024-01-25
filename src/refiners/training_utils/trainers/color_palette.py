@@ -1,33 +1,32 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, List, TypedDict, Tuple
-from pydantic import BaseModel
+from typing import Any, List, Tuple, TypedDict
 
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
+from sklearn.metrics import ndcg_score  # type: ignore
+from sklearn.neighbors import NearestNeighbors  # type: ignore
 from torch import Tensor, randn, tensor
-from sklearn.neighbors import NearestNeighbors # type: ignore
-from sklearn.metrics import ndcg_score # type: ignore
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
 )
 from refiners.training_utils.callback import Callback
+from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
+from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
     TestDiffusionBaseConfig,
     TextEmbeddingLatentsBatch,
 )
-from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
-from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.trainers.trainer import Trainer
+from refiners.training_utils.wandb import WandbLoggable
 
 
 class ColorPaletteConfig(BaseModel):
@@ -41,14 +40,15 @@ class ColorPaletteConfig(BaseModel):
     without_caption_probability: float = 0.17
 
 
-
 class ColorPalettePromptConfig(BaseModel):
     text: str
     color_palette: ColorPalette
 
+
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     prompts: list[ColorPalettePromptConfig]
     num_palette_sample: int = 0
+
 
 @dataclass
 class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
@@ -56,8 +56,7 @@ class TextEmbeddingColorPaletteLatentsBatch(TextEmbeddingLatentsBatch):
     latents: Tensor
     color_palette_embeddings: Tensor
 
-<<<<<<< HEAD:src/refiners/training_utils/trainers/color_palette.py
-=======
+
 class CaptionPaletteImage(CaptionImage):
     palette_1: ColorPalette
     palette_2: ColorPalette
@@ -68,9 +67,11 @@ class CaptionPaletteImage(CaptionImage):
     palette_7: ColorPalette
     palette_8: ColorPalette
 
+
 class ImageAndPalette(TypedDict):
     image: Image.Image
     palette: ColorPalette
+
 
 class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
     def __init__(
@@ -82,13 +83,11 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         self.use_only_trigger_probability = trainer.config.color_palette.use_only_trigger_probability
         logger.info(f"Trigger phrase: {self.trigger_phrase}")
         self.color_palette_encoder = trainer.color_palette_encoder
-    
+
     def get_color_palette(self, index: int) -> ColorPalette:
         # Randomly pick a palette between 1 and 8
         choices = range(1, 9)
-        weights = np.array([
-            getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices
-        ])
+        weights = np.array([getattr(self.config.color_palette.sampling_by_palette, f"palette_{i}") for i in choices])
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
@@ -99,13 +98,12 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
     def process_caption_and_palette(self, caption: str, color_palette: Tensor) -> tuple[str, Tensor]:
         if random.random() < self.config.latent_diffusion.unconditional_sampling_probability:
-            empty = color_palette[:,0:0,:]
+            empty = color_palette[:, 0:0, :]
             return ("", empty)
         if random.random() < self.config.color_palette.without_caption_probability:
             return ("", color_palette)
         return (caption, color_palette)
-    
-    
+
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         caption = self.get_caption(index=index, caption_key=self.config.dataset.caption_key)
         color_palette = tensor([self.get_color_palette(index=index)], dtype=self.trainer.dtype)
@@ -117,7 +115,9 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         )
         processed_image = self.process_image(resized_image)
         latents = self.lda.encode_image(image=processed_image)
-        (processed_caption, processed_palette) = self.process_caption_and_palette(caption=caption, color_palette=color_palette)
+        (processed_caption, processed_palette) = self.process_caption_and_palette(
+            caption=caption, color_palette=color_palette
+        )
 
         clip_text_embedding = self.text_encoder(processed_caption)
         color_palette_embedding = self.color_palette_encoder(processed_palette)
@@ -133,18 +133,19 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         return TextEmbeddingColorPaletteLatentsBatch(
             text_embeddings=text_embeddings, latents=latents, color_palette_embeddings=color_palette_embeddings
         )
->>>>>>> TransformerM:src/refiners/training_utils/color_palette.py
 
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     test_color_palette: TestColorPaletteConfig
 
+
 class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         named_gradient_norm = trainer.named_gradient_norm
-        for (layer_name, norm) in named_gradient_norm:
+        for layer_name, norm in named_gradient_norm:
             trainer.log(data={f"layer_grad_norm/{layer_name}": norm})
+
 
 class ColorPaletteLatentDiffusionTrainer(
     LatentDiffusionBaseTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]
@@ -161,17 +162,15 @@ class ColorPaletteLatentDiffusionTrainer(
             num_layers=self.config.color_palette.num_layers,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
-            device=self.device
+            device=self.device,
         )
         return encoder
-    
+
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
         adapter = SD1ColorPaletteAdapter(target=self.unet, color_palette_encoder=self.color_palette_encoder)
         return adapter
-    
 
-    
     def __init__(
         self,
         config: ColorPaletteLatentDiffusionConfig,
@@ -197,7 +196,7 @@ class ColorPaletteLatentDiffusionTrainer(
             batch.latents,
             batch.color_palette_embeddings,
         )
-        
+
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
@@ -213,19 +212,21 @@ class ColorPaletteLatentDiffusionTrainer(
     @cached_property
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
-            device=self.device,
-            num_inference_steps=self.config.test_color_palette.num_inference_steps,
-            dtype=self.dtype
+            device=self.device, num_inference_steps=self.config.test_color_palette.num_inference_steps, dtype=self.dtype
         )
 
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
-    
-    def compute_prompt_evaluation(self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512) -> ImageAndPalette:
+
+    def compute_prompt_evaluation(
+        self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512
+    ) -> ImageAndPalette:
         sd = self.sd
-        palette_img_size = img_size//self.config.color_palette.max_colors
-        canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size * num_images_per_prompt, img_size+palette_img_size))
+        palette_img_size = img_size // self.config.color_palette.max_colors
+        canvas_image: Image.Image = Image.new(
+            mode="RGB", size=(img_size * num_images_per_prompt, img_size + palette_img_size)
+        )
         for i in range(num_images_per_prompt):
             logger.info(
                 f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt.text} and palette {prompt.color_palette}"
@@ -247,24 +248,25 @@ class ColorPaletteLatentDiffusionTrainer(
                 )
             canvas_image.paste(sd.lda.decode_latents(x=x), box=(img_size * i, 0))
             for index, palette in enumerate(prompt.color_palette):
-                color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), palette, dtype=np.uint8)) # type: ignore
-                canvas_image.paste(color_box,box=(img_size * i+palette_img_size*index, img_size))
-            
+                color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), palette, dtype=np.uint8))  # type: ignore
+                canvas_image.paste(color_box, box=(img_size * i + palette_img_size * index, img_size))
+
         return ImageAndPalette(image=canvas_image, palette=prompt.color_palette)
-    
-    def compute_edge_case_evaluation(self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int) -> List[ImageAndPalette]:
+
+    def compute_edge_case_evaluation(
+        self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int
+    ) -> List[ImageAndPalette]:
         images: dict[str, WandbLoggable] = {}
         images_and_palettes: List[ImageAndPalette] = []
         for prompt in prompts:
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : {str(prompt.color_palette)}"
             image_and_palette = self.compute_prompt_evaluation(prompt, num_images_per_prompt)
-            images[image_name] = image_and_palette['image']
+            images[image_name] = image_and_palette["image"]
             images_and_palettes.append(image_and_palette)
-        
+
         self.log(data=images)
         return images_and_palettes
-        
-    
+
     @cached_property
     def eval_indices(self) -> list[tuple[int, ColorPalette, str]]:
         l = self.dataset_length
@@ -275,36 +277,37 @@ class ColorPaletteLatentDiffusionTrainer(
         palettes = [self.dataset.get_color_palette(i) for i in indices]
         captions = [self.dataset.get_caption(i, self.config.dataset.caption_key) for i in indices]
         return list(zip(indices, palettes, captions))
-    
+
     def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
         batch_image_palette_metrics(self.log, images_and_palettes, prefix)
+
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndPalette]:
         sd = self.sd
         images: dict[str, WandbLoggable] = {}
-        images_and_palettes : List[ImageAndPalette] = []
-        palette_img_size = img_size//self.config.color_palette.max_colors
-        
-        for eval_index, (db_index, palette, caption) in enumerate(self.eval_indices):            
+        images_and_palettes: List[ImageAndPalette] = []
+        palette_img_size = img_size // self.config.color_palette.max_colors
+
+        for eval_index, (db_index, palette, caption) in enumerate(self.eval_indices):
             prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
             image_and_palette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
-            
+
             image = self.dataset.get_image(db_index)
             resized_image = image.resize((img_size, img_size))
-            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size*2+palette_img_size))
-            join_canvas_image.paste(image_and_palette['image'], box=(0, 0))
-            join_canvas_image.paste(resized_image, box=(0, img_size+palette_img_size))
+            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size * 2 + palette_img_size))
+            join_canvas_image.paste(image_and_palette["image"], box=(0, 0))
+            join_canvas_image.paste(resized_image, box=(0, img_size + palette_img_size))
             image_name = f"db_samples/{db_index}_{caption}"
 
             images[image_name] = join_canvas_image
             images_and_palettes.append(image_and_palette)
-            
+
         self.log(data=images)
         return images_and_palettes
-    
+
     def compute_evaluation(self) -> None:
         prompts = self.config.test_color_palette.prompts
         num_images_per_prompt = self.config.test_color_palette.num_images_per_prompt
-        images_and_palettes : List[ImageAndPalette] = []
+        images_and_palettes: List[ImageAndPalette] = []
         if len(prompts) > 0:
             images_and_palettes = self.compute_edge_case_evaluation(prompts, num_images_per_prompt)
             self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-edge")
@@ -313,13 +316,14 @@ class ColorPaletteLatentDiffusionTrainer(
         if num_palette_sample > 0:
             images_and_palettes = self.compute_db_samples_evaluation(num_images_per_prompt)
             self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-samples")
-        
+
+
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = trainer.color_palette_adapter
-        adapter.zero_init()      
+        adapter.zero_init()
         adapter.inject()
-        
+
 
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
@@ -333,12 +337,11 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
         encoder = trainer.color_palette_encoder
-            
+
         state_dict = encoder.state_dict()
         for i in state_dict:
             tensors.update({f"color_palette_encoder.{i}": state_dict[i]})
 
         save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors
+            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors", tensors=tensors
         )

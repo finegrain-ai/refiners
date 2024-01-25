@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType
+from torch import Tensor, cuda, device as Device, dtype as DType, get_rng_state, set_rng_state, stack
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -37,8 +37,8 @@ from refiners.training_utils.callback import (
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
-from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 from refiners.training_utils.sharding_manager import ShardingManager, SimpleShardingManager
+from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -303,27 +303,31 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @cached_property
     def dtype(self) -> DType:
         return self.sharding_manager.dtype
-    
+
     @property
     def parameters(self) -> list[Parameter]:
         """Returns a list of all parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters()]
-    
+
     @property
     def named_parameters(self) -> list[tuple[str, Parameter]]:
         """Returns a list of all parameters in all models"""
-        return [(f"{model_name}.{param[0]}", param[1]) for model_name in self.models for param in self.models[model_name].named_parameters()]
-    
+        return [
+            (f"{model_name}.{param[0]}", param[1])
+            for model_name in self.models
+            for param in self.models[model_name].named_parameters()
+        ]
+
     @property
     def named_learnable_parameters(self) -> list[tuple[str, Parameter]]:
         return [named_param for named_param in self.named_parameters if named_param[1].requires_grad]
-    
+
     @property
     def model_learnable_parameters(self) -> list[tuple[str, list[Parameter]]]:
         """Returns a list of learnable parameters with the model name"""
-        results : list[tuple[str, list[Parameter]]] = []
+        results: list[tuple[str, list[Parameter]]] = []
         for model_name in self.models:
-            params : list[Parameter] = [param for param in self.models[model_name].parameters() if param.requires_grad]
+            params: list[Parameter] = [param for param in self.models[model_name].parameters() if param.requires_grad]
             if len(params) > 0:
                 results.append((model_name, params))
         return results
@@ -352,18 +356,24 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
         return compute_grad_norm(parameters=self.parameters, device=self.device)
-    
+
     @property
     def named_gradient_norm(self) -> list[tuple[str, float]]:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return [(param[0], compute_grad_norm(parameters=[param[1]], device=self.device)) for param in self.named_learnable_parameters]
-    
+        return [
+            (param[0], compute_grad_norm(parameters=[param[1]], device=self.device))
+            for param in self.named_learnable_parameters
+        ]
+
     @cached_property
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
         model_learnable_parameters = self.model_learnable_parameters
-        model_formatted_param_count = [(model_name, human_readable_number(count_learnable_parameters(parameters=param_list))) for model_name, param_list in model_learnable_parameters]
+        model_formatted_param_count = [
+            (model_name, human_readable_number(count_learnable_parameters(parameters=param_list)))
+            for model_name, param_list in model_learnable_parameters
+        ]
         for model_name, param_count in model_formatted_param_count:
             logger.info(f"Number of learnable parameters in model `{model_name}`: {param_count}")
         optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)

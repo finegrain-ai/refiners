@@ -1,5 +1,6 @@
 from PIL import Image
 
+
 def resize_image(image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
     image_min_size = min(image.size)
     if image_min_size > max_size:

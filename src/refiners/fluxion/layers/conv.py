@@ -2,6 +2,7 @@ from torch import device as Device, dtype as DType, nn
 
 from refiners.fluxion.layers.module import WeightedModule
 
+
 class Conv3d(nn.Conv3d, WeightedModule):
     def __init__(
         self,
@@ -31,7 +32,6 @@ class Conv3d(nn.Conv3d, WeightedModule):
             dtype,
         )
         self.use_bias = use_bias
-
 
 
 class Conv2d(nn.Conv2d, WeightedModule):

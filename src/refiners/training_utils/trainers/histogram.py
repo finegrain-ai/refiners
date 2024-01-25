@@ -1,32 +1,35 @@
 from functools import cached_property
-from pydantic import BaseModel
 from typing import Any, List, Tuple, TypedDict
 
+import numpy as np
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, randn, stack
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.adapters.histogram import (
+    HistogramDistance,
+    HistogramEncoder,
+    HistogramExtractor,
+    SD1HistogramAdapter,
+)
+from refiners.fluxion.utils import image_to_tensor, save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
 )
-from refiners.training_utils.callback import Callback
+from refiners.training_utils.callback import Callback, GradientNormLayerLogging
+from refiners.training_utils.datasets.color_palette import ColorPalette
+from refiners.training_utils.datasets.histogram import HistogramLatentsDataset, TextEmbeddingHistogramLatentsBatch
+from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
-    TestDiffusionBaseConfig
+    TestDiffusionBaseConfig,
 )
-from refiners.training_utils.datasets.color_palette import ColorPalette
-from refiners.fluxion.adapters.histogram import HistogramEncoder, HistogramExtractor, HistogramDistance, SD1HistogramAdapter
-from refiners.training_utils.datasets.histogram import HistogramLatentsDataset, TextEmbeddingHistogramLatentsBatch
-from refiners.training_utils.callback import GradientNormLayerLogging
 from refiners.training_utils.wandb import WandbLoggable
-import numpy as np
-from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
-from refiners.fluxion.utils import image_to_tensor
+
 
 class HistogramConfig(BaseModel):
     feedforward_dim: int
@@ -37,26 +40,32 @@ class HistogramConfig(BaseModel):
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
 
+
 Color = Tuple[int, int, int]
 Histogram = Tensor
+
 
 class HistogramPrompt(TypedDict):
     text: str
     histogram: Histogram
     palette: ColorPalette
 
+
 class HistogramDbIndexPromptConfig(BaseModel):
     text: str
     histogram_db_index: int
+
 
 class TestHistogramConfig(TestDiffusionBaseConfig):
     prompts: list[HistogramDbIndexPromptConfig]
     num_samples: int = 0
 
+
 class ImageAndHistogram(TypedDict):
     image: Image.Image
     histogram: Histogram
     palette: ColorPalette
+
 
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     histogram: HistogramConfig
@@ -68,22 +77,21 @@ class HistogramLatentDiffusionTrainer(
 ):
     def load_dataset(self) -> HistogramLatentsDataset:
         return HistogramLatentsDataset(
-            config = self.config.dataset, 
-            lda = self.lda, 
-            text_encoder = self.text_encoder,
-            histogram_encoder = self.histogram_encoder,
-            histogram_extractor = self.histogram_extractor,
-            unconditional_sampling_probability = self.config.latent_diffusion.unconditional_sampling_probability
+            config=self.config.dataset,
+            lda=self.lda,
+            text_encoder=self.text_encoder,
+            histogram_encoder=self.histogram_encoder,
+            histogram_extractor=self.histogram_extractor,
+            unconditional_sampling_probability=self.config.latent_diffusion.unconditional_sampling_probability,
         )
+
     @cached_property
-    def dataset(self) -> HistogramLatentsDataset: # type: ignore
+    def dataset(self) -> HistogramLatentsDataset:  # type: ignore
         return self.load_dataset()
 
     @cached_property
     def histogram_encoder(self) -> HistogramEncoder:
-        assert (
-            self.config.models["histogram_encoder"] is not None
-        ), "The config must contain a histogram entry."
+        assert self.config.models["histogram_encoder"] is not None, "The config must contain a histogram entry."
 
         # TO FIX : connect this to unet cross attention embedding dim
         EMBEDDING_DIM = 768
@@ -98,11 +106,12 @@ class HistogramLatentDiffusionTrainer(
             device=self.device,
         )
         return encoder
+
     @cached_property
     def histogram_adapter(self) -> SD1HistogramAdapter[Any]:
         adapter = SD1HistogramAdapter(target=self.unet, histogram_encoder=self.histogram_encoder)
         return adapter
-    
+
     def __init__(
         self,
         config: HistogramLatentDiffusionConfig,
@@ -120,13 +129,12 @@ class HistogramLatentDiffusionTrainer(
         }
 
     def compute_loss(self, batch: TextEmbeddingHistogramLatentsBatch) -> Tensor:
-        
         text_embeddings, latents, histogram_embeddings = (
             batch.text_embeddings,
             batch.latents,
             batch.histogram_embeddings,
         )
-        
+
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
         noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
@@ -142,27 +150,23 @@ class HistogramLatentDiffusionTrainer(
     @cached_property
     def sd(self) -> StableDiffusion_1:
         scheduler = DPMSolver(
-            device=self.device,
-            num_inference_steps=self.config.test_histogram.num_inference_steps,
-            dtype=self.dtype
+            device=self.device, num_inference_steps=self.config.test_histogram.num_inference_steps, dtype=self.dtype
         )
-        
+
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
-    
-    def compute_prompt_evaluation(self, prompt: HistogramPrompt, num_images_per_prompt: int, img_size: int = 512) -> ImageAndHistogram:
+
+    def compute_prompt_evaluation(
+        self, prompt: HistogramPrompt, num_images_per_prompt: int, img_size: int = 512
+    ) -> ImageAndHistogram:
         sd = self.sd
         canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size * num_images_per_prompt, img_size))
         for i in range(num_images_per_prompt):
-            logger.info(
-                f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt['text']}"
-            )
+            logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt['text']}")
             x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
 
-            cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt['text']).to(device=self.device)
-            cfg_histogram_embedding = self.histogram_encoder.compute_histogram_embedding(
-                prompt['histogram']
-            )
+            cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt["text"]).to(device=self.device)
+            cfg_histogram_embedding = self.histogram_encoder.compute_histogram_embedding(prompt["histogram"])
 
             self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding)
 
@@ -174,13 +178,11 @@ class HistogramLatentDiffusionTrainer(
                 )
             canvas_image.paste(sd.lda.decode_latents(x=x), box=(img_size * i, 0))
 
-        return ImageAndHistogram(image=canvas_image, histogram=prompt['histogram'], palette=prompt['palette'])
-    
-    def compute_edge_case_evaluation(self, 
-            prompts: List[HistogramDbIndexPromptConfig], 
-            num_images_per_prompt: int, 
-            img_size: int = 512
-        ) -> List[ImageAndHistogram]:
+        return ImageAndHistogram(image=canvas_image, histogram=prompt["histogram"], palette=prompt["palette"])
+
+    def compute_edge_case_evaluation(
+        self, prompts: List[HistogramDbIndexPromptConfig], num_images_per_prompt: int, img_size: int = 512
+    ) -> List[ImageAndHistogram]:
         images: dict[str, WandbLoggable] = {}
         images_and_histograms: List[ImageAndHistogram] = []
         for prompt in prompts:
@@ -190,19 +192,18 @@ class HistogramLatentDiffusionTrainer(
             prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram, palette=palette)
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : with colors from {prompt.histogram_db_index}"
             image_and_histogram = self.compute_prompt_evaluation(prompt_histo, num_images_per_prompt)
-            top_image = image_and_histogram['image']
+            top_image = image_and_histogram["image"]
             resized_image = db_image.resize((img_size, img_size))
-            
-            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size*2))
+
+            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size * 2))
             join_canvas_image.paste(top_image, box=(0, 0))
             join_canvas_image.paste(resized_image, box=(0, img_size))
             images[image_name] = join_canvas_image
             images_and_histograms.append(image_and_histogram)
-        
+
         self.log(data=images)
         return images_and_histograms
-        
-    
+
     @cached_property
     def eval_indices(self) -> list[tuple[int, Histogram, str, ColorPalette]]:
         l = self.dataset_length
@@ -214,58 +215,58 @@ class HistogramLatentDiffusionTrainer(
         histograms = [self.histogram_extractor(image_to_tensor(dataset.get_image(i))) for i in indices]
         captions = [self.dataset.get_caption(i) for i in indices]
         return list(zip(indices, histograms, captions, palette))
-    
+
     @cached_property
     def histogram_extractor(self) -> HistogramExtractor:
         return HistogramExtractor(color_bits=self.config.histogram.color_bits)
-    
+
     @cached_property
     def histogram_distance(self) -> HistogramDistance:
         return HistogramDistance(color_bits=self.config.histogram.color_bits)
-    
-    def batch_image_histogram_metrics(self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img") -> None:
-        expected_histograms : List[Histogram] = [image_and_histogram['histogram'] for image_and_histogram in images_and_histograms]
-        actual_histograms : List[Histogram] = [
-            self.histogram_extractor(image_to_tensor(image_and_histogram['image'])) for image_and_histogram in images_and_histograms
+
+    def batch_image_histogram_metrics(
+        self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img"
+    ) -> None:
+        expected_histograms: List[Histogram] = [
+            image_and_histogram["histogram"] for image_and_histogram in images_and_histograms
         ]
-        
-        self.log({
-            f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))
-        })
-        images_and_palettes = [
-            ImageAndPalette(
-                image = image_and_histogram['image'], 
-                palette = image_and_histogram['palette']
-            ) 
+        actual_histograms: List[Histogram] = [
+            self.histogram_extractor(image_to_tensor(image_and_histogram["image"]))
             for image_and_histogram in images_and_histograms
         ]
-        
+
+        self.log({f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))})
+        images_and_palettes = [
+            ImageAndPalette(image=image_and_histogram["image"], palette=image_and_histogram["palette"])
+            for image_and_histogram in images_and_histograms
+        ]
+
         batch_image_palette_metrics(self.log, images_and_palettes, prefix)
-    
+
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndHistogram]:
         images: dict[str, WandbLoggable] = {}
-        images_and_histograms : List[ImageAndHistogram] = []
-        for (db_index, histogram, caption, palette) in self.eval_indices:            
+        images_and_histograms: List[ImageAndHistogram] = []
+        for db_index, histogram, caption, palette in self.eval_indices:
             prompt = HistogramPrompt(text=caption, histogram=histogram, palette=palette)
             image_and_histogram = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
-            
+
             image = self.dataset.get_image(db_index)
             resized_image = image.resize((img_size, img_size))
-            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size*2))
-            join_canvas_image.paste(image_and_histogram['image'], box=(0, 0))
+            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size * 2))
+            join_canvas_image.paste(image_and_histogram["image"], box=(0, 0))
             join_canvas_image.paste(resized_image, box=(0, img_size))
             image_name = f"db_samples/{db_index}_{caption}"
 
             images[image_name] = join_canvas_image
             images_and_histograms.append(image_and_histogram)
-            
+
         self.log(data=images)
         return images_and_histograms
-    
+
     def compute_evaluation(self) -> None:
         prompts = self.config.test_histogram.prompts
         num_images_per_prompt = self.config.test_histogram.num_images_per_prompt
-        images_and_histograms : List[ImageAndHistogram] = []
+        images_and_histograms: List[ImageAndHistogram] = []
         if len(prompts) > 0:
             images_and_histograms = self.compute_edge_case_evaluation(prompts, num_images_per_prompt)
             self.batch_image_histogram_metrics(images_and_histograms, prefix="histogram-image-edge")
@@ -274,17 +275,19 @@ class HistogramLatentDiffusionTrainer(
         if num_samples > 0:
             images_and_histograms = self.compute_db_samples_evaluation(num_images_per_prompt)
             self.batch_image_histogram_metrics(images_and_histograms, prefix="histogram-histogram-samples")
-        
+
+
 class LoadHistogram(Callback[HistogramLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: HistogramLatentDiffusionTrainer) -> None:
         adapter = trainer.histogram_adapter
-        adapter.zero_init()      
+        adapter.zero_init()
         adapter.inject()
-        
+
+
 class SaveHistogram(Callback[HistogramLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: HistogramLatentDiffusionTrainer) -> None:
         tensors: dict[str, Tensor] = {}
-        #metadata: dict[str, str] = {}
+        # metadata: dict[str, str] = {}
 
         model = trainer.unet
         if model.parent is None:
@@ -293,12 +296,11 @@ class SaveHistogram(Callback[HistogramLatentDiffusionTrainer]):
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
         encoder = trainer.histogram_encoder
-            
+
         state_dict = encoder.state_dict()
         for i in state_dict:
             tensors.update({f"histogram_encoder.{i}": state_dict[i]})
 
         save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors
+            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors", tensors=tensors
         )

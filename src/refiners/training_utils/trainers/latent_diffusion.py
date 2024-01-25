@@ -22,10 +22,11 @@ from refiners.foundationals.latent_diffusion.schedulers import DDPM
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsBatch, TextEmbeddingLatentsDataset
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.trainers.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
-from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsDataset, TextEmbeddingLatentsBatch
+
 
 class LatentDiffusionConfig(BaseModel):
     unconditional_sampling_probability: float = 0.2
@@ -117,6 +118,7 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
     def compute_evaluation(self) -> None:
         ...
 
+
 class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, TextEmbeddingLatentsBatch]):
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
         return TextEmbeddingLatentsDataset(
@@ -154,12 +156,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                 x = randn(1, 4, 64, 64)
                 clip_text_embedding = sd.compute_clip_text_embedding(text=prompt)
                 for step in sd.steps:
-                    x = sd(
-                        x,
-                        step=step,
-                        clip_text_embedding=clip_text_embedding,
-                        condition_scale=condition_scale
-                    )
+                    x = sd(x, step=step, clip_text_embedding=clip_text_embedding, condition_scale=condition_scale)
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         self.log(data=images)

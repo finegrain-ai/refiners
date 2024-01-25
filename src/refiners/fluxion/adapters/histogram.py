@@ -1,59 +1,60 @@
-from typing import Callable, List, TypeVar, Any
-import refiners.fluxion.layers as fl
-from torch import device as Device, dtype as DType, Tensor, histogramdd, stack
+from typing import Any, Callable, List, TypeVar
+
+from torch import Tensor, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
+from torch.nn import init
 from torch.nn.functional import mse_loss as _mse_loss
+
+import refiners.fluxion.layers as fl
+from refiners.fluxion.adapters.adapter import Adapter
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
+from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
+from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-from refiners.fluxion.adapters.adapter import Adapter
-from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
-from torch.nn import init
-from torch import nn, zeros_like, cat
-from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
-from refiners.fluxion.layers.attentions import ScaledDotProductAttention
+
 
 class HistogramDistance(fl.Chain):
     def __init__(
-        self, 
-        color_bits:int = 8,
+        self,
+        color_bits: int = 8,
     ) -> None:
         self.color_bits = color_bits
-        super().__init__(
-            fl.Lambda(func=self.kl_div)
-        )
+        super().__init__(fl.Lambda(func=self.kl_div))
+
     def kl_div(self, x: Tensor, y: Tensor) -> Tensor:
         return _mse_loss(x, y)
 
 
 class HistogramExtractor(fl.Chain):
     def __init__(
-        self, 
-        color_bits:int = 8,
+        self,
+        color_bits: int = 8,
     ) -> None:
         self.color_bits = color_bits
-        super().__init__(
-            fl.Permute(0, 2, 3, 1),
-            fl.Lambda(func=self.histogramdd)
-        )
-    
+        super().__init__(fl.Permute(0, 2, 3, 1), fl.Lambda(func=self.histogramdd))
+
     def histogramdd(self, x: Tensor) -> Tensor:
         batch_size = x.shape[0]
-        num_pixels = (x.shape[1]*x.shape[2])
-        histograms : List[Tensor] = []
+        num_pixels = x.shape[1] * x.shape[2]
+        histograms: List[Tensor] = []
         for i in range(batch_size):
             hist_dd = histogramdd(
-                x[i], 
+                x[i],
                 bins=2**self.color_bits,
                 range=[
-                    0, 2**self.color_bits,
-                    0, 2**self.color_bits,
-                    0, 2**self.color_bits,
-                ])
-            hist = hist_dd.hist/num_pixels
+                    0,
+                    2**self.color_bits,
+                    0,
+                    2**self.color_bits,
+                    0,
+                    2**self.color_bits,
+                ],
+            )
+            hist = hist_dd.hist / num_pixels
             histograms.append(hist)
-        
+
         return stack(histograms)
-            
-         
+
 
 class Patch3dEncoder(fl.Chain):
     def __init__(
@@ -80,7 +81,6 @@ class Patch3dEncoder(fl.Chain):
                 dtype=dtype,
             ),
         )
-
 
 
 class ViT3dEmbeddings(fl.Chain):
@@ -136,7 +136,7 @@ class HistogramEncoder(fl.Chain):
         dtype: DType | None = None,
     ) -> None:
         self.color_bits = color_bits
-        cube_size = 2 ** color_bits
+        cube_size = 2**color_bits
         self.embedding_dim = embedding_dim
         self.patch_size = patch_size
         self.num_layers = num_layers
@@ -159,10 +159,12 @@ class HistogramEncoder(fl.Chain):
                     dtype=dtype,
                 )
                 for _ in range(num_layers)
-            )
+            ),
         )
-    def compute_histogram_embedding(self, 
-        x: Tensor, 
+
+    def compute_histogram_embedding(
+        self,
+        x: Tensor,
         negative_histogram: None | Tensor = None,
     ) -> Tensor:
         conditional_embedding = self(x)
@@ -171,13 +173,14 @@ class HistogramEncoder(fl.Chain):
 
         if negative_histogram is None:
             # a uniform palette with all the colors at the same frequency
-            numel : int = x.numel()
+            numel: int = x.numel()
             if numel == 0:
                 raise ValueError("Cannot compute histogram embedding for empty tensor")
-            negative_histogram = (zeros_like(x) + 1.0) * 1/numel
+            negative_histogram = (zeros_like(x) + 1.0) * 1 / numel
 
         negative_embedding = self(negative_histogram)
         return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+
 
 class HistogramCrossAttention(fl.Chain):
     def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
@@ -220,6 +223,7 @@ class HistogramCrossAttention(fl.Chain):
     def scale(self, value: float) -> None:
         self._scale = value
         self.ensure_find(fl.Multiply).scale = value
+
 
 class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
@@ -271,15 +275,14 @@ class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_key_projection.weight = nn.Parameter(key_tensor)
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.histogram_cross_attention.to(self.device, self.dtype)
-    
+
     @property
     def weights(self) -> list[Tensor]:
         return [self.image_key_projection.weight, self.image_value_projection.weight]
 
 
-
-
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
+
 
 class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
     # Prevent PyTorch module registration
@@ -301,20 +304,20 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
         self.sub_adapters: list[CrossAttentionAdapter] = [
             CrossAttentionAdapter(target=cross_attn, scale=scale)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
-        ]        
-    
+        ]
+
     @property
     def weights(self) -> List[Tensor]:
-        weights : List[Tensor] = []
+        weights: List[Tensor] = []
         for adapter in self.sub_adapters:
             weights += adapter.weights
         return weights
-    
+
     def zero_init(self) -> None:
         weights = self.weights
         for weight in weights:
             init.zeros_(weight)
-            
+
     def inject(self, parent: fl.Chain | None = None) -> "SD1HistogramAdapter[Any]":
         for adapter in self.sub_adapters:
             adapter.inject()
@@ -328,7 +331,7 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
     def set_scale(self, scale: float) -> None:
         for cross_attn in self.sub_adapters:
             cross_attn.scale = scale
-    
+
     def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"clip_image_embedding": histogram_embedding})
 
