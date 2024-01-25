@@ -19,13 +19,13 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
 )
 from refiners.training_utils.callback import Callback
-from src.refiners.training_utils.trainers.latent_diffusion import (
+from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
     TestDiffusionBaseConfig,
     TextEmbeddingLatentsBatch,
 )
-from refiners.training_utils.metrics.color_palette import image_palette_metrics, ImageAndPalette, batch_image_palette_metrics
+from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.trainers.trainer import Trainer
 
@@ -207,7 +207,6 @@ class ColorPaletteLatentDiffusionTrainer(
         return list(zip(indices, palettes, captions))
     
     def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
-
         batch_image_palette_metrics(self.log, images_and_palettes, prefix)
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndPalette]:
         sd = self.sd

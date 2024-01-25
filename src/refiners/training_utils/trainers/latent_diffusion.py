@@ -23,7 +23,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
-from src.refiners.training_utils.trainers.trainer import Trainer
+from refiners.training_utils.trainers.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsDataset, TextEmbeddingLatentsBatch
 

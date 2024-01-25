@@ -9,7 +9,7 @@ from refiners.training_utils.callback import Callback
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
-    from refiners.training_utils.trainer import Trainer
+    from refiners.training_utils.trainers.trainer import Trainer
 
 
 __all__ = ["Dropout", "GyroDropout", "DropoutCallback"]

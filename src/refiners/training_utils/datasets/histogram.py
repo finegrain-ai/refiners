@@ -6,6 +6,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder
 from refiners.fluxion.adapters.histogram import HistogramEncoder, HistogramExtractor
 from refiners.training_utils.datasets.color_palette import ColorPalette
+from refiners.fluxion.utils import image_to_tensor
 
 @dataclass
 class TextEmbeddingHistogramLatentsBatch(TextEmbeddingLatentsBatch):
@@ -32,7 +33,7 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
         (processed_caption, conditionnal_flag) = self.process_caption(caption=caption)
         
         if conditionnal_flag:
-            histogram_embedding = self.histogram_encoder(self.histogram_extractor(image))
+            histogram_embedding = self.histogram_encoder(self.histogram_extractor(image_to_tensor(image)))
         else: 
             histogram_embedding = self.histogram_encoder([])
         

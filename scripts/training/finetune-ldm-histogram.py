@@ -1,4 +1,4 @@
-from refiners.training_utils.histogram import HistogramLatentDiffusionConfig, HistogramLatentDiffusionTrainer
+from refiners.training_utils.trainers.histogram import HistogramLatentDiffusionConfig, HistogramLatentDiffusionTrainer
 
 if __name__ == "__main__":
     import sys

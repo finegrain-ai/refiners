@@ -270,13 +270,6 @@ class ImageCrossAttention(fl.Chain):
     def scale(self) -> float:
         return self._scale
     
-    def log_shapes(self, query: Tensor, key: Tensor, value: Tensor) -> None:
-        print("query", query.shape)
-        print("key", key.shape)
-        print("value", value.shape)
-        return query, key, value
-        
-
     @scale.setter
     def scale(self, value: float) -> None:
         self._scale = value
@@ -360,6 +353,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._clip_image_encoder = [clip_image_encoder]
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(clip_image_encoder)]
+            print(self._grid_image_encoder[0]._modules)
+            
         self._image_proj = [image_proj]
 
         self.sub_adapters = [

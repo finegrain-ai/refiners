@@ -7,8 +7,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
 from torch.nn import init
-from torch import nn
-
+from torch import nn, zeros_like, cat
 from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEncoder, TransformerLayer
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 
@@ -35,6 +34,7 @@ class HistogramExtractor(fl.Chain):
             fl.Permute(0, 2, 3, 1),
             fl.Lambda(func=self.histogramdd)
         )
+    
     def histogramdd(self, x: Tensor) -> Tensor:
         batch_size = x.shape[0]
         num_pixels = (x.shape[1]*x.shape[2])
@@ -127,7 +127,6 @@ class HistogramEncoder(fl.Chain):
         self,
         color_bits: int = 8,
         embedding_dim: int = 768,
-        output_dim: int = 512,
         patch_size: int = 8,
         num_layers: int = 3,
         num_attention_heads: int = 3,
@@ -139,14 +138,13 @@ class HistogramEncoder(fl.Chain):
         self.color_bits = color_bits
         cube_size = 2 ** color_bits
         self.embedding_dim = embedding_dim
-        self.output_dim = output_dim
         self.patch_size = patch_size
         self.num_layers = num_layers
         self.num_attention_heads = num_attention_heads
         self.feedforward_dim = feedforward_dim
         cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
         super().__init__(
-            
+            fl.Reshape(1, cube_size, cube_size, cube_size),
             ViT3dEmbeddings(
                 cube_size=cube_size, embedding_dim=embedding_dim, patch_size=patch_size, device=device, dtype=dtype
             ),
@@ -161,12 +159,25 @@ class HistogramEncoder(fl.Chain):
                     dtype=dtype,
                 )
                 for _ in range(num_layers)
-            ),
-            fl.Lambda(func=cls_token_pooling),
-            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
-            fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
+            )
         )
+    def compute_histogram_embedding(self, 
+        x: Tensor, 
+        negative_histogram: None | Tensor = None,
+    ) -> Tensor:
+        conditional_embedding = self(x)
+        if x == negative_histogram:
+            return cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
+        if negative_histogram is None:
+            # a uniform palette with all the colors at the same frequency
+            numel : int = x.numel()
+            if numel == 0:
+                raise ValueError("Cannot compute histogram embedding for empty tensor")
+            negative_histogram = (zeros_like(x) + 1.0) * 1/numel
+
+        negative_embedding = self(negative_histogram)
+        return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
 class HistogramCrossAttention(fl.Chain):
     def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
@@ -319,14 +330,6 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
             cross_attn.scale = scale
     
     def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
-        # Remark : 
-        # I've not renamed clip_image_embedding here
-        # I feel we should not create a new naming for color_palette since it's the exact same component
-        #
-        # But rather one would just rename clip_image_embedding and ImageCrossAttention
-        # 
-        # Naming proposals could be : GenericCrossAttention, NonTextCrossAttention, MediaCrossAttention
-        
         self.set_context("ip_adapter", {"clip_image_embedding": histogram_embedding})
 
     @property

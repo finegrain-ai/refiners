@@ -1,12 +1,11 @@
-from dataclasses import dataclass
 from functools import cached_property
 from pydantic import BaseModel
-from typing import Any, List, Tuple, TypedDict, Callable
+from typing import Any, List, Tuple, TypedDict
 
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, randn, tensor, stack, cat
+from torch import Tensor, randn, stack
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -14,36 +13,27 @@ from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
 )
-from torch.utils.data import Dataset
-
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.latent_diffusion import (
+from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
-    TestDiffusionBaseConfig,
-    TextEmbeddingLatentsBatch,
+    TestDiffusionBaseConfig
 )
-from refiners.training_utils.trainer import Trainer
-from refiners.training_utils.config import BaseConfig
-from refiners.training_utils.color_palette import ColorPalette
+from refiners.training_utils.datasets.color_palette import ColorPalette
 from refiners.fluxion.adapters.histogram import HistogramEncoder, HistogramExtractor, HistogramDistance, SD1HistogramAdapter
-from torch.nn import Module as TorchModule
-from torch.utils.data import Dataset
-from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, load_hf_dataset
-from datasets import DownloadManager  # type: ignore
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
-
-from refiners.training_utils.latent_diffusion import resize_image
-import random 
-
+from refiners.training_utils.datasets.histogram import HistogramLatentsDataset, TextEmbeddingHistogramLatentsBatch
+from refiners.training_utils.callback import GradientNormLayerLogging
 from refiners.training_utils.wandb import WandbLoggable
 import numpy as np
+from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
+from refiners.fluxion.utils import image_to_tensor
 
 class HistogramConfig(BaseModel):
-    feedforward_dim: int = 256
-    color_bits: int = 5
-    num_attention_heads: int = 2
-    num_layers: int = 2
+    feedforward_dim: int
+    color_bits: int
+    patch_size: int
+    num_attention_heads: int
+    num_layers: int
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
 
@@ -68,115 +58,31 @@ class ImageAndHistogram(TypedDict):
     histogram: Histogram
     palette: ColorPalette
 
-@dataclass
-class TextEmbeddingHistogramLatentsBatch(TextEmbeddingLatentsBatch):
-    text_embeddings: Tensor
-    latents: Tensor
-    palette: ColorPalette,
-    histogram_embeddings: Tensor
-
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     histogram: HistogramConfig
     test_histogram: TestHistogramConfig
 
-class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
-    def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        named_gradient_norm = trainer.named_gradient_norm
-        for (layer_name, norm) in named_gradient_norm:
-            trainer.log(data={f"layer_grad_norm/{layer_name}": norm})
-
-
-class HistogramLatentsDataset(Dataset[TextEmbeddingHistogramLatentsBatch]):
-    def __init__(self, trainer: "HistogramLatentDiffusionTrainer") -> None:
-        self.trainer = trainer
-        self.config = trainer.config
-        self.lda = self.trainer.lda
-        self.text_encoder = self.trainer.text_encoder
-        self.dataset = self.load_huggingface_dataset()
-        self.process_image = self.build_image_processor()
-        self.download_manager = DownloadManager()
-        logger.info(f"Loaded {len(self.dataset)} samples from dataset")
-
-    def load_huggingface_dataset(self) -> HuggingfaceDataset[Any]:
-        dataset_config = self.config.dataset
-        logger.info(f"Loading dataset from {dataset_config.hf_repo} revision {dataset_config.revision}")
-        dataset = load_hf_dataset(
-            path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
-        )
-        return dataset
-
-    def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
-        # TODO: make this configurable and add other transforms
-        transforms: list[TorchModule] = []
-        if self.config.dataset.random_crop:
-            transforms.append(RandomCrop(size=512))
-        if self.config.dataset.horizontal_flip:
-            transforms.append(RandomHorizontalFlip(p=0.5))
-        if not transforms:
-            return lambda image: image
-        return Compose(transforms)
-    
-    def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
-        return resize_image(image=image, min_size=min_size, max_size=max_size)
-
-    def process_caption(self, caption: str) -> str:
-        return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
-
-    def get_caption(self, index: int, caption_key: str) -> str:
-        caption = self.dataset[index][caption_key]
-        if not isinstance(caption, str):
-            raise RuntimeError(
-                f"Dataset item at index [{index}] and caption_key [{caption_key}] does not contain a string caption"
-            )
-        return caption
-
-    def __len__(self) -> int:
-        return len(self.dataset)
-    
-    def __getitem__(self, index: int) -> TextEmbeddingHistogramLatentsBatch:
-        item = self.dataset[index]
-        latents = item['latents']
-        image = item['image']
-        clip_text_embedding = item['clip_text_embedding']
-        histogram = self.trainer.histogram_extractor(image)
-        histogram_embedding = self.trainer.histogram_encoder(histogram)
-        
-        if random.random() > self.config.latent_diffusion.unconditional_sampling_probability:
-            clip_text_embedding = self.empty_clip_text_embedding
-            # TODO: empty histogram embedding
-        
-        return TextEmbeddingHistogramLatentsBatch(
-            text_embeddings=clip_text_embedding, 
-            latents=latents,
-            histogram_embeddings=histogram_embedding,
-            palette=palette
-        )
-    
-    @cached_property
-    def empty_clip_text_embedding(self) -> Tensor:
-        return self.text_encoder.encode_text("")
-
-    def collate_fn(self, batch: list[TextEmbeddingHistogramLatentsBatch]) -> TextEmbeddingHistogramLatentsBatch:
-        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
-        latents = cat(tensors=[item.latents for item in batch])
-        histogram_embeddings = cat(tensors=[item.histogram_embeddings for item in batch])
-        
-        return TextEmbeddingHistogramLatentsBatch(
-            text_embeddings=text_embeddings, 
-            latents=latents,
-            histogram_embeddings=histogram_embeddings
-        )
 
 class HistogramLatentDiffusionTrainer(
     LatentDiffusionBaseTrainer[HistogramLatentDiffusionConfig, TextEmbeddingHistogramLatentsBatch]
 ):
-    def load_dataset(self) -> Dataset[TextEmbeddingHistogramLatentsBatch]:
-        return HistogramLatentsDataset(trainer=self)
+    def load_dataset(self) -> HistogramLatentsDataset:
+        return HistogramLatentsDataset(
+            config = self.config.dataset, 
+            lda = self.lda, 
+            text_encoder = self.text_encoder,
+            histogram_encoder = self.histogram_encoder,
+            histogram_extractor = self.histogram_extractor,
+            unconditional_sampling_probability = self.config.latent_diffusion.unconditional_sampling_probability
+        )
+    @cached_property
+    def dataset(self) -> HistogramLatentsDataset: # type: ignore
+        return self.load_dataset()
 
     @cached_property
     def histogram_encoder(self) -> HistogramEncoder:
         assert (
-            self.config.models["histogram"] is not None
+            self.config.models["histogram_encoder"] is not None
         ), "The config must contain a histogram entry."
 
         # TO FIX : connect this to unet cross attention embedding dim
@@ -187,17 +93,11 @@ class HistogramLatentDiffusionTrainer(
             embedding_dim=EMBEDDING_DIM,
             num_layers=self.config.histogram.num_layers,
             num_attention_heads=self.config.histogram.num_attention_heads,
+            patch_size=self.config.histogram.patch_size,
             feedforward_dim=self.config.histogram.feedforward_dim,
             device=self.device,
         )
         return encoder
-
-    def encoder_grad_norm(self) -> float:
-        return self.histogram_encoder.grad_norm()
-    
-    def cross_attention_grad_norm(self) -> float:
-        return self.unet.cross_attention_grad_norm()
-    
     @cached_property
     def histogram_adapter(self) -> SD1HistogramAdapter[Any]:
         adapter = SD1HistogramAdapter(target=self.unet, histogram_encoder=self.histogram_encoder)
@@ -209,7 +109,7 @@ class HistogramLatentDiffusionTrainer(
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((LoadHistogram(), SaveHistogram(), GradientNormLogging()))
+        self.callbacks.extend((LoadHistogram(), SaveHistogram(), GradientNormLayerLogging()))
 
     def load_models(self) -> dict[str, fl.Module]:
         return {
@@ -261,7 +161,7 @@ class HistogramLatentDiffusionTrainer(
 
             cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt['text']).to(device=self.device)
             cfg_histogram_embedding = self.histogram_encoder.compute_histogram_embedding(
-                tensor([prompt['histogram']])
+                prompt['histogram']
             )
 
             self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding)
@@ -284,13 +184,14 @@ class HistogramLatentDiffusionTrainer(
         images: dict[str, WandbLoggable] = {}
         images_and_histograms: List[ImageAndHistogram] = []
         for prompt in prompts:
-            (db_image, _, _, palette) = self.dataset[prompt.histogram_db_index]
-            histogram = self.histogram_extractor(db_image)
+            db_image = self.dataset.get_image(prompt.histogram_db_index)
+            palette = self.dataset.get_palette(prompt.histogram_db_index)
+            histogram = self.histogram_extractor(image_to_tensor(db_image))
             prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram, palette=palette)
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : with colors from {prompt.histogram_db_index}"
             image_and_histogram = self.compute_prompt_evaluation(prompt_histo, num_images_per_prompt)
             top_image = image_and_histogram['image']
-            resized_image = image.resize((img_size, img_size))
+            resized_image = db_image.resize((img_size, img_size))
             
             join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size*2))
             join_canvas_image.paste(top_image, box=(0, 0))
@@ -303,7 +204,7 @@ class HistogramLatentDiffusionTrainer(
         
     
     @cached_property
-    def eval_indices(self) -> list[tuple[int, Histogram, str]]:
+    def eval_indices(self) -> list[tuple[int, Histogram, str, ColorPalette]]:
         l = self.dataset_length
         dataset = self.dataset
         size = self.config.test_histogram.num_samples
@@ -311,7 +212,7 @@ class HistogramLatentDiffusionTrainer(
         indices = list(map(int, indices))
         palette = [dataset.get_palette(i) for i in indices]
         histograms = [self.histogram_extractor(dataset.get_image(i)) for i in indices]
-        captions = [self.dataset.get_caption(i, self.config.dataset.caption_key) for i in indices]
+        captions = [self.dataset.get_caption(i) for i in indices]
         return list(zip(indices, histograms, captions, palette))
     
     @cached_property
@@ -324,20 +225,23 @@ class HistogramLatentDiffusionTrainer(
     
     def batch_image_histogram_metrics(self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img") -> None:
         expected_histograms : List[Histogram] = [image_and_histogram['histogram'] for image_and_histogram in images_and_histograms]
-        actual_histograms : List[Histogram] = [self.histogram_extractor(image_and_histogram['image']) for image_and_histogram in images_and_histograms]
+        actual_histograms : List[Histogram] = [
+            self.histogram_extractor(image_to_tensor(image_and_histogram['image'])) for image_and_histogram in images_and_histograms
+        ]
         
         self.log({
             f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))
         })
+        images_and_palettes = [
+            ImageAndPalette(
+                image = image_and_histogram['image'], 
+                palette = image_and_histogram['palette']
+            ) 
+            for image_and_histogram in images_and_histograms
+        ]
+        
+        batch_image_palette_metrics(self.log, images_and_palettes, prefix)
     
-    def batch_image_histogram_metrics(self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img") -> None:
-        expected_histograms : List[Histogram] = [image_and_histogram['histogram'] for image_and_histogram in images_and_histograms]
-        actual_histograms : List[Histogram] = [self.histogram_extractor(image_and_histogram['image']) for image_and_histogram in images_and_histograms]
-        
-        self.log({
-            f"{prefix}/mse": self.histogram_distance(stack(actual_histograms), stack(expected_histograms))
-        })
-      
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndHistogram]:
         images: dict[str, WandbLoggable] = {}
         images_and_histograms : List[ImageAndHistogram] = []

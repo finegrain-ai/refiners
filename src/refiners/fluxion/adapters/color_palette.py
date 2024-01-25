@@ -182,13 +182,6 @@ class PaletteCrossAttention(fl.Chain):
     @property
     def scale(self) -> float:
         return self._scale
-    
-    def log_shapes(self, query: Tensor, key: Tensor, value: Tensor) -> None:
-        print("query", query.shape)
-        print("key", key.shape)
-        print("value", value.shape)
-        return query, key, value
-        
 
     @scale.setter
     def scale(self, value: float) -> None:

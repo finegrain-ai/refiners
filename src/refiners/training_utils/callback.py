@@ -6,7 +6,7 @@ from torch.nn import Parameter
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
-    from src.refiners.training_utils.trainers.trainer import Trainer
+    from refiners.training_utils.trainers.trainer import Trainer
 
 __all__ = [
     "Callback",
@@ -197,8 +197,8 @@ class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.log(data={"total_grad_norm": trainer.total_gradient_norm})
 
-class GradientNormLayerLogging(Callback[Trainer[BaseConfig, Any]]):
-    def on_backward_end(self, trainer: Trainer[BaseConfig, Any]) -> None:
+class GradientNormLayerLogging(Callback["Trainer[BaseConfig, Any]"]):
+    def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         named_gradient_norm = trainer.named_gradient_norm
         for (layer_name, norm) in named_gradient_norm:
             trainer.log(data={f"layer_grad_norm/{layer_name}": norm})

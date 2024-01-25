@@ -48,15 +48,18 @@ def test_histogram_distance() -> None:
 def test_histogram_encoder() -> None:
     
     batch_size = 2
-    patch_size = 8
+    patch_size = 16
     color_bits = 6
     cube_size = 2 ** color_bits
-    histo1 = torch.rand((batch_size, 1, cube_size, cube_size, cube_size))
+    histo1 = torch.rand((batch_size, cube_size, cube_size, cube_size))
     sum1 = histo1.sum()
     histo1 = histo1 / sum1
     
     output_dim = 768
-    
-    encoder = HistogramEncoder(color_bits=color_bits, output_dim=output_dim, patch_size=patch_size)
+    n_patch = cube_size//patch_size
+
+    print(f"n_patch = cube_size//patch_size: {n_patch}")
+    print(f"n_patch^3 : {n_patch**3}")
+    encoder = HistogramEncoder(color_bits=color_bits, patch_size=patch_size)
     embedding = encoder(histo1)
-    assert embedding.shape == (batch_size, output_dim), "embedding shape should be (batch_size, ouput_dim)"
+    assert embedding.shape == (batch_size, n_patch**3+1, 768), "embedding shape should be (batch_size, ouput_dim)"
