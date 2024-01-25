@@ -73,6 +73,10 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         return (clip_text_embedding, color_palette_embedding)
 
     def get_processed_palette(self, index: int) -> Tensor:
+ 
+        return self.color_palette_encoder(self.get_color_palette(index))
+    
+    def get_color_palette(self, index: int) -> ColorPalette:
         choices = range(1, 9)
         weights = np.array([getattr(self.sampling_by_palette, f"palette_{i}") for i in choices])
         sum = weights.sum()
@@ -80,7 +84,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
         item = self.hf_dataset[index]
         palette: ColorPalette = item[f"palette_{palette_index}"]
-        return self.color_palette_encoder(palette)
+        return palette
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
         text_embeddings = cat(tensors=[item.text_embeddings for item in batch])

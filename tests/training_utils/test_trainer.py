@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
 from refiners.training_utils.config import BaseConfig, TimeUnit
-from refiners.training_utils.trainer import (
+from refiners.training_utils.trainers.trainer import (
     Trainer,
     TrainingClock,
     count_learnable_parameters,

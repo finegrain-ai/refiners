@@ -1,9 +1,6 @@
 import torch
 
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, ColorsTokenizer
-from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1UNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 
 
 def test_colors_tokenizer() -> None:
@@ -23,9 +20,6 @@ def test_color_palette_encoder() -> None:
     device = "cuda:0"
     in_channels = 22
     max_colors = 10
-    unet = SD1UNet(in_channels)
-    # lda = SD1Autoencoder(device=device)
-    cross_attn_2d = unet.ensure_find(CrossAttentionBlock2d)
 
     batch_size = 5
     color_size = 4

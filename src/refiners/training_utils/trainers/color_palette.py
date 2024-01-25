@@ -190,19 +190,18 @@ class ColorPaletteLatentDiffusionTrainer(
         indices = list(np.random.choice(l, size=size, replace=False)) # type: ignore
         indices : List[int] = list(map(int, indices)) # type: ignore
         palettes = [self.dataset.get_color_palette(i) for i in indices]
-        captions = [self.dataset.get_caption(i, self.config.dataset.caption_key) for i in indices]
+        captions = [self.dataset.get_caption(i) for i in indices]
         return list(zip(indices, palettes, captions))
 
     def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
         batch_image_palette_metrics(self.log, images_and_palettes, prefix)
 
     def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndPalette]:
-        sd = self.sd
         images: dict[str, WandbLoggable] = {}
         images_and_palettes: List[ImageAndPalette] = []
         palette_img_size = img_size // self.config.color_palette.max_colors
 
-        for eval_index, (db_index, palette, caption) in enumerate(self.eval_indices):
+        for (db_index, palette, caption) in self.eval_indices:
             prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
             image_and_palette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
 
@@ -243,7 +242,6 @@ class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         tensors: dict[str, Tensor] = {}
-        metadata: dict[str, str] = {}
 
         model = trainer.unet
         if model.parent is None:

@@ -1,9 +1,6 @@
 import torch
 
-from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, ColorsTokenizer
 from refiners.fluxion.adapters.histogram import HistogramDistance, HistogramEncoder, HistogramExtractor
-from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
-from refiners.foundationals.latent_diffusion.stable_diffusion_1 import SD1UNet
 
 
 def test_histogram_extractor() -> None:
@@ -55,11 +52,9 @@ def test_histogram_encoder() -> None:
     sum1 = histo1.sum()
     histo1 = histo1 / sum1
 
-    output_dim = 768
+    embedding_dim = 768
     n_patch = cube_size // patch_size
-
-    print(f"n_patch = cube_size//patch_size: {n_patch}")
-    print(f"n_patch^3 : {n_patch**3}")
-    encoder = HistogramEncoder(color_bits=color_bits, patch_size=patch_size)
+    
+    encoder = HistogramEncoder(color_bits=color_bits, patch_size=patch_size, embedding_dim=embedding_dim)
     embedding = encoder(histo1)
-    assert embedding.shape == (batch_size, n_patch**3 + 1, 768), "embedding shape should be (batch_size, ouput_dim)"
+    assert embedding.shape == (batch_size, n_patch**3 + 1, embedding_dim), "embedding shape should be (batch_size, ouput_dim)"
