@@ -77,10 +77,12 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
         return caption
 
     def get_image(self, index: int) -> Image.Image:
-        if "image" in self.hf_dataset[index]:
-            return self.hf_dataset[index]["image"]
-        elif "url" in self.hf_dataset[index]:
-            url: str = self.hf_dataset[index]["url"]
+        item = self.hf_dataset[index]
+        if "image" in item:
+            logger.info(f"get_image image {index}")
+            return item["image"]
+        elif "url" in item[index]:
+            url: str = item[index]["url"]
             filename: str = self.download_manager.download(url)  # type: ignore
             return Image.open(filename)
         else:
@@ -105,11 +107,15 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 
     def get_processed_image(self, index: int) -> Image.Image:
         image = self.get_image(index=index)
+        logger.info(f"resize_image image {index}")
+
         resized_image = self.resize_image(
             image=image,
             min_size=self.config.resize_image_min_size,
             max_size=self.config.resize_image_max_size,
         )
+        logger.info(f"resized_image image {index}")
+        
         return self.process_image(resized_image)
 
     def __len__(self) -> int:

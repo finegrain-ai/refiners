@@ -4,6 +4,7 @@ from typing import List, Tuple
 
 import numpy as np
 from pydantic import BaseModel
+from torch import Tensor, tensor, empty
 from PIL import Image
 from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsBaseDataset
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
@@ -19,6 +20,12 @@ class ColorPaletteDatasetItem:
     text: str
     image: Image.Image
     conditional_flag: bool
+    
+@dataclass
+class DatasetItem:
+    palettes: dict[str, ColorPalette]
+    image: Image.Image
+
 
 TextEmbeddingColorPaletteLatentsBatch = List[ColorPaletteDatasetItem]
 
@@ -49,27 +56,47 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         logger.info(f"Getting latents {index}")
         
-        image = self.get_processed_image(index)
-        (caption, conditional_flag) = self.process_caption(self.get_caption(index))        
+        item : DatasetItem = self.hf_dataset[index]
+        logger.info(f"Getting item {index}")
+
+        resized_image = self.resize_image(
+            image=item["image"],
+            min_size=self.config.resize_image_min_size,
+            max_size=self.config.resize_image_max_size,
+        )
+        logger.info(f"resized_image image {index}")
+
+        image = self.process_image(resized_image)
         
+        logger.info(f"process_image image {index}")
+        
+        caption_key = self.config.caption_key or "caption"
+        caption = item[caption_key]
+  
+        (caption_processed, conditional_flag) = self.process_caption(self.get_caption(index))        
+        logger.info(f"process_caption {index}")
+
         return [
             ColorPaletteDatasetItem(
                 color_palette=self.get_color_palette(index),
-                text=caption,
+                text=caption_processed,
                 image=image,
                 conditional_flag=conditional_flag
             )
         ]
-
-    def get_color_palette(self, index: int) -> ColorPalette:
+        
+    def process_color_palette(self, item: DatasetItem) -> ColorPalette:
         choices = range(1, 9)
         weights = np.array([getattr(self.sampling_by_palette, f"palette_{i}") for i in choices])
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
-        item = self.hf_dataset[index]
         palette: ColorPalette = item[f"palettes"][str(palette_index)]
+        
         return palette
+    def get_color_palette(self, index: int) -> ColorPalette:
+        item = self.hf_dataset[index]
+        return self.process_color_palette(item)
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
         return [item for sublist in batch for item in sublist]
