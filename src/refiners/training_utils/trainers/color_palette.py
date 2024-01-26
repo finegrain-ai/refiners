@@ -156,7 +156,13 @@ class ColorPaletteLatentDiffusionTrainer(
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
 
         return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
-
+    
+    @scoped_seed(42)
+    def compute_deterministic_prompt_evaluation(
+        self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512
+    ) -> ImageAndPalette:
+        return self.compute_prompt_evaluation(prompt, num_images_per_prompt, img_size=img_size)
+        
     def compute_prompt_evaluation(
         self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512
     ) -> ImageAndPalette:
@@ -191,7 +197,6 @@ class ColorPaletteLatentDiffusionTrainer(
 
         return ImageAndPalette(image=canvas_image, palette=prompt.color_palette)
 
-    @scoped_seed(42)
     def compute_edge_case_evaluation(
         self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int
     ) -> List[ImageAndPalette]:
@@ -200,7 +205,7 @@ class ColorPaletteLatentDiffusionTrainer(
         
         for prompt in prompts:
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : {str(prompt.color_palette)}"
-            image_and_palette = self.compute_prompt_evaluation(prompt, num_images_per_prompt)
+            image_and_palette = self.compute_deterministic_prompt_evaluation(prompt, num_images_per_prompt)
             images[image_name] = image_and_palette["image"]
             images_and_palettes.append(image_and_palette)
 
@@ -284,3 +289,4 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
         save_to_safetensors(
             path=path, tensors=tensors
         )
+        wandb.save('model.h5')
