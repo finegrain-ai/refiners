@@ -136,7 +136,9 @@ class ColorPaletteLatentDiffusionTrainer(
         image_tensor = cat([image_to_tensor(item.image, device=self.lda.device, dtype=self.lda.dtype) for item in batch])
         
         latents = self.lda.encode(image_tensor)
-        color_palette_embeddings = self.color_palette_encoder(tensor([item.color_palette for item in batch], dtype=self.color_palette_encoder.dtype, device=self.color_palette_encoder.device))
+        color_palette_embeddings = self.color_palette_encoder(
+            [item.color_palette for item in batch]
+        )
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
@@ -182,7 +184,7 @@ class ColorPaletteLatentDiffusionTrainer(
 
             cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
             cfg_color_palette_embedding = self.color_palette_encoder.compute_color_palette_embedding(
-                tensor([prompt.color_palette])
+                prompt.color_palette
             )
 
             self.color_palette_adapter.set_color_palette_embedding(cfg_color_palette_embedding)
