@@ -103,6 +103,6 @@ def test_encoder(
     assert (our_embeddings - ref_embeddings).abs().max() < 0.01
     
     # batched inputs
-    double_tokens = tokenizer([prompt, prompt])
+    double_tokens = tokenizer([prompt, prompt[0:3]])
     assert double_tokens.shape[0] == 2
 

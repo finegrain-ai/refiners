@@ -41,7 +41,6 @@ class ColorPaletteConfig(BaseModel):
     max_colors: int
     without_caption_probability: float = 0.17
 
-
 class ColorPalettePromptConfig(BaseModel):
     text: str
     color_palette: ColorPalette
