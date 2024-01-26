@@ -54,28 +54,21 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         )
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
-        logger.info(f"Getting latents {index}")
         
         item : DatasetItem = self.hf_dataset[index]
-        logger.info(f"Getting item {index}")
 
         resized_image = self.resize_image(
             image=item["image"],
             min_size=self.config.resize_image_min_size,
             max_size=self.config.resize_image_max_size,
         )
-        logger.info(f"resized_image image {index}")
 
         image = self.process_image(resized_image)
         
-        logger.info(f"process_image image {index}")
-        
-        caption_key = self.config.caption_key or "caption"
+        caption_key = self.config.caption_key
         caption = item[caption_key]
-  
-        (caption_processed, conditional_flag) = self.process_caption(self.get_caption(index))        
-        logger.info(f"process_caption {index}")
-
+        (caption_processed, conditional_flag) = self.process_caption(caption)   
+        
         return [
             ColorPaletteDatasetItem(
                 color_palette=self.get_color_palette(index),
