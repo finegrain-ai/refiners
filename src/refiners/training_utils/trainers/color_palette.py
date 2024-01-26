@@ -46,6 +46,9 @@ class ColorPalettePromptConfig(BaseModel):
     text: str
     color_palette: ColorPalette
 
+class LatentPrompt(TypedDict):
+    text: str
+    color_palette_embedding: Tensor
 
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     prompts: list[ColorPalettePromptConfig]
@@ -131,10 +134,10 @@ class ColorPaletteLatentDiffusionTrainer(
         texts = [item.text for item in batch]
         text_embeddings = self.text_encoder(texts)
         
-        image_tensor = cat([image_to_tensor(item.image) for item in batch])
+        image_tensor = cat([image_to_tensor(item.image, device=self.lda.device, dtype=self.lda.dtype) for item in batch])
         
-        latents = self.lda(image_tensor)
-        color_palette_embeddings = self.color_palette_encoder(tensor([item.color_palette for item in batch]))
+        latents = self.lda.encode(image_tensor)
+        color_palette_embeddings = self.color_palette_encoder(tensor([item.color_palette for item in batch], dtype=self.color_palette_encoder.dtype, device=self.color_palette_encoder.device))
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)

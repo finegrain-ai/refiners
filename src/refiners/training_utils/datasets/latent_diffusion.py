@@ -1,12 +1,11 @@
 import random
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, List
 
 from datasets import DownloadManager  # type: ignore
 from loguru import logger
 from PIL import Image
-from torch import Tensor
 from torch.nn import Module as TorchModule
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
@@ -14,12 +13,12 @@ from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # 
 from refiners.training_utils.datasets.utils import resize_image
 from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 
-TextEmbeddingLatentsBatch = List[TextImageDatasetItem]
 @dataclass
 class TextImageDatasetItem:
     text: str
     image: Image.Image
 
+TextEmbeddingLatentsBatch = List[TextImageDatasetItem]
 
 BatchType = TypeVar("BatchType", bound=List[Any])
 
@@ -118,15 +117,16 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
 
 
 class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingLatentsBatch]):
-    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
-        clip_text_embedding = self.get_processed_text_embedding(index)
-        (latents, _) = self.get_processed_latents(index)
+    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:        
+        image = self.get_processed_image(index)
+        (caption, _) = self.process_caption(self.get_caption(index))        
+        
         return [
-            TextEmbeddingLatentsDatasetItem(
-                text_embeddings=clip_text_embedding,
-                latents=latents,
+            TextImageDatasetItem(
+                text=caption,
+                image=image
             )
         ]
 
-    def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
+    def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
         return [item for sublist in batch for item in sublist]
