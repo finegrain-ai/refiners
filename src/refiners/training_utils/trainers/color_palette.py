@@ -5,8 +5,9 @@ from refiners.fluxion.utils import load_from_safetensors
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, randn, tensor
+from torch import Tensor, randn, tensor, cat
 import numpy as np
+from refiners.fluxion.utils import image_to_tensor
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
@@ -110,10 +111,7 @@ class ColorPaletteLatentDiffusionTrainer(
 
     def load_dataset(self) -> ColorPaletteDataset:
         return ColorPaletteDataset(
-            config=self.config.dataset,
-            lda=self.lda,
-            text_encoder=self.text_encoder,
-            color_palette_encoder=self.color_palette_encoder
+            config=self.config.dataset
 		)
     
     @cached_property
@@ -129,11 +127,14 @@ class ColorPaletteLatentDiffusionTrainer(
         }
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
-        text_embeddings, latents, color_palette_embeddings = (
-            batch.text_embeddings,
-            batch.latents,
-            batch.color_palette_embeddings,
-        )
+        
+        texts = [item.text for item in batch]
+        text_embeddings = self.text_encoder(texts)
+        
+        image_tensor = cat([image_to_tensor(item.image) for item in batch])
+        
+        latents = self.lda(image_tensor)
+        color_palette_embeddings = self.color_palette_encoder(tensor([item.color_palette for item in batch]))
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
@@ -289,4 +290,3 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
         save_to_safetensors(
             path=path, tensors=tensors
         )
-        wandb.save('model.h5')

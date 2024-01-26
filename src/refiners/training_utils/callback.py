@@ -135,7 +135,16 @@ class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
 
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         logger.info(f"Step {trainer.clock.step} started.")
-
+    
+    def on_lr_scheduler_step_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        logger.info(f"on_lr_scheduler_step_begin.")
+    
+    def on_lr_scheduler_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        logger.info(f"on_lr_scheduler_step_end.")
+    
+    def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        logger.info(f"Step {trainer.clock.step} ended.")
+        
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.step += 1
         trainer.clock.num_batches_processed += 1
