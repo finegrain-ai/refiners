@@ -23,7 +23,7 @@ color_bits = 5 # 2^5 = 32 color-level => 32³ different colors 32 768 colors
 patch_size = 8 # (2^5/8)^3 + 1 => sequence of 65 tokens
 
 [training]
-duration = "20:epoch"
+duration = "5000:steps"
 seed = 0
 gpu_index = 0
 batch_size = 1
@@ -34,8 +34,8 @@ evaluation_interval = "1000:step"
 evaluation_seed = 1
 
 [optimizer]
-optimizer = "Prodigy" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1
+optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
+learning_rate = 5e-4
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2

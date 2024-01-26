@@ -9,10 +9,11 @@ from torch.nn.functional import pad
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
-from refiners.foundationals.clip.common import PositionalEncoder
+from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
 from refiners.foundationals.clip.text_encoder import TransformerLayer
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
@@ -62,27 +63,16 @@ class ColorEncoder(fl.Chain):
             ),
         )
 
-
-class ColorPaletteEncoder(fl.Chain):
-    # _lda: list[SD1Autoencoder]
-
-    @property
-    def lda(self):
-        return self._lda[0]
+class ColorPaletteTransformerEncoder(fl.Chain):
 
     def __init__(
         self,
-        # lda: SD1Autoencoder,
         embedding_dim: int = 768,
         max_colors: int = 8,
-        # Remark :
-        # I have followed the CLIPTextEncoderL parameters
-        # as default parameters here, might require some testing
         num_layers: int = 2,
         num_attention_heads: int = 2,
         feedforward_dim: int = 20,
         layer_norm_eps: float = 1e-5,
-        use_quick_gelu: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -93,7 +83,6 @@ class ColorPaletteEncoder(fl.Chain):
         self.num_attention_heads = num_attention_heads
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
-        self.use_quick_gelu = use_quick_gelu
         super().__init__(
             ColorsTokenizer(max_colors=max_colors),
             fl.Sum(
@@ -125,9 +114,135 @@ class ColorPaletteEncoder(fl.Chain):
             ),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
-        if use_quick_gelu:
-            for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
-                parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
+
+class ColorPaletteMLPEncoder(fl.Chain):
+
+    def __init__(
+        self,
+        embedding_dim: int = 768,
+        max_colors: int = 8,
+        num_layers: int = 2,
+        feedforward_dim: int = 20,
+        layer_norm_eps: float = 1e-5,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        # self._lda = [lda]
+        self.embedding_dim = embedding_dim
+        self.num_layers = num_layers
+        self.feedforward_dim = feedforward_dim
+        self.layer_norm_eps = layer_norm_eps
+        super().__init__(
+            *(
+                fl.Chain(
+                    fl.LayerNorm(
+                        normalized_shape=embedding_dim,
+                        eps=layer_norm_eps,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    FeedForward(
+                        embedding_dim=embedding_dim,
+                        feedforward_dim=feedforward_dim,
+                        device=device,
+                        dtype=dtype,
+                    )
+                )
+                for _ in range(num_layers)
+            )
+        )
+
+class ColorPaletteEncoder(fl.Chain):
+    _lda: list[SD1Autoencoder]
+
+    @property
+    def lda(self):
+        return self._lda[0]
+
+    def __init__(
+        self,
+        lda: SD1Autoencoder,
+        embedding_dim: int = 768,
+        max_colors: int = 8,
+        # Remark :
+        # I have followed the CLIPTextEncoderL parameters
+        # as default parameters here, might require some testing
+        num_layers: int = 2,
+        num_attention_heads: int = 2,
+        feedforward_dim: int = 20,
+        layer_norm_eps: float = 1e-5,
+        mode: str = 'transformer',
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        self._lda = [lda]
+        
+        if mode == 'transformer':
+            encoder_body = ColorPaletteTransformerEncoder(
+                embedding_dim=embedding_dim,
+                max_colors=max_colors,
+                num_layers=num_layers,
+                num_attention_heads=num_attention_heads,
+                feedforward_dim=feedforward_dim,
+                layer_norm_eps=layer_norm_eps,
+                device=device,
+                dtype=dtype
+            )
+        elif mode == 'mlp':
+            encoder_body = ColorPaletteMLPEncoder(
+                embedding_dim=embedding_dim,
+                max_colors=max_colors,
+                num_layers=num_layers,
+                feedforward_dim=feedforward_dim,
+                layer_norm_eps=layer_norm_eps,
+                device=device,
+                dtype=dtype
+            )
+        else:
+            raise ValueError(f"Unknown mode {mode}")
+        
+        if use_lda:
+            encoder_head = fl.Chain(
+                fl.Lambda(self.lda_encode),
+                ColorsTokenizer(max_colors=max_colors),
+                fl.Sum(
+                    ColorEncoder(
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    PositionalEncoder(
+                        max_sequence_length=max_colors,
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                )
+            )
+        else: 
+            encoder_head = fl.Chain(
+                fl.Lambda(self.lda_encode),
+                ColorsTokenizer(max_colors=max_colors),
+                fl.Sum(
+                    ColorEncoder(
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    PositionalEncoder(
+                        max_sequence_length=max_colors,
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                )
+            )
+
+        super().__init__(
+            ,
+            encoder_body,
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+        )
 
     def lda_encode(self, x: Float[Tensor, "*batch num_colors 3"]) -> Float[Tensor, "*batch num_colors 4"]:
         device = x.device
