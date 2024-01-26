@@ -26,19 +26,20 @@ class SDLoraManager:
         assert isinstance(clip_text_encoder, fl.Chain)
         return clip_text_encoder
 
-    def load(
+    def add_loras(
         self,
-        tensors: dict[str, Tensor],
+        name: str,
         /,
+        tensors: dict[str, Tensor],
         scale: float = 1.0,
     ) -> None:
         """Load the LoRA weights from a dictionary of tensors.
 
         Expects the keys to be in the commonly found formats on CivitAI's hub.
         """
-        assert len(self.lora_adapters) == 0, "Loras already loaded"
+        assert name not in self.names, f"LoRA {name} already exists"
         loras = Lora.from_dict(
-            {key: value.to(device=self.target.device, dtype=self.target.dtype) for key, value in tensors.items()}
+            name, {key: value.to(device=self.target.device, dtype=self.target.dtype) for key, value in tensors.items()}
         )
         loras = {key: loras[key] for key in sorted(loras.keys(), key=SDLoraManager.sort_keys)}
 
@@ -46,16 +47,25 @@ class SDLoraManager:
         if not "unet" in loras and not "text" in loras:
             loras = {f"unet_{key}": loras[key] for key in loras.keys()}
 
-        self.load_unet(loras)
-        self.load_text_encoder(loras)
+        self.add_loras_to_unet(loras)
+        self.add_loras_to_text_encoder(loras)
 
-        self.scale = scale
+        self.set_scale(name, scale)
 
-    def load_text_encoder(self, loras: dict[str, Lora], /) -> None:
+    def add_multiple_loras(
+        self,
+        /,
+        tensors: dict[str, dict[str, Tensor]],
+        scale: dict[str, float] | None = None,
+    ) -> None:
+        for name, lora_tensors in tensors.items():
+            self.add_loras(name, tensors=lora_tensors, scale=scale[name] if scale else 1.0)
+
+    def add_loras_to_text_encoder(self, loras: dict[str, Lora], /) -> None:
         text_encoder_loras = {key: loras[key] for key in loras.keys() if "text" in key}
         SDLoraManager.auto_attach(text_encoder_loras, self.clip_text_encoder)
 
-    def load_unet(self, loras: dict[str, Lora], /) -> None:
+    def add_loras_to_unet(self, loras: dict[str, Lora], /) -> None:
         unet_loras = {key: loras[key] for key in loras.keys() if "unet" in key}
         exclude: list[str] = []
         exclude = [
@@ -65,13 +75,42 @@ class SDLoraManager:
         ]
         SDLoraManager.auto_attach(unet_loras, self.unet, exclude=exclude)
 
-    def unload(self) -> None:
+    def remove_loras(self, *names: str) -> None:
+        for lora_adapter in self.lora_adapters:
+            for name in names:
+                lora_adapter.remove_lora(name)
+
+            if len(lora_adapter.loras) == 0:
+                lora_adapter.eject()
+
+    def remove_all(self) -> None:
         for lora_adapter in self.lora_adapters:
             lora_adapter.eject()
+
+    def get_loras_by_name(self, name: str, /) -> list[Lora]:
+        return [lora for lora in self.loras if lora.name == name]
+
+    def get_scale(self, name: str, /) -> float:
+        loras = self.get_loras_by_name(name)
+        assert all([lora.scale == loras[0].scale for lora in loras]), "lora scales are not all the same"
+        return loras[0].scale
+
+    def set_scale(self, name: str, scale: float, /) -> None:
+        self.update_scales({name: scale})
+
+    def update_scales(self, scales: dict[str, float], /) -> None:
+        assert all([name in self.names for name in scales]), f"Scales keys must be a subset of {self.names}"
+        for name, scale in scales.items():
+            for lora in self.get_loras_by_name(name):
+                lora.scale = scale
 
     @property
     def loras(self) -> list[Lora]:
         return list(self.unet.layers(Lora)) + list(self.clip_text_encoder.layers(Lora))
+
+    @property
+    def names(self) -> list[str]:
+        return list(set(lora.name for lora in self.loras))
 
     @property
     def lora_adapters(self) -> list[LoraAdapter]:
@@ -87,15 +126,8 @@ class SDLoraManager:
         }
 
     @property
-    def scale(self) -> float:
-        assert len(self.loras) > 0, "No loras found"
-        assert all([lora.scale == self.loras[0].scale for lora in self.loras])
-        return self.loras[0].scale
-
-    @scale.setter
-    def scale(self, value: float) -> None:
-        for lora in self.loras:
-            lora.scale = value
+    def scales(self) -> dict[str, float]:
+        return {name: self.get_scale(name) for name in self.names}
 
     @staticmethod
     def pad(input: str, /, padding_length: int = 2) -> str:
@@ -130,7 +162,9 @@ class SDLoraManager:
         for key, lora in loras.items():
             if attach := lora.auto_attach(target, exclude=exclude):
                 adapter, parent = attach
-                adapter.inject(parent)
+                # if parent is None, `adapter` is already attached and `lora` has been added to it
+                if parent is not None:
+                    adapter.inject(parent)
             else:
                 failed_loras[key] = lora
 

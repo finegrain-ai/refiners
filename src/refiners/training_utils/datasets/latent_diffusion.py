@@ -1,42 +1,35 @@
 import random
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, List
 
 from datasets import DownloadManager  # type: ignore
 from loguru import logger
 from PIL import Image
-from torch import Tensor, cat
 from torch.nn import Module as TorchModule
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip  # type: ignore
 
-from refiners.foundationals.clip.text_encoder import CLIPTextEncoder
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.datasets.utils import resize_image
 from refiners.training_utils.huggingface_datasets import HuggingfaceDataset, HuggingfaceDatasetConfig, load_hf_dataset
 
-
 @dataclass
-class TextEmbeddingLatentsBatch:
-    text_embeddings: Tensor
-    latents: Tensor
+class TextImageDatasetItem:
+    text: str
+    image: Image.Image
 
+TextEmbeddingLatentsBatch = List[TextImageDatasetItem]
 
-BatchType = TypeVar("BatchType", bound=Any)
+BatchType = TypeVar("BatchType", bound=List[Any])
 
 
 class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
     def __init__(
         self,
         config: HuggingfaceDatasetConfig,
-        lda: SD1Autoencoder,
-        text_encoder: CLIPTextEncoder,
         unconditional_sampling_probability: float = 0.2,
     ) -> None:
         self.config = config
-        self.lda = lda
-        self.text_encoder = text_encoder
         self.hf_dataset = self.load_huggingface_dataset()
         self.process_image = self.build_image_processor()
         self.download_manager = DownloadManager()
@@ -84,10 +77,12 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
         return caption
 
     def get_image(self, index: int) -> Image.Image:
-        if "image" in self.hf_dataset[index]:
-            return self.hf_dataset[index]["image"]
-        elif "url" in self.hf_dataset[index]:
-            url: str = self.hf_dataset[index]["url"]
+        item = self.hf_dataset[index]
+        if "image" in item:
+            logger.info(f"get_image image {index}")
+            return item["image"]
+        elif "url" in item[index]:
+            url: str = item[index]["url"]
             filename: str = self.download_manager.download(url)  # type: ignore
             return Image.open(filename)
         else:
@@ -105,33 +100,39 @@ class TextEmbeddingLatentsBaseDataset(Dataset[BatchType]):
     def collate_fn(self, batch: list[BatchType]) -> BatchType:
         ...
 
-    def get_processed_text_embedding(self, index: int) -> Tensor:
-        caption = self.get_caption(index=index)
-        (processed_caption, _) = self.process_caption(caption=caption)
-        return self.text_encoder(processed_caption)
+    # def get_processed_text_embedding(self, index: int) -> Tensor:
+    #     caption = self.get_caption(index=index)
+    #     (processed_caption, _) = self.process_caption(caption=caption)
+    #     return self.text_encoder(processed_caption)
 
-    def get_processed_latents(self, index: int) -> tuple[Tensor, Image.Image]:
+    def get_processed_image(self, index: int) -> Image.Image:
         image = self.get_image(index=index)
+        logger.info(f"resize_image image {index}")
+
         resized_image = self.resize_image(
             image=image,
             min_size=self.config.resize_image_min_size,
             max_size=self.config.resize_image_max_size,
         )
-        processed_image = self.process_image(resized_image)
-        encoded_image = self.lda.encode_image(image=processed_image)
-        return (encoded_image, processed_image)
+        logger.info(f"resized_image image {index}")
+        
+        return self.process_image(resized_image)
 
     def __len__(self) -> int:
         return len(self.hf_dataset)
 
 
 class TextEmbeddingLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingLatentsBatch]):
-    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
-        clip_text_embedding = self.get_processed_text_embedding(index)
-        (latents, _) = self.get_processed_latents(index)
-        return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
+    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:        
+        image = self.get_processed_image(index)
+        (caption, _) = self.process_caption(self.get_caption(index))        
+        
+        return [
+            TextImageDatasetItem(
+                text=caption,
+                image=image
+            )
+        ]
 
     def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
-        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
-        latents = cat(tensors=[item.latents for item in batch])
-        return TextEmbeddingLatentsBatch(text_embeddings=text_embeddings, latents=latents)
+        return [item for sublist in batch for item in sublist]

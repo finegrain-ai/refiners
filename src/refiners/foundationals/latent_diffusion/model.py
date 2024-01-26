@@ -24,24 +24,13 @@ class LatentDiffusionModel(fl.Module, ABC):
         self.clip_text_encoder = clip_text_encoder
         self.scheduler = scheduler
 
-    def set_num_inference_steps(self, num_inference_steps: int) -> None:
-        initial_diffusion_rate = self.scheduler.initial_diffusion_rate
-        final_diffusion_rate = self.scheduler.final_diffusion_rate
-        device, dtype = self.scheduler.device, self.scheduler.dtype
-
-        scheduler = self.scheduler.__class__(
-            num_inference_steps,
-            initial_diffusion_rate=initial_diffusion_rate,
-            final_diffusion_rate=final_diffusion_rate,
-        ).to(device=device, dtype=dtype)
-
-        self.scheduler = scheduler
+    def set_inference_steps(self, num_steps: int, first_step: int = 0) -> None:
+        self.scheduler = self.scheduler.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
 
     def init_latents(
         self,
         size: tuple[int, int],
         init_image: Image.Image | None = None,
-        first_step: int = 0,
         noise: Tensor | None = None,
     ) -> Tensor:
         height, width = size
@@ -54,11 +43,15 @@ class LatentDiffusionModel(fl.Module, ABC):
         if init_image is None:
             return noise
         encoded_image = self.lda.encode_image(image=init_image.resize(size=(width, height)))
-        return self.scheduler.add_noise(x=encoded_image, noise=noise, step=self.steps[first_step])
+        return self.scheduler.add_noise(
+            x=encoded_image,
+            noise=noise,
+            step=self.scheduler.first_inference_step,
+        )
 
     @property
     def steps(self) -> list[int]:
-        return self.scheduler.steps
+        return self.scheduler.inference_steps
 
     @abstractmethod
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
@@ -91,14 +84,17 @@ class LatentDiffusionModel(fl.Module, ABC):
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 
         # classifier-free guidance
-        noise = unconditional_prediction + condition_scale * (conditional_prediction - unconditional_prediction)
+        predicted_noise = unconditional_prediction + condition_scale * (
+            conditional_prediction - unconditional_prediction
+        )
         x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
 
         if self.has_self_attention_guidance():
-            noise += self.compute_self_attention_guidance(
+            predicted_noise += self.compute_self_attention_guidance(
                 x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
             )
-        return self.scheduler(x, noise=noise, step=step)
+
+        return self.scheduler(x, predicted_noise=predicted_noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:
         return self.__class__(

@@ -123,8 +123,6 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
     def load_dataset(self) -> Dataset[TextEmbeddingLatentsBatch]:
         return TextEmbeddingLatentsDataset(
             config=self.config.dataset,
-            lda=self.lda,
-            text_encoder=self.text_encoder,
             unconditional_sampling_probability=self.config.latent_diffusion.unconditional_sampling_probability,
         )
 

@@ -354,7 +354,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._clip_image_encoder = [clip_image_encoder]
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(clip_image_encoder)]
-            print(self._grid_image_encoder[0]._modules)
 
         self._image_proj = [image_proj]
 
@@ -419,7 +418,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
 
-    # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_clip_image_embedding(self, image_prompt: Tensor) -> Tensor:
         image_encoder = self.clip_image_encoder if not self.fine_grained else self.grid_image_encoder
         clip_embedding = image_encoder(image_prompt)

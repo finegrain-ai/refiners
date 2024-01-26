@@ -55,6 +55,7 @@ class TrainingConfig(BaseModel):
     gpu_index: int = 0
     dtype: str = "float32"
     batch_size: int = 1
+    num_workers: int = 0
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
     clip_grad_norm: float | None = None
     clip_grad_value: float | None = None

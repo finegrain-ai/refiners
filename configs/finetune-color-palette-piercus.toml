@@ -7,17 +7,17 @@ name = "base-l4"
 tags = ["remote", "l4"]
 
 [models]
-unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
-text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
-lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
-color_palette_encoder = {train = true}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false, gpu_index = 0}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false, gpu_index = 0}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false, gpu_index = 0}
+color_palette_encoder = {train = true, gpu_index = 0}
 
 [adapters]
 color_palette_adapter = {}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
-offset_noise = 0.1
+offset_noise = 0.2
 
 [color_palette]
 max_colors = 8
@@ -30,12 +30,13 @@ embedding_dim = 10
 duration = "2:epoch"
 seed = 0
 gpu_index = 0
-batch_size = 4
+batch_size = 10
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
-evaluation_interval = "1000:step"
+evaluation_interval = "250:step"
 evaluation_seed = 1
+num_workers = 8
 
 [optimizer]
 optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
@@ -47,7 +48,7 @@ weight_decay = 1e-2
 [scheduler]
 scheduler_type = "ConstantLR"
 update_interval = "1:step"
-warmup = "500:step"
+warmup = "250:step"
 
 [dropout]
 dropout_probability = 0.2
@@ -61,7 +62,7 @@ caption_key = "ai_description"
 split = "train"
 
 [checkpointing]
-save_interval = "5000:step"
+save_interval = "1:epoch"
 use_wandb = true
 
 [test_color_palette]

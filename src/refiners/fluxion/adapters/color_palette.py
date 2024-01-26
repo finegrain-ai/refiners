@@ -1,6 +1,6 @@
 from typing import Any, List, TypeVar
 
-import torch
+from torch import cat, ones
 from jaxtyping import Float, Int
 from torch import Tensor, device as Device, dtype as DType, tensor, zeros
 from torch.nn import init, Parameter
@@ -18,21 +18,30 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 
-class ColorsTokenizer(fl.Module):
+class PalettesTokenizer(fl.Module):
     def __init__(
         self,
-        max_colors: int = 8,
+        max_colors: int = 8
     ) -> None:
         super().__init__()
         self.max_colors = max_colors
+    
+    def forward(self, palettes: List[List[List[float]]]) -> Float[Tensor, "*batch max_colors 4"]:
+        tensors = [self._forward(palette) for palette in palettes]
+        return cat(tensors, dim=0)
 
-    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:
-        colors = self.add_channel(colors)
+    def _forward(self, palette: List[List[float]]) -> Float[Tensor, "*batch max_colors 4"]:
+        if len(palette) == 0:
+            tensor_palette = zeros(1, 0, 3)
+        else:
+            tensor_palette = tensor([palette])
+        
+        colors = self.add_channel(tensor_palette)
         colors = self.zero_right_padding(colors)
         return colors
 
     def add_channel(self, x: Float[Tensor, "*batch colors 4"]) -> Float[Tensor, "*batch colors_with_end 5"]:
-        return torch.cat((x, torch.ones(x.shape[0], x.shape[1], 1, dtype=x.dtype, device=x.device)), dim=2)
+        return cat((x, ones(x.shape[0], x.shape[1], 1)), dim=2)
 
     def zero_right_padding(
         self, x: Float[Tensor, "*batch colors_with_end embedding_dim"]
@@ -84,20 +93,6 @@ class ColorPaletteTransformerEncoder(fl.Chain):
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
         super().__init__(
-            ColorsTokenizer(max_colors=max_colors),
-            fl.Sum(
-                ColorEncoder(
-                    embedding_dim=embedding_dim,
-                    device=device,
-                    dtype=dtype,
-                ),
-                PositionalEncoder(
-                    max_sequence_length=max_colors,
-                    embedding_dim=embedding_dim,
-                    device=device,
-                    dtype=dtype,
-                ),
-            ),
             *(
                 # Remark :
                 # The current transformer layer has a causal self-attention
@@ -111,8 +106,7 @@ class ColorPaletteTransformerEncoder(fl.Chain):
                     dtype=dtype,
                 )
                 for _ in range(num_layers)
-            ),
-            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+            )
         )
 
 class ColorPaletteMLPEncoder(fl.Chain):
@@ -120,7 +114,6 @@ class ColorPaletteMLPEncoder(fl.Chain):
     def __init__(
         self,
         embedding_dim: int = 768,
-        max_colors: int = 8,
         num_layers: int = 2,
         feedforward_dim: int = 20,
         layer_norm_eps: float = 1e-5,
@@ -161,7 +154,7 @@ class ColorPaletteEncoder(fl.Chain):
 
     def __init__(
         self,
-        lda: SD1Autoencoder,
+        lda: SD1Autoencoder = SD1Autoencoder(),
         embedding_dim: int = 768,
         max_colors: int = 8,
         # Remark :
@@ -172,6 +165,7 @@ class ColorPaletteEncoder(fl.Chain):
         feedforward_dim: int = 20,
         layer_norm_eps: float = 1e-5,
         mode: str = 'transformer',
+        use_lda: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -191,7 +185,6 @@ class ColorPaletteEncoder(fl.Chain):
         elif mode == 'mlp':
             encoder_body = ColorPaletteMLPEncoder(
                 embedding_dim=embedding_dim,
-                max_colors=max_colors,
                 num_layers=num_layers,
                 feedforward_dim=feedforward_dim,
                 layer_norm_eps=layer_norm_eps,
@@ -202,44 +195,27 @@ class ColorPaletteEncoder(fl.Chain):
             raise ValueError(f"Unknown mode {mode}")
         
         if use_lda:
-            encoder_head = fl.Chain(
-                fl.Lambda(self.lda_encode),
-                ColorsTokenizer(max_colors=max_colors),
-                fl.Sum(
-                    ColorEncoder(
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    PositionalEncoder(
-                        max_sequence_length=max_colors,
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                )
-            )
+            color_preprocessing = fl.Lambda(self.lda_encode)
         else: 
-            encoder_head = fl.Chain(
-                fl.Lambda(self.lda_encode),
-                ColorsTokenizer(max_colors=max_colors),
-                fl.Sum(
-                    ColorEncoder(
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    PositionalEncoder(
-                        max_sequence_length=max_colors,
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                )
-            )
+            color_preprocessing = fl.Identity()
 
         super().__init__(
-            ,
+            PalettesTokenizer(max_colors=max_colors),
+            fl.Converter(),
+            color_preprocessing,
+            fl.Sum(
+                    ColorEncoder(
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    PositionalEncoder(
+                        max_sequence_length=max_colors,
+                        embedding_dim=embedding_dim,
+                        device=device,
+                        dtype=dtype,
+                    ),
+            ),
             encoder_body,
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
@@ -262,20 +238,12 @@ class ColorPaletteEncoder(fl.Chain):
 
     def compute_color_palette_embedding(
         self,
-        x: Int[Tensor, "*batch n_colors 3"] | List[List[List[int]]],
-        negative_color_palette: None | Int[Tensor, "*batch n_colors 3"] = None,
+        x: List[List[int]],
+        negative_color_palette: List[List[int]] = [],
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
-        tensor_x = tensor(x, device=self.device, dtype=self.dtype)
-        conditional_embedding = self(tensor_x)
-        if tensor_x == negative_color_palette:
-            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
-
-        if negative_color_palette is None:
-            # a palette without any color in it
-            negative_color_palette = zeros(tensor_x.shape[0], 0, 3, dtype=self.dtype, device=self.device)
-
-        negative_embedding = self(negative_color_palette)
-        return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+        conditional_embedding = self([x])
+        negative_embedding = self([negative_color_palette])
+        return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
 
 class PaletteCrossAttention(fl.Chain):

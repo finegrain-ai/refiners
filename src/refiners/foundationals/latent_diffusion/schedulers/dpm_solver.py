@@ -24,6 +24,7 @@ class DPMSolver(Scheduler):
         final_diffusion_rate: float = 1.2e-2,
         last_step_first_order: bool = False,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
+        first_inference_step: int = 0,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
@@ -33,6 +34,7 @@ class DPMSolver(Scheduler):
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
+            first_inference_step=first_inference_step,
             device=device,
             dtype=dtype,
         )
@@ -48,6 +50,18 @@ class DPMSolver(Scheduler):
             np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps + 1).round().astype(int)[1:],
             device=self.device,
         ).flip(0)
+
+    def rebuild(
+        self: "DPMSolver",
+        num_inference_steps: int | None,
+        first_inference_step: int | None = None,
+    ) -> "DPMSolver":
+        r = super().rebuild(
+            num_inference_steps=num_inference_steps,
+            first_inference_step=first_inference_step,
+        )
+        r.last_step_first_order = self.last_step_first_order
+        return r
 
     def dpm_solver_first_order_update(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         current_timestep = self.timesteps[step]
@@ -92,14 +106,14 @@ class DPMSolver(Scheduler):
         )
         return denoised_x
 
-    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         # We pass forward to give the ability to
         # dynamically change the behavior of the solver
         # using the sharding_manager
         # TODO: change the Scheduler abstract class
-        return self.forward(x, noise, step, generator)
+        return self.forward(x, predicted_noise, step, generator)
 
-    def forward(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def forward(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
         Represents one step of the backward diffusion process that iteratively denoises the input data `x`.
 
@@ -107,13 +121,14 @@ class DPMSolver(Scheduler):
         backward Euler update, which is a numerical method commonly used to solve ordinary differential equations
         (ODEs).
         """
+        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+
         current_timestep = self.timesteps[step]
         scale_factor, noise_ratio = self.cumulative_scale_factors[current_timestep], self.noise_std[current_timestep]
-
-        estimated_denoised_data = (x - noise_ratio * noise) / scale_factor
+        estimated_denoised_data = (x - noise_ratio * predicted_noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
 
-        if step == 0 or (self.last_step_first_order and step == self.num_inference_steps - 1):
+        if step == self.first_inference_step or (self.last_step_first_order and step == self.num_inference_steps - 1):
             return self.dpm_solver_first_order_update(x=x, noise=estimated_denoised_data, step=step)
 
         return self.multistep_dpm_solver_second_order_update(x=x, step=step)
