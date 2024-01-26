@@ -44,8 +44,8 @@ class SDLoraManager:
         loras = {key: loras[key] for key in sorted(loras.keys(), key=SDLoraManager.sort_keys)}
 
         # if no key contains "unet" or "text", assume all keys are for the unet
-        if not "unet" in loras and not "text" in loras:
-            loras = {f"unet_{key}": loras[key] for key in loras.keys()}
+        if all(["unet" not in key and "text" not in key for key in loras.keys()]):
+            loras = {f"unet_{key}": value for key, value in loras.items()}
 
         self.add_loras_to_unet(loras)
         self.add_loras_to_text_encoder(loras)
