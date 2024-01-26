@@ -285,10 +285,10 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         ]
         
         if weights is not None:
-            color_palette_encoder: dict[str, Tensor] = {
+            color_palette_state_dict: dict[str, Tensor] = {
                 k.removeprefix("color_palette_encoder."): v for k, v in weights.items() if k.startswith("color_palette_encoder.")
             }
-            self._color_palette_encoder[0].load_state_dict(image_proj_state_dict)
+            self._color_palette_encoder[0].load_state_dict(color_palette_state_dict)
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: list[Tensor] = []
@@ -297,7 +297,6 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
                     if not k.startswith(prefix):
                         continue
                     cross_attention_weights.append(v)
-
                 assert len(cross_attention_weights) == 2
                 cross_attn.load_weights(*cross_attention_weights)
     @property

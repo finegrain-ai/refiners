@@ -1,17 +1,18 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "disabled" # "online", "offline", "disabled"
+mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
-name = "test-save-ckpts"
+name = "base-l4"
+
 [models]
-unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=1, train = false}
-text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", gpu_index=0, train = false}
-lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", gpu_index=0, train = false}
-color_palette_encoder = {gpu_index=1, train = true}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
+color_palette_encoder = {train = true}
 
 [adapters]
-color_palette_adapter = {checkpoint= "ckpts/dummy-44ah5rn1/step100.safetensors"}
+color_palette_adapter = {}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
@@ -25,10 +26,10 @@ num_attention_heads = 2
 embedding_dim = 10
 
 [training]
-duration = "300:step"
+duration = "2:epoch"
 seed = 0
 gpu_index = 0
-batch_size = 1
+batch_size = 4
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
@@ -59,7 +60,7 @@ caption_key = "ai_description"
 split = "train"
 
 [checkpointing]
-save_interval = "100:step"
+save_interval = "5000:step"
 use_wandb = true
 
 [test_color_palette]
@@ -68,8 +69,8 @@ use_short_prompts = false
 prompts = [
         {"text" = "a cute cat", "color_palette" = [[0,0,255]], seed=1},
         {"text" = "a cute cat", "color_palette" = [[255,0,0]], seed=1},
-#        {"text" = "a cute cat", "color_palette" = [[0,0,255], [255,255,255], [255,0,0]]},
-#        {"text" = "a cute cat", "color_palette" = [[255,0,0], [255,255,255], [0,0,255]]}
+        {"text" = "a cute cat", "color_palette" = [[0,0,255], [255,255,255], [255,0,0]]},
+        {"text" = "a cute cat", "color_palette" = [[255,0,0], [255,255,255], [0,0,255]]}
 ]
-num_palette_sample = 1 # 8
+num_palette_sample = 8
 condition_scale = 7.5
