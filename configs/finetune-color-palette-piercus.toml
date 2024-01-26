@@ -6,10 +6,10 @@ project = "color-palette"
 name = "base-l4"
 
 [models]
-unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
-text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
-lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
-color_palette_encoder = {train = true}
+unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false, gpu_index = 0}
+text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false, gpu_index = 0}
+lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false, gpu_index = 0}
+color_palette_encoder = {train = true, gpu_index = 0}
 
 [adapters]
 color_palette_adapter = {}
