@@ -16,7 +16,7 @@ color_palette_adapter = {}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
-offset_noise = 0.1
+offset_noise = 0.2
 
 [color_palette]
 max_colors = 8
@@ -29,11 +29,11 @@ embedding_dim = 10
 duration = "2:epoch"
 seed = 0
 gpu_index = 0
-batch_size = 4
+batch_size = 12
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
-evaluation_interval = "1000:step"
+evaluation_interval = "250:step"
 evaluation_seed = 1
 
 [optimizer]
@@ -46,7 +46,7 @@ weight_decay = 1e-2
 [scheduler]
 scheduler_type = "ConstantLR"
 update_interval = "1:step"
-warmup = "500:step"
+warmup = "250:step"
 
 [dropout]
 dropout_probability = 0.2
@@ -60,7 +60,7 @@ caption_key = "ai_description"
 split = "train"
 
 [checkpointing]
-save_interval = "5000:step"
+save_interval = "1:epoch"
 use_wandb = true
 
 [test_color_palette]
