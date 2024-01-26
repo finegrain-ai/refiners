@@ -4,7 +4,7 @@ from functools import lru_cache
 from itertools import islice
 from pathlib import Path
 
-from torch import Tensor, tensor
+from torch import Tensor, tensor, cat
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion import pad
@@ -51,8 +51,17 @@ class CLIPTokenizer(fl.Module):
         self.end_of_text_token_id: int = end_of_text_token_id
         self.pad_token_id: int = pad_token_id
 
-    def forward(self, text: str) -> Tensor:
-        tokens = self.encode(text=text, max_length=self.sequence_length).unsqueeze(dim=0)
+    def forward(self, text: str | list[str]) -> Tensor:
+        
+        # if isinstance(text, str):
+        tokens = self.encode(text=text).unsqueeze(dim=0)
+        # else:
+        #     assert isinstance(text, list), f"Expected type `str` or `list[str]`, got {type(text)}"
+        #     inputs = [self.encode(text=txt).unsqueeze(dim=0) for txt in text]
+        #     print(f" shapes : {[inp.shape for inp in inputs]}")
+        #     tokens = cat(inputs)
+        #     print(f"token shape : {tokens.shape}")
+        
         assert (
             tokens.shape[1] <= self.sequence_length
         ), f"Text is too long: tokens.shape[1] > sequence_length: {tokens.shape[1]} > {self.sequence_length}"

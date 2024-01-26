@@ -101,3 +101,8 @@ def test_encoder(
     # numerical differences depending on the backend.
     # Also we use FP16 weights.
     assert (our_embeddings - ref_embeddings).abs().max() < 0.01
+    
+    # batched inputs
+    # our_tokens = tokenizer([prompt, prompt])
+    # assert our_tokens.shape[0] == 2
+
