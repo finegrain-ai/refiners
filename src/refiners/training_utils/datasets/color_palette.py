@@ -83,7 +83,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
         item = self.hf_dataset[index]
-        palette: ColorPalette = item[f"palette_{palette_index}"]
+        palette: ColorPalette = item[f"palettes"][str(palette_index)]
         return palette
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
