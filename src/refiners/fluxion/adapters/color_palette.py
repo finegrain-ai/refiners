@@ -190,6 +190,7 @@ class ColorPaletteEncoder(fl.Chain):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
+        self.embedding_dim = embedding_dim
         if num_layers == 0:
             encoder_body = fl.Identity()
         elif mode == 'transformer':

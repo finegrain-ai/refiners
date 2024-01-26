@@ -71,7 +71,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         
         return [
             ColorPaletteDatasetItem(
-                color_palette=self.get_color_palette(index),
+                color_palette=self.process_color_palette(item),
                 text=caption_processed,
                 image=image,
                 conditional_flag=conditional_flag

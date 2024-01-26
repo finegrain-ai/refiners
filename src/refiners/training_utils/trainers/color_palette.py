@@ -136,8 +136,9 @@ class ColorPaletteLatentDiffusionTrainer(
         image_tensor = cat([image_to_tensor(item.image, device=self.lda.device, dtype=self.lda.dtype) for item in batch])
         
         latents = self.lda.encode(image_tensor)
+        color_palettes = [item.color_palette for item in batch]
         color_palette_embeddings = self.color_palette_encoder(
-            [item.color_palette for item in batch]
+            color_palettes
         )
 
         timestep = self.sample_timestep()
