@@ -1,6 +1,6 @@
 from typing import Any, List, TypeVar
 
-import torch
+from torch import cat, ones
 from jaxtyping import Float, Int
 from torch import Tensor, device as Device, dtype as DType, tensor, zeros
 from torch.nn import init, Parameter
@@ -17,21 +17,30 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 
-class ColorsTokenizer(fl.Module):
+class PalettesTokenizer(fl.Module):
     def __init__(
         self,
-        max_colors: int = 8,
+        max_colors: int = 8
     ) -> None:
         super().__init__()
         self.max_colors = max_colors
+    
+    def forward(self, palettes: List[List[List[float]]]) -> Float[Tensor, "*batch max_colors 4"]:
+        tensors = [self._forward(palette) for palette in palettes]
+        return cat(tensors, dim=0)
 
-    def forward(self, colors: Float[Tensor, "*batch colors 3"]) -> Float[Tensor, "*batch max_colors 4"]:
-        colors = self.add_channel(colors)
+    def _forward(self, palette: List[List[float]]) -> Float[Tensor, "*batch max_colors 4"]:
+        if len(palette) == 0:
+            tensor_palette = zeros(1, 0, 3)
+        else:
+            tensor_palette = tensor([palette])
+        
+        colors = self.add_channel(tensor_palette)
         colors = self.zero_right_padding(colors)
         return colors
 
     def add_channel(self, x: Float[Tensor, "*batch colors 4"]) -> Float[Tensor, "*batch colors_with_end 5"]:
-        return torch.cat((x, torch.ones(x.shape[0], x.shape[1], 1, dtype=x.dtype, device=x.device)), dim=2)
+        return cat((x, ones(x.shape[0], x.shape[1], 1)), dim=2)
 
     def zero_right_padding(
         self, x: Float[Tensor, "*batch colors_with_end embedding_dim"]
@@ -95,7 +104,10 @@ class ColorPaletteEncoder(fl.Chain):
         self.layer_norm_eps = layer_norm_eps
         self.use_quick_gelu = use_quick_gelu
         super().__init__(
-            ColorsTokenizer(max_colors=max_colors),
+            PalettesTokenizer(
+                max_colors=max_colors
+            ),
+            fl.Converter(),
             fl.Sum(
                 ColorEncoder(
                     embedding_dim=embedding_dim,
@@ -153,14 +165,14 @@ class ColorPaletteEncoder(fl.Chain):
         tensor_x = tensor(x, device=self.device, dtype=self.dtype)
         conditional_embedding = self(tensor_x)
         if tensor_x == negative_color_palette:
-            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
+            return cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
 
         if negative_color_palette is None:
             # a palette without any color in it
             negative_color_palette = zeros(tensor_x.shape[0], 0, 3, dtype=self.dtype, device=self.device)
 
         negative_embedding = self(negative_color_palette)
-        return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+        return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
 
 
 class PaletteCrossAttention(fl.Chain):
