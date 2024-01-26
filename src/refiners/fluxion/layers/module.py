@@ -94,6 +94,21 @@ class Module(TorchModule):
         """
         return False
 
+    def get_path(self, parent: "Chain | None" = None, top: "Module | None" = None) -> str:
+        """Helper for debugging purpose only.
+
+        Returns the path of the module in the chain as a string.
+
+        If `top` is set then the path will be relative to `top`,
+        otherwise it will be relative to the root of the chain.
+        """
+        if (parent is None) or (self == top):
+            return self.__class__.__name__
+        for k, m in parent._modules.items():  # type: ignore
+            if m is self:
+                return parent.get_path(parent=parent.parent, top=top) + "." + k
+        raise ValueError(f"{self} not found in {parent}")
+
 
 class ContextModule(Module):
     # we store parent into a one element list to avoid pytorch thinking it's a submodule
@@ -153,6 +168,9 @@ class ContextModule(Module):
         ContextModule.__init__(self=clone)
 
         return clone
+
+    def get_path(self, parent: "Chain | None" = None, top: "Module | None" = None) -> str:
+        return super().get_path(parent=parent or self.parent, top=top)
 
 
 class WeightedModule(Module):
