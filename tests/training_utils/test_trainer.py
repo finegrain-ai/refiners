@@ -6,6 +6,7 @@ from warnings import warn
 import pytest
 import torch
 from torch import Tensor, nn
+from torch.optim import SGD
 from torch.utils.data import Dataset
 
 from refiners.fluxion import layers as fl
@@ -14,6 +15,7 @@ from refiners.training_utils.config import BaseConfig, TimeUnit
 from refiners.training_utils.trainers.trainer import (
     Trainer,
     TrainingClock,
+    WarmupScheduler,
     count_learnable_parameters,
     human_readable_number,
 )
@@ -181,3 +183,24 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     assert clock.step == config.training.duration["number"] * clock.num_batches_per_epoch
 
     assert mock_trainer.step_counter == mock_trainer.clock.step
+
+
+@pytest.fixture
+def warmup_scheduler():
+    optimizer = SGD([nn.Parameter(torch.randn(2, 2), requires_grad=True)], lr=0.1)
+    scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, 1)
+    return WarmupScheduler(optimizer, scheduler, warmup_scheduler_steps=100)
+
+
+def test_initial_lr(warmup_scheduler: WarmupScheduler) -> None:
+    optimizer = warmup_scheduler.optimizer
+    for group in optimizer.param_groups:
+        assert group["lr"] == 1e-3
+
+
+def test_warmup_lr(warmup_scheduler: WarmupScheduler) -> None:
+    for _ in range(102):
+        warmup_scheduler.step()
+    optimizer = warmup_scheduler.optimizer
+    for group in optimizer.param_groups:
+        assert group["lr"] == 0.1

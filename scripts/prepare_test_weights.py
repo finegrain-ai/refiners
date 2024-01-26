@@ -238,6 +238,11 @@ def download_loras():
         "https://huggingface.co/radames/sdxl-DPO-LoRA/resolve/main/pytorch_lora_weights.safetensors", dest_folder
     )
 
+    dest_folder = os.path.join(test_weights_dir, "loras", "sliders")
+    download_file("https://sliders.baulab.info/weights/xl_sliders/age.pt", dest_folder)
+    download_file("https://sliders.baulab.info/weights/xl_sliders/cartoon_style.pt", dest_folder)
+    download_file("https://sliders.baulab.info/weights/xl_sliders/eyesize.pt", dest_folder)
+
 
 def download_preprocessors():
     dest_folder = os.path.join(test_weights_dir, "carolineec", "informativedrawings")
@@ -576,7 +581,7 @@ def convert_sam():
         "convert_segment_anything.py",
         "tests/weights/sam_vit_h_4b8939.pth",
         "tests/weights/segment-anything-h.safetensors",
-        expected_hash="6b843800",
+        expected_hash="3b73b2fd",
     )
 
 

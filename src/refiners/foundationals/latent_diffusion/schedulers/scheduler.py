@@ -33,6 +33,7 @@ class Scheduler(ABC):
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
+        first_inference_step: int = 0,
         device: Device | str = "cpu",
         dtype: DType = float32,
     ):
@@ -43,6 +44,7 @@ class Scheduler(ABC):
         self.initial_diffusion_rate = initial_diffusion_rate
         self.final_diffusion_rate = final_diffusion_rate
         self.noise_schedule = noise_schedule
+        self.first_inference_step = first_inference_step
         self.scale_factors = self.sample_noise_schedule()
         self.cumulative_scale_factors = sqrt(self.scale_factors.cumprod(dim=0))
         self.noise_std = sqrt(1.0 - self.scale_factors.cumprod(dim=0))
@@ -50,9 +52,9 @@ class Scheduler(ABC):
         self.timesteps = self._generate_timesteps()
 
     @abstractmethod
-    def __call__(self, x: Tensor, noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
         """
-        Applies a step of the diffusion process to the input tensor `x` using the provided `noise` and `timestep`.
+        Applies a step of the diffusion process to the input tensor `x` using the provided `predicted_noise` and `timestep`.
 
         This method should be overridden by subclasses to implement the specific diffusion process.
         """
@@ -68,8 +70,26 @@ class Scheduler(ABC):
         ...
 
     @property
-    def steps(self) -> list[int]:
+    def all_steps(self) -> list[int]:
         return list(range(self.num_inference_steps))
+
+    @property
+    def inference_steps(self) -> list[int]:
+        return self.all_steps[self.first_inference_step :]
+
+    def rebuild(self: T, num_inference_steps: int | None, first_inference_step: int | None = None) -> T:
+        num_inference_steps = self.num_inference_steps if num_inference_steps is None else num_inference_steps
+        first_inference_step = self.first_inference_step if first_inference_step is None else first_inference_step
+        return self.__class__(
+            num_inference_steps=num_inference_steps,
+            num_train_timesteps=self.num_train_timesteps,
+            initial_diffusion_rate=self.initial_diffusion_rate,
+            final_diffusion_rate=self.final_diffusion_rate,
+            noise_schedule=self.noise_schedule,
+            first_inference_step=first_inference_step,
+            device=self.device,
+            dtype=self.dtype,
+        )
 
     def scale_model_input(self, x: Tensor, step: int) -> Tensor:
         """

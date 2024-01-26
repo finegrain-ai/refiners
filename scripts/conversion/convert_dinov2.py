@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.utils import load_tensors, save_to_safetensors
 
 
 def convert_dinov2_facebook(weights: dict[str, torch.Tensor]) -> None:
@@ -148,7 +148,7 @@ def main() -> None:
     parser.add_argument("--half", action="store_true", dest="half")
     args = parser.parse_args()
 
-    weights = torch.load(args.source_path)  # type: ignore
+    weights = load_tensors(args.source_path)
     convert_dinov2_facebook(weights)
     if args.half:
         weights = {key: value.half() for key, value in weights.items()}

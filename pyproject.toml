@@ -97,5 +97,5 @@ black = true
 [tool.pyright]
 include = ["src/refiners", "tests", "scripts"]
 strict = ["*"]
-exclude = ["**/__pycache__"]
+exclude = ["**/__pycache__", "tests/weights"]
 reportMissingTypeStubs = "warning"

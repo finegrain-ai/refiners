@@ -13,6 +13,7 @@ class EulerScheduler(Scheduler):
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
+        first_inference_step: int = 0,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
@@ -24,6 +25,7 @@ class EulerScheduler(Scheduler):
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
+            first_inference_step=first_inference_step,
             device=device,
             dtype=dtype,
         )
@@ -56,7 +58,7 @@ class EulerScheduler(Scheduler):
     def __call__(
         self,
         x: Tensor,
-        noise: Tensor,
+        predicted_noise: Tensor,
         step: int,
         generator: Generator | None = None,
         s_churn: float = 0.0,
@@ -64,17 +66,21 @@ class EulerScheduler(Scheduler):
         s_tmax: float = float("inf"),
         s_noise: float = 1.0,
     ) -> Tensor:
+        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+
         sigma = self.sigmas[step]
 
         gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0
 
-        alt_noise = torch.randn(noise.shape, generator=generator, device=noise.device, dtype=noise.dtype)
-        eps = alt_noise * s_noise
+        noise = torch.randn(
+            predicted_noise.shape, generator=generator, device=predicted_noise.device, dtype=predicted_noise.dtype
+        )
+        eps = noise * s_noise
         sigma_hat = sigma * (gamma + 1)
         if gamma > 0:
             x = x + eps * (sigma_hat**2 - sigma**2) ** 0.5
 
-        predicted_x = x - sigma_hat * noise
+        predicted_x = x - sigma_hat * predicted_noise
 
         # 1st order Euler
         derivative = (x - predicted_x) / sigma_hat

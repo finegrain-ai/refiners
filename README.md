@@ -117,10 +117,9 @@ t2i_adapter = SDXLT2IAdapter(
 
 # Tune parameters
 seed = 9752
-first_step = 1
 ip_adapter.set_scale(0.85)
 t2i_adapter.set_scale(0.8)
-sdxl.set_num_inference_steps(50)
+sdxl.set_inference_steps(50, first_step=1)
 sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
 with no_grad():
@@ -136,11 +135,11 @@ with no_grad():
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
     manual_seed(seed=seed)
-    x = sdxl.init_latents(size=(1024, 1024), init_image=init_image, first_step=first_step).to(
+    x = sdxl.init_latents(size=(1024, 1024), init_image=init_image).to(
         device=sdxl.device, dtype=sdxl.dtype
     )
 
-    for step in sdxl.steps[first_step:]:
+    for step in sdxl.steps:
         x = sdxl(
             x,
             step=step,

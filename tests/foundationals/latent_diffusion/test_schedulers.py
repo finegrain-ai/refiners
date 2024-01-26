@@ -35,11 +35,11 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
     refiners_scheduler = DPMSolver(num_inference_steps=n_steps, last_step_first_order=last_step_first_order)
 
     sample = randn(1, 3, 32, 32)
-    noise = randn(1, 3, 32, 32)
+    predicted_noise = randn(1, 3, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
+        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
@@ -60,11 +60,11 @@ def test_ddim_diffusers():
     refiners_scheduler = DDIM(num_inference_steps=30)
 
     sample = randn(1, 4, 32, 32)
-    noise = randn(1, 4, 32, 32)
+    predicted_noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
+        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
@@ -86,15 +86,15 @@ def test_euler_diffusers():
     refiners_scheduler = EulerScheduler(num_inference_steps=30)
 
     sample = randn(1, 4, 32, 32)
-    noise = randn(1, 4, 32, 32)
+    predicted_noise = randn(1, 4, 32, 32)
 
     ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
     assert isinstance(ref_init_noise_sigma, Tensor)
     assert isclose(ref_init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, noise=noise, step=step)
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
+        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
@@ -133,5 +133,5 @@ def test_scheduler_device(test_device: Device):
     scheduler = DDIM(num_inference_steps=30, device=test_device)
     x = randn(1, 4, 32, 32, device=test_device)
     noise = randn(1, 4, 32, 32, device=test_device)
-    noised = scheduler.add_noise(x, noise, scheduler.steps[0])
+    noised = scheduler.add_noise(x, noise, scheduler.first_inference_step)
     assert noised.device == test_device
