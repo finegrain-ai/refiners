@@ -270,6 +270,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
         scale: float = 1.0,
         device: Device | str | None = None,
         dtype: DType | None = None,
+        weights: dict[str, Tensor] | None = None,
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
@@ -282,7 +283,23 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
             )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
+        
+        if weights is not None:
+            color_palette_encoder: dict[str, Tensor] = {
+                k.removeprefix("color_palette_encoder."): v for k, v in weights.items() if k.startswith("color_palette_encoder.")
+            }
+            self._color_palette_encoder[0].load_state_dict(image_proj_state_dict)
 
+            for i, cross_attn in enumerate(self.sub_adapters):
+                cross_attention_weights: list[Tensor] = []
+                for k, v in weights.items():
+                    prefix = f"color_palette_adapter.{i:03d}."
+                    if not k.startswith(prefix):
+                        continue
+                    cross_attention_weights.append(v)
+
+                assert len(cross_attention_weights) == 2
+                cross_attn.load_weights(*cross_attention_weights)
     @property
     def weights(self) -> List[Tensor]:
         weights: List[Tensor] = []

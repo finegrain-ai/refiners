@@ -1,5 +1,6 @@
 from functools import cached_property
 from typing import Any, List, TypedDict
+from refiners.fluxion.utils import load_from_safetensors
 
 from loguru import logger
 from PIL import Image
@@ -13,6 +14,7 @@ from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
+    SD1UNet
 )
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
@@ -26,6 +28,7 @@ from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.datasets.color_palette import ColorPalette, ColorPaletteDataset, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.callback import GradientNormLayerLogging
 
+from refiners.training_utils.trainers.trainer import scoped_seed
 
 class ColorPaletteConfig(BaseModel):
     feedforward_dim: int = 3072
@@ -76,7 +79,25 @@ class ColorPaletteLatentDiffusionTrainer(
 
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
-        adapter = SD1ColorPaletteAdapter(target=self.unet, color_palette_encoder=self.color_palette_encoder)
+        
+        weights : dict[str, Tensor] | None = None
+        scale = 1.0
+        
+        if "color_palette_adapter" in self.config.adapters:
+            if checkpoint := self.config.adapters["color_palette_adapter"].checkpoint:
+                weights = load_from_safetensors(checkpoint)
+            scale = self.config.adapters["color_palette_adapter"].scale
+        
+        adapter : SD1ColorPaletteAdapter[SD1UNet] = SD1ColorPaletteAdapter(
+            target=self.unet,
+            weights=weights,
+            scale=scale,
+            color_palette_encoder=self.color_palette_encoder
+        )
+        
+        if weights is None:
+            adapter.zero_init()
+        
         return adapter
 
     def __init__(
@@ -170,11 +191,13 @@ class ColorPaletteLatentDiffusionTrainer(
 
         return ImageAndPalette(image=canvas_image, palette=prompt.color_palette)
 
+    @scoped_seed(42)
     def compute_edge_case_evaluation(
         self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int
     ) -> List[ImageAndPalette]:
         images: dict[str, WandbLoggable] = {}
         images_and_palettes: List[ImageAndPalette] = []
+        
         for prompt in prompts:
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : {str(prompt.color_palette)}"
             image_and_palette = self.compute_prompt_evaluation(prompt, num_images_per_prompt)
@@ -236,9 +259,7 @@ class ColorPaletteLatentDiffusionTrainer(
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = trainer.color_palette_adapter
-        adapter.zero_init()
         adapter.inject()
-
 
 class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_checkpoint_save(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
@@ -249,13 +270,17 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
             raise ValueError("The model must have a parent.")
         adapter = model.parent
 
-        tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
+        tensors = {f"color_palette_adapter.{i:03d}": w for i, w in enumerate(adapter.weights)}
         encoder = trainer.color_palette_encoder
 
         state_dict = encoder.state_dict()
         for i in state_dict:
             tensors.update({f"color_palette_encoder.{i}": state_dict[i]})
-
+        
+        path = trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors"
+        logger.info(
+            f"Saving {len(tensors)} tensors to {path}"
+        )
         save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors", tensors=tensors
+            path=path, tensors=tensors
         )

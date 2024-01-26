@@ -60,3 +60,7 @@ class WandbLogger:
     @property
     def run_name(self) -> str:
         return self.wandb_run.name or ""  # type: ignore
+
+    @property
+    def dir(self) -> str:
+        return self.wandb_run.dir # type: ignore

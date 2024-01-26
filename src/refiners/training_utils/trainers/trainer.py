@@ -482,6 +482,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             )
             self.checkpoints_save_folder.mkdir(parents=True, exist_ok=False)
             logger.info(f"Checkpointing enabled: {self.checkpoints_save_folder}")
+        if self.config.checkpointing.use_wandb:            
+            self.checkpoints_save_folder = self.wandb.dir
+            logger.info(f"Checkpointing enabled: {self.checkpoints_save_folder}")            
         else:
             self.checkpoints_save_folder = None
             logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")

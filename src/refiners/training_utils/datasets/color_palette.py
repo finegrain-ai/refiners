@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 import numpy as np
 from pydantic import BaseModel
-from torch import Tensor, cat, tensor
+from torch import Tensor, cat, tensor, empty
 
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder
@@ -66,7 +66,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         (processed_caption, conditionnal_flag) = self.process_caption(caption=caption)
 
         if not conditionnal_flag:
-            return (self.text_encoder(caption), self.color_palette_encoder([]))
+            return (self.text_encoder(caption), self.color_palette_encoder(empty((1,0,3), dtype=self.color_palette_encoder.dtype)))
 
         clip_text_embedding = self.text_encoder(processed_caption)
         color_palette_embedding = self.get_processed_palette(index)
@@ -74,7 +74,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
     def get_processed_palette(self, index: int) -> Tensor:
  
-        return self.color_palette_encoder(tensor(self.get_color_palette(index)))
+        return self.color_palette_encoder(tensor([self.get_color_palette(index)], dtype=self.color_palette_encoder.dtype))
     
     def get_color_palette(self, index: int) -> ColorPalette:
         choices = range(1, 9)

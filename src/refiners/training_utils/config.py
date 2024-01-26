@@ -180,6 +180,9 @@ class ModelConfig(BaseModel):
     gpu_index: int | None = None
     dtype: str | None = None
 
+class AdapterConfig(BaseModel):
+    checkpoint: Path | None = None
+    scale: float = 1.0
 
 class GyroDropoutConfig(BaseModel):
     total_subnetworks: int = 512
@@ -213,15 +216,14 @@ class WandbConfig(BaseModel):
 
 class CheckpointingConfig(BaseModel):
     save_folder: Path | None = None
+    use_wandb: bool = False
     save_interval: TimeValue = {"number": 1, "unit": TimeUnit.EPOCH}
 
     @validator("save_interval", pre=True)
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
-
 T = TypeVar("T", bound="BaseConfig")
-
 
 class BaseConfig(BaseModel):
     models: dict[str, ModelConfig]
@@ -231,6 +233,7 @@ class BaseConfig(BaseModel):
     scheduler: SchedulerConfig
     dropout: DropoutConfig
     checkpointing: CheckpointingConfig
+    adapters: dict[str, AdapterConfig] = {}
 
     @classmethod
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:
