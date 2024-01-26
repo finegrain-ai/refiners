@@ -17,12 +17,22 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
-
 class PalettesTokenizer(fl.Module):
+    _lda: list[SD1Autoencoder]
+
+    @property
+    def lda(self):
+        return self._lda[0]
+
     def __init__(
         self,
-        max_colors: int = 8
+        max_colors: int,
+        lda: SD1Autoencoder,
+        use_lda: bool = False
     ) -> None:
+        
+        self._lda = [lda]
+        self.use_lda = use_lda
         super().__init__()
         self.max_colors = max_colors
     
@@ -35,6 +45,9 @@ class PalettesTokenizer(fl.Module):
             tensor_palette = zeros(1, 0, 3)
         else:
             tensor_palette = tensor([palette])
+        
+        if self.use_lda:
+            tensor_palette = self.lda_encode(tensor_palette)
         
         colors = self.add_channel(tensor_palette)
         colors = self.zero_right_padding(colors)
@@ -53,23 +66,34 @@ class PalettesTokenizer(fl.Module):
         result = pad(x, (0, 0, 0, padding_width))
         return result
 
+    def lda_encode(self, x: Float[Tensor, "*batch num_colors 3"]) -> Float[Tensor, "*batch num_colors 4"]:
+        device = x.device
+        dtype = x.dtype
+        batch_size = x.shape[0]
+        num_colors = x.shape[1]
+        if num_colors == 0:
+            return x.reshape(batch_size, 0, 4)
+
+        x = x.reshape(batch_size * num_colors, 3, 1, 1)
+        x = x.repeat(1, 1, 8, 8).to(self.lda.device, self.lda.dtype)
+
+        out = self.lda.encode(x).to(device, dtype)
+
+        out = out.reshape(batch_size, num_colors, 4)
+        return out
 
 class ColorEncoder(fl.Chain):
     def __init__(
         self,
         embedding_dim: int,
+        use_lda : bool = False,
         device: Device | str | None = None,
         eps: float = 1e-5,
         dtype: DType | None = None,
     ) -> None:
+        in_features = 5 if use_lda else 4
         super().__init__(
-            fl.Linear(in_features=4, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
-            fl.LayerNorm(
-                normalized_shape=embedding_dim,
-                eps=eps,
-                device=device,
-                dtype=dtype,
-            ),
+            fl.Linear(in_features=in_features, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
         )
 
 class ColorPaletteTransformerEncoder(fl.Chain):
@@ -125,6 +149,7 @@ class ColorPaletteMLPEncoder(fl.Chain):
         self.num_layers = num_layers
         self.feedforward_dim = feedforward_dim
         self.layer_norm_eps = layer_norm_eps
+        
         super().__init__(
             *(
                 fl.Chain(
@@ -146,11 +171,7 @@ class ColorPaletteMLPEncoder(fl.Chain):
         )
 
 class ColorPaletteEncoder(fl.Chain):
-    _lda: list[SD1Autoencoder]
-
-    @property
-    def lda(self):
-        return self._lda[0]
+ 
 
     def __init__(
         self,
@@ -169,9 +190,9 @@ class ColorPaletteEncoder(fl.Chain):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
-        self._lda = [lda]
-        
-        if mode == 'transformer':
+        if num_layers == 0:
+            encoder_body = fl.Identity()
+        elif mode == 'transformer':
             encoder_body = ColorPaletteTransformerEncoder(
                 embedding_dim=embedding_dim,
                 max_colors=max_colors,
@@ -193,20 +214,19 @@ class ColorPaletteEncoder(fl.Chain):
             )
         else:
             raise ValueError(f"Unknown mode {mode}")
-        
-        if use_lda:
-            color_preprocessing = fl.Lambda(self.lda_encode)
-        else: 
-            color_preprocessing = fl.Identity()
 
         super().__init__(
-            PalettesTokenizer(max_colors=max_colors),
+            PalettesTokenizer(
+                max_colors=max_colors,
+                lda=lda,
+                use_lda=use_lda,
+            ),
             fl.Converter(),
-            color_preprocessing,
             fl.Sum(
                     ColorEncoder(
                         embedding_dim=embedding_dim,
                         device=device,
+                        use_lda=use_lda,
                         dtype=dtype,
                     ),
                     PositionalEncoder(
@@ -219,23 +239,7 @@ class ColorPaletteEncoder(fl.Chain):
             encoder_body,
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
-
-    def lda_encode(self, x: Float[Tensor, "*batch num_colors 3"]) -> Float[Tensor, "*batch num_colors 4"]:
-        device = x.device
-        dtype = x.dtype
-        batch_size = x.shape[0]
-        num_colors = x.shape[1]
-        if num_colors == 0:
-            return x.reshape(batch_size, 0, 4)
-
-        x = x.reshape(batch_size * num_colors, 3, 1, 1)
-        x = x.repeat(1, 1, 8, 8).to(self.lda.device, self.lda.dtype)
-
-        out = self.lda.encode(x).to(device, dtype)
-
-        out = out.reshape(batch_size, num_colors, 4)
-        return out
-
+    
     def compute_color_palette_embedding(
         self,
         x: List[List[int]],

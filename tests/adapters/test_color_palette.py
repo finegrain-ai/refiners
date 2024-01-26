@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 
 def test_colors_tokenizer() -> None:
     max_colors = 10
-    tokenizer = PalettesTokenizer(max_colors=max_colors)
+    tokenizer = PalettesTokenizer(max_colors=max_colors, lda=SD1Autoencoder())
 
     batch_size = 5
 
