@@ -39,6 +39,7 @@ class ColorPaletteConfig(BaseModel):
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
     max_colors: int
+    mode : str = "transformer"
     without_caption_probability: float = 0.17
 
 class ColorPalettePromptConfig(BaseModel):
@@ -74,6 +75,7 @@ class ColorPaletteLatentDiffusionTrainer(
             max_colors=self.config.color_palette.max_colors,
             embedding_dim=self.config.color_palette.embedding_dim,
             num_layers=self.config.color_palette.num_layers,
+            mode=self.config.color_palette.mode,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
             device=self.device,
@@ -168,7 +170,11 @@ class ColorPaletteLatentDiffusionTrainer(
         return self.compute_prompt_evaluation(prompt, num_images_per_prompt, img_size=img_size)
         
     def compute_prompt_evaluation(
-        self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512
+        self, 
+        prompt: ColorPalettePromptConfig, 
+        num_images_per_prompt: int, 
+        img_size: int = 512,
+        cfg_clip_text_embedding: Tensor | None = None
     ) -> ImageAndPalette:
         sd = self.sd
         palette_img_size = img_size // self.config.color_palette.max_colors
@@ -180,8 +186,11 @@ class ColorPaletteLatentDiffusionTrainer(
                 f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt.text} and palette {prompt.color_palette}"
             )
             x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
-
-            cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
+            
+            if cfg_clip_text_embedding is None:
+                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
+            
+            
             cfg_color_palette_embedding = self.color_palette_encoder.compute_color_palette_embedding(
                 prompt.color_palette
             )
