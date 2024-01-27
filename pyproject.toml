@@ -59,6 +59,7 @@ dev-dependencies = [
     "docformatter>=1.7.5",
     "pytest>=7.4.2",
     "mkdocs-material>=9.5.3",
+    "coverage>=7.4.1",
 ]
 
 
