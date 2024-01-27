@@ -81,7 +81,7 @@ line-length = 120
 [tool.ruff]
 src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
 select = [
-  "I", # isort
+    "I", # isort
 ]
 ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
