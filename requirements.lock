@@ -5,6 +5,7 @@
 #   pre: false
 #   features: []
 #   all-features: true
+#   with-sources: false
 
 -e file:.
 aiohttp==3.9.1
