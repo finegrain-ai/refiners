@@ -286,7 +286,7 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
         for i in state_dict:
             tensors.update({f"color_palette_encoder.{i}": state_dict[i]})
         
-        path = trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors"
+        path = f"{trainer.ensure_checkpoints_save_folder}/step{trainer.clock.step}.safetensors"
         logger.info(
             f"Saving {len(tensors)} tensors to {path}"
         )

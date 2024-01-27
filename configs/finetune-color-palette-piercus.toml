@@ -27,7 +27,7 @@ num_attention_heads = 2
 embedding_dim = 10
 
 [training]
-duration = "2:epoch"
+duration = "5:epoch"
 seed = 0
 gpu_index = 0
 batch_size = 10

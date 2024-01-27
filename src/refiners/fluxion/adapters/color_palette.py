@@ -94,6 +94,7 @@ class ColorEncoder(fl.Chain):
         in_features = 5 if use_lda else 4
         super().__init__(
             fl.Linear(in_features=in_features, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=eps, device=device, dtype=dtype),
         )
 
 class ColorPaletteTransformerEncoder(fl.Chain):
