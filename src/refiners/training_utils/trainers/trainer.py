@@ -566,6 +566,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 self._call_callbacks(event_name="on_batch_begin")
                 self.step(batch=batch)
                 self._call_callbacks(event_name="on_batch_end")
+            else:
+                break
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
