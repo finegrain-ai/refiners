@@ -1,5 +1,5 @@
 from PIL import Image
-from torch import Tensor, device as Device, dtype as DType
+from torch import Tensor, device as Device, dtype as DType, cat
 
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (
@@ -211,11 +211,25 @@ class LatentDiffusionAutoencoder(Chain):
         return x
 
     def encode_image(self, image: Image.Image) -> Tensor:
-        x = image_to_tensor(image, device=self.device, dtype=self.dtype)
+        return self.encode_images([image])
+    
+    def encode_images(self, images: list[Image.Image]) -> Tensor:
+        x = cat([image_to_tensor(image, device=self.device, dtype=self.dtype) for image in images], dim=0)
         x = 2 * x - 1
         return self.encode(x)
-
+    
     def decode_latents(self, x: Tensor) -> Image.Image:
+        # For retro-compatibilty
+        return self.decode_image(x)
+    
+    def decode_image(self, x: Tensor) -> Image.Image:
+        if x.shape[0] != 1:
+            raise ValueError(f"Expected batch size of 1, got {x.shape[0]}")
+        
+        return self.decode_images(x)[0]
+        
+    def decode_images(self, x: Tensor) -> list[Image.Image]:
         x = self.decode(x)
         x = (x + 1) / 2
-        return tensor_to_image(x)
+        return [tensor_to_image(t) for t in x.chunk(x.shape[0])]
+        

@@ -54,12 +54,12 @@ class CLIPTokenizer(fl.Module):
     def forward(self, text: str | list[str]) -> Tensor:
         
         if isinstance(text, str):
-            return self._forward(text)
+            return self.tokenize_str(text)
         else:
             assert isinstance(text, list), f"Expected type `str` or `list[str]`, got {type(text)}"
-            return cat([self._forward(txt) for txt in text])
+            return cat([self.tokenize_str(txt) for txt in text])
         
-    def _forward(self, text: str | list[str]) -> Tensor:
+    def tokenize_str(self, text: str) -> Tensor:
         tokens = self.encode(text=text, max_length=self.sequence_length).unsqueeze(dim=0)
         
         assert (
