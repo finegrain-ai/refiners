@@ -68,3 +68,15 @@ You can enforce running tests on CPU. Tests that require a GPU will be skipped.
 ```bash
 REFINERS_TEST_DEVICE=cpu rye run pytest
 ```
+
+You can collect [code coverage](https://github.com/nedbat/coveragepy) data while running tests with, e.g.:
+
+```bash
+rye run test-cov
+```
+
+Then, browse the corresponding HTML report with:
+
+```bash
+rye run serve-cov-report
+```

@@ -69,6 +69,11 @@ allow-direct-references = true
 [tool.rye.scripts]
 lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
+test-cov = "coverage run -m pytest"
+# Work around for "Couldn't parse" errors due to e.g. opencv-python:
+# https://github.com/nedbat/coveragepy/issues/1653
+build-html-cov = { cmd = "coverage html", env = { PYTHONWARNINGS = "ignore:Couldn't parse::coverage.report_core" } }
+serve-cov-report = { chain = ["build-html-cov", "python -m http.server 8080 -b 127.0.0.1 -d htmlcov"]}
 
 [tool.black]
 line-length = 120
@@ -99,3 +104,10 @@ include = ["src/refiners", "tests", "scripts"]
 strict = ["*"]
 exclude = ["**/__pycache__", "tests/weights"]
 reportMissingTypeStubs = "warning"
+
+[tool.coverage.run]
+branch = true
+
+# Also apply to HTML output, where appropriate
+[tool.coverage.report]
+ignore_errors = true # see `build-html-cov` for details
