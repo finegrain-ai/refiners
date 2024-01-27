@@ -49,3 +49,11 @@ def test_encode_decode(encoder: LatentDiffusionAutoencoder, sample_image: Image.
     assert max(iter(decoded.getdata(band=1))) < 255  # type: ignore
 
     ensure_similar_images(sample_image, decoded, min_psnr=20, min_ssim=0.9)
+    
+    encoded = encoder.encode_images([sample_image, sample_image])
+    images = encoder.decode_images(encoded)
+    assert isinstance(images, list)
+    assert len(images) == 2
+    ensure_similar_images(sample_image, images[1], min_psnr=20, min_ssim=0.9)
+
+

@@ -83,7 +83,7 @@ class MultiDiffusion(Generic[T, D], ABC):
     def dtype(self) -> DType:
         return self.ldm.dtype
 
-    def decode_latents(self, x: Tensor) -> Image.Image:
+    def decode_latents(self, x: Tensor) -> Image.Image | list[Image.Image]:
         return self.ldm.lda.decode_latents(x=x)
 
     @staticmethod
