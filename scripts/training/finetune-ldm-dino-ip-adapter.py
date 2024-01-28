@@ -31,7 +31,7 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
     filter_image,
 )
-from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.trainer import Trainer, ConfigType
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
 from refiners.fluxion.utils import manual_seed
@@ -492,8 +492,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((LoadAdapter(), SaveAdapter()))
+        self.callbacks.extend((LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
 
+class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
+    """Callback to compute gradient norm"""
+    def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        if trainer.clock.is_evaluation_step:
+            for name, param in trainer.adapter.named_parameters():
+                if param.grad is not None:
+                    grads = param.grad.detach().data
+                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
+                    trainer.log(data={"grad_norm/" + name: grad_norm})
+        return super().on_backward_end(trainer)
 
 class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""

@@ -9,7 +9,7 @@ project = "finetune-ldm-ip-adapter"
 unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
 text_encoder = { checkpoint = "tests/weights/clip_text.safetensors", train = false }
 lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
-adapter = { train = true }
+adapter = { checkpoint = "tests/weights/ip-adapter-plus_sd15.safetensors", train = true }
 
 [ldm]
 offset_noise = 0.0
