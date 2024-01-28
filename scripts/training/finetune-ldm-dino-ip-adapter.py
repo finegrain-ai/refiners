@@ -14,6 +14,7 @@ from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
+from refiners.foundationals.dinov2.vit import ViT
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -347,7 +348,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
         )
-        ip_adapter.image_encoder.load_from_safetensors(self.config.adapter.image_encoder_path)
+        ip_adapter.image_encoder = ViT().load_from_safetensors(self.config.adapter.image_encoder_path)
         ip_adapter.image_encoder.requires_grad_(False)
         return ip_adapter.to(device=self.device)
 
