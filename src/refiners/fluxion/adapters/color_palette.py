@@ -410,7 +410,8 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def zero_init(self) -> None:
         weights = self.weights
         for weight in weights:
-            init.zeros_(weight)
+            for w in weight:
+                init.zeros_(w)
 
     def inject(self, parent: fl.Chain | None = None) -> "SD1ColorPaletteAdapter[Any]":
         for adapter in self.sub_adapters:
