@@ -48,7 +48,7 @@ weight_decay = 1e-2
 [scheduler]
 scheduler_type = "StepLR"
 update_interval = "500:step"
-gamma: 0.5
+gamma = 0.5
 warmup = "250:step"
 
 [dropout]
