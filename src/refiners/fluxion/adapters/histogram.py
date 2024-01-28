@@ -11,7 +11,8 @@ from refiners.foundationals.clip.image_encoder import ClassToken, PositionalEnco
 from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
-
+from PIL import Image
+from refiners.fluxion.utils import image_to_tensor
 
 class HistogramDistance(fl.Chain):
     def __init__(
@@ -31,6 +32,7 @@ class HistogramExtractor(fl.Chain):
         color_bits: int = 8,
     ) -> None:
         self.color_bits = color_bits
+        self.color_size = 2**color_bits
         super().__init__(fl.Permute(0, 2, 3, 1), fl.Lambda(func=self.histogramdd))
 
     def histogramdd(self, x: Tensor) -> Tensor:
@@ -54,6 +56,14 @@ class HistogramExtractor(fl.Chain):
             histograms.append(hist)
 
         return stack(histograms)
+    
+    def images_to_histograms(self, images: List[Image.Image]) -> Tensor:
+        tensors = []
+        for image in images:
+            tensor = image_to_tensor(image, device=self.device, dtype=self.dtype) * (self.color_size - 1)
+            tensors.append(tensor)
+        images_tensor = cat(tensors, dim=0)
+        return self(images_tensor)
 
 
 class Patch3dEncoder(fl.Chain):
@@ -182,15 +192,15 @@ class HistogramEncoder(fl.Chain):
 
 
 class HistogramCrossAttention(fl.Chain):
-    def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
+    def __init__(self, text_cross_attention: fl.Attention, embedding_dim: int = 768, scale: float = 1.0) -> None:
         self._scale = scale
         super().__init__(
             fl.Distribute(
                 fl.Identity(),
                 fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="palette_embedding"),
+                    fl.UseContext(context="ip_adapter", key="histogram_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=embedding_dim,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -198,9 +208,9 @@ class HistogramCrossAttention(fl.Chain):
                     ),
                 ),
                 fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="palette_embedding"),
+                    fl.UseContext(context="ip_adapter", key="histogram_embedding"),
                     fl.Linear(
-                        in_features=4,
+                        in_features=embedding_dim,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -229,6 +239,7 @@ class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self,
         target: fl.Attention,
         scale: float = 1.0,
+        embedding_dim: int = 768
     ) -> None:
         self._scale = scale
         with self.setup_adapter(target):
@@ -236,6 +247,7 @@ class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
             histogram_cross_attention = HistogramCrossAttention(
                 text_cross_attention=clone,
+                embedding_dim=embedding_dim,
                 scale=self.scale,
             )
             clone.replace(
@@ -301,7 +313,7 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
         self._histogram_encoder = [histogram_encoder]
 
         self.sub_adapters: list[CrossAttentionAdapter] = [
-            CrossAttentionAdapter(target=cross_attn, scale=scale)
+            HistogramCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=histogram_encoder.embedding_dim)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -332,7 +344,7 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
             cross_attn.scale = scale
 
     def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
-        self.set_context("ip_adapter", {"clip_image_embedding": histogram_embedding})
+        self.set_context("ip_adapter", {"histogram_embedding": histogram_embedding})
 
     @property
     def histogram_encoder(self) -> HistogramEncoder:

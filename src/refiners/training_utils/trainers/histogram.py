@@ -20,8 +20,7 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
 )
 from refiners.training_utils.callback import Callback, GradientNormLayerLogging
-from refiners.training_utils.datasets.color_palette import ColorPalette
-from refiners.training_utils.datasets.histogram import HistogramLatentsDataset, TextEmbeddingHistogramLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorPalette, ColorPaletteDataset, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
@@ -29,6 +28,7 @@ from refiners.training_utils.trainers.latent_diffusion import (
     TestDiffusionBaseConfig,
 )
 from refiners.training_utils.wandb import WandbLoggable
+from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 
 
 class HistogramConfig(BaseModel):
@@ -73,22 +73,17 @@ class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
 
 
 class HistogramLatentDiffusionTrainer(
-    LatentDiffusionBaseTrainer[HistogramLatentDiffusionConfig, TextEmbeddingHistogramLatentsBatch]
+    LatentDiffusionBaseTrainer[HistogramLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]
 ):
-    def load_dataset(self) -> HistogramLatentsDataset:
-        return HistogramLatentsDataset(
-            config=self.config.dataset,
-            lda=self.lda,
-            text_encoder=self.text_encoder,
-            histogram_encoder=self.histogram_encoder,
-            histogram_extractor=self.histogram_extractor,
-            unconditional_sampling_probability=self.config.latent_diffusion.unconditional_sampling_probability,
-        )
-
+    def load_dataset(self) -> ColorPaletteDataset:
+        return ColorPaletteDataset(
+            config=self.config.dataset
+		)
+    
     @cached_property
-    def dataset(self) -> HistogramLatentsDataset:  # type: ignore
-        return self.load_dataset()
-
+    def dataset(self) -> ColorPaletteDataset:  # type: ignore
+        return self.load_dataset() 
+    
     @cached_property
     def histogram_encoder(self) -> HistogramEncoder:
         assert self.config.models["histogram_encoder"] is not None, "The config must contain a histogram entry."
@@ -128,12 +123,15 @@ class HistogramLatentDiffusionTrainer(
             "histogram_encoder": self.histogram_encoder,
         }
 
-    def compute_loss(self, batch: TextEmbeddingHistogramLatentsBatch) -> Tensor:
-        text_embeddings, latents, histogram_embeddings = (
-            batch.text_embeddings,
-            batch.latents,
-            batch.histogram_embeddings,
-        )
+    def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
+        
+        texts = [item.text for item in batch]
+        text_embeddings = self.text_encoder(texts)
+        
+        latents = self.lda.encode_images([item.image for item in batch])
+        
+        histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch])
+        histogram_embeddings = self.histogram_encoder(histograms)
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
@@ -189,9 +187,11 @@ class HistogramLatentDiffusionTrainer(
         images: dict[str, WandbLoggable] = {}
         images_and_histograms: List[ImageAndHistogram] = []
         for prompt in prompts:
-            db_image = self.dataset.get_image(prompt.histogram_db_index)
-            palette = self.dataset.get_palette(prompt.histogram_db_index)
-            histogram = self.histogram_extractor(image_to_tensor(db_image))
+            db_index = prompt.histogram_db_index
+            item = self.dataset[db_index][0]
+            db_image = item.image
+            palette = item.color_palette  
+            histogram = self.histogram_extractor.images_to_histograms([db_image])
             prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram, palette=palette)
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : with colors from {prompt.histogram_db_index}"
             image_and_histogram = self.compute_prompt_evaluation(prompt_histo, num_images_per_prompt)
@@ -214,9 +214,10 @@ class HistogramLatentDiffusionTrainer(
         size = self.config.test_histogram.num_samples
         indices = list(np.random.choice(l, size=size, replace=False))
         indices = list(map(int, indices))
-        palette = [dataset.get_palette(i) for i in indices]
-        histograms = [self.histogram_extractor(image_to_tensor(dataset.get_image(i))) for i in indices]
-        captions = [self.dataset.get_caption(i) for i in indices]
+        items = [dataset[i][0] for i in indices]
+        palette = [item.color_palette for item in items]
+        histograms = [self.histogram_extractor.images_to_histograms([item.image]) for item in items]
+        captions = [item.text for item in items]
         return list(zip(indices, histograms, captions, palette))
 
     @cached_property

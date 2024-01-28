@@ -23,7 +23,7 @@ offset_noise = 0.2
 max_colors = 8
 feedforward_dim = 20
 num_layers = 2
-num_attention_heads = 2
+mode='mlp'
 embedding_dim = 10
 
 [training]

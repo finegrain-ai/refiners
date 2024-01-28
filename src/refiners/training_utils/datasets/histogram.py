@@ -20,8 +20,6 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
     def __init__(
         self,
         config: HuggingfaceDatasetConfig,
-        lda: SD1Autoencoder,
-        text_encoder: CLIPTextEncoder,
         histogram_encoder: HistogramEncoder,
         histogram_extractor: HistogramExtractor,
         unconditional_sampling_probability: float = 0.2,
@@ -30,8 +28,6 @@ class HistogramLatentsDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingHisto
         self.histogram_extractor = histogram_extractor
         super().__init__(
             config=config,
-            lda=lda,
-            text_encoder=text_encoder,
             unconditional_sampling_probability=unconditional_sampling_probability,
         )
 

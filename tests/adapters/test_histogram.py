@@ -1,6 +1,7 @@
 import torch
 
 from refiners.fluxion.adapters.histogram import HistogramDistance, HistogramEncoder, HistogramExtractor
+from refiners.fluxion.utils import image_to_tensor, tensor_to_image
 
 
 def test_histogram_extractor() -> None:
@@ -24,6 +25,22 @@ def test_histogram_extractor() -> None:
     assert abs(histogram_white[0, -1, -1, -1] - 1.0) < 1e-4, "histogram_white should be 1.0 at -1,-1,-1,-1"
     assert abs(histogram_white.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
 
+def test_images_histogram_extractor() -> None:
+    color_bits = 3
+
+    extractor = HistogramExtractor(color_bits=color_bits)
+
+    img_white = tensor_to_image(torch.ones((1, 3, 224, 224)))
+    
+    histogram_white = extractor.images_to_histograms([img_white])
+    assert abs(histogram_white[0, -1, -1, -1] - 1.0) < 1e-4, "histogram_white should be 1.0 at -1,-1,-1,-1"
+    assert abs(histogram_white.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
+
+    img_black = tensor_to_image(torch.ones((1, 3, 224, 224))*-1)
+    histogram_black = extractor.images_to_histograms([img_black])
+    
+    assert abs(histogram_black[0, 0, 0, 0] - 1.0) < 1e-4, "histogram_zero should be 1.0 at 0,0,0,0"
+    assert abs(histogram_black.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
 
 def test_histogram_distance() -> None:
     distance = HistogramDistance()
