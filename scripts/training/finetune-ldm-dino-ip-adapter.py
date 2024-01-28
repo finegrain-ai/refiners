@@ -316,12 +316,6 @@ class IPDataset(Dataset[IPBatch]):
 
 class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
     @cached_property
-    def device(self) -> Device:  # TODO: remove, temporary
-        selected_device = Device("cpu")
-        logger.info(f"Using device: {selected_device}")
-        return selected_device
-
-    @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
         return SD1Autoencoder(
@@ -353,7 +347,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
         )
-        ip_adapter.image_encoder.load_from_safetensors(self.config.models["adapter"].image_encoder_path)
+        ip_adapter.image_encoder.load_from_safetensors(self.config.adapter.image_encoder_path)
+        ip_adapter.image_encoder.requires_grad_(False)
         return ip_adapter.to(device=self.device)
 
     @cached_property
