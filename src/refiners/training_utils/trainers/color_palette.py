@@ -137,6 +137,7 @@ class ColorPaletteLatentDiffusionTrainer(
         
         latents = self.lda.encode_images([item.image for item in batch])
         color_palettes = [item.color_palette for item in batch]
+        
         color_palette_embeddings = self.color_palette_encoder(
             color_palettes
         )
@@ -288,7 +289,7 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
             raise ValueError("The model must have a parent.")
         adapter = model.parent
 
-        tensors = {f"color_palette_adapter.{i:03d}": w for i, w in enumerate(adapter.weights)}
+        tensors = {f"color_palette_adapter.{i:03d}.{j:03d}": w for j, w in enumerate(w) for i, ws in enumerate(adapter.weights)}
         encoder = trainer.color_palette_encoder
 
         state_dict = encoder.state_dict()

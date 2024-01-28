@@ -235,7 +235,7 @@ class HistogramLatentDiffusionTrainer(
             image_and_histogram["histogram"] for image_and_histogram in images_and_histograms
         ]
         actual_histograms: List[Histogram] = [
-            self.histogram_extractor(image_to_tensor(image_and_histogram["image"]))
+            self.histogram_extractor.images_to_histograms([image_and_histogram["image"]])
             for image_and_histogram in images_and_histograms
         ]
 

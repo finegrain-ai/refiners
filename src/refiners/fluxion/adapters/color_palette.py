@@ -192,7 +192,6 @@ class ColorPaletteEncoder(fl.Chain):
         dtype: DType | None = None,
     ) -> None:
         self.embedding_dim = embedding_dim
-        print(f"mode: {mode}")
         if num_layers == 0:
             encoder_body = fl.Identity()
         elif mode == 'transformer':
@@ -379,21 +378,33 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
                 k.removeprefix("color_palette_encoder."): v for k, v in weights.items() if k.startswith("color_palette_encoder.")
             }
             self._color_palette_encoder[0].load_state_dict(color_palette_state_dict)
+            
+            print('weights', weights.keys())
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: list[Tensor] = []
-                for k, v in weights.items():
-                    prefix = f"color_palette_adapter.{i:03d}."
-                    if not k.startswith(prefix):
-                        continue
-                    cross_attention_weights.append(v)
-                assert len(cross_attention_weights) == 2
-                cross_attn.load_weights(*cross_attention_weights)
+                
+                ## Tmp code
+                index = i*2
+                index2 = index + 1
+                cross_attn.load_weights(
+                    weights[f"color_palette_adapter.{index:03d}"],
+                    weights[f"color_palette_adapter.{index2:03d}"],
+                )
+                
+                # prefix = f"color_palette_adapter.{i:03d}."
+                # for k, v in weights.items():
+                #     if not k.startswith(prefix):
+                #         continue
+                #     cross_attention_weights.append(v)
+
+                # assert len(cross_attention_weights) == 2
+                # cross_attn.load_weights(*cross_attention_weights)
     @property
     def weights(self) -> List[Tensor]:
         weights: List[Tensor] = []
         for adapter in self.sub_adapters:
-            weights += adapter.weights
+            weights.append(adapter.weights)
         return weights
 
     def zero_init(self) -> None:
