@@ -348,7 +348,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
         )
-        ip_adapter.image_encoder = ViT().load_from_safetensors(self.config.adapter.image_encoder_path)
+        ip_adapter.image_encoder = ViT().load_from_safetensors(self.config.adapter.image_encoder_path, strict=False)
         ip_adapter.image_encoder.requires_grad_(False)
         return ip_adapter.to(device=self.device)
 
