@@ -39,9 +39,10 @@ class HistogramExtractor(fl.Chain):
         batch_size = x.shape[0]
         num_pixels = x.shape[1] * x.shape[2]
         histograms: List[Tensor] = []
+        device = x.device
         for i in range(batch_size):
             hist_dd = histogramdd(
-                x[i],
+                x[i].cpu(),
                 bins=2**self.color_bits,
                 range=[
                     0,
@@ -55,15 +56,19 @@ class HistogramExtractor(fl.Chain):
             hist = hist_dd.hist / num_pixels
             histograms.append(hist)
 
-        return stack(histograms)
+        return stack(histograms).to(device)
     
-    def images_to_histograms(self, images: List[Image.Image]) -> Tensor:
+    def images_to_histograms(self, images: List[Image.Image], device = None, dtype = None) -> Tensor:
         tensors = []
         for image in images:
-            tensor = image_to_tensor(image, device=self.device, dtype=self.dtype) * (self.color_size - 1)
+            tensor = image_to_tensor(image, device=device, dtype=dtype) * (self.color_size - 1)
             tensors.append(tensor)
         images_tensor = cat(tensors, dim=0)
         return self(images_tensor)
+
+    def from_decoded(self, decoded: Tensor) -> Tensor:
+        tensor = (decoded + 1)/2 * (self.color_size - 1)
+        return self(tensor)
 
 
 class Patch3dEncoder(fl.Chain):

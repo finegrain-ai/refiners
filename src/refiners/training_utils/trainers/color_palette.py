@@ -152,6 +152,12 @@ class ColorPaletteLatentDiffusionTrainer(
 
         prediction = self.unet(noisy_latents)
         loss = self.mse_loss(prediction, noise)
+        
+        predicted_latents = self.ddpm_scheduler.remove_noise(x=noisy_latents, noise=prediction, step=self.current_step)
+        predicted_image = self.lda.decode(x=predicted_latents)
+        images_tensor = x = (x + 1) / 2
+        
+        
         return loss
 
     @cached_property
@@ -289,7 +295,7 @@ class SaveColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
             raise ValueError("The model must have a parent.")
         adapter = model.parent
 
-        tensors = {f"color_palette_adapter.{i:03d}.{j:03d}": w for j, w in enumerate(ws) for i, ws in enumerate(adapter.weights)}
+        tensors = {f"color_palette_adapter.{i:03d}.{j:03d}": w for j, w in enumerate(ws ) for i, ws in enumerate(adapter.weights)}
         encoder = trainer.color_palette_encoder
 
         state_dict = encoder.state_dict()

@@ -39,6 +39,7 @@ class HistogramConfig(BaseModel):
     num_layers: int
     trigger_phrase: str = ""
     use_only_trigger_probability: float = 0.0
+    loss_weight: float = 1.0
 
 
 Color = Tuple[int, int, int]
@@ -130,7 +131,7 @@ class HistogramLatentDiffusionTrainer(
         
         latents = self.lda.encode_images([item.image for item in batch])
         
-        histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch])
+        histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
         histogram_embeddings = self.histogram_encoder(histograms)
 
         timestep = self.sample_timestep()
@@ -142,8 +143,24 @@ class HistogramLatentDiffusionTrainer(
         self.histogram_adapter.set_histogram_embedding(histogram_embeddings)
 
         prediction = self.unet(noisy_latents)
-        loss = self.mse_loss(prediction, noise)
-        return loss
+        loss_1 = self.mse_loss(prediction, noise)
+        
+        predicted_latents = self.ddpm_scheduler.remove_noise(
+            x=noisy_latents.to(device=self.ddpm_scheduler.device), 
+            noise=prediction.to(device=self.ddpm_scheduler.device), 
+            step=self.current_step
+        )
+        predicted_decoded = self.lda.decode(x=predicted_latents).to(device=self.device)
+        predicted_histograms = self.histogram_extractor.from_decoded(predicted_decoded)
+        
+        loss_2 = self.histogram_distance(predicted_histograms, histograms)
+        
+        self.log({
+            f"losses/histo": loss_2,
+            f"losses/image": loss_1
+        })
+
+        return loss_1 + loss_2 * self.config.histogram.loss_weight
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
@@ -191,7 +208,7 @@ class HistogramLatentDiffusionTrainer(
             item = self.dataset[db_index][0]
             db_image = item.image
             palette = item.color_palette  
-            histogram = self.histogram_extractor.images_to_histograms([db_image])
+            histogram = self.histogram_extractor.images_to_histograms([db_image], device = self.device, dtype = self.dtype)
             prompt_histo = HistogramPrompt(text=prompt.text, histogram=histogram, palette=palette)
             image_name = f"edge_case/{prompt.text.replace(' ', '_')} : with colors from {prompt.histogram_db_index}"
             image_and_histogram = self.compute_prompt_evaluation(prompt_histo, num_images_per_prompt)
@@ -216,7 +233,7 @@ class HistogramLatentDiffusionTrainer(
         indices = list(map(int, indices))
         items = [dataset[i][0] for i in indices]
         palette = [item.color_palette for item in items]
-        histograms = [self.histogram_extractor.images_to_histograms([item.image]) for item in items]
+        histograms = [self.histogram_extractor.images_to_histograms([item.image], device = self.device, dtype = self.dtype) for item in items]
         captions = [item.text for item in items]
         return list(zip(indices, histograms, captions, palette))
 
@@ -235,7 +252,7 @@ class HistogramLatentDiffusionTrainer(
             image_and_histogram["histogram"] for image_and_histogram in images_and_histograms
         ]
         actual_histograms: List[Histogram] = [
-            self.histogram_extractor.images_to_histograms([image_and_histogram["image"]])
+            self.histogram_extractor.images_to_histograms([image_and_histogram["image"]], device = self.device, dtype = self.dtype)
             for image_and_histogram in images_and_histograms
         ]
 

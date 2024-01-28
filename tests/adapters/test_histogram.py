@@ -20,10 +20,16 @@ def test_histogram_extractor() -> None:
     assert abs(histogram_black[0, 0, 0, 0] - 1.0) < 1e-4, "histogram_zero should be 1.0 at 0,0,0,0"
     assert abs(histogram_black.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
 
-    img_white = torch.ones((1, 3, 224, 224)) * (color_size - 1)
+    img_white_normalized = torch.ones((1, 3, 224, 224)) 
+    img_white = img_white_normalized * (color_size - 1)
     histogram_white = extractor(img_white)
     assert abs(histogram_white[0, -1, -1, -1] - 1.0) < 1e-4, "histogram_white should be 1.0 at -1,-1,-1,-1"
     assert abs(histogram_white.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
+    
+    decoded_histogram_white = img_white_normalized * 2 - 1
+    histogram_white2 = extractor.from_decoded(decoded_histogram_white)
+    distance = HistogramDistance()    
+    assert distance(histogram_white2, histogram_white) == 0.0, "distance between himself should be 0.0"
 
 def test_images_histogram_extractor() -> None:
     color_bits = 3
