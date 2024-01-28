@@ -14,7 +14,7 @@ from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
-from refiners.foundationals.dinov2.vit import ViT
+from refiners.foundationals.dinov2.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -32,7 +32,7 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
     filter_image,
 )
-from refiners.training_utils.trainer import Trainer, ConfigType
+from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
 from refiners.fluxion.utils import manual_seed
@@ -43,6 +43,7 @@ class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
     seed: int = 9752
     image_encoder_path: str
+    image_encoder_type: str
     scale: float = 1.0
     inference_scale: float = 0.75
     use_pooled_text_embedding: bool = False
@@ -348,7 +349,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
         )
-        ip_adapter.image_encoder = ViT().load_from_safetensors(self.config.adapter.image_encoder_path, strict=False)
+        image_encoder_cls = DINOv2_base
+        if self.config.adapter.image_encoder_type == "dinov2_vitl14_reg4":
+            image_encoder_cls = DINOv2_large_reg
+        elif self.config.adapter.image_encoder_type == "dinov2_vitl14":
+            image_encoder_cls = DINOv2_large
+        elif self.config.adapter.image_encoder_type == "dinov2_vitb14_reg4":
+            image_encoder_cls = DINOv2_base_reg
+        elif self.config.adapter.image_encoder_type == "dinov2_vits14_reg4":
+            image_encoder_cls = DINOv2_small_reg
+        elif self.config.adapter.image_encoder_type == "dinov2_vits14":
+            image_encoder_cls = DINOv2_small
+        ip_adapter.image_encoder = image_encoder_cls().load_from_safetensors(self.config.adapter.image_encoder_path)
         ip_adapter.image_encoder.requires_grad_(False)
         return ip_adapter.to(device=self.device)
 

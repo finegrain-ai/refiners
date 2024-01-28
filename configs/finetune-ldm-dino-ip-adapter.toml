@@ -16,7 +16,8 @@ offset_noise = 0.0
 
 [adapter]
 seed = 9752
-image_encoder_path = "tests/weights/dinov2_vits14_reg4_pretrain.safetensors"
+image_encoder_type = "dinov2_vitl14_reg4"
+image_encoder_path = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors"
 scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false
