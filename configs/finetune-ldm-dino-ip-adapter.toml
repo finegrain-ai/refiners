@@ -57,7 +57,6 @@ resize_image_min_size = 512
 resize_image_max_size = 576
 random_crop_size = 512
 filter_min_image_size = true
-horizontal_flip_probability = 0.5
 image_drop_rate = 0.05
 text_drop_rate = 0.05
 text_and_image_drop_rate = 0.05
