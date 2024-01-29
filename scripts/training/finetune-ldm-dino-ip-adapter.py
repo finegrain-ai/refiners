@@ -15,7 +15,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
 from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -159,11 +159,11 @@ class IPDataset(Dataset[IPBatch]):
     @staticmethod
     def encode_captions(
         captions: list[str],
-        text_encoder: DoubleTextEncoder,
+        text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
         return {
-            "text_embedding": [text_encoder(caption)[0] for caption in captions],
+            "text_embedding": [text_encoder(caption) for caption in captions],
         }
 
     def load_huggingface_dataset(self) -> datasets.Dataset:
@@ -334,9 +334,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ).to(device=self.device)
 
     @cached_property
-    def text_encoder(self) -> DoubleTextEncoder:
+    def text_encoder(self) -> CLIPTextEncoderL:
         assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
-        return DoubleTextEncoder(
+        return CLIPTextEncoderL(
             device=self.device,
         ).to(device=self.device)
     @cached_property
@@ -485,6 +485,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
+            # TODO: pool text according to end of text id for pooled text embeds if given option
             print(clip_text_embedding.shape, clip_text_embedding.shape)
             for i in range(num_images_per_prompt):
                 manual_seed(self.config.test_ldm.seed)
