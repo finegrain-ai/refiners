@@ -8,7 +8,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 import numpy as np
 from loguru import logger
 from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16
-from torch.autograd import backward, set_detect_anomaly
+from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -40,7 +40,6 @@ from refiners.training_utils.callback import (
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
-set_detect_anomaly(True)
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
 
@@ -505,8 +504,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
             if self.scaler is not None:
-                self.scaler.step(self.optimizer) # type: ignore
-                self.scaler.update() # type: ignore
+                # logic from accelerator
+                scale_before = self.scaler.get_scale()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                scale_after = self.scaler.get_scale()
+                # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+                if scale_after < scale_before:
+                    print("Overflow in optimizer caused optimizer to skip")
             else:
                 self.optimizer.step()
             self.optimizer.zero_grad()
