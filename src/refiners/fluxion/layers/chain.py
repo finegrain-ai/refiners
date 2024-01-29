@@ -285,13 +285,6 @@ class Chain(ContextModule):
     def _regenerate_keys(self, modules: Iterable[Module]) -> None:
         self._modules = generate_unique_names(tuple(modules))  # type: ignore
 
-    def __add__(self, other: "Chain | Module | list[Module]") -> "Chain":
-        if isinstance(other, Module):
-            other = Chain(other)
-        if isinstance(other, list):
-            other = Chain(*other)
-        return Chain(*self, *other)
-
     @overload
     def __getitem__(self, key: int) -> Module:
         ...
