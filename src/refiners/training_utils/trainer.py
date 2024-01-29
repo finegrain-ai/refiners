@@ -509,6 +509,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
                 scale_after = self.scaler.get_scale()
+                print(scale_before, scale_after)
                 # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
                 if scale_after < scale_before:
                     print("Overflow in optimizer caused optimizer to skip")
