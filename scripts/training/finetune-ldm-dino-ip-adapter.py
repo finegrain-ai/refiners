@@ -264,6 +264,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         image = data["image"]
         cond_image = self.image_encoder_transform(image)
+        print(cond_image.shape)
         cond_image = self.trainer.adapter.compute_image_embedding(cond_image)
         # apply augmentation to the image
         image_transforms: list[Module] = []
