@@ -10,13 +10,14 @@ unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
 text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false }
 lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
 image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false }
-adapter = { checkpoint = "tests/weights/ip-adapter-plus_sd15.safetensors", train = true }
+adapter = { train = true }
 
 [ldm]
 offset_noise = 0.0
 
 [adapter]
 seed = 9752
+checkpoint = "tests/weights/ip-adapter-plus_sd15.safetensors"
 image_encoder_type = "dinov2_vitl14_reg4"
 scale = 1.0
 inference_scale = 1.0

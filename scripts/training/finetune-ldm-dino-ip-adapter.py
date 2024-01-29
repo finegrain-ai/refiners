@@ -35,7 +35,7 @@ from refiners.training_utils.latent_diffusion import (
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
-from refiners.fluxion.utils import manual_seed
+from refiners.fluxion.utils import manual_seed, load_from_safetensors
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
@@ -43,6 +43,7 @@ class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
     seed: int = 9752
     image_encoder_type: str
+    checkpoint: str | None = None
     scale: float = 1.0
     inference_scale: float = 0.75
     use_pooled_text_embedding: bool = False
@@ -354,8 +355,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @cached_property
     def adapter(self) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
+        # A bit of hacky method to initialize model with weights.Potentially refactor this
         ip_adapter = SD1IPAdapter(
             target=self.unet,
+            weights=load_from_safetensors(self.config.adapter.checkpoint) if self.config.adapter.checkpoint is not None else None,
             fine_grained=self.config.adapter.fine_grained,
             scale=self.config.adapter.scale,
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
@@ -380,7 +383,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "image_encoder": self.image_encoder,
-            "adapter": self.adapter,
+            "adapter": self.adapter
         }
 
     def load_dataset(self) -> IPDataset:
