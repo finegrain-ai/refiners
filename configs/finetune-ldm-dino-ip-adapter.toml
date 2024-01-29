@@ -7,7 +7,7 @@ project = "finetune-ldm-ip-adapter"
 
 [models]
 unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
-text_encoder = { checkpoint = "tests/weights/DoubleCLIPTextEncoder.safetensors", train = false }
+text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false }
 lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
 image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false }
 adapter = { train = true }
