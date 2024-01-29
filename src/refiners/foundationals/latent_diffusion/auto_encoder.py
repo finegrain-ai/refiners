@@ -226,7 +226,7 @@ class LatentDiffusionAutoencoder(Chain):
         if x.shape[0] != 1:
             raise ValueError(f"Expected batch size of 1, got {x.shape[0]}")
 
-        return self.decode_images(x)[0]
+        return self.latents_to_images(x)[0]
 
     def latents_to_images(self, x: Tensor) -> list[Image.Image]:
         x = self.decode(x)
