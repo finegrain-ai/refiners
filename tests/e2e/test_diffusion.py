@@ -636,7 +636,7 @@ def test_diffusion_std_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init)
 
@@ -666,7 +666,7 @@ def test_diffusion_std_random_init_euler(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init_euler)
 
@@ -691,7 +691,7 @@ def test_diffusion_karras_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_karras_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -719,7 +719,7 @@ def test_diffusion_std_random_init_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -747,7 +747,7 @@ def test_diffusion_std_random_init_sag(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init_sag)
 
@@ -776,7 +776,7 @@ def test_diffusion_std_init_image(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_init_image)
 
@@ -793,7 +793,7 @@ def test_rectangular_init_latents(
     rect_init_image = cutecat_init.crop((0, 0, width, height))
     x = sd15.init_latents((height, width), rect_init_image)
 
-    assert sd15.lda.decode_latents(x).size == (width, height)
+    assert sd15.lda.latent_to_image(x).size == (width, height)
 
 
 @no_grad()
@@ -823,7 +823,7 @@ def test_diffusion_inpainting(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     # PSNR and SSIM values are large because with float32 we get large differences even v.s. ourselves.
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=25, min_ssim=0.95)
@@ -857,7 +857,7 @@ def test_diffusion_inpainting_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     # PSNR and SSIM values are large because float16 is even worse than float32.
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=20, min_ssim=0.92)
@@ -900,7 +900,7 @@ def test_diffusion_controlnet(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -943,7 +943,7 @@ def test_diffusion_controlnet_structural_copy(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -985,7 +985,7 @@ def test_diffusion_controlnet_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1039,7 +1039,7 @@ def test_diffusion_controlnet_stack(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_controlnet_stack, min_psnr=35, min_ssim=0.98)
 
@@ -1071,7 +1071,7 @@ def test_diffusion_lora(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1114,7 +1114,7 @@ def test_diffusion_sdxl_lora(
             condition_scale=guidance_scale,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1162,7 +1162,7 @@ def test_diffusion_sdxl_multiple_loras(
             condition_scale=guidance_scale,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1181,7 +1181,7 @@ def test_diffusion_refonly(
 
     refonly_adapter = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
-    guide = sd15.lda.encode_image(condition_image_refonly)
+    guide = sd15.lda.image_to_latent(condition_image_refonly)
     guide = torch.cat((guide, guide))
 
     manual_seed(2)
@@ -1198,7 +1198,7 @@ def test_diffusion_refonly(
             condition_scale=7.5,
         )
         torch.randn(2, 4, 64, 64, device=test_device)  # for SD Web UI reproductibility only
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     # min_psnr lowered to 33 because this reference image was generated without noise removal (see #192)
     ensure_similar_images(predicted_image, expected_image_refonly, min_psnr=33, min_ssim=0.99)
@@ -1223,7 +1223,7 @@ def test_diffusion_inpainting_refonly(
     sd15.set_inference_steps(30)
     sd15.set_inpainting_conditions(target_image_inpainting_refonly, mask_image_inpainting_refonly)
 
-    guide = sd15.lda.encode_image(scene_image_inpainting_refonly)
+    guide = sd15.lda.image_to_latent(scene_image_inpainting_refonly)
     guide = torch.cat((guide, guide))
 
     manual_seed(2)
@@ -1243,7 +1243,7 @@ def test_diffusion_inpainting_refonly(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_inpainting_refonly, min_psnr=35, min_ssim=0.99)
 
@@ -1276,7 +1276,7 @@ def test_diffusion_textual_inversion_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -1321,7 +1321,7 @@ def test_diffusion_ip_adapter(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
 
@@ -1370,7 +1370,7 @@ def test_diffusion_sdxl_ip_adapter(
         # See https://huggingface.co/madebyollin/sdxl-vae-fp16-fix: "SDXL-VAE generates NaNs in fp16 because the
         # internal activation values are too big"
         sdxl.lda.to(dtype=torch.float32)
-        predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
+        predicted_image = sdxl.lda.latent_to_image(x.to(dtype=torch.float32))
 
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_woman)
 
@@ -1426,7 +1426,7 @@ def test_diffusion_ip_adapter_controlnet(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_controlnet)
 
@@ -1467,7 +1467,7 @@ def test_diffusion_ip_adapter_plus(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_plus_statue, min_psnr=35, min_ssim=0.98)
 
@@ -1514,7 +1514,7 @@ def test_diffusion_sdxl_ip_adapter_plus(
             condition_scale=5,
         )
     sdxl.lda.to(dtype=torch.float32)
-    predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
+    predicted_image = sdxl.lda.latent_to_image(x.to(dtype=torch.float32))
 
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman)
 
@@ -1548,7 +1548,7 @@ def test_sdxl_random_init(
             time_ids=time_ids,
             condition_scale=5,
         )
-    predicted_image = sdxl.lda.decode_latents(x=x)
+    predicted_image = sdxl.lda.latent_to_image(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1583,7 +1583,7 @@ def test_sdxl_random_init_sag(
             time_ids=time_ids,
             condition_scale=5,
         )
-    predicted_image = sdxl.lda.decode_latents(x=x)
+    predicted_image = sdxl.lda.latent_to_image(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image)
 
@@ -1615,7 +1615,7 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
             step=step,
             targets=[target_1, target_2],
         )
-    result = sd.lda.decode_latents(x=x)
+    result = sd.lda.latent_to_image(x=x)
     ensure_similar_images(img_1=result, img_2=expected_multi_diffusion, min_psnr=35, min_ssim=0.98)
 
 
@@ -1654,7 +1654,7 @@ def test_t2i_adapter_depth(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)
 
@@ -1702,7 +1702,7 @@ def test_t2i_adapter_xl_canny(
             time_ids=time_ids,
             condition_scale=7.5,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)
 
@@ -1741,7 +1741,7 @@ def test_restart(
                 condition_scale=8,
             )
 
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
 
@@ -1773,7 +1773,7 @@ def test_freeu(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_freeu)
 
@@ -1829,6 +1829,6 @@ def test_hello_world(
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latent_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)

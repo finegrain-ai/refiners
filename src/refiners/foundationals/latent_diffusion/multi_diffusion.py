@@ -83,8 +83,15 @@ class MultiDiffusion(Generic[T, D], ABC):
     def dtype(self) -> DType:
         return self.ldm.dtype
 
+    # backward-compatibility alias
     def decode_latents(self, x: Tensor) -> Image.Image:
-        return self.ldm.lda.decode_latents(x=x)
+        return self.latent_to_image(x=x)
+
+    def latent_to_image(self, x: Tensor) -> Image.Image:
+        return self.ldm.lda.latent_to_image(x=x)
+    
+    def latents_to_images(self, x: Tensor) -> list[Image.Image]:
+        return self.ldm.lda.latents_to_images(x=x)
 
     @staticmethod
     def generate_offset_grid(size: tuple[int, int], stride: int = 8) -> list[tuple[int, int]]:

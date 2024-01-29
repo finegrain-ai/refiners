@@ -113,7 +113,7 @@ class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
             max_size=self.config.dataset.resize_image_max_size,
         )
         processed_image = self.process_image(resized_image)
-        latents = self.lda.encode_image(image=processed_image).to(device=self.device)
+        latents = self.lda.image_to_latent(image=processed_image).to(device=self.device)
         processed_caption = self.process_caption(caption=caption)
         clip_text_embedding = self.text_encoder(processed_caption).to(device=self.device)
         return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
@@ -202,7 +202,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
                         step=step,
                         clip_text_embedding=clip_text_embedding,
                     )
-                canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+                canvas_image.paste(sd.lda.latent_to_image(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         self.log(data=images)
 
