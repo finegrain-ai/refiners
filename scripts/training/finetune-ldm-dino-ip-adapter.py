@@ -485,6 +485,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
+            print(clip_text_embedding.shape, clip_text_embedding.shape)
             for i in range(num_images_per_prompt):
                 manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
