@@ -1,7 +1,7 @@
 script = "finetune-ldm-ip-adapter.py" # not used for now
 
 [wandb]
-mode = "online"                         # "online", "offline", "disabled"
+mode = "offline"                         # "online", "offline", "disabled"
 entity = "isamu"
 project = "finetune-ldm-ip-adapter"
 
