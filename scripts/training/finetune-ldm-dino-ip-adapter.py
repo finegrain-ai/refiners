@@ -305,7 +305,7 @@ class IPDataset(Dataset[IPBatch]):
         return data
 
     def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
-        latents = cat(tensors=[item.latent for item in batch])
+        latents = cat(tensors=[item.latent.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
         text_embeddings = cat(tensors=[item.text_embedding for item in batch])
         cond_images = pad_sequence([item.cond_image for item in batch], batch_first=True)
         return IPBatch(
@@ -324,7 +324,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
         return SD1Autoencoder(
             device=self.device,
-        ).to(device=self.device)
+        ).to(self.device, dtype=self.dtype)
 
     @cached_property
     def unet(self) -> SD1UNet:
@@ -332,14 +332,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return SD1UNet(
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
-        ).to(device=self.device)
+        ).to(self.device, dtype=self.dtype)
 
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:
         assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
         return CLIPTextEncoderL(
             device=self.device,
-        ).to(device=self.device)
+        ).to(self.device, dtype=self.dtype)
     @cached_property
     def image_encoder(self) -> ViT:
         assert self.config.models["image_encoder"] is not None, "The config must contain an image_encoder entry."
@@ -354,7 +354,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder_cls = DINOv2_small_reg
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
-        return image_encoder_cls().to(device=self.device)
+        return image_encoder_cls().to(self.device, dtype=self.dtype)
     @cached_property
     def adapter(self) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
@@ -369,14 +369,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
             image_encoder=self.image_encoder
         )
-        return ip_adapter.to(device=self.device)
+        return ip_adapter.to(self.device, dtype=self.dtype)
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
         return DDPM(
             num_inference_steps=1000,  # FIXME: harcoded value
             device=self.device,
-        ).to(device=self.device)
+        ).to(self.device, dtype=self.dtype)
 
     @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
@@ -411,9 +411,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
         # retreive data from batch
-        latents = batch.latent.to(device=self.device)
-        text_embeddings = batch.text_embedding.to(device=self.device)
-        cond_image = batch.cond_image.to(device=self.device)
+        latents = batch.latent.to(self.device, dtype=self.dtype)
+        text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
+        cond_image = batch.cond_image.to(self.device, dtype=self.dtype)
 
         # set IP embeddings context
         self.adapter.set_image_embedding(cond_image)
@@ -483,7 +483,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         images["condition images"] = cond_images
         for prompt, cond_image in zip(prompts, cond_images):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
-            clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
+            clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
             # TODO: pool text according to end of text id for pooled text embeds if given option

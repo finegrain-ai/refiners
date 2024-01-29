@@ -59,6 +59,7 @@ class TrainingConfig(BaseModel):
     clip_grad_value: float | None = None
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
+    mixed_precision: str = "no"
 
     @validator("duration", "gradient_accumulation", "evaluation_interval", pre=True)
     def parse_field(cls, value: Any) -> TimeValue:

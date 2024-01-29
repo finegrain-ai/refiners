@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
+from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16
 from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
@@ -25,6 +25,7 @@ from torch.optim.lr_scheduler import (
     StepLR,
 )
 from torch.utils.data import DataLoader, Dataset
+from torch.cuda.amp import GradScaler
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import manual_seed, no_grad
@@ -301,7 +302,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
         logger.info(f"Using device: {selected_device}")
         return selected_device
-
+    @cached_property
+    def dtype(self) -> DType:
+        weight_dtype = float32
+        if self.config.training.mixed_precision == "fp16":
+            weight_dtype = float16
+        elif self.config.training.mixed_precision == "bf16":
+            weight_dtype = bfloat16
+        return weight_dtype
     @property
     def parameters(self) -> list[Parameter]:
         """Returns a list of all parameters in all models"""
@@ -338,7 +346,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
         optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
         return optimizer
-
+    @cached_property
+    def scaler(self) -> GradScaler | None:
+        if self.config.training.mixed_precision == "no":
+            return None
+        return GradScaler()
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
         config = self.config.scheduler
@@ -421,7 +433,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         else:
             logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
-        model.to(self.device)
+        model.to(self.device, dtype=self.dtype)
         model.zero_grad()
 
     def prepare_models(self) -> None:
@@ -485,11 +497,18 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        backward(tensors=scaled_loss)
+        if self.scaler is not None:
+            self.scaler.scale(scaled_loss).backward() # type: ignore
+        else:
+            backward(tensors=scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
-            self.optimizer.step()
+            if self.scaler is not None:
+                self.scaler.step(self.optimizer) # type: ignore
+                self.scaler.update() # type: ignore
+            else:
+                self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:
