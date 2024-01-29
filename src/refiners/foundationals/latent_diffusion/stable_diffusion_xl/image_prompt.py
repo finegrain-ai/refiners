@@ -16,7 +16,7 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
-        strict: bool = False,
+        strict: bool = True,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False
     ) -> None:

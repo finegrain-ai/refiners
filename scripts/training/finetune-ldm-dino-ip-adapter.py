@@ -359,6 +359,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ip_adapter = SD1IPAdapter(
             target=self.unet,
             weights=load_from_safetensors(self.config.adapter.checkpoint) if self.config.adapter.checkpoint is not None else None,
+            strict=False,
             fine_grained=self.config.adapter.fine_grained,
             scale=self.config.adapter.scale,
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
