@@ -162,27 +162,3 @@ class Parameter(WeightedModule):
 
     def forward(self, x: Tensor) -> Tensor:
         return self.weight.expand(x.shape[0], *self.dims)
-
-
-class Buffer(WeightedModule):
-    """
-    A layer that wraps a tensor as a buffer. This is useful to create a buffer that is not a weight or a bias.
-
-    Buffers are not trainable.
-    """
-
-    def __init__(self, *dims: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
-        super().__init__()
-        self.dims = dims
-        self.register_buffer("buffer", randn(*dims, device=device, dtype=dtype))
-
-    @property
-    def device(self) -> Device:
-        return self.buffer.device
-
-    @property
-    def dtype(self) -> DType:
-        return self.buffer.dtype
-
-    def forward(self, _: Tensor) -> Tensor:
-        return self.buffer

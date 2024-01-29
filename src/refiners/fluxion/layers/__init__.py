@@ -1,7 +1,6 @@
 from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
 from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
 from refiners.fluxion.layers.basics import (
-    Buffer,
     Cos,
     Flatten,
     GetArg,
@@ -75,7 +74,6 @@ __all__ = [
     "Cos",
     "Multiply",
     "Matmul",
-    "Buffer",
     "Lambda",
     "Return",
     "Sum",
