@@ -574,5 +574,4 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def _call_callbacks(self, event_name: str) -> None:
         for callback in self.callbacks:
-            print("calling ", callback, event_name)
             getattr(callback, event_name)(self)

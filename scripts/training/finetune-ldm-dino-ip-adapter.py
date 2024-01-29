@@ -510,8 +510,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         config: AdapterLatentDiffusionConfig,
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
-        super().__init__(config=config, callbacks=callbacks)
         self.callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
+        super().__init__(config=config, callbacks=callbacks)
 
 class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
