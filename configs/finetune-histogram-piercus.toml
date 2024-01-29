@@ -23,7 +23,7 @@ num_layers = 2
 embedding_dim = 128
 color_bits = 5 # 2^5 = 32 color-level => 32³ different colors 32 768 colors
 patch_size = 8 # (2^5/8)^3 + 1 => sequence of 65 tokens
-loss_weight = 0.2
+loss_weight = 0.05
 
 [training]
 duration = "1:epoch"
