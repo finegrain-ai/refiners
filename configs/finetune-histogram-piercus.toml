@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="with-loss"
+name="with-loss-adam-step-lr"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}
