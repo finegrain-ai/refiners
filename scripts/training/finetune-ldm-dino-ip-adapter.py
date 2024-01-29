@@ -480,7 +480,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # for each prompt generate `num_images_per_prompt` images
         # TODO: remove this for loop, batch things up
         images: dict[str, WandbLoggable] = {}
-        images["condition images"] = cond_images
+        for i in range(len(cond_images)):
+            images[f"condition images_{i}"] = cond_images[i]
         for prompt, cond_image in zip(prompts, cond_images):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
