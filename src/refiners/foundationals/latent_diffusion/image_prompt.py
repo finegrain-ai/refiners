@@ -345,11 +345,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
     @property
     def image_key_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[1].Linear
+        return self.image_cross_attention.Distribute[1][-1].Linear
 
     @property
     def image_value_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[2].Linear
+        return self.image_cross_attention.Distribute[2][-1].Linear
 
     @property
     def scale(self) -> float:
@@ -361,11 +361,6 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_cross_attention.scale = value
 
     def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
-        print(self.image_cross_attention)
-        print(self.image_value_projection)
-        print(self.image_key_projection)
-
-
         self.image_key_projection.weight = nn.Parameter(key_tensor)
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.image_cross_attention.to(self.device, self.dtype)
