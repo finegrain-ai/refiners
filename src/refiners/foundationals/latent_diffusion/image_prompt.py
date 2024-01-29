@@ -478,7 +478,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             cross_attn.scale = scale
 
     def set_image_embedding(self, image_embedding: Tensor) -> None:
-        print("Setting image embedding as ", image_embedding.shape)
         self.set_context("ip_adapter", {"image_embedding": image_embedding})
     def set_pooled_text_embedding(self, pooled_text_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"pooled_text_embedding": pooled_text_embedding})

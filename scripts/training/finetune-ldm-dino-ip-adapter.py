@@ -162,8 +162,6 @@ class IPDataset(Dataset[IPBatch]):
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
-        print("encode")
-        print(text_encoder.device)
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
@@ -266,11 +264,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         image = data["image"]
         cond_image = self.image_encoder_transform(image)
-        print("transform")
-        print(cond_image.device)
-        print(self.trainer.adapter.device)
-        print(self.trainer.lda.device)
-        cond_image = self.trainer.adapter.compute_conditional_image_embedding(cond_image)
+        cond_image = self.trainer.adapter.compute_conditional_image_embedding(cond_image)[0]
         # apply augmentation to the image
         image_transforms: list[Module] = []
         if self.trainer.config.dataset.random_crop_size:
