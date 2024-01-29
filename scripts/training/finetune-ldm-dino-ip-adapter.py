@@ -511,12 +511,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((LoadAdapter(), SaveAdapter(), ComputeGradNorm(), ImageEncoderFreeze()))
+        self.callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
 
-class ImageEncoderFreeze(Callback[AdapterLatentDiffusionTrainer]):
+class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
     def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         trainer.adapter.image_encoder.requires_grad_(False)
+        trainer.adapter.target.requires_grad_(False)
         return super().on_init_end(trainer)
 
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
