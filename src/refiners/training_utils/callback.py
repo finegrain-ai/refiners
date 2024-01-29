@@ -182,6 +182,8 @@ class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         clip_norm = trainer.config.training.clip_grad_norm
         if clip_norm is not None:
+            if trainer.scaler is not None:
+                trainer.scaler.unscale_(trainer.optimizer)
             clip_gradient_norm(
                 parameters=trainer.learnable_parameters, total_norm=trainer.total_gradient_norm, clip_norm=clip_norm
             )
@@ -191,6 +193,8 @@ class GradientValueClipping(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         clip_value = trainer.config.training.clip_grad_value
         if clip_value is not None:
+            if trainer.scaler is not None:
+                trainer.scaler.unscale_(trainer.optimizer)
             clip_gradient_value(parameters=trainer.learnable_parameters, clip_value=clip_value)
 
 

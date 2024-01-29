@@ -517,7 +517,7 @@ class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
     def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         trainer.adapter.image_encoder.requires_grad_(False)
-        trainer.adapter.target.requires_grad_(False)
+        trainer.unet.requires_grad_(False)
         return super().on_init_end(trainer)
 
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
