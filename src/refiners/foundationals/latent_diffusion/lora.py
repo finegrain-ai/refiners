@@ -67,11 +67,8 @@ class SDLoraManager:
 
     def add_loras_to_unet(self, loras: dict[str, Lora], /) -> None:
         unet_loras = {key: loras[key] for key in loras.keys() if "unet" in key}
-        exclude: list[str] = []
         exclude = [
-            self.unet_exclusions[exclusion]
-            for exclusion in self.unet_exclusions
-            if all([exclusion not in key for key in unet_loras.keys()])
+            block for s, block in self.unet_exclusions.items() if all([s not in key for key in unet_loras.keys()])
         ]
         SDLoraManager.auto_attach(unet_loras, self.unet, exclude=exclude)
 
@@ -121,8 +118,8 @@ class SDLoraManager:
         return {
             "time": "TimestepEncoder",
             "res": "ResidualBlock",
-            "downsample": "DownsampleBlock",
-            "upsample": "UpsampleBlock",
+            "downsample": "Downsample",
+            "upsample": "Upsample",
         }
 
     @property
