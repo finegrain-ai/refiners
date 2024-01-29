@@ -161,7 +161,7 @@ class IPDataset(Dataset[IPBatch]):
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
         return {
-            "text_embedding": [text_encoder(caption) for caption in captions],
+            "text_embedding": [text_encoder(caption)[0] for caption in captions],
         }
 
     def load_huggingface_dataset(self) -> datasets.Dataset:
@@ -229,7 +229,6 @@ class IPDataset(Dataset[IPBatch]):
         # encode the captions into text embedding
         self.trainer.prepare_model("text_encoder")
         dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
-        dataset = dataset.remove_columns(["palettes"])  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_captions,
             input_columns=["caption"],
