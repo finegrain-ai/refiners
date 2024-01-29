@@ -284,6 +284,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.load_models()
         self.prepare_models()
         self.prepare_checkpointing()
+        print("calling on_init_end")
         self._call_callbacks(event_name="on_init_end")
 
     def default_callbacks(self) -> list[Callback[Any]]:

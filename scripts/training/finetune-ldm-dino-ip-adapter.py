@@ -539,6 +539,7 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""
 
     def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        print(trainer.learnable_parameters)
         logger.info("before inject", len(trainer.learnable_parameters))
         trainer.adapter.inject()
         logger.info("after inject", len(trainer.learnable_parameters))
