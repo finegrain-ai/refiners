@@ -19,6 +19,7 @@ offset_noise = 0.0
 seed = 9752
 checkpoint = "tests/weights/ip-adapter-plus_sd15.safetensors"
 image_encoder_type = "dinov2_vitl14_reg4"
+resolution = 518
 scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false

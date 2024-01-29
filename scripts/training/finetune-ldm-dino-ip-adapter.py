@@ -44,6 +44,7 @@ class AdapterConfig(BaseModel):
     seed: int = 9752
     image_encoder_type: str
     checkpoint: str | None = None
+    resolution: int = 518
     scale: float = 1.0
     inference_scale: float = 0.75
     use_pooled_text_embedding: bool = False
@@ -109,7 +110,8 @@ class IPDataset(Dataset[IPBatch]):
         super().__init__()
         self.trainer = trainer
         self.dataset = self.load_huggingface_dataset()
-        self.image_encoder_transform = trainer.adapter.preprocess_image
+        cond_resolution = trainer.config.adapter.resolution
+        self.image_encoder_transform = lambda x: trainer.adapter.preprocess_image(x, (cond_resolution, cond_resolution))
 
     @staticmethod
     def download_images(
@@ -481,7 +483,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for prompt, cond_image in zip(prompts, cond_images):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
-            image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image))
+            cond_resolution = self.config.adapter.resolution
+            image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
             for i in range(num_images_per_prompt):
                 manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
