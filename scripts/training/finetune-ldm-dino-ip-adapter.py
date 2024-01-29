@@ -376,7 +376,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
-            train_image_proj=True
         )
         return ip_adapter.to(self.device, dtype=self.dtype)
 
