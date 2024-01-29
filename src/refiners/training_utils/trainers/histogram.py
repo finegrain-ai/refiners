@@ -13,6 +13,7 @@ from refiners.fluxion.adapters.histogram import (
     HistogramEncoder,
     HistogramExtractor,
     SD1HistogramAdapter,
+    ColorLoss
 )
 from refiners.fluxion.utils import image_to_tensor, save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
@@ -108,6 +109,10 @@ class HistogramLatentDiffusionTrainer(
         adapter = SD1HistogramAdapter(target=self.unet, histogram_encoder=self.histogram_encoder)
         return adapter
 
+    @cached_property
+    def color_loss(self) -> ColorLoss:
+        return ColorLoss()
+    
     def __init__(
         self,
         config: HistogramLatentDiffusionConfig,
@@ -131,7 +136,7 @@ class HistogramLatentDiffusionTrainer(
 
         images = [item.image for item in batch]
         latents = self.lda.images_to_latents(images)
-        image_tensor = images_to_tensor(images)
+        images_tensor = images_to_tensor(images)
         
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
         histogram_embeddings = self.histogram_encoder(histograms)
@@ -155,15 +160,15 @@ class HistogramLatentDiffusionTrainer(
         )
 
         predicted_decoded = self.lda.decode(x=predicted_latents).to(device=self.device)
-        loss_2 = self.histogram_extractor.color_loss(
-            predicted_decoded,
+        predicted_images_tensor = (images_tensor + 1) / 2
 
+        loss_2 = self.color_loss(
+            predicted_images_tensor,
+            images_tensor
         )
-        
-        loss_2 = self.histogram_distance(predicted_histograms, histograms)
-        
+                
         self.log({
-            f"losses/histo": loss_2,
+            f"losses/color_loss": loss_2,
             f"losses/image": loss_1
         })
 
