@@ -1,5 +1,5 @@
 from PIL import Image
-from torch import Tensor, device as Device, dtype as DType, cat
+from torch import Tensor, cat, device as Device, dtype as DType
 
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (
@@ -15,7 +15,7 @@ from refiners.fluxion.layers import (
     Sum,
     Upsample,
 )
-from refiners.fluxion.utils import image_to_tensor, tensor_to_image
+from refiners.fluxion.utils import images_to_tensor, tensor_to_images
 
 
 class Resnet(Sum):
@@ -210,26 +210,25 @@ class LatentDiffusionAutoencoder(Chain):
         x = decoder(x / self.encoder_scale)
         return x
 
-    def encode_image(self, image: Image.Image) -> Tensor:
-        return self.encode_images([image])
-    
-    def encode_images(self, images: list[Image.Image]) -> Tensor:
-        x = cat([image_to_tensor(image, device=self.device, dtype=self.dtype) for image in images], dim=0)
+    def image_to_latent(self, image: Image.Image) -> Tensor:
+        return self.images_to_latents([image])
+
+    def images_to_latents(self, images: list[Image.Image]) -> Tensor:
+        x = images_to_tensor(images)
         x = 2 * x - 1
         return self.encode(x)
     
+    # backward-compatibility alias
     def decode_latents(self, x: Tensor) -> Image.Image:
-        # For retro-compatibilty
-        return self.decode_image(x)
-    
-    def decode_image(self, x: Tensor) -> Image.Image:
+        return self.latent_to_image(x)
+
+    def latent_to_image(self, x: Tensor) -> Image.Image:
         if x.shape[0] != 1:
             raise ValueError(f"Expected batch size of 1, got {x.shape[0]}")
-        
+
         return self.decode_images(x)[0]
-        
-    def decode_images(self, x: Tensor) -> list[Image.Image]:
+
+    def latents_to_images(self, x: Tensor) -> list[Image.Image]:
         x = self.decode(x)
         x = (x + 1) / 2
-        return [tensor_to_image(t) for t in x.chunk(x.shape[0])]
-        
+        return tensor_to_images(x)

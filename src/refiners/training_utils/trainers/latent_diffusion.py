@@ -155,7 +155,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                 clip_text_embedding = sd.compute_clip_text_embedding(text=prompt)
                 for step in sd.steps:
                     x = sd(x, step=step, clip_text_embedding=clip_text_embedding, condition_scale=condition_scale)
-                canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+                canvas_image.paste(sd.lda.latent_to_image(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         self.log(data=images)
 
