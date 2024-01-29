@@ -107,7 +107,15 @@ reportMissingTypeStubs = "warning"
 
 [tool.coverage.run]
 branch = true
+source = ["src/refiners"]
 
 # Also apply to HTML output, where appropriate
 [tool.coverage.report]
 ignore_errors = true # see `build-html-cov` for details
+exclude_also = [
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
