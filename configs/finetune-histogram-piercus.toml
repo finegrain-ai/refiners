@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="with-loss-adam-step-lr"
+name="loss0.2-adam-step-lr"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}
@@ -52,7 +52,7 @@ update_interval = "1:step"
 # 5000 steps = 4e-5
 # 12500 steps = 1e-6
 gamma = 0.9995 
-warmup = "250:step"
+warmup = "1000:step"
 
 [dropout]
 dropout_probability = 0.0
