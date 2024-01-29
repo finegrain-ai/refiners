@@ -65,7 +65,7 @@ class HistogramExtractor(fl.Chain):
             tensors.append(tensor)
         images_tensor = cat(tensors, dim=0)
         return self(images_tensor)
-
+            
     def from_decoded(self, decoded: Tensor) -> Tensor:
         tensor = (decoded + 1)/2 * (self.color_size - 1)
         return self(tensor)
