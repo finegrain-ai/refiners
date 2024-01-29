@@ -1,5 +1,5 @@
 from PIL import Image
-from torch import Tensor, cat, device as Device, dtype as DType
+from torch import Tensor, device as Device, dtype as DType
 
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (

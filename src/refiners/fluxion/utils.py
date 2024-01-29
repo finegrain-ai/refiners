@@ -1,6 +1,6 @@
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Literal, TypeVar, cast
+from typing import Any, Iterable, Literal, TypeVar, cast, List
 
 import torch
 from jaxtyping import Float
@@ -138,7 +138,7 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
     return image_tensor.unsqueeze(0)
 
 def tensor_to_images(tensor: Tensor) -> List[Image.Image]:
-    return [tensor_to_image(t) for t in tensor.split(1)]
+    return [tensor_to_image(t) for t in tensor.split(1)] # type: ignore
    
 def tensor_to_image(tensor: Tensor) -> Image.Image:
     """
