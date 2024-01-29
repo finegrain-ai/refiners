@@ -19,7 +19,6 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder im
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.clip.text_encoder import DoubleTextEncoder
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter
 from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
