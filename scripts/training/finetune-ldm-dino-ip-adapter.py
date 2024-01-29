@@ -14,7 +14,7 @@ from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
-from refiners.foundationals.dinov2.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg
+from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -338,17 +338,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return CLIPTextEncoderL(
             device=self.device,
         ).to(device=self.device)
-
     @cached_property
-    def adapter(self) -> SD1IPAdapter:
-        assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
-        ip_adapter = SD1IPAdapter(
-            target=self.unet,
-            fine_grained=self.config.adapter.fine_grained,
-            scale=self.config.adapter.scale,
-            use_timestep_embedding=self.config.adapter.use_timestep_embedding,
-            use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
-        )
+    def image_encoder(self) -> ViT:
+        assert self.config.models["image_encoder"] is not None, "The config must contain an image_encoder entry."
         image_encoder_cls = DINOv2_base
         if self.config.adapter.image_encoder_type == "dinov2_vitl14_reg4":
             image_encoder_cls = DINOv2_large_reg
@@ -360,8 +352,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder_cls = DINOv2_small_reg
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
-        ip_adapter.image_encoder = image_encoder_cls().load_from_safetensors(self.config.adapter.image_encoder_path)
-        ip_adapter.image_encoder.requires_grad_(False)
+        return image_encoder_cls().to(device=self.device)
+    @cached_property
+    def adapter(self) -> SD1IPAdapter:
+        assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
+        ip_adapter = SD1IPAdapter(
+            target=self.unet,
+            fine_grained=self.config.adapter.fine_grained,
+            scale=self.config.adapter.scale,
+            use_timestep_embedding=self.config.adapter.use_timestep_embedding,
+            use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
+            image_encoder=self.image_encoder
+        )
         return ip_adapter.to(device=self.device)
 
     @cached_property
@@ -379,6 +381,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             "lda": self.lda,
             "unet": self.unet,
             "text_encoder": self.text_encoder,
+            "image_encoder": self.image_encoder,
             "adapter": self.adapter,
         }
 
@@ -501,6 +504,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
         self.callbacks.extend((LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
+
+class ImageEncoderFreeze(Callback[AdapterLatentDiffusionTrainer]):
+    """Callback to compute gradient norm"""
+    def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        trainer.adapter.image_encoder.requires_grad_(False)
+        return super().on_init_end(trainer)
 
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
