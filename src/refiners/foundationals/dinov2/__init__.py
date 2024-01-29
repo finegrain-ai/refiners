@@ -6,13 +6,7 @@ from .dinov2 import (
     DINOv2_small,
     DINOv2_small_reg,
 )
-from .vit import (
-    ViT,
-    ViT_base,
-    ViT_large,
-    ViT_small,
-    ViT_tiny,
-)
+from .vit import ViT
 
 __all__ = [
     "DINOv2_base",
@@ -22,8 +16,4 @@ __all__ = [
     "DINOv2_small",
     "DINOv2_small_reg",
     "ViT",
-    "ViT_base",
-    "ViT_large",
-    "ViT_small",
-    "ViT_tiny",
 ]
