@@ -23,7 +23,7 @@ num_layers = 2
 embedding_dim = 128
 color_bits = 5 # 2^5 = 32 color-level => 32³ different colors 32 768 colors
 patch_size = 8 # (2^5/8)^3 + 1 => sequence of 65 tokens
-loss_weight = 0.05
+loss_weight = 0.1
 
 [training]
 duration = "1:epoch"
@@ -38,20 +38,14 @@ evaluation_seed = 1
 
 [optimizer]
 optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 5e-4
+learning_rate = 2e-4
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
 
 [scheduler]
-scheduler_type = "StepLR"
+scheduler_type = "ConstantLR"
 update_interval = "1:step"
-# 0.0005 * 0.9995 ** (2500*n)
-# divide by 2 every epoch (2500 steps) First epoch 
-# 2500 steps = 1e-4
-# 5000 steps = 4e-5
-# 12500 steps = 1e-6
-gamma = 0.9995 
 warmup = "1000:step"
 
 [dropout]
