@@ -81,3 +81,12 @@ def test_histogram_encoder() -> None:
     encoder = HistogramEncoder(color_bits=color_bits, patch_size=patch_size, embedding_dim=embedding_dim)
     embedding = encoder(histo1)
     assert embedding.shape == (batch_size, n_patch**3 + 1, embedding_dim), "embedding shape should be (batch_size, ouput_dim)"
+
+def test_color_loss() -> None:
+    
+    img_white_normalized = torch.ones((2, 3, 224, 224)) 
+    img_black_normalized = torch.zeros((2, 3, 224, 224)) 
+
+    color_loss = ColorLoss()
+
+    assert color_loss(img_white_normalized, img_black_normalized) == 1.0, "White and black image should give loss = 1"

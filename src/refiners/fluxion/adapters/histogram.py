@@ -1,7 +1,7 @@
 from typing import Any, List, TypeVar
 
-from torch import Tensor, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
-from torch.nn import init
+from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
+from torch.nn import init, L1Loss
 from torch.nn.functional import mse_loss as _mse_loss
 
 import refiners.fluxion.layers as fl
@@ -12,7 +12,27 @@ from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionA
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 from PIL import Image
-from refiners.fluxion.utils import image_to_tensor
+from refiners.fluxion.utils import images_to_tensor
+
+class ColorLoss(fl.Module):
+    def __init__():
+        self.l1_loss = L1Loss()
+        super().__init__()
+    
+    def image_to_cdfs(image: Tensor) -> Tensor:
+        sorted_channels = []
+        for channel in image.split(1, dim=1):
+            # We extract RGB curves
+            sorted_channel = sort(flatten(tensor, 1))
+            sorted_channels.append(sorted_channel)
+        return cat(sorted_channels, dim=1)
+    
+    def forward(actual: Tensor, expected: Tensor) - > Tensor:
+        assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
+        assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
+        return self.l1_loss(self.image_to_cdfs(actual), self.image_to_cdfs(expected))
+
+
 
 class HistogramDistance(fl.Chain):
     def __init__(
@@ -40,6 +60,9 @@ class HistogramExtractor(fl.Chain):
         num_pixels = x.shape[1] * x.shape[2]
         histograms: List[Tensor] = []
         device = x.device
+        # x is a [0, 1] normalized image
+        x = x * (self.color_size - 1)
+
         for i in range(batch_size):
             hist_dd = histogramdd(
                 x[i].cpu(),
@@ -58,17 +81,8 @@ class HistogramExtractor(fl.Chain):
 
         return stack(histograms).to(device)
     
-    def images_to_histograms(self, images: List[Image.Image], device = None, dtype = None) -> Tensor:
-        tensors = []
-        for image in images:
-            tensor = image_to_tensor(image, device=device, dtype=dtype) * (self.color_size - 1)
-            tensors.append(tensor)
-        images_tensor = cat(tensors, dim=0)
-        return self(images_tensor)
-            
-    def from_decoded(self, decoded: Tensor) -> Tensor:
-        tensor = (decoded + 1)/2 * (self.color_size - 1)
-        return self(tensor)
+    def images_to_histograms(self, images: List[Image.Image], device: Device | None = None, dtype : DType | None = None) -> Tensor:
+        return self(images_to_tensor(images, device=device, dtype = dtype))
 
 
 class Patch3dEncoder(fl.Chain):

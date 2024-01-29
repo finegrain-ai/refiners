@@ -128,8 +128,10 @@ class HistogramLatentDiffusionTrainer(
         
         texts = [item.text for item in batch]
         text_embeddings = self.text_encoder(texts)
-        
-        latents = self.lda.encode_images([item.image for item in batch])
+
+        images = [item.image for item in batch]
+        latents = self.lda.images_to_latents(images)
+        image_tensor = images_to_tensor(images)
         
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
         histogram_embeddings = self.histogram_encoder(histograms)
@@ -143,6 +145,7 @@ class HistogramLatentDiffusionTrainer(
         self.histogram_adapter.set_histogram_embedding(histogram_embeddings)
 
         prediction = self.unet(noisy_latents)
+
         loss_1 = self.mse_loss(prediction, noise)
         
         predicted_latents = self.ddpm_scheduler.remove_noise(
@@ -150,8 +153,12 @@ class HistogramLatentDiffusionTrainer(
             noise=prediction.to(device=self.ddpm_scheduler.device), 
             step=self.current_step
         )
+
         predicted_decoded = self.lda.decode(x=predicted_latents).to(device=self.device)
-        predicted_histograms = self.histogram_extractor.from_decoded(predicted_decoded)
+        loss_2 = self.histogram_extractor.color_loss(
+            predicted_decoded,
+
+        )
         
         loss_2 = self.histogram_distance(predicted_histograms, histograms)
         
