@@ -231,4 +231,4 @@ class LatentDiffusionAutoencoder(Chain):
     def decode_images(self, x: Tensor) -> list[Image.Image]:
         x = self.decode(x)
         x = (x + 1) / 2
-        return [tensor_to_image(t) for t in x.chunk(x.shape[0])]
+        return [tensor_to_image(t) for t in x.split(1)]
