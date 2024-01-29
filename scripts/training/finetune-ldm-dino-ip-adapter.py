@@ -229,6 +229,7 @@ class IPDataset(Dataset[IPBatch]):
         # encode the captions into text embedding
         self.trainer.prepare_model("text_encoder")
         dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
+        dataset = dataset.remove_columns(["palettes"])  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_captions,
             input_columns=["caption"],
