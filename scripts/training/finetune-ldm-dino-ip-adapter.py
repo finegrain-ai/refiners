@@ -108,7 +108,7 @@ class IPDataset(Dataset[IPBatch]):
         super().__init__()
         self.trainer = trainer
         self.dataset = self.load_huggingface_dataset()
-        self.image_encoder_transform = trainer.image_encoder_transform
+        self.image_encoder_transform = trainer.adapter.preprocess_image
 
     @staticmethod
     def download_images(
@@ -246,7 +246,6 @@ class IPDataset(Dataset[IPBatch]):
             output_all_columns=True,
             columns=[
                 "text_embedding",
-                "IPs",
             ],
         )
 

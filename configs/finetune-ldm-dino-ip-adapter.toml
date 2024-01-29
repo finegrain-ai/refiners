@@ -72,8 +72,8 @@ save_interval = "250:step"
 [test_ldm]
 num_inference_steps = 30
 prompts = [
-    "A cat flying over a castle",
+    "A dog flying over a castle",
 ]
 validation_image_paths = [
-    "tests/weights/cat.jpg"
+    "tests/weights/frida.jpg"
 ]
