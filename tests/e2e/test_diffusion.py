@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 from typing import Iterator
 from warnings import warn
@@ -28,6 +29,13 @@ from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSc
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from tests.utils import ensure_similar_images
+
+
+@pytest.fixture(autouse=True)
+def ensure_gc():
+    # Avoid GPU OOMs
+    # See https://github.com/pytest-dev/pytest/discussions/8153#discussioncomment-214812
+    gc.collect()
 
 
 @pytest.fixture(scope="module")
