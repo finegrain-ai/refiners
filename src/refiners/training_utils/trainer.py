@@ -8,7 +8,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 import numpy as np
 from loguru import logger
 from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16
-from torch.autograd import backward
+from torch.autograd import backward, set_detect_anomaly
 from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -40,7 +40,7 @@ from refiners.training_utils.callback import (
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
-
+set_detect_anomaly(True)
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
 
