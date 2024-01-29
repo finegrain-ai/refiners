@@ -130,25 +130,6 @@ class Unsqueeze(Module):
         return x.unsqueeze(self.dim)
 
 
-class Unbind(Module):
-    def __init__(self, dim: int = 0) -> None:
-        self.dim = dim
-        super().__init__()
-
-    def forward(self, x: Tensor) -> tuple[Tensor, ...]:
-        return x.unbind(dim=self.dim)  # type: ignore
-
-
-class Chunk(Module):
-    def __init__(self, chunks: int, dim: int = 0) -> None:
-        self.chunks = chunks
-        self.dim = dim
-        super().__init__()
-
-    def forward(self, x: Tensor) -> tuple[Tensor, ...]:
-        return x.chunk(chunks=self.chunks, dim=self.dim)  # type: ignore
-
-
 class Sin(Module):
     def forward(self, x: Tensor) -> Tensor:
         return torch.sin(input=x)
