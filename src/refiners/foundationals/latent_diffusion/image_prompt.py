@@ -381,7 +381,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     # Prevent PyTorch module registration
     _image_encoder: list[CLIPImageEncoderH | ViT]
     _grid_image_encoder: list[CLIPImageEncoderH | ViT]
-    _image_proj: list[fl.Module]
+    _image_proj: list[fl.Module] | fl.Module
 
     def __init__(
         self,
@@ -393,7 +393,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         weights: dict[str, Tensor] | None = None,
         strict: bool = True,
         use_timestep_embedding: bool = False,
-        use_pooled_text_embedding: bool = False
+        use_pooled_text_embedding: bool = False,
+        train_image_proj: bool = False
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(target)
@@ -404,7 +405,11 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._image_encoder = [image_encoder]
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(image_encoder)]
-        self._image_proj = [image_proj]
+        self.train_image_proj = train_image_proj
+        if train_image_proj:
+            self._image_proj = image_proj
+        else:
+            self._image_proj = [image_proj]
 
         self.sub_adapters = [
             CrossAttentionAdapter(target=cross_attn, scale=scale, use_timestep_embedding=use_timestep_embedding, use_pooled_text_embedding=use_pooled_text_embedding)
@@ -448,6 +453,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     @property
     def image_proj(self) -> fl.Module:
+        if self.train_image_proj:
+            return self._image_proj
         return self._image_proj[0]
 
     def inject(self: "TIPAdapter", parent: fl.Chain | None = None) -> "TIPAdapter":

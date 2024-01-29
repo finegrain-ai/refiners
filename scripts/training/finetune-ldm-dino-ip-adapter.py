@@ -376,7 +376,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
             image_encoder=self.image_encoder,
-            image_proj=self.image_proj
+            image_proj=self.image_proj,
+            train_image_proj=True
         )
         return ip_adapter.to(self.device, dtype=self.dtype)
 
@@ -548,7 +549,18 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""
 
     def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        print("before inject", len(trainer.learnable_parameters))
         trainer.adapter.inject()
+        print("after inject", len(trainer.learnable_parameters))
+        for model_name in trainer.models:
+            print(model_name)
+            i = 0
+            for name, param in trainer.models[model_name].named_parameters():
+                if param.requires_grad:
+                    print(name)
+                    i += 1
+            print(i)
+
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to save the adapter when a checkpoint is saved."""
