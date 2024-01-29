@@ -516,8 +516,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
     def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        trainer.adapter.image_encoder.requires_grad_(False)
+        print("before freeze", trainer.learnable_parameter_count)
+        trainer.image_encoder.requires_grad_(False)
         trainer.unet.requires_grad_(False)
+        print("after freeze", trainer.learnable_parameter_count)
         return super().on_init_end(trainer)
 
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
@@ -535,7 +537,9 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""
 
     def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        print("before inject", trainer.learnable_parameter_count)
         trainer.adapter.inject()
+        print("after inject", trainer.learnable_parameter_count)
 
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
