@@ -361,7 +361,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_cross_attention.scale = value
 
     def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
+        print(self.image_cross_attention)
+        print(self.image_value_projection)
         print(self.image_key_projection)
+
+
         self.image_key_projection.weight = nn.Parameter(key_tensor)
         self.image_value_projection.weight = nn.Parameter(value_tensor)
         self.image_cross_attention.to(self.device, self.dtype)
