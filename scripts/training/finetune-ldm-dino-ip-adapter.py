@@ -162,6 +162,8 @@ class IPDataset(Dataset[IPBatch]):
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
+        print("encode")
+        print(text_encoder.device)
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
@@ -264,8 +266,11 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         image = data["image"]
         cond_image = self.image_encoder_transform(image)
-        print(cond_image.shape)
-        cond_image = self.trainer.adapter.compute_image_embedding(cond_image)
+        print("transform")
+        print(cond_image.device)
+        print(self.trainer.adapter.device)
+        print(self.trainer.lda.device)
+        cond_image = self.trainer.adapter.compute_conditional_image_embedding(cond_image)
         # apply augmentation to the image
         image_transforms: list[Module] = []
         if self.trainer.config.dataset.random_crop_size:
@@ -486,9 +491,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(device=self.device)
             cond_resolution = self.config.adapter.resolution
-            print(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).shape)
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
-            print(image_embedding.shape)
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
                 manual_seed(self.config.test_ldm.seed)
