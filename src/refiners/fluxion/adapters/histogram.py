@@ -15,19 +15,19 @@ from PIL import Image
 from refiners.fluxion.utils import images_to_tensor
 
 class ColorLoss(fl.Module):
-    def __init__():
-        self.l1_loss = L1Loss()
+    def __init__(self):
         super().__init__()
-    
-    def image_to_cdfs(image: Tensor) -> Tensor:
+        self.l1_loss = L1Loss()
+
+    def image_to_cdfs(self, image: Tensor) -> Tensor:
         sorted_channels = []
         for channel in image.split(1, dim=1):
             # We extract RGB curves
-            sorted_channel = sort(flatten(tensor, 1))
+            sorted_channel, _ = sort(flatten(channel, 1))
             sorted_channels.append(sorted_channel)
         return cat(sorted_channels, dim=1)
     
-    def forward(actual: Tensor, expected: Tensor) - > Tensor:
+    def forward(self, actual: Tensor, expected: Tensor) -> Tensor:
         assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
         assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
         return self.l1_loss(self.image_to_cdfs(actual), self.image_to_cdfs(expected))

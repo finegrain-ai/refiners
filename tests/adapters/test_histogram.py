@@ -1,6 +1,6 @@
 import torch
 
-from refiners.fluxion.adapters.histogram import HistogramDistance, HistogramEncoder, HistogramExtractor
+from refiners.fluxion.adapters.histogram import HistogramDistance, HistogramEncoder, HistogramExtractor, ColorLoss
 from refiners.fluxion.utils import image_to_tensor, tensor_to_image
 
 
