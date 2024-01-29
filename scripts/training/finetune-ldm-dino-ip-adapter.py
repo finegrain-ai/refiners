@@ -263,7 +263,7 @@ class IPDataset(Dataset[IPBatch]):
         """Apply transforms to data."""
         dataset_config = self.trainer.config.dataset
         image = data["image"]
-        cond_image = self.image_encoder_transform(image)
+        cond_image = self.image_encoder_transform(image).to(self.trainer.device, dtype=self.trainer.dtype)
         cond_image = self.trainer.adapter.compute_conditional_image_embedding(cond_image)[0]
         # apply augmentation to the image
         image_transforms: list[Module] = []
@@ -306,8 +306,8 @@ class IPDataset(Dataset[IPBatch]):
 
     def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
         latents = cat(tensors=[item.latent.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
-        text_embeddings = cat(tensors=[item.text_embedding for item in batch])
-        cond_images = pad_sequence([item.cond_image for item in batch], batch_first=True)
+        text_embeddings = cat(tensors=[item.text_embedding.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
+        cond_images = pad_sequence([item.cond_image.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch], batch_first=True)
         return IPBatch(
             latent=latents,
             text_embedding=text_embeddings,
