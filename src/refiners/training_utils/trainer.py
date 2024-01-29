@@ -496,6 +496,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
+        print("Called backward")
+        print(self.scaler)
         if self.scaler is not None:
             self.scaler.scale(scaled_loss).backward() # type: ignore
         else:
