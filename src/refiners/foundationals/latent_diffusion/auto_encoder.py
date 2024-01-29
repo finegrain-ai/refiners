@@ -15,7 +15,7 @@ from refiners.fluxion.layers import (
     Sum,
     Upsample,
 )
-from refiners.fluxion.utils import image_to_tensor, tensor_to_image
+from refiners.fluxion.utils import images_to_tensor, tensor_to_images
 
 
 class Resnet(Sum):
@@ -214,7 +214,7 @@ class LatentDiffusionAutoencoder(Chain):
         return self.images_to_latents([image])
 
     def images_to_latents(self, images: list[Image.Image]) -> Tensor:
-        x = cat([image_to_tensor(image, device=self.device, dtype=self.dtype) for image in images], dim=0)
+        x = images_to_tensor(images)
         x = 2 * x - 1
         return self.encode(x)
     
@@ -231,4 +231,4 @@ class LatentDiffusionAutoencoder(Chain):
     def latents_to_images(self, x: Tensor) -> list[Image.Image]:
         x = self.decode(x)
         x = (x + 1) / 2
-        return [tensor_to_image(t) for t in x.split(1)]
+        return tensor_to_images(x)

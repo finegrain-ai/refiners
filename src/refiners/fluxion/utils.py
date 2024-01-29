@@ -15,6 +15,7 @@ from torch import (
     manual_seed as _manual_seed,  # type: ignore
     no_grad as _no_grad,  # type: ignore
     norm as _norm,  # type: ignore
+    cat
 )
 from torch.nn.functional import conv2d, interpolate as _interpolate, pad as _pad  # type: ignore
 
@@ -112,6 +113,8 @@ def gaussian_blur(
 
     return tensor
 
+def images_to_tensor(images: List[Image.Image], device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
+    return cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
 
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
     """
@@ -134,7 +137,9 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
 
     return image_tensor.unsqueeze(0)
 
-
+def tensor_to_images(tensor: Tensor) -> List[Image.Image]:
+    return [tensor_to_image(t) for t in tensor.split(1)]
+   
 def tensor_to_image(tensor: Tensor) -> Image.Image:
     """
     Convert a Tensor to a PIL Image.
