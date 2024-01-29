@@ -39,14 +39,15 @@ mixed_precision = "bfloat16"
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 5e-4
+learning_rate = 2e-5
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
 
 [scheduler]
 scheduler_type = "CosineAnnealingLR"
-update_interval = "1:step"
+update_interval = "1000:step"
+eta_min = 2e-6
 
 [dropout]
 dropout_probability = 0
