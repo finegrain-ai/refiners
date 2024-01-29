@@ -419,7 +419,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             try:
                 self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
             except:
-                print("Failed to load image projection weight")
+                None
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: list[Tensor] = []
