@@ -39,7 +39,6 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
         strict: bool = True,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
-        train_image_proj: bool = False
     ) -> None:
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
@@ -58,6 +57,5 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             weights=weights,
             strict=strict,
             use_timestep_embedding=use_timestep_embedding,
-            use_pooled_text_embedding=use_pooled_text_embedding,
-            train_image_proj=train_image_proj
+            use_pooled_text_embedding=use_pooled_text_embedding
         )
