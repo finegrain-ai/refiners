@@ -7,7 +7,7 @@ import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like
+from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like, no_grad
 from torch.distributions import Beta
 from torch.nn import Module
 from torch.nn.functional import mse_loss
@@ -258,12 +258,13 @@ class IPDataset(Dataset[IPBatch]):
     def empty_text_embedding(self) -> Tensor:
         """Return an empty text embedding."""
         return self.trainer.text_encoder("")
-
+    @no_grad()
     def transform(self, data: dict[str, Any]) -> IPBatch:
         """Apply transforms to data."""
         dataset_config = self.trainer.config.dataset
         image = data["image"]
         cond_image = self.image_encoder_transform(image)
+        cond_image = self.trainer.adapter.compute_image_embedding(cond_image)
         # apply augmentation to the image
         image_transforms: list[Module] = []
         if self.trainer.config.dataset.random_crop_size:
