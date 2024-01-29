@@ -541,7 +541,14 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
         print("before inject", len(trainer.learnable_parameters))
         trainer.adapter.inject()
         print("after inject", len(trainer.learnable_parameters))
-        print(trainer.learnable_parameters)
+        for model_name in trainer.models:
+            print(model_name)
+            i = 0
+            for name, param in trainer.models[model_name].named_parameters():
+                if param.requires_grad:
+                    print(name)
+                    i += 1
+            print(i)
 
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
