@@ -411,8 +411,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def compute_loss(self, batch: IPBatch) -> Tensor:
         # retreive data from batch
         latents = batch.latent
-        text_embeddings = batch.text_embedding
-        cond_image = batch.cond_image
+        text_embeddings = batch.text_embedding.to(device=self.device)
+        cond_image = batch.cond_image.to(device=self.device)
 
         # set IP embeddings context
         self.adapter.set_image_embedding(cond_image)
@@ -486,7 +486,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
             # TODO: pool text according to end of text id for pooled text embeds if given option
-            print(clip_text_embedding.shape, clip_text_embedding.shape)
             for i in range(num_images_per_prompt):
                 manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
