@@ -410,7 +410,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
         # retreive data from batch
-        latents = batch.latent
+        latents = batch.latent.to(device=self.device)
         text_embeddings = batch.text_embedding.to(device=self.device)
         cond_image = batch.cond_image.to(device=self.device)
 
