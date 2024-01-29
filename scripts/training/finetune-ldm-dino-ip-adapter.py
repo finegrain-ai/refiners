@@ -42,7 +42,6 @@ Image.MAX_IMAGE_PIXELS = 200_000_000
 class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
     seed: int = 9752
-    image_encoder_path: str
     image_encoder_type: str
     scale: float = 1.0
     inference_scale: float = 0.75
