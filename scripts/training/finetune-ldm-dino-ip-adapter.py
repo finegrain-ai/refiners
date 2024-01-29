@@ -16,15 +16,17 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
 from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter, get_sd1_image_proj
 from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
 from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
+from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, PerceiverResampler
 from refiners.training_utils.latent_diffusion import (
     LatentDiffusionConfig,
     TestDiffusionConfig,
@@ -356,6 +358,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder_cls = DINOv2_small
         return image_encoder_cls().to(self.device, dtype=self.dtype)
     @cached_property
+    def image_proj(self) -> ImageProjection | PerceiverResampler:
+        assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
+        cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
+        image_proj = get_sd1_image_proj(self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained)
+        return image_proj.to(self.device, dtype=self.dtype)
+    @cached_property
     def adapter(self) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
         # A bit of hacky method to initialize model with weights.Potentially refactor this
@@ -367,7 +375,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             scale=self.config.adapter.scale,
             use_timestep_embedding=self.config.adapter.use_timestep_embedding,
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
-            image_encoder=self.image_encoder
+            image_encoder=self.image_encoder,
+            image_proj=self.image_proj
         )
         return ip_adapter.to(self.device, dtype=self.dtype)
 
@@ -387,7 +396,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "image_encoder": self.image_encoder,
-            "adapter": self.adapter
+            "image_proj": self.image_proj,
+            "adapter": self.adapter,
         }
 
     def load_dataset(self) -> IPDataset:
