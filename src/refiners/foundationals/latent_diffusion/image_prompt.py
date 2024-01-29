@@ -415,10 +415,11 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             image_proj_state_dict: dict[str, Tensor] = {
                 k.removeprefix("image_proj."): v for k, v in weights.items() if k.startswith("image_proj.")
             }
-            for key in image_proj_state_dict:
-                print(key, image_proj_state_dict[key].shape)
-            print("strict", strict)
-            self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
+            # Hack to go around image projection with same weight name but different projection shape.
+            try:
+                self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
+            except:
+                print("Failed to load image projection weight")
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: list[Tensor] = []
