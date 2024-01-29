@@ -415,7 +415,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         cond_image = batch.cond_image
 
         # set IP embeddings context
-        self.adapter.set_cond_image_embedding(cond_image)
+        self.adapter.set_image_embedding(cond_image)
 
         # set text embeddings context
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
@@ -489,7 +489,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device)
-                self.adapter.set_image_embedding(embeddings=image_embedding)
+                self.adapter.set_image_embedding(image_embedding)
                 for step in sd.steps:
                     x = sd(
                         x=x,
