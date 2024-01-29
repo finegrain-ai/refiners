@@ -391,6 +391,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         scale: float = 1.0,
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
+        strict: bool = False,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False
     ) -> None:
@@ -414,7 +415,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             image_proj_state_dict: dict[str, Tensor] = {
                 k.removeprefix("image_proj."): v for k, v in weights.items() if k.startswith("image_proj.")
             }
-            self.image_proj.load_state_dict(image_proj_state_dict)
+            self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: list[Tensor] = []
@@ -430,7 +431,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
                     k.removeprefix("pooled_text_embedding_proj."): v for k, v in weights.items() if k.startswith("pooled_text_embedding_proj.")
                 }
-                self.pooled_text_embedding_proj.load_state_dict(pooled_text_embedding_proj_state_dict)
+                self.pooled_text_embedding_proj.load_state_dict(pooled_text_embedding_proj_state_dict, strict=strict)
 
     @property
     def image_encoder(self) -> CLIPImageEncoderH | ViT:
