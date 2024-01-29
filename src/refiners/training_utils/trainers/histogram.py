@@ -15,7 +15,7 @@ from refiners.fluxion.adapters.histogram import (
     SD1HistogramAdapter,
     ColorLoss
 )
-from refiners.fluxion.utils import image_to_tensor, save_to_safetensors
+from refiners.fluxion.utils import images_to_tensor, image_to_tensor, save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
