@@ -510,7 +510,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         config: AdapterLatentDiffusionConfig,
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
-        self.callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
+        # if initializing after, the on_init_end methods do not get called for the extended callbacks
+        if callbacks is None:
+            callbacks = []
+        callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
         super().__init__(config=config, callbacks=callbacks)
 
 class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
