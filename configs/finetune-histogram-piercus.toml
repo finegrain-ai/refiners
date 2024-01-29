@@ -37,16 +37,22 @@ evaluation_interval = "1000:step"
 evaluation_seed = 1
 
 [optimizer]
-optimizer = "Prodigy" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1
+optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
+learning_rate = 5e-4
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
 
 [scheduler]
-scheduler_type = "ConstantLR"
+scheduler_type = "StepLR"
 update_interval = "1:step"
-warmup = "500:step"
+# 0.0005 * 0.9995 ** (2500*n)
+# divide by 2 every epoch (2500 steps) First epoch 
+# 2500 steps = 1e-4
+# 5000 steps = 4e-5
+# 12500 steps = 1e-6
+gamma = 0.9995 
+warmup = "250:step"
 
 [dropout]
 dropout_probability = 0.0
@@ -68,10 +74,10 @@ save_interval = "10000:step"
 num_inference_steps = 30
 use_short_prompts = false
 prompts = [
-#        {"text" = "a cute cat", "histogram_db_index" = 0},
-#        {"text" = "a cute cat", "histogram_db_index" = 1},
-#        {"text" = "a cute cat", "histogram_db_index" = 2},
-#        {"text" = "a cute cat", "histogram_db_index" = 3}
+        {"text" = "a cute cat", "histogram_db_index" = 0},
+        {"text" = "a cute cat", "histogram_db_index" = 1},
+        {"text" = "a cute cat", "histogram_db_index" = 2},
+        {"text" = "a cute cat", "histogram_db_index" = 3}
 ]
-num_samples = 0 # 8
+num_samples = 8
 condition_scale = 1.0 # deactivate cause negative sampling not well defined
