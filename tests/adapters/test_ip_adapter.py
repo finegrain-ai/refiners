@@ -27,7 +27,7 @@ def new_adapter(target: SD1UNet | SDXLUNet) -> SD1IPAdapter | SDXLIPAdapter:
 @no_grad()
 @pytest.mark.parametrize("k_unet", [SD1UNet, SDXLUNet])
 def test_inject_eject(k_unet: type[SD1UNet] | type[SDXLUNet], test_device: torch.device):
-    unet = k_unet(in_channels=4, device=test_device)
+    unet = k_unet(in_channels=4, device=test_device, dtype=torch.float16)
     initial_repr = repr(unet)
     adapter = new_adapter(unet)
     assert repr(unet) == initial_repr
