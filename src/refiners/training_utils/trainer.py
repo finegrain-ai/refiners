@@ -342,6 +342,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def optimizer(self) -> Optimizer:
+        print("Optimizer found ", len(self.learnable_parameters), "number of params")
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
         optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
