@@ -310,7 +310,7 @@ class IPDataset(Dataset[IPBatch]):
     def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
         latents = cat(tensors=[item.latent.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
         text_embeddings = cat(tensors=[item.text_embedding.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
-        cond_images = pad_sequence([item.cond_image.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch], batch_first=True)
+        cond_images = cat([item.cond_image.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
         drop_cond_image = [item.drop_cond_image[0] for item in batch]
         return IPBatch(
             latent=latents,
