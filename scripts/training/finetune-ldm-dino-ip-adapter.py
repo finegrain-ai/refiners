@@ -429,7 +429,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         cond_image = batch.cond_image.to(self.device, dtype=self.dtype)
         drop_cond_image = batch.drop_cond_image
         batch_size = len(drop_cond_image)
-        print("batch size is", batch_size, drop_cond_image)
         with no_grad():
             image_encoder = self.adapter.image_encoder if not self.adapter.fine_grained else self.adapter.grid_image_encoder
             image_embedding = image_encoder(cond_image)
@@ -438,7 +437,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                     image_embedding[i][:] = 0
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
-        self.adapter.set_image_embedding(cond_image)
+        self.adapter.set_image_embedding(image_embedding)
 
         # set text embeddings context
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
