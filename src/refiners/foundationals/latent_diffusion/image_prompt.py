@@ -439,12 +439,11 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     @property
     def image_encoder(self) -> CLIPImageEncoderH | ViT:
-        return self._image_encoder[0]
-
-    @property
-    def grid_image_encoder(self) -> CLIPImageEncoderH | ViT:
-        assert hasattr(self, "_grid_image_encoder")
-        return self._grid_image_encoder[0]
+        if not self.fine_grained:
+            return self._image_encoder[0]
+        else:
+            assert hasattr(self, "_grid_image_encoder")
+            return self._grid_image_encoder[0]
 
     @property
     def image_proj(self) -> fl.Module:
@@ -483,7 +482,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.set_context("ip_adapter", {"pooled_text_embedding": pooled_text_embedding})
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_image_embedding(self, image_prompt: Tensor) -> Tensor:
-        image_encoder = self.image_encoder if not self.fine_grained else self.grid_image_encoder
+        image_encoder = self.image_encoder
         clip_embedding = image_encoder(image_prompt)
         conditional_embedding = self.image_proj(clip_embedding)
         if not self.fine_grained:
