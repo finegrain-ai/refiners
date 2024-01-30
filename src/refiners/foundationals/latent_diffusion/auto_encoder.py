@@ -77,7 +77,13 @@ class Encoder(Chain):
                         device=device,
                         dtype=dtype,
                     ),
-                    Resnet(in_channels=resnet_sizes[i], num_groups=num_groups, out_channels=resnet_sizes[i], device=device, dtype=dtype),
+                    Resnet(
+                        in_channels=resnet_sizes[i],
+                        num_groups=num_groups,
+                        out_channels=resnet_sizes[i],
+                        device=device,
+                        dtype=dtype,
+                    ),
                 ]
             )
             for i in range(len(resnet_sizes))
@@ -140,9 +146,23 @@ class Decoder(Chain):
                             num_groups=num_groups,
                             device=device,
                             dtype=dtype,
-                        ) if i > 0 else Identity(),
-                        Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], num_groups=num_groups, device=device, dtype=dtype),
-                        Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], num_groups=num_groups, device=device, dtype=dtype),
+                        )
+                        if i > 0
+                        else Identity(),
+                        Resnet(
+                            in_channels=resnet_sizes[i],
+                            out_channels=resnet_sizes[i],
+                            num_groups=num_groups,
+                            device=device,
+                            dtype=dtype,
+                        ),
+                        Resnet(
+                            in_channels=resnet_sizes[i],
+                            out_channels=resnet_sizes[i],
+                            num_groups=num_groups,
+                            device=device,
+                            dtype=dtype,
+                        ),
                     ]
                 )
             )
