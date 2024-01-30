@@ -316,7 +316,7 @@ class IPDataset(Dataset[IPBatch]):
             latent=latents,
             text_embedding=text_embeddings,
             cond_image=cond_images,
-            drop_cond_image=
+            drop_cond_image=drop_cond_image
         )
 
     def __len__(self) -> int:
