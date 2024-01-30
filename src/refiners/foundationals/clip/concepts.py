@@ -97,6 +97,8 @@ class ConceptExtender(fl.Chain, Adapter[CLIPTextEncoder]):
         with self.setup_adapter(target):
             super().__init__(target)
 
+        self._ensure_no_nesting()
+
         try:
             token_encoder, token_encoder_parent = next(target.walk(TokenEncoder))
             self._token_encoder_parent = [token_encoder_parent]
@@ -112,6 +114,11 @@ class ConceptExtender(fl.Chain, Adapter[CLIPTextEncoder]):
 
         self._embedding_extender = [EmbeddingExtender(token_encoder)]
         self._token_extender = [TokenExtender(clip_tokenizer)]
+
+    def _ensure_no_nesting(self) -> None:
+        assert not isinstance(
+            self.target.parent, ConceptExtender
+        ), "ConceptExtender cannot be nested, add concepts to the injected instance instead."
 
     @property
     def embedding_extender(self) -> EmbeddingExtender:
@@ -138,6 +145,7 @@ class ConceptExtender(fl.Chain, Adapter[CLIPTextEncoder]):
         self.token_extender.add_token(token, self.embedding_extender.num_embeddings - 1)
 
     def inject(self: "ConceptExtender", parent: fl.Chain | None = None) -> "ConceptExtender":
+        self._ensure_no_nesting()
         self.embedding_extender.inject(self.token_encoder_parent)
         self.token_extender.inject(self.clip_tokenizer_parent)
         return super().inject(parent)
