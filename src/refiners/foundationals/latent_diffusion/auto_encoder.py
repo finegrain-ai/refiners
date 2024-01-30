@@ -5,6 +5,7 @@ from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import (
     Chain,
     Conv2d,
+    Conv3d,
     Downsample,
     GroupNorm,
     Identity,
@@ -24,13 +25,21 @@ class Resnet(Sum):
         in_channels: int,
         out_channels: int,
         num_groups: int = 32,
+        spatial_dims: int = 2,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
+        if spatial_dims == 2:
+            Conv = Conv2d
+        elif spatial_dims == 3:
+            Conv = Conv3d
+        else:
+            raise ValueError(f"Unsupported spatial dimension {spatial_dims}")
+        
         shortcut = (
-            Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, device=device, dtype=dtype)
+            Conv(in_channels=in_channels, out_channels=out_channels, kernel_size=1, device=device, dtype=dtype)
             if in_channels != out_channels
             else Identity()
         )
@@ -39,7 +48,7 @@ class Resnet(Sum):
             Chain(
                 GroupNorm(channels=in_channels, num_groups=num_groups, device=device, dtype=dtype),
                 SiLU(),
-                Conv2d(
+                Conv(
                     in_channels=in_channels,
                     out_channels=out_channels,
                     kernel_size=3,
@@ -49,7 +58,7 @@ class Resnet(Sum):
                 ),
                 GroupNorm(channels=out_channels, num_groups=num_groups, device=device, dtype=dtype),
                 SiLU(),
-                Conv2d(
+                Conv(
                     in_channels=out_channels,
                     out_channels=out_channels,
                     kernel_size=3,
@@ -65,6 +74,7 @@ class Encoder(Chain):
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         resnet_sizes: list[int] = [128, 256, 512, 512, 512]
         input_channels: int = 3
+        spatial_dims: int = 2
         latent_dim: int = 8
         resnet_layers: list[Chain] = [
             Chain(
