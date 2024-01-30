@@ -178,7 +178,7 @@ class ModelConfig(BaseModel):
 
 class GyroDropoutConfig(BaseModel):
     total_subnetworks: int = 512
-    concurent_subnetworks: int = 64
+    concurrent_subnetworks: int = 64
     iters_per_epoch: int = 512
     num_features_threshold: float = 5e5
 

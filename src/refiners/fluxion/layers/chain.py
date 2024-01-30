@@ -215,7 +215,7 @@ class Chain(ContextModule):
     @staticmethod
     def _pretty_print_args(*args: Any) -> str:
         """
-        Flatten nested tuples and print tensors with their shape and other informations.
+        Flatten nested tuples and print tensors with their shape and other information.
         """
 
         def _flatten_tuple(t: Tensor | tuple[Any, ...], /) -> list[Any]:
