@@ -116,7 +116,7 @@ class DenseCrossSparseAttention(fl.Chain):
         )
 
 
-class TwoWayTranformerLayer(fl.Chain):
+class TwoWayTransformerLayer(fl.Chain):
     def __init__(
         self,
         embedding_dim: int,

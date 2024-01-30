@@ -5,7 +5,7 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.foundationals.segment_anything.transformer import (
     SparseCrossDenseAttention,
-    TwoWayTranformerLayer,
+    TwoWayTransformerLayer,
 )
 
 
@@ -210,7 +210,7 @@ class MaskDecoder(fl.Chain):
             EmbeddingsAggregator(num_output_mask=num_output_mask),
             Transformer(
                 *(
-                    TwoWayTranformerLayer(
+                    TwoWayTransformerLayer(
                         embedding_dim=embedding_dim,
                         num_heads=8,
                         feed_forward_dim=feed_forward_dim,

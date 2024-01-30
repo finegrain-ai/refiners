@@ -581,7 +581,7 @@ def convert_sam():
         "convert_segment_anything.py",
         "tests/weights/sam_vit_h_4b8939.pth",
         "tests/weights/segment-anything-h.safetensors",
-        expected_hash="3b73b2fd",
+        expected_hash="b62ad5ed",
     )
 
 
