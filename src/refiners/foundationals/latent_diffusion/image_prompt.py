@@ -493,12 +493,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             clip_embedding = image_encoder(zeros_like(image_prompt))
             negative_embedding = self.image_proj(clip_embedding)
         return cat((negative_embedding, conditional_embedding))
-    def compute_conditional_image_embedding(self, image_prompt: Tensor, image_proj: fl.Module | None = None) -> Tensor:
-        image_proj = image_proj if image_proj is not None else self.image_proj
-        image_encoder = self.image_encoder if not self.fine_grained else self.grid_image_encoder
-        clip_embedding = image_encoder(image_prompt)
-        conditional_embedding = image_proj(clip_embedding)
-        return conditional_embedding
     def preprocess_image(
         self,
         image: Image.Image,

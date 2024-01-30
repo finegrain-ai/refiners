@@ -7,7 +7,7 @@ import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like
+from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like, no_grad
 from torch.distributions import Beta
 from torch.nn import Module
 from torch.nn.functional import mse_loss
@@ -99,6 +99,7 @@ class IPBatch:
     latent: Tensor
     text_embedding: Tensor
     cond_image: Tensor
+    drop_cond_image: List[int]
 
 
 class IPDataset(Dataset[IPBatch]):
@@ -265,7 +266,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         image = data["image"]
         cond_image = self.image_encoder_transform(image).to(self.trainer.device, dtype=self.trainer.dtype)
-        cond_image = self.trainer.adapter.compute_conditional_image_embedding(cond_image, image_proj=self.trainer.image_proj)[0]
+        drop_cond_image = 0
         # apply augmentation to the image
         image_transforms: list[Module] = []
         if self.trainer.config.dataset.random_crop_size:
@@ -285,17 +286,18 @@ class IPDataset(Dataset[IPBatch]):
         text_embedding = data["text_embedding"]
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
-            cond_image = zeros_like(cond_image)
+            drop_cond_image = 1
         elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
             text_embedding = self.empty_text_embedding
         elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate):
             text_embedding = self.empty_text_embedding
-            cond_image = zeros_like(cond_image)
+            drop_cond_image = 1
 
         return IPBatch(
             latent=latent,
             text_embedding=text_embedding,
             cond_image=cond_image,
+            drop_cond_image=[drop_cond_image]
         )
 
     def __getitem__(self, index: int) -> IPBatch:
@@ -309,10 +311,12 @@ class IPDataset(Dataset[IPBatch]):
         latents = cat(tensors=[item.latent.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
         text_embeddings = cat(tensors=[item.text_embedding.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch])
         cond_images = pad_sequence([item.cond_image.to(self.trainer.device, dtype=self.trainer.dtype) for item in batch], batch_first=True)
+        drop_cond_image = [item.drop_cond_image[0] for item in batch]
         return IPBatch(
             latent=latents,
             text_embedding=text_embeddings,
             cond_image=cond_images,
+            drop_cond_image=
         )
 
     def __len__(self) -> int:
@@ -423,7 +427,16 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         cond_image = batch.cond_image.to(self.device, dtype=self.dtype)
-
+        drop_cond_image = batch.drop_cond_image
+        batch_size = len(drop_cond_image)
+        print("batch size is", batch_size, drop_cond_image)
+        with no_grad():
+            image_encoder = self.adapter.image_encoder if not self.adapter.fine_grained else self.adapter.grid_image_encoder
+            image_embedding = image_encoder(cond_image)
+            for i in range(batch_size):
+                if drop_cond_image[i] == 1:
+                    image_embedding[i][:] = 0
+        image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
         self.adapter.set_image_embedding(cond_image)
 
