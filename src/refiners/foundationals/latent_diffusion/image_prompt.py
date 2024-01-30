@@ -447,7 +447,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(encoder_clone[-3], fl.Lambda)  # pooling (classif token)
         for _ in range(3):
             encoder_clone.pop()
-        transfomer_layers = encoder_clone[-1]
-        assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
-        transfomer_layers.pop()
+        transformer_layers = encoder_clone[-1]
+        assert isinstance(transformer_layers, fl.Chain) and len(transformer_layers) == 32
+        transformer_layers.pop()
         return encoder_clone

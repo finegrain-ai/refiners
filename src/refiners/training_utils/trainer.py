@@ -213,7 +213,7 @@ class TrainingClock:
         return int(time.time() - self.start_time)
 
     @cached_property
-    def evalution_interval_steps(self) -> int:
+    def evaluation_interval_steps(self) -> int:
         return self.convert_time_unit_to_steps(
             number=self.evaluation_interval["number"], unit=self.evaluation_interval["unit"]
         )
@@ -244,7 +244,7 @@ class TrainingClock:
 
     @property
     def is_evaluation_step(self) -> bool:
-        return self.step % self.evalution_interval_steps == 0
+        return self.step % self.evaluation_interval_steps == 0
 
     @property
     def is_checkpointing_step(self) -> bool:
