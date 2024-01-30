@@ -45,6 +45,7 @@ Special cases:
     - `expected_t2i_adapter_xl_canny.png`
     - `expected_image_sdxl_ip_adapter_plus_woman.png`
     - `expected_cutecat_sdxl_ddim_random_init_sag.png`
+    - `expected_cutecat_sdxl_euler_random_init.png`
     - `expected_restart.png`
     - `expected_freeu.png`
     - `expected_dropy_slime_9752.png`
