@@ -1,5 +1,5 @@
 site_name: Refiners
-site_decription: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
+site_description: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
 repo_name: Refiners
 repo_url: https://github.com/finegrain-ai/refiners
 edit_uri: edit/main/docs/
