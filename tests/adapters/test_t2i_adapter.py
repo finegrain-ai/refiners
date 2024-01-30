@@ -29,7 +29,11 @@ def new_adapter(target: SD1UNet | SDXLUNet, name: str) -> SD1T2IAdapter | SDXLT2
 @pytest.mark.parametrize("k_unet", [SD1UNet, SDXLUNet])
 def test_inject_eject(k_unet: type[SD1UNet] | type[SDXLUNet], test_device: torch.device):
     unet = k_unet(in_channels=4, device=test_device)
-    adapter_1 = new_adapter(unet, "adapter 1").inject()
+    initial_repr = repr(unet)
+    adapter_1 = new_adapter(unet, "adapter 1")
+    assert repr(unet) == initial_repr
+    adapter_1.inject()
+    assert repr(unet) != initial_repr
 
     with pytest.raises(AssertionError) as already_injected_error:
         new_adapter(unet, "adapter 1").inject()
@@ -50,3 +54,4 @@ def test_inject_eject(k_unet: type[SD1UNet] | type[SDXLUNet], test_device: torch
 
     assert unet.parent is None
     assert unet.find(T2IFeatures) is None
+    assert repr(unet) == initial_repr

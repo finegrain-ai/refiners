@@ -11,6 +11,8 @@ from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 @pytest.mark.parametrize("k_encoder", [CLIPTextEncoderL])
 def test_inject_eject(k_encoder: type[CLIPTextEncoder], test_device: torch.device):
     encoder = k_encoder(device=test_device)
+    initial_repr = repr(encoder)
+
     extender = ConceptExtender(encoder)
 
     cat_embedding = torch.randn((encoder.embedding_dim,), device=test_device)
@@ -18,7 +20,9 @@ def test_inject_eject(k_encoder: type[CLIPTextEncoder], test_device: torch.devic
 
     extender_2 = ConceptExtender(encoder)
 
+    assert repr(encoder) == initial_repr
     extender.inject()
+    assert repr(encoder) != initial_repr
 
     with pytest.raises(AssertionError) as no_nesting:
         extender_2.inject()
@@ -34,6 +38,7 @@ def test_inject_eject(k_encoder: type[CLIPTextEncoder], test_device: torch.devic
 
     extender_2.inject().eject()
     ConceptExtender(encoder)  # no exception
+    assert repr(encoder) == initial_repr
 
     tokenizer = encoder.ensure_find(CLIPTokenizer)
     assert len(tokenizer.encode("<token1>")) > 3
