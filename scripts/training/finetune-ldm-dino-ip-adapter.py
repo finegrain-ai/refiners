@@ -553,6 +553,11 @@ class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
                     grads = param.grad.detach().data
                     grad_norm = (grads.norm(p=2) / grads.numel()).item()
                     trainer.log(data={"grad_norm/" + name: grad_norm})
+            for name, param in trainer.image_proj.named_parameters():
+                if param.grad is not None:
+                    grads = param.grad.detach().data
+                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
+                    trainer.log(data={"grad_norm/" + name: grad_norm})
         return super().on_backward_end(trainer)
 
 class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
