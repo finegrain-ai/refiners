@@ -7,14 +7,17 @@ from refiners.fluxion.layers import (
     Conv2d,
     Conv3d,
     Downsample,
+    Downsample3d,
     GroupNorm,
     Identity,
     Residual,
     SelfAttention2d,
+    SelfAttention3d,
     SiLU,
     Slicing,
     Sum,
     Upsample,
+    Upsample3d,
 )
 from refiners.fluxion.utils import images_to_tensor, tensor_to_images
 
@@ -71,36 +74,62 @@ class Resnet(Sum):
 
 
 class Encoder(Chain):
-    def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
-        resnet_sizes: list[int] = [128, 256, 512, 512, 512]
-        input_channels: int = 3
-        spatial_dims: int = 2
-        latent_dim: int = 8
+    def __init__(self, 
+        spatial_dims: int = 2, 
+        num_groups: int = 32, 
+        resnet_sizes: list[int] = [128, 256, 512, 512, 512],
+        input_channels: int = 3,
+        n_down_samples: int = 3,
+        latent_dim: int = 8,
+        slide_end: int = 4,
+        device: Device | str | None = None, 
+        dtype: DType | None = None,        
+    ) -> None:
+        if spatial_dims == 2:
+            Conv = Conv2d
+            SelfAttention = SelfAttention2d
+            Dsample = Downsample
+        elif spatial_dims == 3:
+            Conv = Conv3d
+            SelfAttention = SelfAttention3d
+            Dsample = Downsample3d
+        else:
+            raise ValueError(f"Unsupported spatial dimension {spatial_dims}")
+        
         resnet_layers: list[Chain] = [
             Chain(
                 [
                     Resnet(
                         in_channels=resnet_sizes[i - 1] if i > 0 else resnet_sizes[0],
                         out_channels=resnet_sizes[i],
+                        num_groups=num_groups,
+                        spatial_dims=spatial_dims,
                         device=device,
                         dtype=dtype,
                     ),
-                    Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], device=device, dtype=dtype),
+                    Resnet(
+                        in_channels=resnet_sizes[i],
+                        num_groups=num_groups,
+                        out_channels=resnet_sizes[i],
+                        spatial_dims=spatial_dims,                        
+                        device=device,
+                        dtype=dtype,
+                    ),
                 ]
             )
             for i in range(len(resnet_sizes))
         ]
-        for _, layer in zip(range(3), resnet_layers):
+        for _, layer in zip(range(n_down_samples), resnet_layers):
             channels: int = layer[-1].out_channels  # type: ignore
-            layer.append(Downsample(channels=channels, scale_factor=2, device=device, dtype=dtype))
+            layer.append(Dsample(channels=channels, scale_factor=2, device=device, dtype=dtype))
 
         attention_layer = Residual(
-            GroupNorm(channels=resnet_sizes[-1], num_groups=32, eps=1e-6, device=device, dtype=dtype),
-            SelfAttention2d(channels=resnet_sizes[-1], device=device, dtype=dtype),
+            GroupNorm(channels=resnet_sizes[-1], num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
+            SelfAttention(channels=resnet_sizes[-1], device=device, dtype=dtype),
         )
         resnet_layers[-1].insert_after_type(Resnet, attention_layer)
         super().__init__(
-            Conv2d(
+            Conv(
                 in_channels=input_channels,
                 out_channels=resnet_sizes[0],
                 kernel_size=3,
@@ -110,9 +139,9 @@ class Encoder(Chain):
             ),
             Chain(*resnet_layers),
             Chain(
-                GroupNorm(channels=resnet_sizes[-1], num_groups=32, eps=1e-6, device=device, dtype=dtype),
+                GroupNorm(channels=resnet_sizes[-1], num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
                 SiLU(),
-                Conv2d(
+                Conv(
                     in_channels=resnet_sizes[-1],
                     out_channels=latent_dim,
                     kernel_size=3,
@@ -122,8 +151,8 @@ class Encoder(Chain):
                 ),
             ),
             Chain(
-                Conv2d(in_channels=8, out_channels=8, kernel_size=1, device=device, dtype=dtype),
-                Slicing(dim=1, end=4),
+                Conv(in_channels=latent_dim, out_channels=latent_dim, kernel_size=1, device=device, dtype=dtype),
+                Slicing(dim=1, end=slide_end),
             ),
         )
 
@@ -132,49 +161,83 @@ class Encoder(Chain):
 
 
 class Decoder(Chain):
-    def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
-        self.resnet_sizes: list[int] = [128, 256, 512, 512, 512]
-        self.latent_dim: int = 4
-        self.output_channels: int = 3
-        resnet_sizes = self.resnet_sizes[::-1]
+    def __init__(self, 
+        spatial_dims: int = 2, 
+        num_groups: int = 32, 
+        resnet_sizes: list[int] = [128, 256, 512, 512, 512],
+        output_channels: int = 3,
+        latent_dim: int = 8,
+        n_up_samples: int = 3,
+        device: Device | str | None = None, 
+        dtype: DType | None = None,     
+    ) -> None:    
+                     
+        if spatial_dims == 2:
+            Conv = Conv2d
+            SelfAttention = SelfAttention2d
+            Usample = Upsample
+        elif spatial_dims == 3:
+            Conv = Conv3d
+            SelfAttention = SelfAttention3d
+            Usample = Upsample3d
+        else:
+            raise ValueError(f"Unsupported spatial dimension {spatial_dims}")
+         
+        resnet_sizes = resnet_sizes[::-1]
+        
         resnet_layers: list[Chain] = [
             (
                 Chain(
                     [
                         Resnet(
-                            in_channels=resnet_sizes[i - 1] if i > 0 else resnet_sizes[0],
+                            in_channels=resnet_sizes[i - 1],
                             out_channels=resnet_sizes[i],
+                            num_groups=num_groups,
+                            spatial_dims=spatial_dims,
+                            device=device,
+                            dtype=dtype,
+                        )
+                        if i > 0
+                        else Identity(),
+                        Resnet(
+                            in_channels=resnet_sizes[i],
+                            out_channels=resnet_sizes[i],
+                            num_groups=num_groups,
+                            spatial_dims=spatial_dims,
                             device=device,
                             dtype=dtype,
                         ),
-                        Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], device=device, dtype=dtype),
-                        Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], device=device, dtype=dtype),
-                    ]
-                )
-                if i > 0
-                else Chain(
-                    [
-                        Resnet(in_channels=resnet_sizes[0], out_channels=resnet_sizes[i], device=device, dtype=dtype),
-                        Resnet(in_channels=resnet_sizes[i], out_channels=resnet_sizes[i], device=device, dtype=dtype),
+                        Resnet(
+                            in_channels=resnet_sizes[i],
+                            out_channels=resnet_sizes[i],
+                            num_groups=num_groups,
+                            spatial_dims=spatial_dims,
+                            device=device,
+                            dtype=dtype,
+                        ),
                     ]
                 )
             )
             for i in range(len(resnet_sizes))
         ]
         attention_layer = Residual(
-            GroupNorm(channels=resnet_sizes[0], num_groups=32, eps=1e-6, device=device, dtype=dtype),
-            SelfAttention2d(channels=resnet_sizes[0], device=device, dtype=dtype),
+            GroupNorm(channels=resnet_sizes[0], num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
+            SelfAttention(channels=resnet_sizes[0], device=device, dtype=dtype),
         )
         resnet_layers[0].insert(1, attention_layer)
-        for _, layer in zip(range(3), resnet_layers[1:]):
+        if n_up_samples > len(resnet_layers) - 1:
+            raise ValueError(
+                f"Number of up-samples ({n_up_samples}) must be less than or equal to the number of resnet layers - 1 ({len(resnet_layers)})"
+            )
+        for _, layer in zip(range(n_up_samples), resnet_layers[1:]):
             channels: int = layer[-1].out_channels
-            layer.insert(-1, Upsample(channels=channels, upsample_factor=2, device=device, dtype=dtype))
+            layer.insert(-1, Usample(channels=channels, upsample_factor=2, device=device, dtype=dtype))
         super().__init__(
-            Conv2d(
-                in_channels=self.latent_dim, out_channels=self.latent_dim, kernel_size=1, device=device, dtype=dtype
+            Conv(
+                in_channels=latent_dim, out_channels=latent_dim, kernel_size=1, device=device, dtype=dtype
             ),
-            Conv2d(
-                in_channels=self.latent_dim,
+            Conv(
+                in_channels=latent_dim,
                 out_channels=resnet_sizes[0],
                 kernel_size=3,
                 padding=1,
@@ -183,11 +246,11 @@ class Decoder(Chain):
             ),
             Chain(*resnet_layers),
             Chain(
-                GroupNorm(channels=resnet_sizes[-1], num_groups=32, eps=1e-6, device=device, dtype=dtype),
+                GroupNorm(channels=resnet_sizes[-1], num_groups=num_groups, eps=1e-6, device=device, dtype=dtype),
                 SiLU(),
-                Conv2d(
+                Conv(
                     in_channels=resnet_sizes[-1],
-                    out_channels=self.output_channels,
+                    out_channels=output_channels,
                     kernel_size=3,
                     padding=1,
                     device=device,

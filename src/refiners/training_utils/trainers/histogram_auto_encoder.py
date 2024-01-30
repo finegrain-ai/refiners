@@ -32,8 +32,15 @@ from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 
 
-class HistogramAutoEncoderConfig(BaseModel):
+class HistogramConfig(BaseModel):
     feedforward_dim: int
+    color_bits: int
+    patch_size: int
+    num_attention_heads: int
+    num_layers: int
+    trigger_phrase: str = ""
+    use_only_trigger_probability: float = 0.0
+    loss_weight: float = 1.0
 
 
 Color = Tuple[int, int, int]
@@ -62,12 +69,7 @@ class ImageAndHistogram(TypedDict):
     palette: ColorPalette
 
 
-class FinetuneLatentDiffusionBaseConfig(BaseConfig):
-    dataset: HuggingfaceDatasetConfig
-    histogram_auto_encoder: HistogramAutoEncoderConfig
-
-
-class HistogramLatentDiffusionTrainer(
+class HistogramAutoEncoderTrainer(
     LatentDiffusionBaseTrainer[HistogramLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]
 ):
     def load_dataset(self) -> ColorPaletteDataset:

@@ -1,5 +1,5 @@
 from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
-from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
+from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d, SelfAttention3d
 from refiners.fluxion.layers.basics import (
     Buffer,
     Chunk,
@@ -44,7 +44,7 @@ from refiners.fluxion.layers.module import ContextModule, Module, WeightedModule
 from refiners.fluxion.layers.norm import GroupNorm, InstanceNorm2d, LayerNorm, LayerNorm2d
 from refiners.fluxion.layers.padding import ReflectionPad2d
 from refiners.fluxion.layers.pixelshuffle import PixelUnshuffle
-from refiners.fluxion.layers.sampling import Downsample, Interpolate, Upsample
+from refiners.fluxion.layers.sampling import Downsample, Downsample3d, Interpolate, Upsample, Upsample3d
 
 __all__ = [
     "Embedding",
@@ -61,6 +61,7 @@ __all__ = [
     "Attention",
     "SelfAttention",
     "SelfAttention2d",
+    "SelfAttention3d",
     "Identity",
     "GetArg",
     "View",
@@ -98,7 +99,9 @@ __all__ = [
     "Linear",
     "MultiLinear",
     "Downsample",
+    "Downsample3d",
     "Upsample",
+    "Upsample3d",
     "Module",
     "WeightedModule",
     "ContextModule",

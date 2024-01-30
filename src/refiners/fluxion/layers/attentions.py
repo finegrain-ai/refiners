@@ -244,3 +244,45 @@ class SelfAttention2d(SelfAttention):
     ) -> Float[Tensor, "batch channels height width"]:
         height, width = self.use_context("reshape").values()
         return x.transpose(1, 2).reshape(x.shape[0], x.shape[2], height, width)
+
+
+class SelfAttention3d(SelfAttention):
+    def __init__(
+        self,
+        channels: int,
+        num_heads: int = 1,
+        use_bias: bool = True,
+        is_causal: bool | None = None,
+        is_optimized: bool = True,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        assert channels % num_heads == 0, f"channels {channels} must be divisible by num_heads {num_heads}"
+        self.channels = channels
+        super().__init__(
+            embedding_dim=channels,
+            num_heads=num_heads,
+            use_bias=use_bias,
+            is_causal=is_causal,
+            is_optimized=is_optimized,
+            device=device,
+            dtype=dtype,
+        )
+        self.insert(0, Lambda(self.tensor_3d_to_sequence))
+        self.append(Lambda(self.sequence_to_tensor_3d))
+
+    def init_context(self) -> Contexts:
+        return {"reshape": {"height": None, "width": None, "depth": None}}
+
+    def tensor_3d_to_sequence(
+        self, x: Float[Tensor, "batch channels height width depth"]
+    ) -> Float[Tensor, "batch height*width*depth channels"]:
+        height, width, depth = x.shape[-3:]
+        self.set_context(context="reshape", value={"height": height, "width": width, "depth": depth})
+        return x.reshape(x.shape[0], x.shape[1], height * width * depth).transpose(1, 2)
+
+    def sequence_to_tensor_3d(
+        self, x: Float[Tensor, "batch sequence_length channels"]
+    ) -> Float[Tensor, "batch channels height width depth"]:
+        height, width, depth = self.use_context("reshape").values()
+        return x.transpose(1, 2).reshape(x.shape[0], x.shape[2], height, width, depth)
