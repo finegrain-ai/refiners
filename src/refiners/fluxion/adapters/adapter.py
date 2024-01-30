@@ -79,7 +79,7 @@ class Adapter(Generic[T]):
 
     def _pre_structural_copy(self) -> None:
         if isinstance(self.target, fl.Chain):
-            raise RuntimeError("Chain adapters typically cannot be copied, eject them first.")
+            raise RuntimeError(f"Chain adapters ({self}) typically cannot be copied, eject them first.")
 
     def _post_structural_copy(self: TAdapter, source: TAdapter) -> None:
         self._target = [source.target]
