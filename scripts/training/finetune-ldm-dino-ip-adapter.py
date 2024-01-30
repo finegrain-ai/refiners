@@ -37,13 +37,12 @@ from refiners.training_utils.latent_diffusion import (
 from refiners.training_utils.trainer import Trainer
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
-from refiners.fluxion.utils import manual_seed, load_from_safetensors
+from refiners.fluxion.utils import load_from_safetensors
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
 class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
-    seed: int = 9752
     image_encoder_type: str
     checkpoint: str | None = None
     resolution: int = 518
@@ -499,7 +498,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
-                manual_seed(self.config.test_ldm.seed)
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device)
                 self.adapter.set_image_embedding(image_embedding)

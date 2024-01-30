@@ -17,7 +17,6 @@ adapter = { train = true }
 offset_noise = 0.0
 
 [adapter]
-seed = 9752
 checkpoint = "tests/weights/ip-adapter-plus_sd15.safetensors"
 image_encoder_type = "dinov2_vitl14_reg4"
 resolution = 518
@@ -35,7 +34,7 @@ gpu_index = 0
 batch_size = 8
 gradient_accumulation = "1:step"
 evaluation_interval = "250:step"
-evaluation_seed = 1
+evaluation_seed = 9752
 mixed_precision = "bfloat16"
 
 [optimizer]
