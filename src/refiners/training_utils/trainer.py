@@ -358,7 +358,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         step_size = self.clock.convert_time_unit_to_steps(
             number=config.update_interval["number"], unit=config.update_interval["unit"]
         )
-
+        print("step_size is ", step_size)
         match config.scheduler_type:
             case SchedulerType.CONSTANT_LR:
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lambda _: 1.0)
