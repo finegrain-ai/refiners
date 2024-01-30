@@ -19,6 +19,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLIPAdapter,
     SDXLT2IAdapter,
     SDXLUNet,
+    StableDiffusion_XL,
 )
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "CLIPTextEncoderL",
     "LatentDiffusionAutoencoder",
     "SDFreeUAdapter",
+    "StableDiffusion_XL",
 ]
