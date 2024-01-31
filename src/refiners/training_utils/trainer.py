@@ -408,6 +408,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 raise ValueError(f"Unknown scheduler type: {config.scheduler_type}")
 
         warmup_steps = self.clock.convert_time_unit_to_steps(number=config.warmup["number"], unit=config.warmup["unit"])
+        print("Set warmup steps to ", warmup_steps)
         if warmup_steps > 0:
             lr_scheduler = WarmupScheduler(
                 optimizer=self.optimizer,
