@@ -34,7 +34,7 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
     filter_image,
 )
-from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.trainer import Trainer, scoped_seed
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
@@ -320,13 +320,14 @@ class IPDataset(Dataset[IPBatch]):
 
 
 class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
         return SD1Autoencoder(
             device=self.device,
         ).to(self.device, dtype=self.dtype)
-
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
@@ -334,13 +335,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
         ).to(self.device, dtype=self.dtype)
-
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:
         assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
         return CLIPTextEncoderL(
             device=self.device,
         ).to(self.device, dtype=self.dtype)
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def image_encoder(self) -> ViT:
         assert self.config.models["image_encoder"] is not None, "The config must contain an image_encoder entry."
@@ -356,12 +358,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
         return image_encoder_cls().to(self.device, dtype=self.dtype)
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def image_proj(self) -> ImageProjection | PerceiverResampler:
         assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained)
         return image_proj.to(self.device, dtype=self.dtype)
+    @scoped_seed(seed=Trainer.get_training_seed)
     @cached_property
     def adapter(self) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
