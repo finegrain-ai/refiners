@@ -29,7 +29,7 @@ fine_grained = true
 
 [training]
 duration = "10000:step"
-seed = 0
+seed = 9752
 gpu_index = 0
 batch_size = 8
 gradient_accumulation = "1:step"
