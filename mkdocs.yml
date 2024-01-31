@@ -21,6 +21,8 @@ theme:
     - toc.follow
     - toc.integrate
     - navigation.tabs.sticky
+plugins:
+  - mkdocstrings
 extra_css:
   - stylesheets/extra.css
 nav:
