@@ -106,6 +106,7 @@ class SchedulerConfig(BaseModel):
     min_lr: float | list[float] = 0
     max_lr: float | list[float] = 0
     eta_min: float = 0
+    max_steps: int = 2000
 
     @validator("update_interval", "warmup", pre=True)
     def parse_field(cls, value: Any) -> TimeValue:
