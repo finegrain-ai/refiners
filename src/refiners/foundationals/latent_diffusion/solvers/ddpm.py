@@ -1,9 +1,9 @@
 from torch import Generator, Tensor, arange, device as Device, dtype as DType
 
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
 
 
-class DDPM(Scheduler):
+class DDPM(Solver):
     """
     Denoising Diffusion Probabilistic Model
 

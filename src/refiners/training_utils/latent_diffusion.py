@@ -19,7 +19,8 @@ from refiners.foundationals.latent_diffusion import (
     SD1UNet,
     StableDiffusion_1,
 )
-from refiners.foundationals.latent_diffusion.schedulers import DDPM
+from refiners.foundationals.latent_diffusion.solvers import DDPM
+from refiners.foundationals.latent_diffusion.solvers.solver import Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
@@ -150,7 +151,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         return TextEmbeddingLatentsDataset(trainer=self)
 
     @cached_property
-    def ddpm_scheduler(self) -> DDPM:
+    def ddpm_solver(self) -> Solver:
         return DDPM(
             num_inference_steps=1000,
             device=self.device,
@@ -159,7 +160,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
-        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+        return self.ddpm_solver.timesteps[random_step].unsqueeze(dim=0)
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
@@ -170,7 +171,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+        noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
         prediction = self.unet(noisy_latents)
@@ -182,7 +183,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
             unet=self.unet,
             lda=self.lda,
             clip_text_encoder=self.text_encoder,
-            scheduler=DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps),
+            solver=DPMSolver(num_inference_steps=self.config.test_diffusion.num_inference_steps),
             device=self.device,
         )
         prompts = self.config.test_diffusion.prompts

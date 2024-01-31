@@ -3,10 +3,10 @@ from collections import deque
 import numpy as np
 from torch import Generator, Tensor, device as Device, dtype as Dtype, exp, float32, tensor
 
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
 
 
-class DPMSolver(Scheduler):
+class DPMSolver(Solver):
     """
     Implements DPM-Solver++ from https://arxiv.org/abs/2211.01095
 
@@ -48,7 +48,6 @@ class DPMSolver(Scheduler):
         # ...and we want the same result as the original codebase.
         return tensor(
             np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps + 1).round().astype(int)[1:],
-            device=self.device,
         ).flip(0)
 
     def rebuild(

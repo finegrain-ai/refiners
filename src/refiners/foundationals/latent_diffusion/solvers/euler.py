@@ -2,10 +2,10 @@ import numpy as np
 import torch
 from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
 
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
 
 
-class EulerScheduler(Scheduler):
+class Euler(Solver):
     def __init__(
         self,
         num_inference_steps: int,
@@ -40,9 +40,7 @@ class EulerScheduler(Scheduler):
         # numpy.linspace(0,999,31)[15] is 499.49999999999994
         # torch.linspace(0,999,31)[15] is 499.5
         # ...and we want the same result as the original codebase.
-        timesteps = torch.tensor(
-            np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps), dtype=self.dtype, device=self.device
-        ).flip(0)
+        timesteps = torch.tensor(np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps)).flip(0)
         return timesteps
 
     def _generate_sigmas(self) -> Tensor:
