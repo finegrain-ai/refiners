@@ -362,6 +362,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return GradScaler()
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
+        print("Calling lr scheduler")
         config = self.config.scheduler
         step_size = self.clock.convert_time_unit_to_steps(
             number=config.update_interval["number"], unit=config.update_interval["unit"]
