@@ -21,8 +21,11 @@ theme:
     - toc.follow
     - toc.integrate
     - navigation.tabs.sticky
+    - content.code.copy
 plugins:
   - mkdocstrings
+  - search
+  - tags
 extra_css:
   - stylesheets/extra.css
 nav:
@@ -51,5 +54,21 @@ extra:
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/finegrain-ai/
 markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
