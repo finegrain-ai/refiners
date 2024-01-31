@@ -90,7 +90,7 @@ def _init_learnable_weights(module: Module, initializer_range: float):
                     module.weight.data.zero_()
                 else:
                     trunc_normal_(module.weight, std=initializer_range)
-            if module.bias.requires_grad:
+            if module.bias is not None and odule.bias.requires_grad:
                 module.bias.data.zero_()
         elif isinstance(module, Embedding):
             if module.weight.requires_grad:
