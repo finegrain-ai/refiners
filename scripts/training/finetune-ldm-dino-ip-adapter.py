@@ -9,7 +9,7 @@ from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like, no_grad
 from torch.distributions import Beta
-from torch.nn import Module
+from torch.nn import Module, trunc_normal_, Linear, Embedding, LayerNorm
 from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
@@ -51,6 +51,8 @@ class AdapterConfig(BaseModel):
     use_pooled_text_embedding: bool = False
     use_timestep_embedding: bool = False
     fine_grained: bool = False
+    initialize_model: bool = True
+    initializer_range: float = 0.02
 
 
 class DatasetConfig(BaseModel):
@@ -69,7 +71,28 @@ class DatasetConfig(BaseModel):
     text_and_image_drop_rate: float = 0.05
     to_wds: bool = False # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
     pre_encode: bool = False # TODO
+    image_column: str = "image"
+    caption_column: str = "caption"
+    download_images: bool = True
 
+# Adapted from https://github.com/huggingface/open-muse
+def _init_learnable_weights(module: Module, initializer_range: float):
+        """
+        Initialize the weights according to the original implementation.
+        https://github.com/google-research/maskgit/blob/main/maskgit/nets/maskgit_transformer.py#L37
+        """
+        # TODO: make this configurable
+        if isinstance(module, Linear):
+            trunc_normal_(module.weight, std=initializer_range)
+            if module.bias.requires_grad:
+                module.bias.data.zero_()
+        elif isinstance(module, Embedding):
+            trunc_normal_(module.weight, std=initializer_range)
+        elif isinstance(module, (LayerNorm)):
+            if hasattr(module, "weight") and module.weight.requires_grad:
+                module.weight.data.fill_(1.0)
+            if hasattr(module, "bias") and module.bias.requires_grad:
+                module.bias.data.zero_()
 
 class TestIPDiffusionConfig(TestDiffusionConfig):
     """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
@@ -180,21 +203,24 @@ class IPDataset(Dataset[IPBatch]):
             revision=dataset_config.revision,
             split=dataset_config.split,
         )
-        dataset = dataset.select(list(range(100)))  # type: ignore # FIXME: temporary
 
-        # download images from urls
-        dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
-        dataset = dataset.map(  # type: ignore
-            function=self.download_images,
-            input_columns=["url"],
-            remove_columns=["url"],
-            batched=True,
-            num_proc=8,  # FIXME: harcoded value
-            fn_kwargs={
-                "dl_manager": dl_manager,
-            },
-            desc="Downloading images",  # type: ignore
-        )
+        if dataset_config.download_images:
+            # download images from urls
+            dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
+            dataset = dataset.map(  # type: ignore
+                function=self.download_images,
+                input_columns=["url"],
+                remove_columns=["url"],
+                batched=True,
+                num_proc=8,  # FIXME: harcoded value
+                fn_kwargs={
+                    "dl_manager": dl_manager,
+                },
+                desc="Downloading images",  # type: ignore
+            )
+        else:
+            dataset = dataset.rename_column(dataset_config.image_column, "caption")  # type: ignore
+
 
         # cast the "image" column to Image feature type
         dataset = dataset.cast_column(  # type: ignore
@@ -529,11 +555,11 @@ class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
         trainer.image_encoder.requires_grad_(False)
         trainer.unet.requires_grad_(False)
         return super().on_init_end(trainer)
-
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
     def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         if trainer.clock.is_evaluation_step:
+            
             for name, param in trainer.adapter.named_parameters():
                 if param.grad is not None:
                     grads = param.grad.detach().data
@@ -551,6 +577,13 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
 
     def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         trainer.adapter.inject()
+        if trainer.config.adapter.initialize_model:
+            for model_name in trainer.models:
+                model = trainer.models[model_name]
+                if trainer.config.models[model_name].train:
+                    for module in model.modules():
+                        _init_learnable_weights(module, trainer.config.adapter.initializer_range)
+
 
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
