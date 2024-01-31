@@ -19,13 +19,34 @@ theme:
     - navigation.expand
     - navigation.path
     - toc.follow
-    - toc.integrate
     - navigation.tabs.sticky
     - content.code.copy
 plugins:
-  - mkdocstrings
   - search
   - tags
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          import:
+            - https://docs.python.org/3/objects.inv
+            - https://pytorch.org/docs/master/objects.inv
+          options:
+            show_bases: true
+            show_source: true
+            show_root_toc_entry: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_if_no_docstring: false
+            filters:
+              - "!^_"
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
 extra_css:
   - stylesheets/extra.css
 nav:
@@ -39,7 +60,7 @@ nav:
     - concepts/index.md
     - concepts/adapters.md
   - API Reference:
-      - index.md
+      - Refiners: reference/
 extra:
   social:
     - icon: fontawesome/brands/discord
