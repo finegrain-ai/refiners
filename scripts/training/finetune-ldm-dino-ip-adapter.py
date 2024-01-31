@@ -569,7 +569,6 @@ class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
     def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         if trainer.clock.is_evaluation_step:
-            
             for name, param in trainer.adapter.named_parameters():
                 if param.grad is not None:
                     grads = param.grad.detach().data

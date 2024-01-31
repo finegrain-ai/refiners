@@ -577,7 +577,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.compute_evaluation()
         self._call_callbacks(event_name="on_evaluate_end")
         self.set_models_to_train_mode()
-
+    @scoped_seed(seed=get_training_seed)
     def _call_callbacks(self, event_name: str) -> None:
         for callback in self.callbacks:
             getattr(callback, event_name)(self)
