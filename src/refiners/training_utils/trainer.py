@@ -284,7 +284,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.load_models()
         self.prepare_models()
         self.prepare_checkpointing()
-        print("calling on_init_end")
         self._call_callbacks(event_name="on_init_end")
 
     def default_callbacks(self) -> list[Callback[Any]]:
@@ -318,7 +317,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def learnable_parameters(self) -> list[Parameter]:
         """Returns a list of learnable parameters in all models"""
-        return [param for model in self.models.values() for param in model.parameters() if param.requires_grad]
+        out: list[Parameter] = []
+        for model_name in self.models:
+            model = self.models[model_name]
+            if self.config.models[model_name].train:
+                for param in model.parameters():
+                    if param.requires_grad:
+                        out.append(param)
+        return out
 
     @property
     def learnable_parameter_count(self) -> int:
@@ -328,12 +334,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def gradients(self) -> list[Tensor]:
         """Returns a list of detached gradients for all learnable parameters in all models"""
-        return [
-            param.grad.detach()
-            for model in self.models.values()
-            for param in model.parameters()
-            if param.grad is not None
-        ]
+        out: list[Tensor] = []
+        for model_name in self.models:
+            model = self.models[model_name]
+            if self.config.models[model_name].train:
+                for param in model.parameters():
+                    if param.grad is not None:
+                        out.append(param.grad)
+        return out
 
     @property
     def total_gradient_norm(self) -> float:
