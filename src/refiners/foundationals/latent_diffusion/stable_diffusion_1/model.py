@@ -7,8 +7,7 @@ from refiners.fluxion.utils import image_to_tensor, interpolate
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
-from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
-from refiners.foundationals.latent_diffusion.solvers.solver import Solver
+from refiners.foundationals.latent_diffusion.solvers import DPMSolver, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 

@@ -9,7 +9,7 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.utils import gaussian_blur, interpolate
-from refiners.foundationals.latent_diffusion.solvers.solver import Solver
+from refiners.foundationals.latent_diffusion.solvers import Solver
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
