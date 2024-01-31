@@ -388,7 +388,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
         return  exp(self.ddpm_scheduler.signal_to_noise_ratios)**2
-    @scoped_seed(seed=Trainer.get_training_seed)
     def load_models(self) -> dict[str, fl.Module]:
         return {
             "lda": self.lda,
