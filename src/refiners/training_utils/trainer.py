@@ -346,7 +346,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def total_gradient_norm(self) -> float:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return compute_grad_norm(parameters=self.parameters)
+        return compute_grad_norm(parameters=self.learnable_parameters)
 
     @cached_property
     def optimizer(self) -> Optimizer:
