@@ -57,8 +57,9 @@ nav:
   - Guides:
     - guides/index.md
   - Key Concepts:
-    - concepts/index.md
-    - concepts/adapters.md
+    - concepts/chain.md
+    - concepts/context.md
+    - concepts/adapter/index.md
   - API Reference:
       - Refiners: reference/
 extra:
