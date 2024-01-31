@@ -54,7 +54,7 @@ dropout_probability = 0
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "gigant/oldbookillustrations"
+hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 split = "train"
 horizontal_flip_probability = 0.5
@@ -67,8 +67,8 @@ text_drop_rate = 0.05
 text_and_image_drop_rate = 0.05
 to_wds = false
 pre_encode =  false
-image_column = "1600px"
-caption_column = "image_description"
+image_column = "image"
+caption_column = "ai_descriptions"
 download_images = false
 
 

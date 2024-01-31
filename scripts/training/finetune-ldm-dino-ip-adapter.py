@@ -220,7 +220,7 @@ class IPDataset(Dataset[IPBatch]):
                 desc="Downloading images",  # type: ignore
             )
         else:
-            dataset = dataset.rename_column(dataset_config.image_column, "caption")  # type: ignore
+            dataset = dataset.rename_column(dataset_config.image_column, "image")  # type: ignore
 
 
         # cast the "image" column to Image feature type
@@ -258,7 +258,7 @@ class IPDataset(Dataset[IPBatch]):
 
         # encode the captions into text embedding
         self.trainer.prepare_model("text_encoder")
-        dataset = dataset.rename_column("ai_description", "caption")  # type: ignore
+        dataset = dataset.rename_column(dataset_config.caption_column, "caption")  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_captions,
             input_columns=["caption"],
