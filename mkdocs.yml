@@ -31,18 +31,15 @@ extra_css:
 nav:
   - Home: 
     - index.md
-  - Getting started: getting_started.md
-  - Models: 
-    - models/index.md
-    - models/latent_diffusion.md
-    - models/segment_anything.md
-  - Fluxion:
-    - fluxion/index.md
-    - fluxion/adapters.md
-  - Training utils: 
-    - training_utils/index.md
-  - Contributing:
-    - contributing/index.md
+  - Getting started:
+    - getting_started.md
+  - Guides:
+    - guides/index.md
+  - Key Concepts:
+    - concepts/index.md
+    - concepts/adapters.md
+  - API Reference:
+      - index.md
 extra:
   social:
     - icon: fontawesome/brands/discord
