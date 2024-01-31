@@ -9,7 +9,8 @@ from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like, no_grad
 from torch.distributions import Beta
-from torch.nn import Module, trunc_normal_, Linear, Embedding, LayerNorm
+from torch.nn import Module, Linear, Embedding, LayerNorm
+from torch.nn.init import trunc_normal_
 from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
