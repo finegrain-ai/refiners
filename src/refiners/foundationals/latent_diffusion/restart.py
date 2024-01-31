@@ -5,8 +5,7 @@ from typing import Generic, TypeVar
 import torch
 
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
-from refiners.foundationals.latent_diffusion.solvers.ddim import DDIM
-from refiners.foundationals.latent_diffusion.solvers.solver import Solver
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Solver
 
 T = TypeVar("T", bound=LatentDiffusionModel)
 

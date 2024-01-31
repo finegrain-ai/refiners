@@ -19,8 +19,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1UNet,
     StableDiffusion_1,
 )
-from refiners.foundationals.latent_diffusion.solvers import DDPM
-from refiners.foundationals.latent_diffusion.solvers.solver import Solver
+from refiners.foundationals.latent_diffusion.solvers import DDPM, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig

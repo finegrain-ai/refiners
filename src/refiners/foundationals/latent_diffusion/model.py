@@ -7,7 +7,7 @@ from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
-from refiners.foundationals.latent_diffusion.solvers.solver import Solver
+from refiners.foundationals.latent_diffusion.solvers import Solver
 
 T = TypeVar("T", bound="fl.Module")
 
