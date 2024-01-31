@@ -463,6 +463,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def prepare_model(self, model_name: str) -> None:
         model = self.models[model_name]
+        
+        dropout_config = self.config.dropout
+        chain_models = [model for model in self.models.values() if isinstance(model, fl.Chain)]
+        for model in chain_models:
+            dropout_config.apply_dropout(model=model)
+        
         if (checkpoint := self.config.models[model_name].checkpoint) is not None:
             model.load_from_safetensors(tensors_path=checkpoint)
         else:

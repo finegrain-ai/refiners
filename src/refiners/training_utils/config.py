@@ -203,7 +203,6 @@ class DropoutConfig(BaseModel):
             else:
                 apply_dropout(module=model, probability=self.dropout_probability)
 
-
 class WandbConfig(BaseModel):
     mode: Literal["online", "offline", "disabled"] = "online"
     project: str
@@ -213,7 +212,6 @@ class WandbConfig(BaseModel):
     group: str | None = None
     job_type: str | None = None
     notes: str | None = None
-
 
 class CheckpointingConfig(BaseModel):
     save_folder: Path | None = None

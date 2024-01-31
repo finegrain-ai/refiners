@@ -37,6 +37,9 @@ class Module(TorchModule):
         state_dict = load_from_safetensors(tensors_path)
         self.load_state_dict(state_dict, strict=strict)
         return self
+    
+    def get_class_name(self) -> str:
+        return self.__class__.__name__
 
     def named_modules(self, *args: Any, **kwargs: Any) -> "Generator[tuple[str, Module], None, None]":  # type: ignore
         return super().named_modules(*args)  # type: ignore
@@ -48,7 +51,7 @@ class Module(TorchModule):
         basic_attributes_str = ", ".join(
             f"{key}={value}" for key, value in self.basic_attributes(init_attrs_only=True).items()
         )
-        result = f"{self.__class__.__name__}({basic_attributes_str})"
+        result = f"{self.get_class_name()}({basic_attributes_str})"
         return result
 
     def __repr__(self) -> str:

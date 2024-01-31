@@ -6,6 +6,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import Tensor, randn, stack
+from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.histogram import (
@@ -87,26 +88,23 @@ class HistogramLatentDiffusionTrainer(
         return self.load_dataset() 
     
     @cached_property
-    def histogram_encoder(self) -> HistogramEncoder:
-        assert self.config.models["histogram_encoder"] is not None, "The config must contain a histogram entry."
-
-        # TO FIX : connect this to unet cross attention embedding dim
-        EMBEDDING_DIM = 768
-
-        encoder = HistogramEncoder(
-            color_bits=self.config.histogram.color_bits,
-            embedding_dim=EMBEDDING_DIM,
-            num_layers=self.config.histogram.num_layers,
-            num_attention_heads=self.config.histogram.num_attention_heads,
-            patch_size=self.config.histogram.patch_size,
-            feedforward_dim=self.config.histogram.feedforward_dim,
-            device=self.device,
+    def histogram_auto_encoder(self) -> HistogramAutoEncoder:
+        assert self.config.models["histogram_auto_encoder"] is not None, "The config must contain a histogram entry."
+        
+        autoencoder = HistogramAutoEncoder(
+            latent_dim=self.config.histogram_auto_encoder.latent_dim, 
+            resnet_sizes=self.config.histogram_auto_encoder.resnet_sizes,
+            n_down_samples=self.config.histogram_auto_encoder.n_down_samples,
+            device=self.device
         )
-        return encoder
+        logger.info(f"Building autoencoder with compression rate {autoencoder.compression_rate}")
+        return autoencoder
 
     @cached_property
     def histogram_adapter(self) -> SD1HistogramAdapter[Any]:
-        adapter = SD1HistogramAdapter(target=self.unet, histogram_encoder=self.histogram_encoder)
+        embedding_dim = self.histogram_auto_encoder.embedding_dim
+            
+        adapter = SD1HistogramAdapter(target=self.unet, embedding_dim=embedding_dim)
         return adapter
 
     @cached_property
@@ -126,7 +124,7 @@ class HistogramLatentDiffusionTrainer(
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "lda": self.lda,
-            "histogram_encoder": self.histogram_encoder,
+            "histogram_auto_encoder": self.histogram_auto_encoder
         }
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
@@ -139,7 +137,8 @@ class HistogramLatentDiffusionTrainer(
         images_tensor = images_to_tensor(images)
         
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
-        histogram_embeddings = self.histogram_encoder(histograms)
+        histogram_embeddings = self.histogram_auto_encoder.encode(histograms)
+        histogram_embeddings = histogram_embeddings.reshape(histogram_embeddings.shape[0], 1, -1)
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
@@ -160,13 +159,13 @@ class HistogramLatentDiffusionTrainer(
         )
 
         predicted_decoded = self.lda.decode(x=predicted_latents).to(device=self.device)
-        predicted_images_tensor = (images_tensor + 1) / 2
+        predicted_images_tensor = (predicted_decoded + 1) / 2
 
         loss_2 = self.color_loss(
             predicted_images_tensor,
             images_tensor
         )
-                
+        
         self.log({
             f"losses/color_loss": loss_2,
             f"losses/image": loss_1

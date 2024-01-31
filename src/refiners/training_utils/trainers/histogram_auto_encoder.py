@@ -10,9 +10,7 @@ from torch.nn.functional import mse_loss
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.histogram import (
     HistogramDistance,
-    HistogramExtractor,
-    histogram_to_histo_channels,
-    images_to_histo_channels
+    HistogramExtractor
 )
 from torch.utils.data import DataLoader
 from refiners.fluxion.utils import save_to_safetensors
@@ -75,7 +73,7 @@ class HistogramAutoEncoderTrainer(
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((GradientNormLayerLogging(),))
+        self.callbacks.extend((GradientNormLayerLogging(),SaveHistogramAutoEncoder()))
 
     def load_models(self) -> dict[str, fl.Module]:
         return {
@@ -150,7 +148,7 @@ class SaveHistogramAutoEncoder(Callback[HistogramAutoEncoderTrainer]):
     def on_checkpoint_save(self, trainer: HistogramAutoEncoderTrainer) -> None:
 
         histogram_auto_encoder = trainer.histogram_auto_encoder
-        tensors = histogram_auto_encoder.state_dict()
+        histogram_auto_encoder.state_dict()
         
         path = f"{trainer.ensure_checkpoints_save_folder}/step{trainer.clock.step}.safetensors"
         

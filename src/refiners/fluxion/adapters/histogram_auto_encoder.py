@@ -11,8 +11,9 @@ class HistogramAutoEncoder(Chain):
     def __init__(
         self,
         latent_dim: int = 8,
-        resnet_sizes: list[int] = [8, 4],
+        resnet_sizes: list[int] = [4, 4, 8],
         num_groups: int = 4,
+        color_bits: int = 8,
         n_down_samples: int = 2,
         device: Device | str | None = None,
         dtype: DType | None = None,
@@ -22,6 +23,7 @@ class HistogramAutoEncoder(Chain):
         spatial_dims = 3
         self.n_down_samples = n_down_samples
         self.latent_dim = latent_dim
+        self.color_bits = color_bits
         
         super().__init__(
             Chain(
@@ -71,5 +73,10 @@ class HistogramAutoEncoder(Chain):
         return self.encode(histograms)
     
     @property
-    def compression_rate(self) -> float:
+    def compression_rate(self) -> int:
         return (2**self.n_down_samples)**3 / self.latent_dim
+    
+    def embedding_dim(self) -> int:
+        color_size = 2**self.color_bits
+        
+        return 2**color_size / self.compression_rate

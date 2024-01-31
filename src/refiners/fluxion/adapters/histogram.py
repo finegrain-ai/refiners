@@ -350,7 +350,7 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
     def __init__(
         self,
         target: TSDNet,
-        histogram_encoder: HistogramEncoder,
+        embedding_dim: int = 768,
         scale: float = 1.0,
         device: Device | str | None = None,
         dtype: DType | None = None,
@@ -358,10 +358,8 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
         with self.setup_adapter(target):
             super().__init__(target)
 
-        self._histogram_encoder = [histogram_encoder]
-
         self.sub_adapters: list[CrossAttentionAdapter] = [
-            HistogramCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=histogram_encoder.embedding_dim)
+            HistogramCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=embedding_dim)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -393,7 +391,3 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
 
     def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"histogram_embedding": histogram_embedding})
-
-    @property
-    def histogram_encoder(self) -> HistogramEncoder:
-        return self._histogram_encoder[0]
