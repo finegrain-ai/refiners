@@ -362,12 +362,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return GradScaler()
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
-        print("Calling lr scheduler")
         config = self.config.scheduler
         step_size = self.clock.convert_time_unit_to_steps(
             number=config.update_interval["number"], unit=config.update_interval["unit"]
         )
-        print("step_size is ", step_size)
         match config.scheduler_type:
             case SchedulerType.CONSTANT_LR:
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lambda _: 1.0)
@@ -376,7 +374,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case SchedulerType.EXPONENTIAL_LR:
                 lr_scheduler = ExponentialLR(optimizer=self.optimizer, gamma=config.gamma)
             case SchedulerType.COSINE_ANNEALING_LR:
-                lr_scheduler = CosineAnnealingLR(optimizer=self.optimizer, T_max=step_size, eta_min=config.eta_min)
+                lr_scheduler = CosineAnnealingLR(optimizer=self.optimizer, T_max=config.max_steps, eta_min=config.eta_min)
             case SchedulerType.REDUCE_LR_ON_PLATEAU:
                 lr_scheduler = cast(
                     LRScheduler,
