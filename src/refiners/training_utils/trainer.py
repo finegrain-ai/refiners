@@ -479,7 +479,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dataset_length(self) -> int:
         assert hasattr(self.dataset, "__len__"), "The dataset must implement the `__len__` method."
         return len(self.dataset)  # type: ignore
-    @scoped_seed(seed=get_training_seed)
     @cached_property
     def dataloader(self) -> DataLoader[Batch]:
         collate_fn = getattr(self.dataset, "collate_fn", None)
