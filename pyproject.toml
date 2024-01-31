@@ -22,9 +22,6 @@ training = [
     "torchvision>=0.16.1",
     "loguru>=0.7.2",
     "wandb>=0.16.0",
-    # Added scipy as a work around until this PR gets merged:
-    # https://github.com/TimDettmers/bitsandbytes/pull/525
-    "scipy>=1.11.4",
     "datasets>=2.15.0",
     "tomli>=2.0.1",
 ]
