@@ -1,6 +1,6 @@
 from typing import Any, List, TypeVar
 
-from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
+from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like
 from torch.nn import init, L1Loss
 from torch.nn.functional import mse_loss as _mse_loss
 
@@ -14,25 +14,54 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from PIL import Image
 from refiners.fluxion.utils import images_to_tensor
 
+def images_to_histo_channels(images: List[Image.Image], color_bits: int = 8) -> List[Tensor]:
+    img_tensor = images_to_tensor(images)
+    sorted_channels = tensor_to_sorted_channels(img_tensor)
+    return sorted_channels_to_histo_channels(sorted_channels, color_bits=color_bits)
+    
+
+def tensor_to_sorted_channels(image: Tensor, color_bits: int = 8) -> List[Tensor]:
+    sorted_channels: List[Tensor] = []
+    channels: List[Tensor] = image.split(1, dim=1)
+    for channel in channels:
+        # We extract RGB curves
+        sorted_channel, _ = sort(flatten(channel, 1))
+        sorted_channels.append(sorted_channel)
+    return sorted_channels
+
+def sorted_channels_to_histo_channels(sorted_channels: List[Tensor], color_bits: int = 8) -> List[Tensor]:
+    histos: List[Tensor] = []
+    for channel in sorted_channels:
+        print(f"channel.shape: {channel.shape}")
+        histograms: List[Tensor] = []
+        for i in range(channel.shape[0]):
+            elem = channel[i]
+            histo, _ = histogram(
+                        elem.cpu(),
+                        bins=2**color_bits,
+                        range= (0.0,1.0)
+                    )
+            histograms.append(histo/elem.numel())
+        histo = stack(histograms)
+        histos.append(histo)
+    return histos
+
+def histogram_to_histo_channels(histogram: Tensor) -> List[Tensor]:
+    red = histogram.sum(dim=(2,3))
+    green = histogram.sum(dim=(1,3))
+    blue = histogram.sum(dim=(1,2))
+    
+    return [red, green, blue]
+
 class ColorLoss(fl.Module):
     def __init__(self):
         super().__init__()
         self.l1_loss = L1Loss()
 
-    def image_to_cdfs(self, image: Tensor) -> Tensor:
-        sorted_channels = []
-        for channel in image.split(1, dim=1):
-            # We extract RGB curves
-            sorted_channel, _ = sort(flatten(channel, 1))
-            sorted_channels.append(sorted_channel)
-        return cat(sorted_channels, dim=1)
-    
     def forward(self, actual: Tensor, expected: Tensor) -> Tensor:
         assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
         assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
-        return self.l1_loss(self.image_to_cdfs(actual), self.image_to_cdfs(expected))
-
-
+        return self.l1_loss(tensor_to_sorted_channels(actual), tensor_to_sorted_channels(expected))
 
 class HistogramDistance(fl.Chain):
     def __init__(

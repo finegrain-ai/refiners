@@ -20,35 +20,37 @@ class HistogramAutoEncoder(Chain):
         
         histogram_dim = 1
         spatial_dims = 3
+        self.n_down_samples = n_down_samples
+        self.latent_dim = latent_dim
         
         super().__init__(
             Chain(
-				Unsqueeze(dim=1),
-				Encoder(
-					spatial_dims = spatial_dims, 
-					num_groups = num_groups, 
-					resnet_sizes = resnet_sizes,
-					input_channels = histogram_dim,
-					latent_dim = latent_dim,
-					device=device, 
-					n_down_samples=n_down_samples,
-     				slide_end = latent_dim,
-					dtype=dtype
-				)
-			),
+                Unsqueeze(dim=1),
+                Encoder(
+                    spatial_dims = spatial_dims, 
+                    num_groups = num_groups, 
+                    resnet_sizes = resnet_sizes,
+                    input_channels = histogram_dim,
+                    latent_dim = latent_dim,
+                    device=device, 
+                    n_down_samples=n_down_samples,
+                     slide_end = latent_dim,
+                    dtype=dtype
+                )
+            ),
             Chain(
-				Decoder(
-					spatial_dims = spatial_dims, 
-					num_groups = num_groups, 
-					resnet_sizes = resnet_sizes,
-					output_channels = histogram_dim,
-     				n_up_samples=n_down_samples,
-					latent_dim = latent_dim,
-					device=device, 
-					dtype=dtype
-				),
-				Squeeze(dim=1)    
-			)
+                Decoder(
+                    spatial_dims = spatial_dims, 
+                    num_groups = num_groups, 
+                    resnet_sizes = resnet_sizes,
+                    output_channels = histogram_dim,
+                     n_up_samples=n_down_samples,
+                    latent_dim = latent_dim,
+                    device=device, 
+                    dtype=dtype
+                ),
+                Squeeze(dim=1)    
+            )
         )
     
     def encode(self, x: Tensor) -> Tensor:
@@ -67,3 +69,7 @@ class HistogramAutoEncoder(Chain):
     def images_to_latents(self, images: list[Image.Image]) -> Tensor:
         histograms = self.histogram_extractor.images_to_histograms(images)
         return self.encode(histograms)
+    
+    @property
+    def compression_rate(self) -> float:
+        return (2**self.n_down_samples)**3 / self.latent_dim
