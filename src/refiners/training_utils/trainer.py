@@ -462,7 +462,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         else:
             self.checkpoints_save_folder = None
             logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")
-    @scoped_seed(seed=get_training_seed)
+
     @abstractmethod
     def load_models(self) -> dict[str, fl.Module]:
         ...
@@ -479,6 +479,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dataset_length(self) -> int:
         assert hasattr(self.dataset, "__len__"), "The dataset must implement the `__len__` method."
         return len(self.dataset)  # type: ignore
+    @scoped_seed(seed=get_training_seed)
     @cached_property
     def dataloader(self) -> DataLoader[Batch]:
         collate_fn = getattr(self.dataset, "collate_fn", None)
@@ -549,7 +550,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_batch_begin")
             self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
-
 
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
