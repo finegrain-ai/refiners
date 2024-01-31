@@ -47,7 +47,7 @@ weight_decay = 1e-2
 [scheduler]
 scheduler_type = "CosineAnnealingLR"
 update_interval = "1000:step"
-eta_min = 2e-6
+eta_min = 1e-6
 
 [dropout]
 dropout_probability = 0
