@@ -7,8 +7,8 @@ from refiners.fluxion.utils import image_to_tensor, interpolate
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
-from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
+from refiners.foundationals.latent_diffusion.solvers.solver import Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.self_attention_guidance import SD1SAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 
@@ -26,20 +26,20 @@ class StableDiffusion_1(LatentDiffusionModel):
         unet: SD1UNet | None = None,
         lda: SD1Autoencoder | None = None,
         clip_text_encoder: CLIPTextEncoderL | None = None,
-        scheduler: Scheduler | None = None,
+        solver: Solver | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
         unet = unet or SD1UNet(in_channels=4)
         lda = lda or SD1Autoencoder()
         clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
-        scheduler = scheduler or DPMSolver(num_inference_steps=30)
+        solver = solver or DPMSolver(num_inference_steps=30)
 
         super().__init__(
             unet=unet,
             lda=lda,
             clip_text_encoder=clip_text_encoder,
-            scheduler=scheduler,
+            solver=solver,
             device=device,
             dtype=dtype,
         )
@@ -82,14 +82,14 @@ class StableDiffusion_1(LatentDiffusionModel):
         assert sag is not None
 
         degraded_latents = sag.compute_degraded_latents(
-            scheduler=self.scheduler,
+            solver=self.solver,
             latents=x,
             noise=noise,
             step=step,
             classifier_free_guidance=True,
         )
 
-        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        timestep = self.solver.timesteps[step].unsqueeze(dim=0)
         negative_embedding, _ = clip_text_embedding.chunk(2)
         self.set_unet_context(timestep=timestep, clip_text_embedding=negative_embedding, **kwargs)
         if "ip_adapter" in self.unet.provider.contexts:
@@ -111,14 +111,14 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         unet: SD1UNet | None = None,
         lda: SD1Autoencoder | None = None,
         clip_text_encoder: CLIPTextEncoderL | None = None,
-        scheduler: Scheduler | None = None,
+        solver: Solver | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
         self.mask_latents: Tensor | None = None
         self.target_image_latents: Tensor | None = None
         super().__init__(
-            unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, scheduler=scheduler, device=device, dtype=dtype
+            unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, solver=solver, device=device, dtype=dtype
         )
 
     def forward(
@@ -162,7 +162,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         assert self.target_image_latents is not None
 
         degraded_latents = sag.compute_degraded_latents(
-            scheduler=self.scheduler,
+            solver=self.solver,
             latents=x,
             noise=noise,
             step=step,
@@ -173,7 +173,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
             dim=1,
         )
 
-        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        timestep = self.solver.timesteps[step].unsqueeze(dim=0)
         negative_embedding, _ = clip_text_embedding.chunk(2)
         self.set_unet_context(timestep=timestep, clip_text_embedding=negative_embedding, **kwargs)
 

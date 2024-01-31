@@ -3,8 +3,8 @@ from torch import Tensor, device as Device, dtype as DType
 
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.model import LatentDiffusionModel
-from refiners.foundationals.latent_diffusion.schedulers.ddim import DDIM
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.solvers.ddim import DDIM
+from refiners.foundationals.latent_diffusion.solvers.solver import Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.self_attention_guidance import SDXLSAGAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
@@ -23,20 +23,20 @@ class StableDiffusion_XL(LatentDiffusionModel):
         unet: SDXLUNet | None = None,
         lda: SDXLAutoencoder | None = None,
         clip_text_encoder: DoubleTextEncoder | None = None,
-        scheduler: Scheduler | None = None,
+        solver: Solver | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
         unet = unet or SDXLUNet(in_channels=4)
         lda = lda or SDXLAutoencoder()
         clip_text_encoder = clip_text_encoder or DoubleTextEncoder()
-        scheduler = scheduler or DDIM(num_inference_steps=30)
+        solver = solver or DDIM(num_inference_steps=30)
 
         super().__init__(
             unet=unet,
             lda=lda,
             clip_text_encoder=clip_text_encoder,
-            scheduler=scheduler,
+            solver=solver,
             device=device,
             dtype=dtype,
         )
@@ -131,7 +131,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         assert sag is not None
 
         degraded_latents = sag.compute_degraded_latents(
-            scheduler=self.scheduler,
+            solver=self.solver,
             latents=x,
             noise=noise,
             step=step,
@@ -140,7 +140,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
 
         negative_text_embedding, _ = clip_text_embedding.chunk(2)
         negative_pooled_embedding, _ = pooled_text_embedding.chunk(2)
-        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        timestep = self.solver.timesteps[step].unsqueeze(dim=0)
         time_ids, _ = time_ids.chunk(2)
 
         self.set_unet_context(

@@ -5,7 +5,7 @@ import pytest
 from torch import Tensor, allclose, device as Device, equal, isclose, randn
 
 from refiners.fluxion import manual_seed
-from refiners.foundationals.latent_diffusion.schedulers import DDIM, DDPM, DPMSolver, EulerScheduler
+from refiners.foundationals.latent_diffusion.solvers import DDIM, DDPM, DPMSolver, Euler
 
 
 def test_ddpm_diffusers():
@@ -83,7 +83,7 @@ def test_euler_diffusers():
         use_karras_sigmas=False,
     )
     diffusers_scheduler.set_timesteps(30)
-    refiners_scheduler = EulerScheduler(num_inference_steps=30)
+    refiners_scheduler = Euler(num_inference_steps=30)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)

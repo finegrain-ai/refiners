@@ -1,9 +1,9 @@
 from torch import Generator, Tensor, arange, device as Device, dtype as Dtype, float32, sqrt, tensor
 
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule, Scheduler
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
 
 
-class DDIM(Scheduler):
+class DDIM(Solver):
     def __init__(
         self,
         num_inference_steps: int,
@@ -25,15 +25,14 @@ class DDIM(Scheduler):
             device=device,
             dtype=dtype,
         )
-        self.timesteps = self._generate_timesteps()
 
     def _generate_timesteps(self) -> Tensor:
         """
         Generates decreasing timesteps with 'leading' spacing and offset of 1
-        similar to diffusers settings for the DDIM scheduler in Stable Diffusion 1.5
+        similar to diffusers settings for the DDIM solver in Stable Diffusion 1.5
         """
         step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = arange(start=0, end=self.num_inference_steps, step=1, device=self.device) * step_ratio + 1
+        timesteps = arange(start=0, end=self.num_inference_steps, step=1) * step_ratio + 1
         return timesteps.flip(0)
 
     def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:

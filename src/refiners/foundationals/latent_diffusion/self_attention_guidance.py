@@ -9,7 +9,7 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.utils import gaussian_blur, interpolate
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.solvers.solver import Solver
 
 if TYPE_CHECKING:
     from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
@@ -89,13 +89,13 @@ class SAGAdapter(Generic[T], fl.Chain, Adapter[T]):
         return interpolate(attn_mask, Size((h, w)))
 
     def compute_degraded_latents(
-        self, scheduler: Scheduler, latents: Tensor, noise: Tensor, step: int, classifier_free_guidance: bool = True
+        self, solver: Solver, latents: Tensor, noise: Tensor, step: int, classifier_free_guidance: bool = True
     ) -> Tensor:
         sag_mask = self.compute_sag_mask(latents=latents, classifier_free_guidance=classifier_free_guidance)
-        original_latents = scheduler.remove_noise(x=latents, noise=noise, step=step)
+        original_latents = solver.remove_noise(x=latents, noise=noise, step=step)
         degraded_latents = gaussian_blur(original_latents, kernel_size=self.kernel_size, sigma=self.sigma)
         degraded_latents = degraded_latents * sag_mask + original_latents * (1 - sag_mask)
-        return scheduler.add_noise(degraded_latents, noise=noise, step=step)
+        return solver.add_noise(degraded_latents, noise=noise, step=step)
 
     def init_context(self) -> Contexts:
         return {"self_attention_map": {"middle_block_attn_map": None, "middle_block_attn_shape": []}}

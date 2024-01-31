@@ -51,7 +51,7 @@ class MultiDiffusion(Generic[T, D], ABC):
             match step:
                 case step if step == target.start_step and target.init_latents is not None:
                     noise_view = target.crop(noise)
-                    view = self.ldm.scheduler.add_noise(
+                    view = self.ldm.solver.add_noise(
                         x=target.init_latents,
                         noise=noise_view,
                         step=step,

@@ -24,8 +24,8 @@ from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.schedulers import DDIM, EulerScheduler
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from tests.utils import ensure_similar_images
@@ -491,8 +491,8 @@ def sd15_ddim(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -509,8 +509,8 @@ def sd15_ddim_karras(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -527,8 +527,8 @@ def sd15_euler(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    euler_scheduler = EulerScheduler(num_inference_steps=30)
-    sd15 = StableDiffusion_1(scheduler=euler_scheduler, device=test_device)
+    euler_solver = Euler(num_inference_steps=30)
+    sd15 = StableDiffusion_1(solver=euler_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -545,8 +545,8 @@ def sd15_ddim_lda_ft_mse(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
     sd15.lda.load_state_dict(load_from_safetensors(lda_ft_mse_weights))
@@ -599,8 +599,8 @@ def sdxl_ddim(
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    scheduler = DDIM(num_inference_steps=30)
-    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+    solver = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
     sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_weights)
@@ -617,8 +617,8 @@ def sdxl_ddim_lda_fp16_fix(
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    scheduler = DDIM(num_inference_steps=30)
-    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+    solver = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
     sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_fp16_fix_weights)
@@ -659,8 +659,8 @@ def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
     sd15 = sd15_euler
-    euler_scheduler = sd15_euler.scheduler
-    assert isinstance(euler_scheduler, EulerScheduler)
+    euler_solver = sd15_euler.solver
+    assert isinstance(euler_solver, Euler)
 
     prompt = "a cute cat, detailed high-quality professional image"
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
@@ -670,7 +670,7 @@ def test_diffusion_std_random_init_euler(
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
-    x = x * euler_scheduler.init_noise_sigma
+    x = x * euler_solver.init_noise_sigma
 
     for step in sd15.steps:
         x = sd15(
@@ -1202,7 +1202,7 @@ def test_diffusion_refonly(
 
     for step in sd15.steps:
         noise = torch.randn(2, 4, 64, 64, device=test_device)
-        noised_guide = sd15.scheduler.add_noise(guide, noise, step)
+        noised_guide = sd15.solver.add_noise(guide, noise, step)
         refonly_adapter.set_controlnet_condition(noised_guide)
         x = sd15(
             x,
@@ -1244,7 +1244,7 @@ def test_diffusion_inpainting_refonly(
 
     for step in sd15.steps:
         noise = torch.randn_like(guide)
-        noised_guide = sd15.scheduler.add_noise(guide, noise, step)
+        noised_guide = sd15.solver.add_noise(guide, noise, step)
         # See https://github.com/Mikubill/sd-webui-controlnet/pull/1275 ("1.1.170 reference-only begin to support
         # inpaint variation models")
         noised_guide = torch.cat([noised_guide, torch.zeros_like(noised_guide)[:, 0:1, :, :], guide], dim=1)

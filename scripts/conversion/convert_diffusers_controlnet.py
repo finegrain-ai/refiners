@@ -37,8 +37,8 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     clip_text_embedding = torch.rand(1, 77, 768)
     unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
-    scheduler = DPMSolver(num_inference_steps=10)
-    timestep = scheduler.timesteps[0].unsqueeze(dim=0)
+    solver = DPMSolver(num_inference_steps=10)
+    timestep = solver.timesteps[0].unsqueeze(dim=0)
     unet.set_timestep(timestep=timestep.unsqueeze(dim=0))
 
     x = torch.randn(1, 4, 64, 64)
