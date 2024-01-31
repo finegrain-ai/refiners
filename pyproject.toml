@@ -60,6 +60,7 @@ dev-dependencies = [
     "pytest>=7.4.2",
     "mkdocs-material>=9.5.3",
     "coverage>=7.4.1",
+    "mkdocstrings[python]>=0.24.0",
 ]
 
 
