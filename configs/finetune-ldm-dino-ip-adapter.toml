@@ -70,7 +70,7 @@ text_and_image_drop_rate = 0.05
 to_wds = false
 pre_encode =  false
 image_column = "image"
-caption_column = "ai_descriptions"
+caption_column = "ai_description"
 download_images = true
 
 
