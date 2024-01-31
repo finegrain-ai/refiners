@@ -22,9 +22,6 @@ training = [
     "torchvision>=0.16.1",
     "loguru>=0.7.2",
     "wandb>=0.16.0",
-    # Added scipy as a work around until this PR gets merged:
-    # https://github.com/TimDettmers/bitsandbytes/pull/525
-    "scipy>=1.11.4",
     "datasets>=2.15.0",
     "tomli>=2.0.1",
 ]
@@ -54,11 +51,11 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright == 1.1.342",
-    "ruff>=0.0.292",
+    "pyright==1.1.349",
+    "ruff>=0.1.15",
     "docformatter>=1.7.5",
-    "pytest>=7.4.2",
-    "mkdocs-material>=9.5.3",
+    "pytest>=8.0.0",
+    "mkdocs-material>=9.5.6",
     "coverage>=7.4.1",
     "mkdocstrings[python]>=0.24.0",
 ]

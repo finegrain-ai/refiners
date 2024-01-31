@@ -21,10 +21,11 @@ class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
     ) -> None:
         with self.setup_adapter(target):
             super().__init__(fl.Lambda(func=self.lookup))
-        self.old_weight = cast(Parameter, target.weight)
-        self.new_weight = Parameter(
+        p = Parameter(
             zeros([0, target.embedding_dim], device=target.device, dtype=target.dtype)
         )  # requires_grad=True by default
+        self.old_weight = cast(Parameter, target.weight)
+        self.new_weight = cast(Parameter, p)  # PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
 
     # Use F.embedding instead of nn.Embedding to make sure that gradients can only be computed for the new embeddings
     def lookup(self, x: Tensor) -> Tensor:
@@ -33,9 +34,8 @@ class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
 
     def add_embedding(self, embedding: Tensor) -> None:
         assert embedding.shape == (self.old_weight.shape[1],)
-        self.new_weight = Parameter(
-            cat([self.new_weight, embedding.unsqueeze(0).to(self.new_weight.device, self.new_weight.dtype)])
-        )
+        p = Parameter(cat([self.new_weight, embedding.unsqueeze(0).to(self.new_weight.device, self.new_weight.dtype)]))
+        self.new_weight = cast(Parameter, p)  # PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
 
     @property
     def num_embeddings(self) -> int:

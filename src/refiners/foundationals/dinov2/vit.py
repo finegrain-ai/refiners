@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import Tensor
 
@@ -60,17 +62,17 @@ class LayerScale(fl.WeightedModule):
         super().__init__()
         self.embedding_dim = embedding_dim
 
-        self.register_parameter(
-            name="weight",
-            param=torch.nn.Parameter(
-                torch.full(
-                    size=(embedding_dim,),
-                    fill_value=init_value,
-                    dtype=dtype,
-                    device=device,
-                ),
+        p = torch.nn.Parameter(
+            torch.full(
+                size=(embedding_dim,),
+                fill_value=init_value,
+                dtype=dtype,
+                device=device,
             ),
         )
+
+        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+        self.register_parameter(name="weight", param=cast(torch.nn.Parameter, p))
 
     def forward(self, x: Tensor) -> Tensor:
         return x * self.weight
