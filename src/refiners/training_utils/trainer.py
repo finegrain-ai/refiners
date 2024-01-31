@@ -399,7 +399,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use MultiplicativeLR"
                 lr_scheduler = MultiplicativeLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
             case SchedulerType.COSINE_ANNEALING_WARM_RESTARTS:
-                lr_scheduler = CosineAnnealingWarmRestarts(optimizer=self.optimizer, T_0=step_size)
+                lr_scheduler = CosineAnnealingWarmRestarts(optimizer=self.optimizer, T_0=config.max_steps, eta_min=config.eta_min)
             case SchedulerType.CYCLIC_LR:
                 lr_scheduler = CyclicLR(optimizer=self.optimizer, base_lr=config.base_lr, max_lr=config.max_lr)
             case SchedulerType.MULTI_STEP_LR:
