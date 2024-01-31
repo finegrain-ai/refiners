@@ -359,9 +359,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained)
-        for param in image_proj.parameters():
-            print(param)
-            break
         return image_proj.to(self.device, dtype=self.dtype)
 
     @cached_property
