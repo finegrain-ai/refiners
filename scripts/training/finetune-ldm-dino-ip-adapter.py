@@ -82,13 +82,22 @@ def _init_learnable_weights(module: Module, initializer_range: float):
         Initialize the weights according to the original implementation.
         https://github.com/google-research/maskgit/blob/main/maskgit/nets/maskgit_transformer.py#L37
         """
+
         # TODO: make this configurable
         if isinstance(module, Linear):
-            trunc_normal_(module.weight, std=initializer_range)
+            if module.weight.requires_grad:
+                if initializer_range == 0:
+                    module.weight.data.zero_()
+                else:
+                    trunc_normal_(module.weight, std=initializer_range)
             if module.bias.requires_grad:
                 module.bias.data.zero_()
         elif isinstance(module, Embedding):
-            trunc_normal_(module.weight, std=initializer_range)
+            if module.weight.requires_grad:
+                if initializer_range == 0:
+                    module.weight.data.zero_()
+                else:
+                    trunc_normal_(module.weight, std=initializer_range)
         elif isinstance(module, (LayerNorm)):
             if hasattr(module, "weight") and module.weight.requires_grad:
                 module.weight.data.fill_(1.0)
