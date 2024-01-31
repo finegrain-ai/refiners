@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from enum import Enum, auto
+from typing import cast
 
 import torch
 from jaxtyping import Float, Int
@@ -180,9 +181,9 @@ class MaskEncoder(fl.Chain):
                 dtype=dtype,
             ),
         )
-        self.register_parameter(
-            "no_mask_embedding", nn.Parameter(torch.randn(1, embedding_dim, device=device, dtype=dtype))
-        )
+        p = nn.Parameter(torch.randn(1, embedding_dim, device=device, dtype=dtype))
+        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+        self.register_parameter("no_mask_embedding", cast(nn.Parameter, p))
 
     def get_no_mask_dense_embedding(
         self, image_embedding_size: tuple[int, int], batch_size: int = 1
