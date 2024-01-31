@@ -49,7 +49,7 @@ scheduler_type = "CosineAnnealingLR"
 update_interval = "1:step"
 max_steps = 2000
 eta_min = 2e-6
-warmup_steps = 1000
+warmup_steps = "500:step"
 
 [dropout]
 dropout_probability = 0
