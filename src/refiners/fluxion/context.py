@@ -7,16 +7,38 @@ Contexts = dict[str, Context]
 
 
 class ContextProvider:
+    """A class that provides a context store."""
+
     def __init__(self) -> None:
+        """Initializes the ContextProvider."""
         self.contexts: Contexts = {}
 
     def set_context(self, key: str, value: Context) -> None:
+        """Store a value in the context.
+
+        Args:
+            key: The key of the context.
+            value: The context.
+        """
         self.contexts[key] = value
 
     def get_context(self, key: str) -> Any:
+        """Retreive a value from the context.
+
+        Args:
+            key: The key of the context.
+
+        Returns:
+            The context value.
+        """
         return self.contexts.get(key)
 
     def update_contexts(self, new_contexts: Contexts) -> None:
+        """Update the contexts with new contexts.
+
+        Args:
+            new_contexts: The new contexts.
+        """
         for key, value in new_contexts.items():
             if key not in self.contexts:
                 self.contexts[key] = value
@@ -25,6 +47,14 @@ class ContextProvider:
 
     @staticmethod
     def create(contexts: Contexts) -> "ContextProvider":
+        """Create a ContextProvider from a dict of contexts.
+
+        Args:
+            contexts: The contexts.
+
+        Returns:
+            A ContextProvider with the contexts.
+        """
         provider = ContextProvider()
         provider.update_contexts(contexts)
         return provider
