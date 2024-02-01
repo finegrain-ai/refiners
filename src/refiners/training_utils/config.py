@@ -1,14 +1,18 @@
 from enum import Enum
 from logging import warn
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Type, TypeVar
+from typing import Any, Callable, Literal, Type, TypeVar
 
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
 from pydantic import BaseModel, validator
-from torch.nn import Parameter
 from torch.optim import SGD, Adam, AdamW, Optimizer
+
+try:
+    from torch.optim.optimizer import params_t as ParamsT  # PyTorch 2.1. TODO: remove "soon"
+except ImportError as e:
+    from torch.optim.optimizer import ParamsT
 from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
 
 import refiners.fluxion.layers as fl
@@ -119,17 +123,17 @@ class OptimizerConfig(BaseModel):
     eps: float = 1e-8
     weight_decay: float = 0.0
 
-    def get(self, model_parameters: Iterable[Parameter]) -> Optimizer:
+    def get(self, params: ParamsT) -> Optimizer:
         match self.optimizer:
             case Optimizers.SGD:
                 return SGD(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     weight_decay=self.weight_decay,
                 )
             case Optimizers.Adam:
                 return Adam(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -137,7 +141,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.AdamW:
                 return AdamW(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -145,7 +149,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.AdamW8bit:
                 return AdamW8bit(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -153,7 +157,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.Lion8bit:
                 return Lion8bit(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
@@ -163,7 +167,7 @@ class OptimizerConfig(BaseModel):
                     warn("Prodigy learning rate is not 1.0, this might cause instability.")
                 return Prodigy(
                     lr=self.learning_rate,
-                    params=model_parameters,
+                    params=params,
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
                     safeguard_warmup=True,
@@ -174,7 +178,10 @@ class OptimizerConfig(BaseModel):
 class ModelConfig(BaseModel):
     checkpoint: Path | None = None
     train: bool = True
-    learning_rate: float | None = None  # TODO: Implement this
+    learning_rate: float | None = None
+    betas: tuple[float, float] | None = None
+    eps: float | None = None
+    weight_decay: float | None = None
 
 
 class GyroDropoutConfig(BaseModel):
