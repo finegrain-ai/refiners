@@ -148,7 +148,7 @@ class SaveHistogramAutoEncoder(Callback[HistogramAutoEncoderTrainer]):
     def on_checkpoint_save(self, trainer: HistogramAutoEncoderTrainer) -> None:
 
         histogram_auto_encoder = trainer.histogram_auto_encoder
-        histogram_auto_encoder.state_dict()
+        tensors = histogram_auto_encoder.state_dict()
         
         path = f"{trainer.ensure_checkpoints_save_folder}/step{trainer.clock.step}.safetensors"
         

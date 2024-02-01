@@ -464,6 +464,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def prepare_model(self, model_name: str) -> None:
         model = self.models[model_name]
         
+        ## hardcore fix for #226
         dropout_config = self.config.dropout
         chain_models = [model for model in self.models.values() if isinstance(model, fl.Chain)]
         for model in chain_models:
