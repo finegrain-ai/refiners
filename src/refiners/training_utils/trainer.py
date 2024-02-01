@@ -1,9 +1,11 @@
+from ast import Param
 import random
 import time
 from abc import ABC, abstractmethod
 from functools import cached_property, wraps
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
+from torch.optim.optimizer import params_t as ParamsT
 
 import numpy as np
 from loguru import logger
@@ -311,6 +313,34 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def learnable_parameters(self) -> list[Parameter]:
         """Returns a list of learnable parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters() if param.requires_grad]
+    
+    @property
+    def optimizer_parameters(self) -> list[dict[str,Any]]:
+        """Returns a list of learnable parameters in all models"""
+        
+        params : list[dict[str,Any]] = []
+        for (model_name, model) in self.models.items():
+            model_params = [
+                param
+                for param in model.parameters()
+                if param.requires_grad
+            ]
+            model_config = self.config.models[model_name]
+            model_optim_conf : dict[str, Any] = {}
+            
+            optimizer_config = model_config.optimizer
+            if optimizer_config is not None:
+                for key in optimizer_config:
+                    if optimizer_config[key] is not None:
+                        model_optim_conf[key] = optimizer_config[key]
+                
+            for param in model_params:
+                params.append({
+                    'params': param,
+                    **model_optim_conf
+                })
+                    
+        return params
 
     @property
     def learnable_parameter_count(self) -> int:
@@ -336,7 +366,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
-        optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
+        
+        
+        optimizer = self.config.optimizer.get(params=self.optimizer_parameters)
         return optimizer
 
     @cached_property
