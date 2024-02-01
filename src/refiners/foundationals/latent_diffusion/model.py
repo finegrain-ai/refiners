@@ -50,7 +50,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
         if init_image is None:
             return noise
-        encoded_image = self.lda.encode_image(image=init_image.resize(size=(width, height)))
+        encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
         return self.solver.add_noise(
             x=encoded_image,
             noise=noise,

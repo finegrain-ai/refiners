@@ -10,6 +10,7 @@ from safetensors import safe_open as _safe_open  # type: ignore
 from safetensors.torch import save_file as _save_file  # type: ignore
 from torch import (
     Tensor,
+    cat,
     device as Device,
     dtype as DType,
     manual_seed as _manual_seed,  # type: ignore
@@ -113,6 +114,12 @@ def gaussian_blur(
     return tensor
 
 
+def images_to_tensor(
+    images: list[Image.Image], device: Device | str | None = None, dtype: DType | None = None
+) -> Tensor:
+    return cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
+
+
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
     """
     Convert a PIL Image to a Tensor.
@@ -133,6 +140,10 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
             raise ValueError(f"Unsupported image mode: {image.mode}")
 
     return image_tensor.unsqueeze(0)
+
+
+def tensor_to_images(tensor: Tensor) -> list[Image.Image]:
+    return [tensor_to_image(t) for t in tensor.split(1)]  # type: ignore
 
 
 def tensor_to_image(tensor: Tensor) -> Image.Image:
