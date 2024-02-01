@@ -1,3 +1,7 @@
+---
+icon: material/comment-alert-outline
+---
+
 # Context
 
 ## Motivation: avoiding "props drilling"
