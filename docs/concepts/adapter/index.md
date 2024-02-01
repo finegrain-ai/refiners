@@ -1,3 +1,7 @@
+---
+icon: material/tray-plus
+---
+
 # Adapter
 
 Adapters are the final and most high-level abstraction in Refiners. They are the concept of adaptation turned into code.

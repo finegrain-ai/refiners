@@ -53,9 +53,11 @@ extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - index.md
+    - Refiners: index.md
+    - home/why.md
   - Getting started:
-    - getting_started.md
+    - getting-started/recommended.md
+    - getting-started/advanced.md
   - Guides:
     - guides/index.md
   - Key Concepts:
