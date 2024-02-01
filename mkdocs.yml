@@ -34,6 +34,7 @@ plugins:
           import:
             - https://docs.python.org/3/objects.inv
             - https://pytorch.org/docs/master/objects.inv
+            - https://docs.kidger.site/jaxtyping/objects.inv
           options:
             show_bases: true
             show_source: true
