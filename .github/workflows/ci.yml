@@ -2,6 +2,11 @@ name: CI
 
 on:
   push:
+    paths:
+      - src/**
+      - tests/**
+      - scripts/**
+      - .github/workflows/ci.yml
   pull_request_target:
     types: [labeled]
 
