@@ -1,11 +1,9 @@
-from ast import Param
 import random
 import time
 from abc import ABC, abstractmethod
 from functools import cached_property, wraps
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
-from torch.optim.optimizer import params_t as ParamsT
 
 import numpy as np
 from loguru import logger
@@ -313,33 +311,34 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def learnable_parameters(self) -> list[Parameter]:
         """Returns a list of learnable parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters() if param.requires_grad]
-    
+
     @property
-    def optimizer_parameters(self) -> list[dict[str,Any]]:
-        """Returns a list of learnable parameters in all models"""
-        
-        params : list[dict[str,Any]] = []
-        for (model_name, model) in self.models.items():
-            model_params = [
-                param
-                for param in model.parameters()
-                if param.requires_grad
-            ]
+    def optimizer_parameters(self) -> list[dict[str, Any]]:
+        """
+        Returns a optimizer compatible list of param dict
+        See https://pytorch.org/docs/stable/optim.html#per-parameter-options for more details
+        """
+
+        params: list[dict[str, Any]] = []
+        for model_name, model in self.models.items():
+            model_params = [param for param in model.parameters() if param.requires_grad]
             model_config = self.config.models[model_name]
-            model_optim_conf : dict[str, Any] = {}
-            
+            model_optim_conf: dict[str, Any] = {}
+
             optimizer_config = model_config.optimizer
             if optimizer_config is not None:
-                for key in optimizer_config:
-                    if optimizer_config[key] is not None:
-                        model_optim_conf[key] = optimizer_config[key]
-                
+                if optimizer_config.learning_rate is not None:
+                    model_optim_conf["lr"] = optimizer_config.learning_rate
+                if optimizer_config.weight_decay is not None:
+                    model_optim_conf["weight_decay"] = optimizer_config.weight_decay
+                if optimizer_config.betas is not None:
+                    model_optim_conf["betas"] = optimizer_config.betas
+                if optimizer_config.eps is not None:
+                    model_optim_conf["eps"] = optimizer_config.eps
+
             for param in model_params:
-                params.append({
-                    'params': param,
-                    **model_optim_conf
-                })
-                    
+                params.append({"params": param, **model_optim_conf})
+
         return params
 
     @property
@@ -366,8 +365,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
-        
-        
+
         optimizer = self.config.optimizer.get(params=self.optimizer_parameters)
         return optimizer
 

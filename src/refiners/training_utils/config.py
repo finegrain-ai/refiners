@@ -1,15 +1,16 @@
 from enum import Enum
 from logging import warn
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Type, TypeVar
+from typing import Any, Callable, Literal, Type, TypeVar
 
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
 from pydantic import BaseModel, validator
 from torch.optim import SGD, Adam, AdamW, Optimizer
-from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
 from torch.optim.optimizer import params_t as ParamsT
+from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
+
 import refiners.fluxion.layers as fl
 from refiners.training_utils.dropout import apply_dropout, apply_gyro_dropout
 
@@ -109,6 +110,7 @@ class SchedulerConfig(BaseModel):
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
+
 class OptimizerConfig(BaseModel):
     optimizer: Optimizers
     learning_rate: float = 1e-4
@@ -167,16 +169,19 @@ class OptimizerConfig(BaseModel):
                     use_bias_correction=True,  # recommended for diffusion models
                 )
 
+
 class ModelOptimizerConfig(BaseModel):
     learning_rate: float | None = None
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
 
+
 class ModelConfig(BaseModel):
     checkpoint: Path | None = None
     train: bool = True
     optimizer: ModelOptimizerConfig | None = None
+
 
 class GyroDropoutConfig(BaseModel):
     total_subnetworks: int = 512
