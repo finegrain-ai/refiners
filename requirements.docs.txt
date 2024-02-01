@@ -1,3 +1,4 @@
+-e file:.[training]
 mkdocs-material==9.5.3
 mkdocstrings==0.24.0
 mkdocstrings-python==1.8.0
