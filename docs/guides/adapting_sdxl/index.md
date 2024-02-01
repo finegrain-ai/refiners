@@ -4,16 +4,16 @@ icon: material/castle
 
 # Adapting Stable Diffusion XL
 
-Stable Diffusion XL (SDXL) is a very popular text-to-image open source foundational model. This guide will show you how to boost its capabilities without the need for tedious prompt engineering with Refiners using iconic adapters the framework supports out-of-the-box. We'll follow a step by step approach, progressively increasing the number of adapters involved to showcase how simple adapter composition is using Refiners. Our use case will be the generation of an image with "a futuristic castle surrounded by a forest, mountains in the background".
+Stable Diffusion XL (SDXL) is a very popular text-to-image open source foundation model. This guide will show you how to boost its capabilities with Refiners, using iconic adapters the framework supports out-of-the-box, i.e. without the need for tedious prompt engineering. We'll follow a step by step approach, progressively increasing the number of adapters involved to showcase how simple adapter composition is using Refiners. Our use case will be the generation of an image with "a futuristic castle surrounded by a forest, mountains in the background".
 
 ## Prerequisites
 
+Make sure Refiners is installed in your local environment - see [Getting started](/getting-started/recommended/) - and you have access to a decent GPU. 
+
 !!! warning
-    You need to have access to a GPU to run this guide's code snippets (the examples use CUDA), with minimum 24GB VRAM.
+    As the examples in this guide's code snippets use CUDA, a minimum of 24GB VRAM is needed. 
 
-First, make sure Refiners is installed in your local environment - see [Getting started](/getting-started/recommended/).
-
-Before diving into adapters, let's see establish a baseline by simply prompting SDXL with Refiners.
+Before diving into the adapters themselves, let's establish a baseline by simply prompting SDXL with Refiners.
 
 !!! note "Reminder"
     A StableDiffusion model is composed of three modules: 
@@ -22,7 +22,7 @@ Before diving into adapters, let's see establish a baseline by simply prompting 
     - A UNet, responsible for the diffusion process;
     - A prompt encoder, such as CLIP, responsible for encoding the user prompt which will guide the diffusion process.
 
-First, download and convert the weights of each module by calling our conversion scripts directly from your terminal (make sure you're in your local `refiners` directory, with your local environment active):
+As Refiners comes with a new model representation - see [Chain](/concepts/chain/) - , you need to download and convert the weights of each module by calling our conversion scripts directly from your terminal (make sure you're in your local `refiners` directory, with your local environment active):
 
 ```bash
 python scripts/conversion/convert_transformers_clip_text_model.py --from "stabilityai/stable-diffusion-xl-base-1.0" --subfolder2 text_encoder_2 --to DoubleCLIPTextEncoder.safetensors --half
@@ -158,9 +158,7 @@ It's time to execute your code. The resulting image should look like this:
   <img src="vanilla_sdxl.webp" alt="Image title" width="400">
 </figure>
 
-It is not really what we prompted the model for. To improve the results using only this vanilla model, and get a more futuristic-looking castle, one would need lots of tedious prompt engineering, without any certainty of real improvements.
-
-A simpler solution to this problem would be to use a pretrained LoRA, tailored for our use case. Well, it turns out that there is a LoRA for it on Civitai, called [Sci-fi Environments](https://civitai.com/models/105945?modelVersionId=140624)!
+It is not really what we prompted the model for, unfortunately. To get a more futuristic-looking castle, you can either go for tedious prompt engineering, or use a pretrainered LoRA tailored to our use case, like the [Sci-fi Environments](https://civitai.com/models/105945?modelVersionId=140624) LoRA available on Civitai. We'll now show you how the LoRA option works with Refiners. 
 
 ## Single LoRA
 
