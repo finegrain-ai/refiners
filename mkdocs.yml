@@ -59,7 +59,7 @@ nav:
     - getting-started/recommended.md
     - getting-started/advanced.md
   - Guides:
-    - guides/adapting_sdxl/index.md
+    - Adapting SDXL: guides/adapting_sdxl/index.md
   - Key Concepts:
     - concepts/chain.md
     - concepts/context.md

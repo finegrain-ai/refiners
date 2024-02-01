@@ -2,7 +2,7 @@
 icon: material/castle
 ---
 
-# Adapting StableDiffusionXL
+# Adapting Stable Diffusion XL
 
 Stable Diffusion XL (SDXL) is a very popular text-to-image open source foundational model. This guide will show you how to boost its capabilities without the need for tedious prompt engineering with Refiners using iconic adapters the framework supports out-of-the-box. We'll follow a step by step approach, progressively increasing the number of adapters involved to showcase how simple adapter composition is using Refiners. Our use case will be the generation of an image with "a futuristic castle surrounded by a forest, mountains in the background".
 
@@ -11,7 +11,7 @@ Stable Diffusion XL (SDXL) is a very popular text-to-image open source foundatio
 !!! warning
     You need to have access to a GPU to run this guide's code snippets (the examples use CUDA), with minimum 24GB VRAM.
 
-First, make sure Refiners is installed in your local environment - see [Getting started](https://refine.rs/getting_started/#installation).
+First, make sure Refiners is installed in your local environment - see [Getting started](/getting-started/recommended/).
 
 Before diving into adapters, let's see establish a baseline by simply prompting SDXL with Refiners.
 
