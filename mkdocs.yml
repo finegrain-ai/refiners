@@ -8,6 +8,7 @@ theme:
   favicon: assets/favicon.svg
   logo: assets/favicon.svg
   name: material
+  custom_dir: docs/overrides
   palette:
     primary: deep orange
     accent: deep orange
@@ -21,6 +22,7 @@ theme:
     - toc.follow
     - navigation.tabs.sticky
     - content.code.copy
+    - announce.dismiss
 plugins:
   - search
   - tags
