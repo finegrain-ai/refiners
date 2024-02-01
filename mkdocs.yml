@@ -95,3 +95,6 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
+validation:
+  links:
+    absolute_links: info  # use relative_to_docs when we switch to mkdocs 1.6
