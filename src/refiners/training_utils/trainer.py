@@ -325,19 +325,18 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             model_config = self.config.models[model_name]
             model_optim_conf: dict[str, Any] = {}
 
-            optimizer_config = model_config.optimizer
-            if optimizer_config is not None:
-                if optimizer_config.learning_rate is not None:
-                    model_optim_conf["lr"] = optimizer_config.learning_rate
-                if optimizer_config.weight_decay is not None:
-                    model_optim_conf["weight_decay"] = optimizer_config.weight_decay
-                if optimizer_config.betas is not None:
-                    model_optim_conf["betas"] = optimizer_config.betas
-                if optimizer_config.eps is not None:
-                    model_optim_conf["eps"] = optimizer_config.eps
+            if model_config.learning_rate is not None:
+                model_optim_conf["lr"] = model_config.learning_rate
+            if model_config.weight_decay is not None:
+                model_optim_conf["weight_decay"] = model_config.learning_rate
+            if model_config.betas is not None:
+                model_optim_conf["betas"] = model_config.learning_rate
+            if model_config.eps is not None:
+                model_optim_conf["eps"] = model_config.learning_rate
 
             for param in model_params:
-                params.append({"params": param, **model_optim_conf})
+                optim_params_dict = {"params": param, **model_optim_conf}
+                params.append(optim_params_dict)
 
         return params
 

@@ -170,17 +170,13 @@ class OptimizerConfig(BaseModel):
                 )
 
 
-class ModelOptimizerConfig(BaseModel):
+class ModelConfig(BaseModel):
+    checkpoint: Path | None = None
+    train: bool = True
     learning_rate: float | None = None
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
-
-
-class ModelConfig(BaseModel):
-    checkpoint: Path | None = None
-    train: bool = True
-    optimizer: ModelOptimizerConfig | None = None
 
 
 class GyroDropoutConfig(BaseModel):
