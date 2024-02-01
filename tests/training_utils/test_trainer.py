@@ -214,3 +214,39 @@ def test_warmup_lr(warmup_scheduler: WarmupScheduler) -> None:
     optimizer = warmup_scheduler.optimizer
     for group in optimizer.param_groups:
         assert group["lr"] == 0.1
+
+
+class MockTrainerWith2Models(MockTrainer):
+    @cached_property
+    def mock_model1(self) -> MockModel:
+        return MockModel()
+
+    @cached_property
+    def mock_model2(self) -> MockModel:
+        return MockModel()
+
+    def load_models(self) -> dict[str, fl.Module]:
+        return {"mock_model1": self.mock_model1, "mock_model2": self.mock_model2}
+
+    def compute_loss(self, batch: MockBatch) -> Tensor:
+        self.step_counter += 1
+        inputs, targets = batch.inputs.to(self.device), batch.targets.to(self.device)
+        outputs = self.mock_model2(self.mock_model1(inputs))
+        return norm(outputs - targets)
+
+
+@pytest.fixture
+def mock_config_2_models(test_device: torch.device) -> MockConfig:
+    return MockConfig.load_from_toml(Path(__file__).parent / "mock_config_2_models.toml")
+
+
+@pytest.fixture
+def mock_trainer_2_models(mock_config_2_models: MockConfig) -> MockTrainerWith2Models:
+    return MockTrainerWith2Models(config=mock_config_2_models)
+
+
+def test_optimizer_parameters(mock_trainer_2_models: MockTrainerWith2Models) -> None:
+    assert (
+        len(mock_trainer_2_models.optimizer.param_groups) == 12
+    )  # 12 == (3 [linear layers] * 2 [bias + weights]) * 2 [models]
+    assert mock_trainer_2_models.optimizer.param_groups[0]["lr"] == 1e-5

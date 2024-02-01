@@ -330,6 +330,32 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return [param for model in self.models.values() for param in model.parameters() if param.requires_grad]
 
     @property
+    def optimizer_parameters(self) -> list[dict[str, Any]]:
+        """
+        Returns a list of `dict`-s containing the params and optimizer options for each model.
+        See https://pytorch.org/docs/stable/optim.html#per-parameter-options for more details
+        """
+        params: list[dict[str, Any]] = []
+        for model_name, model in self.models.items():
+            model_params = [param for param in model.parameters() if param.requires_grad]
+            model_config = self.config.models[model_name]
+            model_optim_conf: dict[str, Any] = {}
+
+            if model_config.learning_rate is not None:
+                model_optim_conf["lr"] = model_config.learning_rate
+            if model_config.weight_decay is not None:
+                model_optim_conf["weight_decay"] = model_config.learning_rate
+            if model_config.betas is not None:
+                model_optim_conf["betas"] = model_config.learning_rate
+            if model_config.eps is not None:
+                model_optim_conf["eps"] = model_config.learning_rate
+
+            for param in model_params:
+                params.append({"params": param, **model_optim_conf})
+
+        return params
+
+    @property
     def learnable_parameter_count(self) -> int:
         """Returns the number of learnable parameters in all models"""
         return count_learnable_parameters(parameters=self.learnable_parameters)
@@ -353,7 +379,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def optimizer(self) -> Optimizer:
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
-        optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
+
+        optimizer = self.config.optimizer.get(params=self.optimizer_parameters)
         return optimizer
 
     @cached_property
