@@ -50,6 +50,8 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             signature_crossrefs: true
+watch:
+  - src/refiners
 extra_css:
   - stylesheets/extra.css
 nav:
