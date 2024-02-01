@@ -17,7 +17,7 @@ image_proj = { train = true }
 offset_noise = 0.0
 
 [adapter]
-image_encoder_type = "dinov2_vitl14_reg4"
+image_encoder_type = "dinov2_vitb14_reg4"
 resolution = 518
 scale = 1.0
 inference_scale = 1.0
@@ -28,7 +28,7 @@ initialize_model = true
 initializer_range = 0.02
 
 [training]
-duration = "10000:step"
+duration = "100000:step"
 seed = 9752
 gpu_index = 0
 batch_size = 8
@@ -65,7 +65,7 @@ resize_image_max_size = 576
 random_crop_size = 512
 filter_min_image_size = true
 image_drop_rate = 0.05
-text_drop_rate = 0.05
+text_drop_rate = 0.1
 text_and_image_drop_rate = 0.05
 to_wds = false
 pre_encode =  false
