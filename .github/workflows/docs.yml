@@ -10,12 +10,28 @@ jobs:
     name: Deploy docs
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v2
+      - name: Checkout
+      - uses: actions/checkout@v4
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
-      - name: Deploy MkDocs
-        uses: mhausenblas/mkdocs-deploy-gh-pages@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_DOMAIN: refine.rs
-          REQUIREMENTS: ./requirements.docs.txt
+      - name: Install Python
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Handle cache
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - uses: actions/cache@v3
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+
+      - name: Install MkDocs dependencies
+      - run: pip install -r requirements.docs.txt
+
+      - name: Deploy to GitHub Pages
+      - run: mkdocs gh-deploy --force
