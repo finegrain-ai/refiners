@@ -29,17 +29,6 @@ class ContextProvider:
         provider.update_contexts(contexts)
         return provider
 
-    def __add__(self, other: "ContextProvider") -> "ContextProvider":
-        self.contexts.update(other.contexts)
-        return self
-
-    def __lshift__(self, other: "ContextProvider") -> "ContextProvider":
-        other.contexts.update(self.contexts)
-        return other
-
-    def __bool__(self) -> bool:
-        return bool(self.contexts)
-
     def _get_repr_for_value(self, value: Any) -> str:
         if isinstance(value, Tensor):
             return f"Tensor(shape={value.shape}, dtype={value.dtype}, device={value.device})"

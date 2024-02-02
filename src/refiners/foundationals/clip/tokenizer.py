@@ -63,7 +63,7 @@ class CLIPTokenizer(fl.Module):
 
         assert (
             tokens.shape[1] <= self.sequence_length
-        ), f"Text is too long: tokens.shape[1] > sequence_length: {tokens.shape[1]} > {self.sequence_length}, {len(text)}"
+        ), f"Text is too long ({len(text)}): tokens.shape[1] > sequence_length: {tokens.shape[1]} > {self.sequence_length}"
         return pad(x=tokens, pad=(0, self.sequence_length - tokens.shape[1]), value=self.pad_token_id)
 
     @lru_cache()

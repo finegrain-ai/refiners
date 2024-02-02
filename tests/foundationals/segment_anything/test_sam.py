@@ -21,7 +21,7 @@ from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import image_to_tensor, load_tensors, no_grad
 from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
 from refiners.foundationals.segment_anything.model import SegmentAnythingH
-from refiners.foundationals.segment_anything.transformer import TwoWayTranformerLayer
+from refiners.foundationals.segment_anything.transformer import TwoWayTransformerLayer
 
 # See predictor_example.ipynb official notebook
 PROMPTS: list[SAMPrompt] = [
@@ -188,7 +188,7 @@ def test_two_way_transformer(facebook_sam_h: FacebookSAM) -> None:
     dense_positional_embedding = torch.randn(1, 64 * 64, 256, device=facebook_sam_h.device)
     sparse_embedding = torch.randn(1, 3, 256, device=facebook_sam_h.device)
 
-    refiners_layer = TwoWayTranformerLayer(
+    refiners_layer = TwoWayTransformerLayer(
         embedding_dim=256, feed_forward_dim=2048, num_heads=8, device=facebook_sam_h.device
     )
     facebook_layer = facebook_sam_h.mask_decoder.transformer.layers[1]  # type: ignore

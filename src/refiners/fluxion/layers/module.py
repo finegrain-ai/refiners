@@ -77,7 +77,7 @@ class Module(TorchModule):
         tree = ModuleTree(module=self)
         print(tree._generate_tree_repr(tree.root, is_root=True, depth=depth))  # type: ignore[reportPrivateUsage]
 
-    def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType]:
+    def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType | Sequence[BasicType]]:
         """Return a dictionary of basic attributes of the module.
 
         Basic attributes are public attributes made of basic types (int, float, str, bool) or a sequence of basic types.
@@ -99,7 +99,7 @@ class Module(TorchModule):
             return False
 
         return {
-            key: str(object=value)
+            key: value
             for key, value in self.__dict__.items()
             if is_basic_attribute(key=key, value=value)
             and (not init_attrs_only or (key in init_params and value != default_values.get(key)))

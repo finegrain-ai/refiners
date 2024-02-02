@@ -18,7 +18,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1UNet,
     StableDiffusion_1,
 )
-from refiners.foundationals.latent_diffusion.schedulers import DDPM
+from refiners.foundationals.latent_diffusion.solvers import DDPM, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
@@ -68,7 +68,78 @@ class CaptionImage(TypedDict):
     url: str
 
 
+<<<<<<< HEAD:src/refiners/training_utils/trainers/latent_diffusion.py
 class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
+=======
+ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionConfig)
+
+
+class TextEmbeddingLatentsDataset(Dataset[TextEmbeddingLatentsBatch]):
+    def __init__(self, trainer: "LatentDiffusionTrainer[Any]") -> None:
+        self.trainer = trainer
+        self.config = trainer.config
+        self.device = self.trainer.device
+        self.lda = self.trainer.lda
+        self.text_encoder = self.trainer.text_encoder
+        self.dataset = self.load_huggingface_dataset()
+        self.process_image = self.build_image_processor()
+        logger.info(f"Loaded {len(self.dataset)} samples from dataset")
+
+    def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
+        # TODO: make this configurable and add other transforms
+        transforms: list[Module] = []
+        if self.config.dataset.random_crop:
+            transforms.append(RandomCrop(size=512))
+        if self.config.dataset.horizontal_flip:
+            transforms.append(RandomHorizontalFlip(p=0.5))
+        if not transforms:
+            return lambda image: image
+        return Compose(transforms)
+
+    def load_huggingface_dataset(self) -> HuggingfaceDataset[CaptionImage]:
+        dataset_config = self.config.dataset
+        logger.info(f"Loading dataset from {dataset_config.hf_repo} revision {dataset_config.revision}")
+        return load_hf_dataset(
+            path=dataset_config.hf_repo, revision=dataset_config.revision, split=dataset_config.split
+        )
+
+    def resize_image(self, image: Image.Image, min_size: int = 512, max_size: int = 576) -> Image.Image:
+        return resize_image(image=image, min_size=min_size, max_size=max_size)
+
+    def process_caption(self, caption: str) -> str:
+        return caption if random.random() > self.config.latent_diffusion.unconditional_sampling_probability else ""
+
+    def get_caption(self, index: int) -> str:
+        return self.dataset[index]["caption"]
+
+    def get_image(self, index: int) -> Image.Image:
+        return self.dataset[index]["image"]
+
+    def __getitem__(self, index: int) -> TextEmbeddingLatentsBatch:
+        caption = self.get_caption(index=index)
+        image = self.get_image(index=index)
+        resized_image = self.resize_image(
+            image=image,
+            min_size=self.config.dataset.resize_image_min_size,
+            max_size=self.config.dataset.resize_image_max_size,
+        )
+        processed_image = self.process_image(resized_image)
+        latents = self.lda.image_to_latents(image=processed_image).to(device=self.device)
+        processed_caption = self.process_caption(caption=caption)
+        clip_text_embedding = self.text_encoder(processed_caption).to(device=self.device)
+        return TextEmbeddingLatentsBatch(text_embeddings=clip_text_embedding, latents=latents)
+
+    def collate_fn(self, batch: list[TextEmbeddingLatentsBatch]) -> TextEmbeddingLatentsBatch:
+        text_embeddings = cat(tensors=[item.text_embeddings for item in batch])
+        latents = cat(tensors=[item.latents for item in batch])
+        return TextEmbeddingLatentsBatch(text_embeddings=text_embeddings, latents=latents)
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+
+class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
+>>>>>>> topological-load:src/refiners/training_utils/latent_diffusion.py
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
@@ -93,15 +164,16 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
         ...
 
     @cached_property
-    def ddpm_scheduler(self) -> DDPM:
-        ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
-        self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
-        return ddpm_scheduler
+    def ddpm_solver(self) -> Solver:
+        return DDPM(
+            num_inference_steps=1000,
+            device=self.device,
+        ).to(device=self.device)
 
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
-        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+        return self.ddpm_solver.timesteps[random_step].unsqueeze(dim=0)
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
@@ -130,8 +202,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-
+        noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
@@ -154,8 +225,17 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                 x = randn(1, 4, 64, 64)
                 clip_text_embedding = sd.compute_clip_text_embedding(text=prompt)
                 for step in sd.steps:
+<<<<<<< HEAD:src/refiners/training_utils/trainers/latent_diffusion.py
                     x = sd(x, step=step, clip_text_embedding=clip_text_embedding, condition_scale=condition_scale)
                 canvas_image.paste(sd.lda.latent_to_image(x=x), box=(0, 512 * i))
+=======
+                    x = sd(
+                        x,
+                        step=step,
+                        clip_text_embedding=clip_text_embedding,
+                    )
+                canvas_image.paste(sd.lda.latents_to_image(x=x), box=(0, 512 * i))
+>>>>>>> topological-load:src/refiners/training_utils/latent_diffusion.py
             images[prompt] = canvas_image
         self.log(data=images)
 
@@ -169,7 +249,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
 
         self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
 
-        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, solver=scheduler)
 
 
 def sample_noise(

@@ -283,19 +283,19 @@ class LatentDiffusionAutoencoder(Chain):
         x = decoder(x / self.encoder_scale)
         return x
 
-    def image_to_latent(self, image: Image.Image) -> Tensor:
+    def image_to_latents(self, image: Image.Image) -> Tensor:
         return self.images_to_latents([image])
 
     def images_to_latents(self, images: list[Image.Image]) -> Tensor:
-        x = images_to_tensor(images)
+        x = images_to_tensor(images, device=self.device, dtype=self.dtype)
         x = 2 * x - 1
         return self.encode(x)
-    
+
     # backward-compatibility alias
     def decode_latents(self, x: Tensor) -> Image.Image:
-        return self.latent_to_image(x)
+        return self.latents_to_image(x)
 
-    def latent_to_image(self, x: Tensor) -> Image.Image:
+    def latents_to_image(self, x: Tensor) -> Image.Image:
         if x.shape[0] != 1:
             raise ValueError(f"Expected batch size of 1, got {x.shape[0]}")
 

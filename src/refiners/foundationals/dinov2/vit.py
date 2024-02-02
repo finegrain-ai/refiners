@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import Tensor
 
@@ -60,17 +62,17 @@ class LayerScale(fl.WeightedModule):
         super().__init__()
         self.embedding_dim = embedding_dim
 
-        self.register_parameter(
-            name="weight",
-            param=torch.nn.Parameter(
-                torch.full(
-                    size=(embedding_dim,),
-                    fill_value=init_value,
-                    dtype=dtype,
-                    device=device,
-                ),
+        p = torch.nn.Parameter(
+            torch.full(
+                size=(embedding_dim,),
+                fill_value=init_value,
+                dtype=dtype,
+                device=device,
             ),
         )
+
+        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+        self.register_parameter(name="weight", param=cast(torch.nn.Parameter, p))
 
     def forward(self, x: Tensor) -> Tensor:
         return x * self.weight
@@ -303,71 +305,3 @@ class ViT(fl.Chain):
                 dtype=dtype,
             )
             self.insert_before_type(Transformer, registers)
-
-
-class ViT_tiny(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=192,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=3,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_small(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=384,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=6,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_base(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=768,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=12,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_large(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=1024,
-            patch_size=16,
-            image_size=224,
-            num_layers=24,
-            num_heads=16,
-            device=device,
-            dtype=dtype,
-        )

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+from typing import cast
 from warnings import warn
 
 import pytest
@@ -98,7 +99,8 @@ def test_count_learnable_parameters_with_params() -> None:
         nn.Parameter(torch.randn(5), requires_grad=False),
         nn.Parameter(torch.randn(3, 3), requires_grad=True),
     ]
-    assert count_learnable_parameters(params) == 13
+    # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+    assert count_learnable_parameters(cast(list[nn.Parameter], params)) == 13
 
 
 def test_count_learnable_parameters_with_model(mock_model: fl.Chain) -> None:

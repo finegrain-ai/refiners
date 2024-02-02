@@ -39,9 +39,9 @@ def sample_image(ref_path: Path) -> Image.Image:
 
 
 @no_grad()
-def test_encode_decode(encoder: LatentDiffusionAutoencoder, sample_image: Image.Image):
-    encoded = encoder.image_to_latent(sample_image)
-    decoded = encoder.latent_to_image(encoded)
+def test_encode_decode_image(encoder: LatentDiffusionAutoencoder, sample_image: Image.Image):
+    encoded = encoder.image_to_latents(sample_image)
+    decoded = encoder.latents_to_image(encoded)
 
     assert decoded.mode == "RGB"
 
@@ -50,6 +50,9 @@ def test_encode_decode(encoder: LatentDiffusionAutoencoder, sample_image: Image.
 
     ensure_similar_images(sample_image, decoded, min_psnr=20, min_ssim=0.9)
 
+
+@no_grad()
+def test_encode_decode_images(encoder: LatentDiffusionAutoencoder, sample_image: Image.Image):
     encoded = encoder.images_to_latents([sample_image, sample_image])
     images = encoder.latents_to_images(encoded)
     assert isinstance(images, list)

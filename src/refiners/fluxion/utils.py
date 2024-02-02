@@ -10,6 +10,7 @@ from safetensors import safe_open as _safe_open  # type: ignore
 from safetensors.torch import save_file as _save_file  # type: ignore
 from torch import (
     Tensor,
+    cat,
     device as Device,
     dtype as DType,
     manual_seed as _manual_seed,  # type: ignore
@@ -116,6 +117,12 @@ def gaussian_blur(
 def images_to_tensor(images: List[Image.Image], device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
     return cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
 
+def images_to_tensor(
+    images: list[Image.Image], device: Device | str | None = None, dtype: DType | None = None
+) -> Tensor:
+    return cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
+
+
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:
     """
     Convert a PIL Image to a Tensor.
@@ -140,9 +147,17 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
 
     return image_tensor.unsqueeze(0)
 
+<<<<<<< HEAD
 def tensor_to_images(tensor: Tensor) -> List[Image.Image]:
     return [tensor_to_image(t) for t in tensor.split(1)] # type: ignore
    
+=======
+
+def tensor_to_images(tensor: Tensor) -> list[Image.Image]:
+    return [tensor_to_image(t) for t in tensor.split(1)]  # type: ignore
+
+
+>>>>>>> topological-load
 def tensor_to_image(tensor: Tensor) -> Image.Image:
     """
     Convert a Tensor to a PIL Image.
@@ -204,11 +219,6 @@ def load_tensors(path: Path | str, /, device: Device | str = "cpu") -> dict[str,
 def load_from_safetensors(path: Path | str, device: Device | str = "cpu") -> dict[str, Tensor]:
     with safe_open(path=path, framework="pytorch", device=device) as tensors:  # type: ignore
         return {key: tensors.get_tensor(key) for key in tensors.keys()}  # type: ignore
-
-
-def load_metadata_from_safetensors(path: Path | str) -> dict[str, str] | None:
-    with safe_open(path=path, framework="pytorch") as tensors:  # type: ignore
-        return tensors.metadata()  # type: ignore
 
 
 def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: dict[str, str] | None = None) -> None:

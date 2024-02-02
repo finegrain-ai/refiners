@@ -221,7 +221,7 @@ class Chain(ContextModule):
     @staticmethod
     def _pretty_print_args(*args: Any) -> str:
         """
-        Flatten nested tuples and print tensors with their shape and other informations.
+        Flatten nested tuples and print tensors with their shape and other information.
         """
 
         def _flatten_tuple(t: Tensor | tuple[Any, ...], /) -> list[Any]:
@@ -290,13 +290,6 @@ class Chain(ContextModule):
 
     def _regenerate_keys(self, modules: Iterable[Module]) -> None:
         self._modules = generate_unique_names(tuple(modules))  # type: ignore
-
-    def __add__(self, other: "Chain | Module | list[Module]") -> "Chain":
-        if isinstance(other, Module):
-            other = Chain(other)
-        if isinstance(other, list):
-            other = Chain(*other)
-        return Chain(*self, *other)
 
     @overload
     def __getitem__(self, key: int) -> Module:

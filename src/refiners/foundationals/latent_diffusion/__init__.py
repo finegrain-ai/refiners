@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.auto_encoder import (
     LatentDiffusionAutoencoder,
 )
 from refiners.foundationals.latent_diffusion.freeu import SDFreeUAdapter
-from refiners.foundationals.latent_diffusion.schedulers import DPMSolver, Scheduler
+from refiners.foundationals.latent_diffusion.solvers import DPMSolver, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     SD1ControlnetAdapter,
     SD1IPAdapter,
@@ -19,6 +19,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLIPAdapter,
     SDXLT2IAdapter,
     SDXLUNet,
+    StableDiffusion_XL,
 )
 
 __all__ = [
@@ -33,8 +34,9 @@ __all__ = [
     "SDXLIPAdapter",
     "SDXLT2IAdapter",
     "DPMSolver",
-    "Scheduler",
+    "Solver",
     "CLIPTextEncoderL",
     "LatentDiffusionAutoencoder",
     "SDFreeUAdapter",
+    "StableDiffusion_XL",
 ]
