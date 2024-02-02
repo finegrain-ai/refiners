@@ -1,6 +1,5 @@
 from typing import Any
 
-
 class LabelTree:
     def __init__(self, name: str, name_index: int = 1, src_path: str | None = None):
         self.name = name
@@ -25,9 +24,7 @@ class LabelTree:
         else:
             raise ValueError(f"Found multiple similar children for {other.name}")
 
-
 SQUEEZABLE_NAMES = ["DropoutAdapter", "Chain"]
-
 
 class AssignementError(Exception):
     def __init__(self, message: str, path: str = "") -> None:
@@ -43,10 +40,8 @@ class AssignementError(Exception):
 
         return self
 
-
 AssignementErrors = list[dict[str, str]]
 Assignement = dict[str, str]
-
 
 def match_trees(tree1: LabelTree, tree2: LabelTree) -> tuple[Assignement, list[AssignementError]]:
     out: Assignement = {}
@@ -151,11 +146,9 @@ def simplify_node(node: LabelTree) -> LabelTree:
         node.children = simple_children
         return node
 
+StateDictLike = dict[str, Any]
 
-StateDict = dict[str, Any]
-
-
-def match_state_dict(source: StateDict, target: StateDict) -> StateDict:
+def match_state_dict(source: StateDictLike, target: StateDictLike) -> StateDictLike:
     source_keys = list(source.keys())
     target_keys = list(target.keys())
     simplified_source = simplify_node(paths_to_tree(source_keys))
@@ -165,7 +158,7 @@ def match_state_dict(source: StateDict, target: StateDict) -> StateDict:
     if len(errors) > 0:
         raise Exception(errors)
 
-    out: StateDict = {}
+    out: StateDictLike = {}
 
     for key in source_keys:
         if key in assignment:
