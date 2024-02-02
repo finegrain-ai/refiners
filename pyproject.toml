@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
+    "ruff>=0.2.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -86,6 +87,9 @@ line-length = 120
 
 [tool.ruff]
 src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
+line-length = 120
+
+[tool.ruff.lint]
 select = [
     "I", # isort
 ]
@@ -93,7 +97,6 @@ ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
     "E731", # do-not-assign-lambda
 ]
-line-length = 120
 
 [tool.ruff.lint.isort]
 # Allow this kind of import on a single line:
