@@ -146,7 +146,10 @@ class CLIPTextEncoder(fl.Chain):
         )
         if use_quick_gelu:
             for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
-                parent.replace(old_module=gelu, new_module=fl.ApproximateGeLU())
+                parent.replace(
+                    old_module=gelu,
+                    new_module=fl.GeLU(approximation=fl.GeLUApproximation.SIGMOID),
+                )
 
 
 class CLIPTextEncoderL(CLIPTextEncoder):
