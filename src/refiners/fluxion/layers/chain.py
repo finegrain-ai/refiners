@@ -496,7 +496,7 @@ class Chain(ContextModule):
         """
         self.insert(-1, module)
 
-    def pop(self, index: int = -1) -> Module | tuple[Module]:
+    def pop(self, index: int = -1) -> Module:
         """Pop a module from the chain at the given index.
 
         Args:
