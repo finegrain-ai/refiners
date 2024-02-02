@@ -25,7 +25,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
     Attributes:
         unet: The U-Net model.
         clip_text_encoder: The text encoder.
-        lda (SDXLAutoencoder): The image autoencoder.
+        lda: The image autoencoder.
     """
 
     unet: SDXLUNet
@@ -103,7 +103,7 @@ class StableDiffusion_XL(LatentDiffusionModel):
         time_ids: Tensor,
         **_: Tensor,
     ) -> None:
-        """Sets the various context parameters required by the U-Net model.
+        """Set the various context parameters required by the U-Net model.
 
         Args:
             timestep: The timestep to set.
