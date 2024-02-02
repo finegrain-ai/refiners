@@ -28,15 +28,6 @@ class Identity(Module):
         return x
 
 
-class View(Module):
-    def __init__(self, *shape: int) -> None:
-        super().__init__()
-        self.shape = shape
-
-    def forward(self, x: Tensor) -> Tensor:
-        return x.view(*self.shape)
-
-
 class GetArg(Module):
     """GetArg operation layer.
 
