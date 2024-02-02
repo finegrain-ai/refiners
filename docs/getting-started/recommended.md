@@ -8,7 +8,7 @@ Refiners is still a young project and development is active, so to use the lates
 
 Moreover, we recommend using [Rye](https://rye-up.com) which simplifies several things related to Python package management, so start by following the instructions to install it on your system.
 
-## Trying Refiners, converting weights
+## Installing
 
 To try Refiners, clone the GitHub repository and install it with all optional features:
 
@@ -18,13 +18,18 @@ cd refiners
 rye sync --all-features
 ```
 
+## Converting weights
+
 The format of state dicts used by Refiners is custom and we do not redistribute model weights, but we provide conversion tools and working scripts for popular models. For instance, let us convert the autoencoder from Stable Diffusion 1.5:
 
 ```bash
 python "scripts/conversion/convert_diffusers_autoencoder_kl.py" --to "lda.safetensors"
 ```
 
-If you need to convert weights for all models, check out `script/prepare_test_weights.py` (warning: it requires a GPU with significant VRAM and a lot of disk space).
+If you need to convert weights for all models, check out `script/prepare_test_weights.py`.
+
+!!! warning
+    Using `script/prepare_test_weights.py` requires a GPU with significant VRAM and a lot of disk space.
 
 Now to check that it works copy your favorite 512x512 picture in the current directory as `input.png` and create `ldatest.py` with this content:
 
@@ -38,8 +43,8 @@ with no_grad():
     lda.load_from_safetensors("lda.safetensors")
 
     image = Image.open("input.png")
-    latents = lda.encode_image(image)
-    decoded = lda.decode_latents(latents)
+    latents = lda.image_to_latents(image)
+    decoded = lda.latents_to_image(latents)
     decoded.save("output.png")
 ```
 
@@ -51,7 +56,7 @@ python ldatest.py
 
 Inspect `output.png`: it should be similar to `input.png` but have a few differences. Latent Autoencoders are good compressors!
 
-## Using refiners in your own project
+## Using Refiners in your own project
 
 So far you used Refiners as a standalone package, but if you want to create your own project using it as a dependency here is how you can proceed:
 
@@ -70,7 +75,8 @@ To convert weights, you can either use a copy of the `refiners` repository as de
 rye add --dev --git "git@github.com:finegrain-ai/refiners.git" --features conversion refiners
 ```
 
-Note that you will still need to download the conversion scripts independently if you go that route.
+!!! note
+    You will still need to download the conversion scripts independently if you go that route.
 
 ## What's next?
 
