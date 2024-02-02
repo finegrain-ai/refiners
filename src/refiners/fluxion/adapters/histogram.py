@@ -33,10 +33,8 @@ def tensor_to_sorted_channels(image: Tensor, color_bits: int = 8, extended : boo
             (red+blue)/2,
             (green+blue)/2
         ]
-    else: 
-        extended_channels = channels
     
-    for channel in extended_channels:
+    for channel in channels:
         # We extract RGB curves
         sorted_channel, _ = sort(flatten(channel, 1))
         sorted_channels.append(sorted_channel)
