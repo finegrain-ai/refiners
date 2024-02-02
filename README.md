@@ -8,7 +8,7 @@
 
 **The simplest way to train and run adapters on top of foundation models**
 
-[**Manifesto**](https://refine.rs/home/why/) | [**Documentation**](https://refine.rs) | [**Guides**](https://refine.rs/guides/adapting_sdxl/) | [**Discord**](https://discord.gg/mCmjNUVV7d)
+[**Manifesto**](https://refine.rs/home/why/) | [**Docs**](https://refine.rs) | [**Guides**](https://refine.rs/guides/adapting_sdxl/) | [**Discussions**](https://github.com/finegrain-ai/refiners/discussions) | [**Discord**](https://discord.gg/mCmjNUVV7d)
 
 ______________________________________________________________________
 
