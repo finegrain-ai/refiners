@@ -9,7 +9,7 @@ When we say models are implemented in a declarative way in Refiners, what this m
 
 ## A first example
 
-To give you an idea of how it looks, let us take an example similar to the one from the PyTorch paper:
+To give you an idea of how it looks, let us take an example similar to the one from the PyTorch paper[^1]:
 
 ```py
 class BasicModel(nn.Module):
@@ -106,7 +106,7 @@ Did it work? Let's see:
 
 ## Accessing and iterating
 
-There are also many ways to access or iterate nodes even if they are deep in the tree. Most of them are implemented using a powerful iterator named `walk`. However, most of the time, you can use simpler helpers. For instance, to iterate all the modules in the tree that hold weights (the `Conv2d` and the `Linear`s), we can just do:
+There are also many ways to access or iterate nodes even if they are deep in the tree. Most of them are implemented using a powerful iterator named [`walk`][refiners.fluxion.layers.Chain.walk]. However, most of the time, you can use simpler helpers. For instance, to iterate all the modules in the tree that hold weights (the `Conv2d` and the `Linear`s), we can just do:
 
 ```py
 for x in m.layers(fl.WeightedModule):
@@ -120,3 +120,5 @@ Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), device=cpu, dtype=fl
 Linear(in_features=128, out_features=40, device=cpu, dtype=float32)
 Linear(in_features=40, out_features=10, device=cpu, dtype=float32
 ```
+
+[^1]: Paszke et al., 2019. PyTorch: An Imperative Style, High-Performance Deep Learning Library.
