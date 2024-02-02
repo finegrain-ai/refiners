@@ -56,7 +56,7 @@ extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - Refiners: index.md
+    - Welcome: index.md
     - home/why.md
   - Getting started:
     - getting-started/recommended.md
