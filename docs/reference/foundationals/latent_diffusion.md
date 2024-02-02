@@ -7,3 +7,5 @@
 ::: refiners.foundationals.latent_diffusion.solvers
 
 ::: refiners.foundationals.latent_diffusion.lora
+
+::: refiners.foundationals.latent_diffusion.image_prompt
