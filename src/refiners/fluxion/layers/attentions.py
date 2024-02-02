@@ -20,7 +20,9 @@ def scaled_dot_product_attention(
 ) -> Float[Tensor, "batch source_sequence_length dim"]:
     """Scaled Dot Product Attention.
 
-    Optimization depends on which pytorch backend is used.
+    Note:
+        Optimization depends on which PyTorch backend is used.
+
     See [[arXiv:1706.03762] Attention Is All You Need (Equation 1)](https://arxiv.org/abs/1706.03762) for more details.
     See also [torch.nn.functional.scaled_dot_product_attention](https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html).
     """
@@ -213,7 +215,7 @@ class Attention(Chain):
             which transforms the 3 inputs into Query, Key and Value
         - a [`ScaledDotProductAttention`][refiners.fluxion.layers.attentions.ScaledDotProductAttention] layer
         - a [`Linear`][refiners.fluxion.layers.linear.Linear] layer,
-            which further transforms the output of the
+            which projects the output of the
             [`ScaledDotProductAttention`][refiners.fluxion.layers.attentions.ScaledDotProductAttention] layer
 
     Receives:
@@ -461,7 +463,7 @@ class SelfAttention2d(SelfAttention):
     ) -> Float[Tensor, "batch height*width channels"]:
         """Transform a 2D Tensor into a sequence.
 
-        The height and width of the input Tensor are stored in the context,
+        The height and width of the input Tensor are stored in a `"reshape"` context,
         so that the output Tensor can be transformed back into a 2D Tensor in the `sequence_to_tensor_2d` method.
         """
         height, width = x.shape[-2:]
@@ -480,7 +482,7 @@ class SelfAttention2d(SelfAttention):
     ) -> Float[Tensor, "batch channels height width"]:
         """Transform a sequence into a 2D Tensor.
 
-        The height and width of the output Tensor are retrieved from the context,
+        The height and width of the output Tensor are retrieved from the `"reshape"` context,
         which was set in the `tensor_2d_to_sequence` method.
         """
         height, width = self.use_context("reshape").values()

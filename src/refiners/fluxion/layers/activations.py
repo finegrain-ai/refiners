@@ -55,7 +55,7 @@ class ReLU(Activation):
         output = relu(tensor)
 
         expected_output = torch.tensor([[0.0, 0.0, 1.0]])
-        assert torch.allclose(output, expected_output)
+        assert torch.equal(output, expected_output)
         ```
     """
 

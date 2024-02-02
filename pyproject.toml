@@ -43,7 +43,8 @@ conversion = [
     "tqdm>=4.62.3",
 ]
 doc = [
-    "black>=24.1.1",                # required by mkdocs to format the signatures
+    # required by mkdocs to format the signatures
+    "black>=24.1.1",
     "mkdocs-material>=9.5.6",
     "mkdocstrings[python]>=0.24.0",
     "mkdocs-literate-nav>=0.6.1",
