@@ -154,10 +154,10 @@ class SegmentAnything(fl.Module):
         return w
 
     def compute_target_size(self, size: tuple[int, int]) -> tuple[int, int]:
-        """Compute the target size for a given size.
+        """Compute the target size as expected by the image encoder.
 
         Args:
-            size: The size of the image.
+            size: The size of the input image.
 
         Returns:
             The target height.
@@ -171,7 +171,7 @@ class SegmentAnything(fl.Module):
         return (newh, neww)
 
     def preprocess_image(self, image: Image.Image, target_size: tuple[int, int]) -> Tensor:
-        """Preprocess an image.
+        """Preprocess an image without distorting its aspect ratio.
 
         Args:
             image: The image to preprocess.
