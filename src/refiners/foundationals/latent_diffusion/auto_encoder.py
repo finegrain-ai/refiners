@@ -166,7 +166,7 @@ class Decoder(Chain):
         num_groups: int = 32, 
         resnet_sizes: list[int] = [128, 256, 512, 512, 512],
         output_channels: int = 3,
-        latent_dim: int = 8,
+        latent_dim: int = 4,
         n_up_samples: int = 3,
         device: Device | str | None = None, 
         dtype: DType | None = None,     

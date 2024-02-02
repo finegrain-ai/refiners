@@ -61,7 +61,17 @@ class ColorLoss(fl.Module):
     def forward(self, actual: Tensor, expected: Tensor) -> Tensor:
         assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
         assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
-        return self.l1_loss(tensor_to_sorted_channels(actual), tensor_to_sorted_channels(expected))
+        actual_channels = tensor_to_sorted_channels(actual)
+        expected_channels = tensor_to_sorted_channels(expected)
+
+        actual_channels_tensor = cat([
+            channel.unsqueeze(1) for channel in actual_channels
+        ], dim=1)
+        
+        expected_channels_tensor = cat([
+            channel.unsqueeze(1) for channel in expected_channels
+        ], dim=1)
+        return self.l1_loss(actual_channels_tensor, expected_channels_tensor)
 
 class HistogramDistance(fl.Chain):
     def __init__(

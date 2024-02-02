@@ -1,4 +1,3 @@
-from ast import List
 from functools import cached_property
 from typing import Any
 from loguru import logger
@@ -21,7 +20,6 @@ from refiners.training_utils.datasets.color_palette import ColorPaletteDataset, 
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.trainers.trainer import Trainer
 from pydantic import BaseModel
-import wandb
 
 class HistogramAutoEncoderConfig(BaseModel):
     latent_dim: int
@@ -114,7 +112,8 @@ class HistogramAutoEncoderTrainer(
     def compute_evaluation_metrics(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
         
         eval_loss = self.compute_loss(batch)
-        self.log({f"eval/loss": eval_loss})
+        self.log({f"eval/loss": eval_loss.item()})
+        return eval_loss
 
         # images = [item.image for item in batch]
         # [red_gt, green_gt, blue_gt] = images_to_histo_channels(images)

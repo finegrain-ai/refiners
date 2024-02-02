@@ -1,22 +1,24 @@
 from functools import cached_property
+from turtle import color
 from typing import Any, List, Tuple, TypedDict
 
 import numpy as np
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
+from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAutoEncoderConfig
+from refiners.training_utils.config import TrainingConfig
 from torch import Tensor, randn, stack
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.histogram import (
     HistogramDistance,
-    HistogramEncoder,
     HistogramExtractor,
     SD1HistogramAdapter,
     ColorLoss
 )
-from refiners.fluxion.utils import images_to_tensor, image_to_tensor, save_to_safetensors
+from refiners.fluxion.utils import images_to_tensor, save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
@@ -31,17 +33,6 @@ from refiners.training_utils.trainers.latent_diffusion import (
 )
 from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
-
-
-class HistogramConfig(BaseModel):
-    feedforward_dim: int
-    color_bits: int
-    patch_size: int
-    num_attention_heads: int
-    num_layers: int
-    trigger_phrase: str = ""
-    use_only_trigger_probability: float = 0.0
-    loss_weight: float = 1.0
 
 
 Color = Tuple[int, int, int]
@@ -69,10 +60,13 @@ class ImageAndHistogram(TypedDict):
     histogram: Histogram
     palette: ColorPalette
 
+class ColorTrainingConfig(TrainingConfig):
+    color_loss_weight: float = 1.0
 
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
-    histogram: HistogramConfig
+    histogram_auto_encoder: HistogramAutoEncoderConfig
     test_histogram: TestHistogramConfig
+    training: ColorTrainingConfig
 
 
 class HistogramLatentDiffusionTrainer(
@@ -94,6 +88,7 @@ class HistogramLatentDiffusionTrainer(
         autoencoder = HistogramAutoEncoder(
             latent_dim=self.config.histogram_auto_encoder.latent_dim, 
             resnet_sizes=self.config.histogram_auto_encoder.resnet_sizes,
+            color_bits=self.config.histogram_auto_encoder.color_bits,
             n_down_samples=self.config.histogram_auto_encoder.n_down_samples,
             device=self.device
         )
@@ -134,7 +129,7 @@ class HistogramLatentDiffusionTrainer(
 
         images = [item.image for item in batch]
         latents = self.lda.images_to_latents(images)
-        images_tensor = images_to_tensor(images)
+        images_tensor = images_to_tensor(images, device=self.device, dtype=self.dtype)
         
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
         histogram_embeddings = self.histogram_auto_encoder.encode(histograms)
@@ -160,18 +155,17 @@ class HistogramLatentDiffusionTrainer(
 
         predicted_decoded = self.lda.decode(x=predicted_latents).to(device=self.device)
         predicted_images_tensor = (predicted_decoded + 1) / 2
-
         loss_2 = self.color_loss(
             predicted_images_tensor,
             images_tensor
         )
         
         self.log({
-            f"losses/color_loss": loss_2,
-            f"losses/image": loss_1
+            f"losses/color_loss": loss_2.item(),
+            f"losses/image": loss_1.item()
         })
 
-        return loss_1 + loss_2 * self.config.histogram.loss_weight
+        return loss_1 + loss_2 * self.config.training.color_loss_weight
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
@@ -195,7 +189,7 @@ class HistogramLatentDiffusionTrainer(
             x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
 
             cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt["text"]).to(device=self.device)
-            cfg_histogram_embedding = self.histogram_encoder.compute_histogram_embedding(prompt["histogram"])
+            cfg_histogram_embedding = self.histogram_auto_encoder.compute_histogram_embedding(prompt["histogram"])
 
             self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding)
 
@@ -250,11 +244,11 @@ class HistogramLatentDiffusionTrainer(
 
     @cached_property
     def histogram_extractor(self) -> HistogramExtractor:
-        return HistogramExtractor(color_bits=self.config.histogram.color_bits)
+        return HistogramExtractor(color_bits=self.config.histogram_auto_encoder.color_bits)
 
     @cached_property
     def histogram_distance(self) -> HistogramDistance:
-        return HistogramDistance(color_bits=self.config.histogram.color_bits)
+        return HistogramDistance(color_bits=self.config.histogram_auto_encoder.color_bits)
 
     def batch_image_histogram_metrics(
         self, images_and_histograms: List[ImageAndHistogram], prefix: str = "histogram-img"
@@ -327,11 +321,6 @@ class SaveHistogram(Callback[HistogramLatentDiffusionTrainer]):
         adapter = model.parent
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
-        encoder = trainer.histogram_encoder
-
-        state_dict = encoder.state_dict()
-        for i in state_dict:
-            tensors.update({f"histogram_encoder.{i}": state_dict[i]})
 
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors", tensors=tensors

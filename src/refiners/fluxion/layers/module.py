@@ -1,11 +1,16 @@
+from os import name
 import sys
 from collections import defaultdict
 from inspect import Parameter, signature
 from pathlib import Path
+from tkinter import Label
+from tkinter.tix import Tree
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, DefaultDict, Generator, Sequence, TypedDict, TypeVar, cast
 
-from torch import device as Device, dtype as DType
+from refiners.fluxion.topological_utils import match_trees, paths_to_tree, simplify_node
+
+from torch import device as Device, dtype as DType, Tensor
 from torch.nn.modules.module import Module as TorchModule
 
 from refiners.fluxion.context import Context, ContextProvider
@@ -17,7 +22,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Module")
 TContextModule = TypeVar("TContextModule", bound="ContextModule")
 BasicType = str | float | int | bool
-
 
 class Module(TorchModule):
     _parameters: dict[str, Any]
@@ -32,10 +36,21 @@ class Module(TorchModule):
 
     def __setattr__(self, name: str, value: Any) -> None:
         return super().__setattr__(name=name, value=value)
-
+    
     def load_from_safetensors(self, tensors_path: str | Path, strict: bool = True) -> "Module":
         state_dict = load_from_safetensors(tensors_path)
-        self.load_state_dict(state_dict, strict=strict)
+        try:
+            self.load_state_dict(state_dict, strict=strict)
+        except Exception as e:
+            self.topological_load_state_dict(state_dict, strict=strict)
+        return self
+    
+    def topological_load_state_dict(self, state_dict : dict[str, Tensor], strict: bool = True) -> "Module":
+        tree1 = simplify_node(paths_to_tree(list(state_dict.keys())))
+        tree2 = simplify_node(paths_to_tree(list(self.state_dict().keys())))
+        assignement = match_trees(tree1, tree2)
+        assigned_state_dict = {v: state_dict[k] for k, v in assignement.items()}
+        self.load_state_dict(assigned_state_dict, strict=strict)
         return self
     
     def get_class_name(self) -> str:

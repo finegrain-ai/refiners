@@ -31,21 +31,27 @@ class Lambda(Module):
         return f"Lambda({func_name}{str(inspect.signature(self.func))})"
 
 
+def generate_unique_keys(
+    keys: list[str]
+) -> list[str]:
+    name_counts: dict[str, int] = {}
+    unique_keys: list[str] = []
+    for key in keys:
+        name_counts[key] = name_counts.get(key, 0) + 1
+        
+    name_counter: dict[str, int] = {}
+    for key in keys:
+        name_counter[key] = name_counter.get(key, 0) + 1
+        unique_key = f"{key}_{name_counter[key]}" if name_counts[key] > 1 else key
+        unique_keys.append(unique_key)
+    return unique_keys
+
+
 def generate_unique_names(
     modules: tuple[Module, ...],
 ) -> dict[str, Module]:
-    class_counts: dict[str, int] = {}
-    unique_names: list[tuple[str, Module]] = []
-    for module in modules:
-        class_name = module.__class__.__name__
-        class_counts[class_name] = class_counts.get(class_name, 0) + 1
-    name_counter: dict[str, int] = {}
-    for module in modules:
-        class_name = module.__class__.__name__
-        name_counter[class_name] = name_counter.get(class_name, 0) + 1
-        unique_name = f"{class_name}_{name_counter[class_name]}" if class_counts[class_name] > 1 else class_name
-        unique_names.append((unique_name, module))
-    return dict(unique_names)
+    unique_names = generate_unique_keys([m.__class__.__name__ for m in modules])
+    return dict(zip(unique_names, modules))
 
 
 class UseContext(ContextModule):
