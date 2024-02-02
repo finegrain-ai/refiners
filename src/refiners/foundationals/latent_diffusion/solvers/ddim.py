@@ -4,6 +4,11 @@ from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule
 
 
 class DDIM(Solver):
+    """Denoising Diffusion Implicit Model (DDIM) solver.
+
+    See [[arXiv:2010.02502] Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502) for more details.
+    """
+
     def __init__(
         self,
         num_inference_steps: int,
@@ -15,6 +20,18 @@ class DDIM(Solver):
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ) -> None:
+        """Initializes a new DDIM solver.
+
+        Args:
+            num_inference_steps: The number of inference steps.
+            num_train_timesteps: The number of training timesteps.
+            initial_diffusion_rate: The initial diffusion rate.
+            final_diffusion_rate: The final diffusion rate.
+            noise_schedule: The noise schedule.
+            first_inference_step: The first inference step.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         super().__init__(
             num_inference_steps=num_inference_steps,
             num_train_timesteps=num_train_timesteps,
