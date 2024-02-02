@@ -137,7 +137,7 @@ class HistogramLatentDiffusionTrainer(
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+        noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
         self.unet.set_timestep(timestep=timestep)
 
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
@@ -147,9 +147,9 @@ class HistogramLatentDiffusionTrainer(
 
         loss_1 = self.mse_loss(prediction, noise)
         
-        predicted_latents = self.ddpm_scheduler.remove_noise(
-            x=noisy_latents.to(device=self.ddpm_scheduler.device), 
-            noise=prediction.to(device=self.ddpm_scheduler.device), 
+        predicted_latents = self.ddpm_solver.remove_noise(
+            x=noisy_latents.to(device=self.ddpm_solver.device), 
+            noise=prediction.to(device=self.ddpm_solver.device), 
             step=self.current_step
         )
 
@@ -169,12 +169,13 @@ class HistogramLatentDiffusionTrainer(
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
-        scheduler = DPMSolver(
+        solver = DPMSolver(
             device=self.device, num_inference_steps=self.config.test_histogram.num_inference_steps, dtype=self.dtype
         )
 
-        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
-        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+        self.sharding_manager.add_device_hooks(solver, solver.device)
+        return StableDiffusion_1(
+            unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, solver=solver)
     
     def compute_prompt_evaluation(
         self, 

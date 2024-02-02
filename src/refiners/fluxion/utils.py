@@ -147,17 +147,11 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
 
     return image_tensor.unsqueeze(0)
 
-<<<<<<< HEAD
-def tensor_to_images(tensor: Tensor) -> List[Image.Image]:
-    return [tensor_to_image(t) for t in tensor.split(1)] # type: ignore
-   
-=======
 
 def tensor_to_images(tensor: Tensor) -> list[Image.Image]:
     return [tensor_to_image(t) for t in tensor.split(1)]  # type: ignore
 
 
->>>>>>> topological-load
 def tensor_to_image(tensor: Tensor) -> Image.Image:
     """
     Convert a Tensor to a PIL Image.

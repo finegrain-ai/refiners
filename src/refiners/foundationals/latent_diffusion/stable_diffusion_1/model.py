@@ -30,27 +30,11 @@ class StableDiffusion_1(LatentDiffusionModel):
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
-<<<<<<< HEAD
         unet = unet or SD1UNet(in_channels=4, device=device, dtype=dtype)
         lda = lda or SD1Autoencoder(device=device, dtype=dtype)
         clip_text_encoder = clip_text_encoder or CLIPTextEncoderL(device=device, dtype=dtype)
-        scheduler = scheduler or DPMSolver(num_inference_steps=30, device=device, dtype=dtype)
-        super().__init__(unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, scheduler=scheduler)
-=======
-        unet = unet or SD1UNet(in_channels=4)
-        lda = lda or SD1Autoencoder()
-        clip_text_encoder = clip_text_encoder or CLIPTextEncoderL()
-        solver = solver or DPMSolver(num_inference_steps=30)
-
-        super().__init__(
-            unet=unet,
-            lda=lda,
-            clip_text_encoder=clip_text_encoder,
-            solver=solver,
-            device=device,
-            dtype=dtype,
-        )
->>>>>>> topological-load
+        solver = solver or DPMSolver(num_inference_steps=30, device=device, dtype=dtype)
+        super().__init__(unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, solver=solver)
 
     def compute_clip_text_embedding(self, text: str, negative_text: str = "") -> Tensor:
         conditional_embedding = self.clip_text_encoder(text)

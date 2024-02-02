@@ -144,7 +144,7 @@ class ColorPaletteLatentDiffusionTrainer(
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+        noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
         self.unet.set_timestep(timestep=timestep)
 
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
@@ -153,7 +153,7 @@ class ColorPaletteLatentDiffusionTrainer(
         prediction = self.unet(noisy_latents)
         loss = self.mse_loss(prediction, noise)
         
-        predicted_latents = self.ddpm_scheduler.remove_noise(x=noisy_latents, noise=prediction, step=self.current_step)
+        predicted_latents = self.ddpm_solver.remove_noise(x=noisy_latents, noise=prediction, step=self.current_step)
         predicted_image = self.lda.decode(x=predicted_latents)
         images_tensor = x = (x + 1) / 2
         

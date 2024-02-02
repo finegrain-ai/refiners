@@ -20,10 +20,23 @@ def images_to_histo_channels(images: List[Image.Image], color_bits: int = 8) -> 
     return sorted_channels_to_histo_channels(sorted_channels, color_bits=color_bits)
     
 
-def tensor_to_sorted_channels(image: Tensor, color_bits: int = 8) -> List[Tensor]:
+def tensor_to_sorted_channels(image: Tensor, color_bits: int = 8, extended : bool = False) -> List[Tensor]:
     sorted_channels: List[Tensor] = []
     channels: List[Tensor] = image.split(1, dim=1)
-    for channel in channels:
+    if extended:
+        [red, green, blue] = channels
+        channels = [
+            red,
+            green, 
+            blue,
+            (red+green)/2,
+            (red+blue)/2,
+            (green+blue)/2
+        ]
+    else: 
+        extended_channels = channels
+    
+    for channel in extended_channels:
         # We extract RGB curves
         sorted_channel, _ = sort(flatten(channel, 1))
         sorted_channels.append(sorted_channel)
@@ -53,6 +66,16 @@ def histogram_to_histo_channels(histogram: Tensor) -> List[Tensor]:
     
     return [red, green, blue]
 
+def expand_channels(rgb_channels : list[Tensor]) -> List[Tensor]:
+    if len(rgb_channels) != 3:
+        raise ValueError("3 channels expected")
+    [red, green, blue] = rgb_channels
+    return [
+        red,
+        green,
+        blue
+    ]
+
 class ColorLoss(fl.Module):
     def __init__(self):
         super().__init__()
@@ -61,9 +84,9 @@ class ColorLoss(fl.Module):
     def forward(self, actual: Tensor, expected: Tensor) -> Tensor:
         assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
         assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
-        actual_channels = tensor_to_sorted_channels(actual)
-        expected_channels = tensor_to_sorted_channels(expected)
-
+        actual_channels = tensor_to_sorted_channels(actual, extended=True)
+        expected_channels = tensor_to_sorted_channels(expected, extended=True)
+        
         actual_channels_tensor = cat([
             channel.unsqueeze(1) for channel in actual_channels
         ], dim=1)
@@ -71,6 +94,7 @@ class ColorLoss(fl.Module):
         expected_channels_tensor = cat([
             channel.unsqueeze(1) for channel in expected_channels
         ], dim=1)
+        
         return self.l1_loss(actual_channels_tensor, expected_channels_tensor)
 
 class HistogramDistance(fl.Chain):

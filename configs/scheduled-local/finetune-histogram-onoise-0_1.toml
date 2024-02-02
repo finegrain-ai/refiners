@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="frozen-histo-autoencode"
+name="frz-onoise-0.1"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}
@@ -13,7 +13,7 @@ histogram_auto_encoder = {gpu_index=0, train = false, checkpoint = "tmp/step1900
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
-offset_noise = 0.2
+offset_noise = 0.1
 
 [histogram_auto_encoder]
 latent_dim = 8
@@ -22,7 +22,7 @@ n_down_samples = 5
 color_bits = 6
 
 [training]
-duration = "1:epoch"
+duration = "5000:step"
 seed = 0
 gpu_index = 0
 batch_size = 1
@@ -35,7 +35,7 @@ color_loss_weight = 0.2
 
 [optimizer]
 optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1e-5
+learning_rate = 1e-4
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
