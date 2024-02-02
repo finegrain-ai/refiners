@@ -8,6 +8,7 @@ theme:
   favicon: assets/favicon.svg
   logo: assets/favicon.svg
   name: material
+  custom_dir: docs/overrides
   palette:
     primary: deep orange
     accent: deep orange
@@ -21,6 +22,7 @@ theme:
     - toc.follow
     - navigation.tabs.sticky
     - content.code.copy
+    - announce.dismiss
 plugins:
   - search
   - tags
@@ -51,14 +53,17 @@ extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - index.md
+    - Refiners: index.md
+    - home/why.md
   - Getting started:
-    - getting_started.md
-  - Guides:
-    - guides/index.md
+    - getting-started/recommended.md
+    - getting-started/advanced.md
   - Key Concepts:
-    - concepts/index.md
-    - concepts/adapters.md
+    - concepts/chain.md
+    - concepts/context.md
+    - concepts/adapter/index.md
+  - Guides:
+    - Adapting SDXL: guides/adapting_sdxl/index.md
   - API Reference:
       - Refiners: reference/
 extra:
@@ -90,3 +95,6 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
+validation:
+  links:
+    absolute_links: info  # use relative_to_docs when we switch to mkdocs 1.6

@@ -19,6 +19,7 @@ class SD1Autoencoder(LatentDiffusionAutoencoder):
 class StableDiffusion_1(LatentDiffusionModel):
     unet: SD1UNet
     clip_text_encoder: CLIPTextEncoderL
+    lda: SD1Autoencoder
 
     def __init__(
         self,

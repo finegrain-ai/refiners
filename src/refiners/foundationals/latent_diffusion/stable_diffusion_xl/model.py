@@ -16,6 +16,7 @@ class SDXLAutoencoder(LatentDiffusionAutoencoder):
 class StableDiffusion_XL(LatentDiffusionModel):
     unet: SDXLUNet
     clip_text_encoder: DoubleTextEncoder
+    lda: SDXLAutoencoder
 
     def __init__(
         self,

@@ -209,11 +209,6 @@ def load_from_safetensors(path: Path | str, device: Device | str = "cpu") -> dic
         return {key: tensors.get_tensor(key) for key in tensors.keys()}  # type: ignore
 
 
-def load_metadata_from_safetensors(path: Path | str) -> dict[str, str] | None:
-    with safe_open(path=path, framework="pytorch") as tensors:  # type: ignore
-        return tensors.metadata()  # type: ignore
-
-
 def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: dict[str, str] | None = None) -> None:
     _save_file(tensors, path, metadata)  # type: ignore
 

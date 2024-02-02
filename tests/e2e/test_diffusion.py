@@ -7,6 +7,7 @@ import pytest
 import torch
 from PIL import Image
 
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
@@ -134,12 +135,17 @@ def expected_image_ip_adapter_controlnet(ref_path: Path) -> Image.Image:
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert(mode="RGB")
+    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init_sag(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert(mode="RGB")
+    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_sdxl_euler_random_init(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_cutecat_sdxl_euler_random_init.png").convert("RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -624,6 +630,18 @@ def sdxl_ddim_lda_fp16_fix(
     sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
 
     return sdxl
+
+
+@pytest.fixture
+def sdxl_euler_deterministic(sdxl_ddim: StableDiffusion_XL) -> StableDiffusion_XL:
+    return StableDiffusion_XL(
+        unet=sdxl_ddim.unet,
+        lda=sdxl_ddim.lda,
+        clip_text_encoder=sdxl_ddim.clip_text_encoder,
+        solver=Euler(num_inference_steps=30),
+        device=sdxl_ddim.device,
+        dtype=sdxl_ddim.dtype,
+    )
 
 
 @no_grad()
@@ -1638,6 +1656,87 @@ def test_sdxl_random_init_sag(
     predicted_image = sdxl.lda.latents_to_image(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image)
+
+
+@no_grad()
+def test_diffusion_sdxl_sliced_attention(
+    sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image
+) -> None:
+    unet = sdxl_ddim.unet.structural_copy()
+    for layer in unet.layers(ScaledDotProductAttention):
+        layer.slice_size = 2048
+
+    sdxl = StableDiffusion_XL(
+        unet=unet,
+        lda=sdxl_ddim.lda,
+        clip_text_encoder=sdxl_ddim.clip_text_encoder,
+        solver=sdxl_ddim.solver,
+        device=sdxl_ddim.device,
+        dtype=sdxl_ddim.dtype,
+    )
+
+    expected_image = expected_sdxl_ddim_random_init
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+    sdxl.set_inference_steps(30)
+    manual_seed(2)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+
+    predicted_image = sdxl.lda.decode_latents(x)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_euler_deterministic(
+    sdxl_euler_deterministic: StableDiffusion_XL, expected_sdxl_euler_random_init: Image.Image
+) -> None:
+    sdxl = sdxl_euler_deterministic
+    assert isinstance(sdxl.solver, Euler)
+
+    expected_image = expected_sdxl_euler_random_init
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+    sdxl.set_inference_steps(30)
+    manual_seed(2)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+
+    # init latents must be scaled for Euler
+    # TODO make init_latents work
+    x = x * sdxl.solver.init_noise_sigma
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+
+    predicted_image = sdxl.lda.decode_latents(x)
+    ensure_similar_images(predicted_image, expected_image)
 
 
 @no_grad()

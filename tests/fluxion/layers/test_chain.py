@@ -21,6 +21,13 @@ def test_chain_find() -> None:
     assert chain.find(fl.Conv2d) is None
 
 
+def test_chain_getitem_accessor() -> None:
+    chain = fl.Chain(fl.Linear(1, 1), fl.Linear(1, 1))
+    assert chain["Linear_2"] == chain.Linear_2
+    with pytest.raises(KeyError):
+        chain["Linear_3"]
+
+
 def test_chain_find_parent():
     chain = fl.Chain(fl.Chain(fl.Linear(1, 1)))
 
@@ -46,6 +53,30 @@ def test_chain_slice() -> None:
     assert len(chain) == 5
     assert len(sliced_chain) == 3
     assert chain[:-1](x).shape == (1, 1)
+
+
+def test_chain_walk() -> None:
+    chain = fl.Chain(
+        fl.Sum(
+            fl.Chain(fl.Linear(1, 1)),
+            fl.Linear(1, 1),
+        ),
+        fl.Chain(),
+    )
+
+    assert list(chain.walk()) == [(chain.Sum, chain), (chain.Chain, chain)]
+    assert list(chain.walk(fl.Linear)) == [
+        (chain.Sum.Chain.Linear, chain.Sum.Chain),
+        (chain.Sum.Linear, chain.Sum),
+    ]
+
+    assert list(chain.walk(recurse=True)) == [
+        (chain.Sum, chain),
+        (chain.Sum.Chain, chain.Sum),
+        (chain.Sum.Chain.Linear, chain.Sum.Chain),
+        (chain.Sum.Linear, chain.Sum),
+        (chain.Chain, chain),
+    ]
 
 
 def test_chain_walk_stop_iteration() -> None:
@@ -243,17 +274,3 @@ def test_debug_print() -> None:
     )
 
     assert chain._show_error_in_tree("Chain.Linear_2") == EXPECTED_TREE  # type: ignore[reportPrivateUsage]
-
-
-def test_module_get_path() -> None:
-    chain = fl.Chain(
-        fl.Sum(
-            fl.Linear(1, 1),
-            fl.Linear(1, 1),
-        ),
-        fl.Sum(),
-    )
-
-    assert chain.Sum_1.Linear_2.get_path(parent=chain.Sum_1) == "Chain.Sum_1.Linear_2"
-    assert chain.Sum_1.Linear_2.get_path(parent=chain.Sum_1, top=chain.Sum_1) == "Sum.Linear_2"
-    assert chain.Sum_1.get_path() == "Chain.Sum_1"
