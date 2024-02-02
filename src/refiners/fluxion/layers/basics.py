@@ -17,7 +17,7 @@ class Identity(Module):
         tensor = torch.randn(10, 10)
         output = identity(tensor)
 
-        assert torch.allclose(tensor, output)
+        assert torch.equal(tensor, output)
         ```
     """
 
@@ -51,9 +51,9 @@ class GetArg(Module):
             torch.randn(20, 20),
             torch.randn(30, 30),
         )
-        output = get_arg(inputs)
+        output = get_arg(*inputs)
 
-        assert torch.allclose(tensor[1], output)
+        assert id(inputs[1]) == id(output)
         ```
     """
 

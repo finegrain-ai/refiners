@@ -9,7 +9,7 @@ from refiners.fluxion.adapters.adapter import Adapter
 
 
 class Lora(fl.Chain, ABC):
-    """Low-rank approximation (LoRA) layer.
+    """Low-Rank Adaptation (LoRA) layer.
 
     This layer is composed of two [`WeightedModule`][refiners.fluxion.layers.WeightedModule]:
 
@@ -156,7 +156,7 @@ class Lora(fl.Chain, ABC):
             return LoraAdapter(layer, self), parent
 
     def load_weights(self, down_weight: Tensor, up_weight: Tensor) -> None:
-        """Load the weights of the LoRA.
+        """Load the (pre-trained) weights of the LoRA.
 
         Args:
             down_weight: The down weight.
@@ -169,7 +169,7 @@ class Lora(fl.Chain, ABC):
 
 
 class LinearLora(Lora):
-    """Low-rank approximation (LoRA) layer for linear layers.
+    """Low-Rank Adaptation (LoRA) layer for linear layers.
 
     This layer uses two [`Linear`][refiners.fluxion.layers.Linear] layers as its down and up layers.
     """
@@ -255,7 +255,7 @@ class LinearLora(Lora):
 
 
 class Conv2dLora(Lora):
-    """Low-rank approximation (LoRA) layer for 2D convolutional layers.
+    """Low-Rank Adaptation (LoRA) layer for 2D convolutional layers.
 
     This layer uses two [`Conv2d`][refiners.fluxion.layers.Conv2d] layers as its down and up layers.
     """
@@ -391,12 +391,12 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
 
     @property
     def loras(self) -> dict[str, Lora]:
-        """The LoRA layers."""
+        """The LoRA layers indexed by name."""
         return {lora.name: lora for lora in self.layers(Lora)}
 
     @property
     def scales(self) -> dict[str, float]:
-        """The scales of the LoRA layers."""
+        """The scales of the LoRA layers indexed by names."""
         return {lora.name: lora.scale for lora in self.layers(Lora)}
 
     @scales.setter
@@ -407,6 +407,9 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
     def add_lora(self, lora: Lora, /) -> None:
         """Add a LoRA layer to the adapter.
 
+        Raises:
+            AssertionError: If the adapter already contains a LoRA layer with the same name.
+
         Args:
             lora: The LoRA layer to add.
         """
@@ -415,6 +418,9 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
 
     def remove_lora(self, name: str, /) -> Lora | None:
         """Remove a LoRA layer from the adapter.
+
+        Note:
+            If the adapter doesn't contain a LoRA layer with the given name, nothing happens and `None` is returned.
 
         Args:
             name: The name of the LoRA layer to remove.

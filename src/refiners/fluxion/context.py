@@ -23,7 +23,7 @@ class ContextProvider:
         self.contexts[key] = value
 
     def get_context(self, key: str) -> Any:
-        """Retreive a value from the context.
+        """Retrieve a value from the context.
 
         Args:
             key: The key of the context.
@@ -34,7 +34,7 @@ class ContextProvider:
         return self.contexts.get(key)
 
     def update_contexts(self, new_contexts: Contexts) -> None:
-        """Update the contexts with new contexts.
+        """Update or set the contexts with new contexts.
 
         Args:
             new_contexts: The new contexts.
