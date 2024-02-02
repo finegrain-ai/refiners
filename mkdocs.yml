@@ -57,7 +57,7 @@ extra_css:
 nav:
   - Home: 
     - Welcome: index.md
-    - home/why.md
+    - Manifesto: home/why.md
   - Getting started:
     - getting-started/recommended.md
     - getting-started/advanced.md
