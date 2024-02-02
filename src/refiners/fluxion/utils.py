@@ -221,7 +221,7 @@ def load_tensors(path: Path | str, /, device: Device | str = "cpu") -> dict[str,
 
     Warning:
         Still, **only load data you trust** and favor using
-        [`load_from_safetensors`](refiners.fluxion.utils.load_from_safetensors) instead.
+        [`load_from_safetensors`][refiners.fluxion.utils.load_from_safetensors] instead.
     """
     # see https://github.com/pytorch/pytorch/issues/97207#issuecomment-1494781560
     with warnings.catch_warnings():
