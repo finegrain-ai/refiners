@@ -96,6 +96,9 @@ class StableDiffusion_1(LatentDiffusionModel):
     def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
         """Set whether to enable self-attention guidance.
 
+        See [[arXiv:2210.00939] Improving Sample Quality of Diffusion Models Using Self-Attention Guidance](https://arxiv.org/abs/2210.00939)
+        for more details.
+
         Args:
             enable: Whether to enable self-attention guidance.
             scale: The scale to use.
@@ -114,7 +117,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         return self._find_sag_adapter() is not None
 
     def _find_sag_adapter(self) -> SD1SAGAdapter | None:
-        """Finds the self-attention guidance adapter."""
+        """Finds the self-attention guidance adapter, if any."""
         for p in self.unet.get_parents():
             if isinstance(p, SD1SAGAdapter):
                 return p

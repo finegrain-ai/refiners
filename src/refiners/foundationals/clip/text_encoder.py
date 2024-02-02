@@ -154,7 +154,7 @@ class CLIPTextEncoderL(CLIPTextEncoder):
 
     Note:
         We replace the GeLU activation function with an approximate GeLU to comply with the original CLIP implementation
-        of OpenAI (https://github.com/openai/CLIP/blob/main/clip/model.py#L166)
+        of OpenAI (https://github.com/openai/CLIP/blob/a1d0717/clip/model.py#L166)
 
     See [[arXiv:2103.00020] Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)
     for more details.

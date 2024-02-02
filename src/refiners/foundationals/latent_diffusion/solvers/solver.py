@@ -121,6 +121,10 @@ class Solver(fl.Module, ABC):
     def remove_noise(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         """Remove noise from the input tensor using the current step of the diffusion process.
 
+        Note:
+            See [[arXiv:2006.11239] Denoising Diffusion Probabilistic Models, Equation 15](https://arxiv.org/abs/2006.11239)
+            and [[arXiv:2210.00939] Improving Sample Quality of Diffusion Models Using Self-Attention Guidance](https://arxiv.org/abs/2210.00939).
+
         Args:
             x: The input tensor to remove noise from.
             noise: The noise tensor to remove from the input tensor.
@@ -132,9 +136,6 @@ class Solver(fl.Module, ABC):
         timestep = self.timesteps[step]
         cumulative_scale_factors = self.cumulative_scale_factors[timestep]
         noise_stds = self.noise_std[timestep]
-        # See equation (15) from https://arxiv.org/pdf/2006.11239.pdf.
-        # Useful to preview progress or for guidance
-        # See also https://arxiv.org/pdf/2210.00939.pdf (self-attention guidance)
         denoised_x = (x - noise_stds * noise) / cumulative_scale_factors
         return denoised_x
 
@@ -195,6 +196,9 @@ class Solver(fl.Module, ABC):
         Note:
             This method should only be overridden by solvers that
             need to scale the input according to the current timestep.
+
+            By default, this method does not scale the input.
+            (scale=1)
 
         Args:
             x: The input tensor to scale.
