@@ -28,7 +28,6 @@ from refiners.fluxion.layers.basics import (
     Transpose,
     Unflatten,
     Unsqueeze,
-    View,
 )
 from refiners.fluxion.layers.chain import (
     Breakpoint,
@@ -75,7 +74,6 @@ __all__ = [
     "SelfAttention2d",
     "Identity",
     "GetArg",
-    "View",
     "Flatten",
     "Unflatten",
     "Transpose",
