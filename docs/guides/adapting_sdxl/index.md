@@ -528,7 +528,7 @@ with torch.no_grad():
     import torch
     from PIL import Image
 
-    from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, image_to_tensor, interpolate
+    from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, image_to_tensor
     from refiners.foundationals.latent_diffusion.lora import SDLoraManager
     from refiners.foundationals.latent_diffusion.stable_diffusion_xl import StableDiffusion_XL, SDXLT2IAdapter
     from refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt import SDXLIPAdapter
@@ -586,9 +586,8 @@ with torch.no_grad():
         clip_image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(image_prompt))
         ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
-        condition = image_to_tensor(image_depth_condition.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
         # Spatial dimensions should be divisible by default downscale factor (=16 for T2IAdapter ConditionEncoder)
-        condition = interpolate(condition, torch.Size((1024, 1024)))
+        condition = image_to_tensor(image_depth_condition.convert("RGB").resize((1024, 1024)), device=sdxl.device, dtype=sdxl.dtype)
         t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
         manual_seed(seed=seed)
