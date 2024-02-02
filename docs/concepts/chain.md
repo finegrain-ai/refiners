@@ -5,7 +5,7 @@ icon: material/family-tree
 # Chain
 
 
-When we say models are implemented in a declarative way in Refiners, what this means in practice is they are implemented as Chains. `Chain` is a Python class to implement trees of modules. It is a subclass of Refiners' `Module`, which is in turn a subclass of PyTorch's `Module`. All inner nodes of a Chain are subclasses of `Chain`, and leaf nodes are subclasses of Refiners' `Module`.
+When we say models are implemented in a declarative way in Refiners, what this means in practice is they are implemented as Chains. [`Chain`][refiners.fluxion.layers.Chain] is a Python class to implement trees of modules. It is a subclass of Refiners' [`Module`][refiners.fluxion.layers.Module], which is in turn a subclass of PyTorch's `Module`. All inner nodes of a Chain are subclasses of `Chain`, and leaf nodes are subclasses of Refiners' `Module`.
 
 ## A first example
 
@@ -41,9 +41,10 @@ class BasicModel(fl.Chain):
         )
 ```
 
-> **Note** - We often use the namespace `fl` which means `fluxion`, which is the name of the part of Refiners that implements basic layers.
+!!! note
+    We often use the namespace `fl` which means `fluxion`, which is the name of the part of Refiners that implements basic layers.
 
-As of writing, Refiners does not include a `Softmax` layer by default, but as you can see you can easily call arbitrary code using `fl.Lambda`. Alternatively, if you just wanted to write `Softmax()`, you could implement it like this:
+As of writing, Refiners does not include a `Softmax` layer by default, but as you can see you can easily call arbitrary code using [`fl.Lambda`][refiners.fluxion.layers.Lambda]. Alternatively, if you just wanted to write `Softmax()`, you could implement it like this:
 
 ```py
 class Softmax(fl.Module):
@@ -51,7 +52,8 @@ class Softmax(fl.Module):
         return torch.nn.functional.softmax(x)
 ```
 
-> Note that we use type hints here. All of Refiners' codebase is typed, which makes it a pleasure to use if your downstream code is typed too.
+!!! note
+    Notice the type hints here. All of Refiners' codebase is typed, which makes it a pleasure to use if your downstream code is typed too.
 
 ## Inspecting and manipulating
 

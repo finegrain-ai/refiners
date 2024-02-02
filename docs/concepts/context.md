@@ -44,7 +44,7 @@ m.set_context("my context", {"my key": 4})
 m()  # prints 6
 ```
 
-As you can see, to use the context, you define it by subclassing any `Chain` and defining `init_context`. You can set the context with the `set_context` method or the `SetContext` layer, and you can access it anywhere down the provider's tree with `UseContext`.
+As you can see, to use the context, you define it by subclassing any `Chain` and defining `init_context`. You can set the context with the [`set_context`][refiners.fluxion.layers.Chain.set_context] method or the [`SetContext`][refiners.fluxion.layers.SetContext] layer, and you can access it anywhere down the provider's tree with [`UseContext`][refiners.fluxion.layers.UseContext].
 
 ## Simplifying complex models with Context
 
