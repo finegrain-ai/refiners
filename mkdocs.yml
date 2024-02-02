@@ -58,12 +58,12 @@ nav:
   - Getting started:
     - getting-started/recommended.md
     - getting-started/advanced.md
-  - Guides:
-    - Adapting SDXL: guides/adapting_sdxl/index.md
   - Key Concepts:
     - concepts/chain.md
     - concepts/context.md
     - concepts/adapter/index.md
+  - Guides:
+    - Adapting SDXL: guides/adapting_sdxl/index.md
   - API Reference:
       - Refiners: reference/
 extra:
