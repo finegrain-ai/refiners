@@ -42,6 +42,12 @@ conversion = [
     "requests>=2.26.0",
     "tqdm>=4.62.3",
 ]
+doc = [
+    "black>=24.1.1",                # required by mkdocs to format the signatures
+    "mkdocs-material>=9.5.6",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-literate-nav>=0.6.1",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -56,9 +62,6 @@ dev-dependencies = [
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
-    "mkdocs-material>=9.5.6",
-    "mkdocstrings[python]>=0.24.0",
-    "mkdocs-literate-nav>=0.6.1",
 ]
 
 
