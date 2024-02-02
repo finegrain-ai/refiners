@@ -97,24 +97,21 @@ class GeLU(Activation):
         ```
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        approximation: GeLUApproximation = GeLUApproximation.NONE,
+    ) -> None:
         super().__init__()
+        self.approximation = approximation
 
     def forward(self, x: Tensor) -> Tensor:
-        return gelu(x)  # type: ignore
-
-
-class ApproximateGeLU(Activation):
-    """
-    The approximate form of Gaussian Error Linear Unit (GELU)
-    For more details, see section 2: https://arxiv.org/abs/1606.08415
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, x: Tensor) -> Tensor:
-        return x * sigmoid(1.702 * x)
+        match self.approximation:
+            case GeLUApproximation.NONE:
+                return gelu(x, approximate="none")
+            case GeLUApproximation.TANH:
+                return gelu(x, approximate="tanh")
+            case GeLUApproximation.SIGMOID:
+                return x * sigmoid(1.702 * x)
 
 
 class Sigmoid(Activation):
