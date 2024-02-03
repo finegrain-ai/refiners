@@ -322,7 +322,7 @@ class IPDataset(Dataset[IPBatch]):
                 batch_size=50,  # FIXME: harcoded value
                 fn_kwargs={
                     "image_encoder_transform": self.image_encoder_transform,
-                    "image_encoder": self.trainer.adapter.image_encoder  # weights must be loaded to get same hash everytime
+                    "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
                     "image_encoder_column": self.image_encoder_column,
                     "device": self.trainer.device,
                     "dtype": self.trainer.dtype,
