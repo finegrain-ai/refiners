@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, List, Callable
-
+import os
 import datasets
 from loguru import logger
 from PIL import Image
@@ -77,6 +77,7 @@ class DatasetConfig(BaseModel):
     image_column: str = "image"
     caption_column: str = "caption"
     download_images: bool = True
+    save_path: str | None = None
 
 # Adapted from https://github.com/huggingface/open-muse
 def _init_learnable_weights(module: Module, initializer_range: float):
@@ -238,8 +239,6 @@ class IPDataset(Dataset[IPBatch]):
     def encode_lda_images(
         images: list[Image.Image],
         lda: SD1Autoencoder,
-        device: Device,
-        dtype: DType,
         random_crop_size: int | None = 512,
         center_crop_size: int | None = 512,
         horizontal_flip_probability: float = 0.5,
@@ -272,11 +271,19 @@ class IPDataset(Dataset[IPBatch]):
             f"revision {dataset_config.revision}, "
             f"split {dataset_config.split}"
         )
-        dataset = datasets.load_dataset(  # type: ignore
-            path=dataset_config.hf_repo,
-            revision=dataset_config.revision,
-            split=dataset_config.split,
-        )
+        dataset_save_path: str | None = self.trainer.config.dataset.save_path
+        if dataset_save_path and os.path.exists(dataset_save_path):
+            dataset = datasets.load_from_disk(self.trainer.config.dataset.save_path)[dataset_config.split]
+            logger.info(
+                f"Dataset has {len(dataset)} elements"
+            )
+            return dataset
+        else:
+            dataset = datasets.load_dataset(  # type: ignore
+                path=dataset_config.hf_repo,
+                revision=dataset_config.revision,
+                split=dataset_config.split,
+            )
         logger.info(
             f"Dataset has {len(dataset)} elements"
         )
@@ -354,8 +361,6 @@ class IPDataset(Dataset[IPBatch]):
                 batch_size=50,  # FIXME: harcoded value
                 fn_kwargs={
                     "lda": self.trainer.lda,
-                    "device": self.trainer.device,
-                    "dtype": self.trainer.dtype,
                     "random_crop_size": self.trainer.config.dataset.random_crop_size,
                     "center_crop_size": self.trainer.config.dataset.center_crop_size,
                     "horizontal_flip_probability": self.trainer.config.dataset.horizontal_flip_probability,
@@ -383,9 +388,12 @@ class IPDataset(Dataset[IPBatch]):
             output_all_columns=True,
             columns=[
                 "text_embedding",
+                self.image_encoder_column,
+                "lda_embedding"
             ],
         )
-
+        if dataset_save_path:
+            dataset.save_to_disk(dataset_save_path)
         return dataset  # type: ignore
 
     @cached_property
@@ -421,7 +429,6 @@ class IPDataset(Dataset[IPBatch]):
         else:
             image_embedding = data[self.image_encoder_column]
             latent = data["lda_embedding"]
-            print(image_embedding.shape, latent.shape)
         text_embedding = data["text_embedding"]
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
