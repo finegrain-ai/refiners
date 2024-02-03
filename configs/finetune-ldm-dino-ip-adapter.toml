@@ -83,7 +83,9 @@ save_interval = "250:step"
 num_inference_steps = 30
 prompts = [
     "A dog flying over a castle",
+    "Cute cats watching a tv"
 ]
 validation_image_paths = [
-    "tests/weights/frida.jpg"
+    "tests/weights/frida.jpg",
+    "tests/weights/cute_cats.jpg"
 ]
