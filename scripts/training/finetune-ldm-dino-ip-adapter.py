@@ -202,7 +202,7 @@ class IPDataset(Dataset[IPBatch]):
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
-        print(text_encoder(captions)[0].shape)
+        print(text_encoder(captions[0]).shape)
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
@@ -233,7 +233,6 @@ class IPDataset(Dataset[IPBatch]):
         cond_resolution: int,
     ) -> dict[str, list[Tensor]]:
         cond_images = [IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images]
-        print(image_encoder(cond_images[0]).shape)
         return {
             image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]
         }
