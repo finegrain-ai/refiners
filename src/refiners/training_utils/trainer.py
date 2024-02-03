@@ -7,7 +7,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16
+from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16, compile
 from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
@@ -468,6 +468,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         model.requires_grad_(requires_grad=self.config.models[model_name].train)
         model.to(self.device, dtype=self.dtype)
         model.zero_grad()
+        if self.config.models[model_name].compile:
+            self.models[model_name] = compile(model)
 
     def prepare_models(self) -> None:
         assert self.models, "No models found."

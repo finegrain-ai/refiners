@@ -6,12 +6,12 @@ entity = "isamu"
 project = "finetune-ldm-ip-adapter"
 
 [models]
-unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
-text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false }
-lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
-image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false }
-adapter = { train = true }
-image_proj = { train = true }
+unet = { checkpoint = "tests/weights/unet.safetensors", train = false, compile = false }
+text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false, compile = false }
+lda = { checkpoint = "tests/weights/lda.safetensors", train = false, compile = false }
+image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false, compile = false }
+adapter = { train = true, compile = false }
+image_proj = { train = true, compile = false }
 
 [ldm]
 offset_noise = 0.0
@@ -35,7 +35,7 @@ batch_size = 8
 gradient_accumulation = "1:step"
 evaluation_interval = "250:step"
 evaluation_seed = 9752
-mixed_precision = "bfloat16"
+mixed_precision = "float32"
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
