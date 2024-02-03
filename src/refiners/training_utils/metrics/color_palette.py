@@ -7,6 +7,8 @@ from sklearn.metrics import ndcg_score  # type: ignore
 from sklearn.neighbors import NearestNeighbors  # type: ignore
 
 from refiners.training_utils.datasets.color_palette import ColorPalette
+from src.refiners.fluxion.utils import tensor_to_image
+from src.refiners.training_utils.trainers.histogram import BatchHistogramResults
 
 Logger = Callable[[Any], None]
 
@@ -79,3 +81,18 @@ def batch_image_palette_metrics(log: Logger, images_and_palettes: List[ImageAndP
             log({f"{prefix}/ndcg_{num}": score, f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"]).item()})
         else:
             log({f"{prefix}/std_dev_{num}": np.std(per_num[num]["distances"]).item()})
+
+
+def batch_palette_metrics(log: Logger, images_and_palettes: BatchHistogramResults, prefix: str = "palette-img"):
+    
+    images = [tensor_to_image(image) for image in images_and_palettes["images"].split(1)]
+    palettes = images_and_palettes["palettes"]
+    
+    if len(images) != len(palettes):
+        raise ValueError("Images and palettes must have the same length")
+    
+    return batch_image_palette_metrics(
+        log, 
+        [{"image": image, "palette": palette} for image, palette in zip(images, palettes)], 
+        prefix
+    )

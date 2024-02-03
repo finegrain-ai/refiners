@@ -34,7 +34,6 @@ class LatentDiffusionConfig(BaseModel):
     min_step: int = 0
     max_step: int = 999
 
-
 class TestDiffusionBaseConfig(BaseModel):
     seed: int = 0
     num_inference_steps: int = 30
@@ -43,24 +42,19 @@ class TestDiffusionBaseConfig(BaseModel):
     num_images_per_prompt: int = 1
     condition_scale: float = 7.5
 
-
 class TestDiffusionConfig(TestDiffusionBaseConfig):
     prompts: list[str]
-
 
 class FinetuneLatentDiffusionBaseConfig(BaseConfig):
     dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
 
-
 class FinetuneLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     test_diffusion: TestDiffusionConfig
-
 
 ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionBaseConfig)
 BatchType = TypeVar("BatchType", bound=Any)
 DiffusionConfigType = TypeVar("DiffusionConfigType", bound=FinetuneLatentDiffusionConfig)
-
 
 class CaptionImage(TypedDict):
     caption: str

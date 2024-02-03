@@ -94,6 +94,16 @@ class ColorLoss(fl.Module):
         ], dim=1)
         
         return self.l1_loss(actual_channels_tensor, expected_channels_tensor)
+    
+    def image_vs_histo(self, image: Tensor, histo: Tensor, color_bits: int) -> Tensor:
+        actual_channels = tensor_to_sorted_channels(image, extended=False)
+        actual_channels_tensor = cat([
+            channel.unsqueeze(1) for channel in actual_channels
+        ], dim=1)
+        
+        histo_channels = histogram_to_histo_channels(histogram)
+        image_histo_channels = sorted_channels_to_histo_channels(actual_channels, color_bits=color_bits)
+        return self.l1_loss(histo_channels, image_histo_channels)
 
 class HistogramDistance(fl.Chain):
     def __init__(
