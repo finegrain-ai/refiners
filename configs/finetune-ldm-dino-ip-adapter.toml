@@ -9,7 +9,7 @@ project = "finetune-ldm-ip-adapter"
 unet = { checkpoint = "tests/weights/unet.safetensors", train = false }
 text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false }
 lda = { checkpoint = "tests/weights/lda.safetensors", train = false }
-image_encoder = { checkpoint = "tests/weights/dinov2_vitb14_reg4_pretrain.safetensors", train = false }
+image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false }
 adapter = { train = true }
 image_proj = { train = true }
 
@@ -17,13 +17,13 @@ image_proj = { train = true }
 offset_noise = 0.0
 
 [adapter]
-image_encoder_type = "dinov2_vitb14_reg4"
+image_encoder_type = "dinov2_vitl14_reg4"
 resolution = 518
 scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false
 use_timestep_embedding = false
-fine_grained = true
+fine_grained = false
 initialize_model = true
 initializer_range = 0.02
 
