@@ -202,7 +202,6 @@ class IPDataset(Dataset[IPBatch]):
         text_encoder: CLIPTextEncoderL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
-        print(text_encoder(captions[0]).shape)
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
@@ -260,7 +259,6 @@ class IPDataset(Dataset[IPBatch]):
             )
         image_compose = Compose(image_transforms)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
-        print(lda.encode_image(image=lda_images[0]).shape)
         return {
             "lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]
         }
@@ -273,8 +271,6 @@ class IPDataset(Dataset[IPBatch]):
             f"split {dataset_config.split}"
         )
         dataset_save_path: str | None = self.trainer.config.dataset.save_path
-        print(dataset_save_path)
-        print(os.path.exists(dataset_save_path))
 
         if dataset_save_path and os.path.exists(dataset_save_path):
             dataset = datasets.load_from_disk(self.trainer.config.dataset.save_path)[dataset_config.split]
