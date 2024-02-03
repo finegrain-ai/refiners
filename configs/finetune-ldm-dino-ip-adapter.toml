@@ -35,7 +35,7 @@ batch_size = 8
 gradient_accumulation = "1:step"
 evaluation_interval = "250:step"
 evaluation_seed = 9752
-mixed_precision = "float32"
+mixed_precision = "bfloat16"
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
