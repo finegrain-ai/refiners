@@ -112,19 +112,19 @@ class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
                 f"{trainer.clock.num_iterations} iterations."
             )
         )
-        trainer.clock.start_timer()
+        # trainer.clock.start_timer()
 
     def on_train_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.stop_timer()
+        # trainer.clock.stop_timer()
         logger.info(
             (
                 "Training took: "
-                f"{trainer.clock.time_elapsed} seconds, "
                 f"{trainer.clock.iteration} iterations, "
                 f"{trainer.clock.epoch} epochs, "
                 f"{trainer.clock.step} steps."
             )
         )
+        #  f"{trainer.clock.time_elapsed} seconds, "
 
     def on_epoch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         logger.info(f"Epoch {trainer.clock.epoch} started.")
@@ -162,11 +162,13 @@ class MonitorLoss(Callback["Trainer[BaseConfig, Any]"]):
         loss_value = trainer.loss.detach().cpu().item()
         self.epoch_losses.append(loss_value)
         self.iteration_losses.append(loss_value)
-        trainer.log(data={"step_loss": loss_value})
+        if trainer.clock.is_evaluation_step:
+            trainer.log(data={"step_loss": loss_value})
 
     def on_optimizer_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
-        trainer.log(data={"average_iteration_loss": avg_iteration_loss})
+        if trainer.clock.is_evaluation_step:
+            trainer.log(data={"average_iteration_loss": avg_iteration_loss})
         self.iteration_losses = []
 
     def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
@@ -175,7 +177,14 @@ class MonitorLoss(Callback["Trainer[BaseConfig, Any]"]):
         self.epoch_losses = []
 
     def on_lr_scheduler_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
+        if trainer.clock.is_evaluation_step:
+            trainer.log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
+
+class MonitorTime(Callback["Trainer[BaseConfig, Any]"]):
+    def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        batch_time, forward_time, backprop_time, data_time = trainer.batch_time_m.avg, trainer.forward_time_m.avg, trainer.backprop_time_m.avg, trainer.data_time_m.avg
+        if trainer.clock.is_evaluation_step:
+            trainer.log(data={"batch_time": batch_time, "forward_time": forward_time, "backprop_time": backprop_time, "data_time": data_time})
 
 
 class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):
@@ -200,4 +209,5 @@ class GradientValueClipping(Callback["Trainer[BaseConfig, Any]"]):
 
 class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.log(data={"total_grad_norm": trainer.total_gradient_norm})
+        if trainer.clock.is_evaluation_step:
+            trainer.log(data={"total_grad_norm": trainer.total_gradient_norm})

@@ -42,6 +42,24 @@ from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
+# Ported from open-muse
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val: float = 0
+        self.avg: float = 0
+        self.sum: float = 0
+        self.count: int = 0
+
+    def update(self, val:float, n: int=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 def count_learnable_parameters(parameters: Iterable[Parameter]) -> int:
     return sum(p.numel() for p in parameters if p.requires_grad)
@@ -277,6 +295,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             lr_scheduler_interval=config.scheduler.update_interval,
             checkpointing_save_interval=config.checkpointing.save_interval,
         )
+        self.batch_time_m = AverageMeter()
+        self.forward_time_m = AverageMeter()
+        self.backprop_time_m = AverageMeter()
+        self.data_time_m = AverageMeter()
         self.callbacks = callbacks or []
         self.callbacks += self.default_callbacks()
         self._call_callbacks(event_name="on_init_begin")
@@ -536,21 +558,33 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.checkpointing_enabled and self.clock.is_checkpointing_step:
             self._call_callbacks(event_name="on_checkpoint_save")
 
-    def step(self, batch: Batch) -> None:
+    def step(self, batch: Batch) -> tuple[int, int]:
         """Perform a single training step."""
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
+        forward_time = self.clock.time_elapsed
+        self.forward_time_m.update(forward_time)
+        self.clock.start_timer()
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
+        backward_time = self.clock.time_elapsed
+        self.backprop_time_m.update(backward_time)
+        return forward_time, backward_time
 
     def epoch(self) -> None:
         """Perform a single epoch."""
+        self.clock.start_timer()
         for batch in self.dataloader:
+            data_time = self.clock.time_elapsed
+            self.data_time_m.update(data_time)
+            self.clock.start_timer()
             self._call_callbacks(event_name="on_batch_begin")
-            self.step(batch=batch)
+            forward_time, backward_time = self.step(batch=batch)
+            self.clock.start_timer()
+            batch_time = data_time+forward_time+backward_time
+            self.batch_time_m.update(batch_time)
             self._call_callbacks(event_name="on_batch_end")
-
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
         """Train the model."""

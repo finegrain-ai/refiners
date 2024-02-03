@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, List
+from typing import Any, List, Callable
 
 import datasets
 from loguru import logger
@@ -14,7 +14,7 @@ from torch.nn.init import trunc_normal_
 from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, CenterCrop, Resize
 from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
@@ -66,7 +66,8 @@ class DatasetConfig(BaseModel):
     resize_image_min_size: int = 512
     resize_image_max_size: int = 576
     filter_min_image_size: bool = False
-    random_crop_size: int = 512
+    random_crop_size: int | None = 512
+    center_crop_size: int | None = 512
     image_drop_rate: float = 0.05
     text_drop_rate: float = 0.05
     text_and_image_drop_rate: float = 0.05
@@ -139,13 +140,16 @@ class IPDataset(Dataset[IPBatch]):
     Transforms the data from the HuggingFace dataset into `IPBatch`.
     The `collate_fn` is used by the trainer to batch the data.
     """
-
+    @no_grad()
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
         super().__init__()
         self.trainer = trainer
         self.dataset = self.load_huggingface_dataset()
-        cond_resolution = trainer.config.adapter.resolution
-        self.image_encoder_transform = lambda x: trainer.adapter.preprocess_image(x, (cond_resolution, cond_resolution))
+        self.image_encoder_column: str = self.trainer.config.adapter.image_encoder_type
+        if self.trainer.config.adapter.fine_grained:
+            self.image_encoder_column += "_fine_grained"
+        self.image_encoder_column += "_embedding"
+        self.image_encoder_transform: Callable[Image, Tensor] = lambda x: trainer.adapter.preprocess_image(x, (cond_resolution, cond_resolution))
 
     @staticmethod
     def download_images(
@@ -199,7 +203,49 @@ class IPDataset(Dataset[IPBatch]):
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
+    @staticmethod
+    def encode_cond_images(
+        images: list[Image],
+        image_encoder_transform: Callable[Image, Tensor],
+        image_encoder: ViT,
+        image_encoder_column: str,
+        device: Device,
+        dtype: DType,
+    ) -> dict[str, list[Tensor]]:
+        cond_images = [image_encoder_transform(image).to(device, dtype=dtype) for image in images]
+        return {
+            image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]
+        }
+    @staticmethod
+    def encode_lda_images(
+        images: list[Image],
+        lda: SD1Autoencoder,
+        device: Device,
+        dtype: DType,
+        random_crop_size: int | None = 512,
+        center_crop_size: int | None = 512,
+        horizontal_flip_probability: float = 0.5,
+    ) -> dict[str, list[Tensor]]:
+        # TODO: Multiple random latents per image
+        image_transforms: list[Module] = []
+        if random_crop_size:
+            image_transforms.append(
+                RandomCrop(size=random_crop_size),
+            )
+        else:
+            image_transforms.append(
+                CenterCrop(size=center_crop_size),
+            )
+        if horizontal_flip_probability:
+            image_transforms.append(
+                RandomHorizontalFlip(p=horizontal_flip_probability),
+            )
+        image_compose = Compose(image_transforms)
+        lda_images = [image_compose(image).to(device, dtype=dtype) for image in images]
 
+        return {
+            "lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]
+        }
     def load_huggingface_dataset(self) -> datasets.Dataset:
         """Load the dataset from Hugging Face and apply some pre-processing."""
         dataset_config = self.trainer.config.dataset
@@ -250,7 +296,6 @@ class IPDataset(Dataset[IPBatch]):
                 },
                 desc="Capping image sizes",  # type: ignore
             )
-
         # limit max image size
         dataset = dataset.map(  # type: ignore
             function=self.resize_images,
@@ -264,9 +309,40 @@ class IPDataset(Dataset[IPBatch]):
             },
             desc="Capping image sizes",  # type: ignore
         )
+        # encode cond images
+        self.trainer.prepare_models()
+        if self.trainer.config.dataset.pre_encode:
+            dataset = dataset.map(  # type: ignore
+                function=self.encode_cond_images,
+                input_columns=["image"],
+                batched=True,
+                batch_size=50,  # FIXME: harcoded value
+                fn_kwargs={
+                    "image_encoder_transform": self.image_encoder_transform,
+                    "image_encoder": self.trainer.adapter.image_encoder  # weights must be loaded to get same hash everytime
+                    "image_encoder_column": self.image_encoder_column,
+                    "device": self.trainer.device,
+                    "dtype": self.trainer.dtype,
+                },
+                desc="Encoding conditional images into embeddings",  # type: ignore
+            )
+            dataset = dataset.map(  # type: ignore
+                function=self.encode_lda_images,
+                input_columns=["image"],
+                batched=True,
+                batch_size=50,  # FIXME: harcoded value
+                fn_kwargs={
+                    "lda": self.trainer.lda,
+                    "device": self.trainer.device,
+                    "dtype": self.trainer.dtype,
+                    "random_crop_size": self.trainer.config.dataset.random_crop_size,
+                    "center_crop_size": self.trainer.config.dataset.center_crop_size,
+                    "horizontal_flip_probability": self.trainer.config.dataset.horizontal_flip_probability,
+                },
+                desc="Encoding lda images into embeddings",  # type: ignore
+            )
 
         # encode the captions into text embedding
-        self.trainer.prepare_model("text_encoder")
         dataset = dataset.rename_column(dataset_config.caption_column, "caption")  # type: ignore
         dataset = dataset.map(  # type: ignore
             function=self.encode_captions,
@@ -298,25 +374,32 @@ class IPDataset(Dataset[IPBatch]):
     def transform(self, data: dict[str, Any]) -> IPBatch:
         """Apply transforms to data."""
         dataset_config = self.trainer.config.dataset
-        image = data["image"]
-        cond_image = self.image_encoder_transform(image).to(self.trainer.device, dtype=self.trainer.dtype)
-        image_embedding = self.trainer.adapter.image_encoder(cond_image)
-        # apply augmentation to the image
-        image_transforms: list[Module] = []
-        if self.trainer.config.dataset.random_crop_size:
-            image_transforms.append(
-                RandomCrop(size=self.trainer.config.dataset.random_crop_size),
-            )
-        if self.trainer.config.dataset.horizontal_flip_probability:
-            image_transforms.append(
-                RandomHorizontalFlip(p=self.trainer.config.dataset.horizontal_flip_probability),
-            )
-        image_compose = Compose(image_transforms)
-        image = image_compose(image)  # type: ignore
+        if not self.trainer.config.dataset.pre_encode:
+            image = data["image"]
+            cond_image = self.image_encoder_transform(image).to(self.trainer.device, dtype=self.trainer.dtype)
+            image_embedding = self.trainer.adapter.image_encoder(cond_image)
+            # apply augmentation to the image
+            image_transforms: list[Module] = []
+            if self.trainer.config.dataset.random_crop_size:
+                image_transforms.append(
+                    RandomCrop(size=self.trainer.config.dataset.random_crop_size),
+                )
+            else:
+                image_transforms.append(
+                    CenterCrop(size=self.trainer.config.dataset.random_crop_size),
+                )
+            if self.trainer.config.dataset.horizontal_flip_probability:
+                image_transforms.append(
+                    RandomHorizontalFlip(p=self.trainer.config.dataset.horizontal_flip_probability),
+                )
+            image_compose = Compose(image_transforms)
+            image = image_compose(image)  # type: ignore
 
-        # encode the image into latent
-        latent = self.trainer.lda.encode_image(image=image)  # type: ignore
-
+            # encode the image into latent
+            latent = self.trainer.lda.encode_image(image=image)  # type: ignore
+        else:
+            image_embedding = data[self.image_encoder_column]
+            latent = data["lda_embedding"]
         text_embedding = data["text_embedding"]
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
@@ -356,6 +439,7 @@ class IPDataset(Dataset[IPBatch]):
 
 
 class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
+
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
