@@ -273,7 +273,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset_save_path: str | None = self.trainer.config.dataset.save_path
 
         if dataset_save_path and os.path.exists(dataset_save_path):
-            dataset = datasets.load_from_disk(self.trainer.config.dataset.save_path)[dataset_config.split]
+            dataset = datasets.load_from_disk(self.trainer.config.dataset.save_path)
             logger.info(
                 f"Dataset has {len(dataset)} elements"
             )
