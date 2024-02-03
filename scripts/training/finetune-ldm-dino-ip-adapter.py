@@ -18,6 +18,7 @@ from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, Ce
 from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
+from refiners.fluxion.utils import image_to_tensor, normalize
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
@@ -148,7 +149,7 @@ class IPDataset(Dataset[IPBatch]):
         if self.trainer.config.adapter.fine_grained:
             self.image_encoder_column += "_fine_grained"
         self.image_encoder_column += "_embedding"
-        self.image_encoder_transform: Callable[Image, Tensor] = lambda x: trainer.adapter.preprocess_image(x, (cond_resolution, cond_resolution))
+        self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
 
     @staticmethod
@@ -204,21 +205,38 @@ class IPDataset(Dataset[IPBatch]):
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
     @staticmethod
+    def cond_transform(
+        image: Image.Image,
+        device: Device,
+        dtype: DType,
+        size: tuple[int, int] = (518, 518),
+        mean: list[float] | None = None,
+        std: list[float] | None = None,
+    ) -> Tensor:
+        # Default mean and std are parameters from https://github.com/openai/CLIP
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        return normalize(
+            image_to_tensor(image.resize(size), device=device, dtype=dtype),
+            mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
+            std=[0.26862954, 0.26130258, 0.27577711] if std is None else std,
+        )
+    @staticmethod
     def encode_cond_images(
-        images: list[Image],
-        image_encoder_transform: Callable[Image, Tensor],
+        images: list[Image.Image],
         image_encoder: ViT,
         image_encoder_column: str,
         device: Device,
         dtype: DType,
+        cond_resolution: int,
     ) -> dict[str, list[Tensor]]:
-        cond_images = [image_encoder_transform(image).to(device, dtype=dtype) for image in images]
+        cond_images = [IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images]
         return {
             image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]
         }
     @staticmethod
     def encode_lda_images(
-        images: list[Image],
+        images: list[Image.Image],
         lda: SD1Autoencoder,
         device: Device,
         dtype: DType,
@@ -321,11 +339,11 @@ class IPDataset(Dataset[IPBatch]):
                 batched=True,
                 batch_size=50,  # FIXME: harcoded value
                 fn_kwargs={
-                    "image_encoder_transform": self.image_encoder_transform,
                     "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
                     "image_encoder_column": self.image_encoder_column,
                     "device": self.trainer.device,
                     "dtype": self.trainer.dtype,
+                    "cond_resolution": self.cond_resolution
                 },
                 desc="Encoding conditional images into embeddings",  # type: ignore
             )
@@ -379,7 +397,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         if not self.trainer.config.dataset.pre_encode:
             image = data["image"]
-            cond_image = self.image_encoder_transform(image).to(self.trainer.device, dtype=self.trainer.dtype)
+            cond_image = self.cond_transform(image, self.trainer.device, self.trainer.dtype, (self.cond_resolution, self.cond_resolution))
             image_embedding = self.trainer.adapter.image_encoder(cond_image)
             # apply augmentation to the image
             image_transforms: list[Module] = []
