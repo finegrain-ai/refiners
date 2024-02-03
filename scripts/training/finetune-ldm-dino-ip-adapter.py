@@ -144,12 +144,12 @@ class IPDataset(Dataset[IPBatch]):
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
         super().__init__()
         self.trainer = trainer
-        self.dataset = self.load_huggingface_dataset()
         self.image_encoder_column: str = self.trainer.config.adapter.image_encoder_type
         if self.trainer.config.adapter.fine_grained:
             self.image_encoder_column += "_fine_grained"
         self.image_encoder_column += "_embedding"
         self.image_encoder_transform: Callable[Image, Tensor] = lambda x: trainer.adapter.preprocess_image(x, (cond_resolution, cond_resolution))
+        self.dataset = self.load_huggingface_dataset()
 
     @staticmethod
     def download_images(
