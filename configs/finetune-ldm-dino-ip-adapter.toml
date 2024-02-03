@@ -69,11 +69,10 @@ image_drop_rate = 0.05
 text_drop_rate = 0.05
 text_and_image_drop_rate = 0.05
 to_wds = false
-pre_encode =  false
+pre_encode =  true
 image_column = "image"
 caption_column = "ai_description"
 download_images = true
-pre_encode = true
 
 
 [checkpointing]
