@@ -259,6 +259,9 @@ class IPDataset(Dataset[IPBatch]):
             revision=dataset_config.revision,
             split=dataset_config.split,
         )
+        logger.info(
+            f"Dataset has {len(dataset)} elements"
+        )
 
         if dataset_config.download_images:
             # download images from urls
