@@ -46,7 +46,8 @@ class ImageAndHistogram(TypedDict):
     image: Image.Image
     histogram: Histogram
     palette: ColorPalette
-class BatchHistogramPrompt:
+
+class BatchHistogramPrompt(Dataset):
     def __init__(
         self,
         source_histogram_embeddings: Tensor,
@@ -170,6 +171,8 @@ class BatchHistogramResults(BatchHistogramPrompt):
             db_indexes=histo_prompt.db_indexes,
             source_images=histo_prompt.source_images
         )
+
+
 
 class ColorTrainingConfig(TrainingConfig):
     color_loss_weight: float = 1.0
