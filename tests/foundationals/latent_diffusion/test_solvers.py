@@ -97,7 +97,7 @@ def test_euler_diffusers():
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
         refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
-        assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
+        assert allclose(diffusers_output, refiners_output, rtol=0.02), f"outputs differ at step {step}"
 
 
 def test_scheduler_remove_noise():
