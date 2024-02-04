@@ -27,7 +27,7 @@ training = [
     "tomli>=2.0.1",
 ]
 test = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
     "invisible-watermark>=0.2.0",
@@ -37,7 +37,7 @@ test = [
     "segment-anything-py>=1.0",
 ]
 conversion = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
     "requests>=2.26.0",

@@ -30,6 +30,7 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         beta_end=0.012,
         lower_order_final=False,
         euler_at_final=last_step_first_order,
+        final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
     )
     diffusers_scheduler.set_timesteps(n_steps)
     refiners_scheduler = DPMSolver(num_inference_steps=n_steps, last_step_first_order=last_step_first_order)
