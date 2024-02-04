@@ -85,7 +85,14 @@ class HistogramAutoEncoder(Chain):
         
         embedding_dim = color_size**3 / self.compression_rate
         return int(embedding_dim)
-
+    
+    
+    def unconditionnal_embedding_like(self, x: Tensor) -> Tensor:
+        numel: int = x.numel()
+        if numel == 0:
+            raise ValueError("Cannot compute histogram embedding for empty tensor")        
+        return (zeros_like(x) + 1.0) / numel
+    
     def compute_histogram_embedding(
         self,
         x: Tensor,
@@ -97,10 +104,7 @@ class HistogramAutoEncoder(Chain):
 
         if negative_histogram is None:
             # a uniform palette with all the colors at the same frequency
-            numel: int = x.numel()
-            if numel == 0:
-                raise ValueError("Cannot compute histogram embedding for empty tensor")
-            negative_histogram = (zeros_like(x) + 1.0) / numel
+            negative_histogram = self.unconditionnal_embedding_like(x)
 
         negative_embedding = self.encode_sequence(negative_histogram)
         return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
