@@ -1,5 +1,5 @@
 import math
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, List
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, List, Callable
 
 from jaxtyping import Float
 from PIL import Image
@@ -401,9 +401,11 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         if use_pooled_text_embedding:
             self.pooled_text_embedding_proj = PooledTextEmbeddingTimestepEncoder(self.target.device, self.target.dtype)
         self.fine_grained = fine_grained
-        self._image_encoder = [image_encoder]
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(image_encoder)]
+        else:
+            self._image_encoder = [self.convert_to_pooled_features(image_encoder)]
+
         self._image_proj = [image_proj]
 
         self.sub_adapters = [
@@ -510,7 +512,17 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
             std=[0.26862954, 0.26130258, 0.27577711] if std is None else std,
         )
-
+    @staticmethod
+    def convert_to_pooled_features(image_encoder: CLIPImageEncoderH | ViT) -> CLIPImageEncoderH | ViT:
+        encoder_clone = image_encoder.structural_copy()
+        if isinstance(image_encoder, CLIPImageEncoderH):
+            return encoder_clone
+        else:
+            assert isinstance(encoder_clone[-1], fl.LayerNorm) # final normalization
+            pooling_func:Callable[Tensor, Tensor] = lambda x: x[:, 0]
+            encoder_clone.append(fl.Lambda(pooling_func))
+            encoder_clone.pop()
+        return encoder_clone
     @staticmethod
     def convert_to_grid_features(image_encoder: CLIPImageEncoderH | ViT) -> CLIPImageEncoderH | ViT:
         encoder_clone = image_encoder.structural_copy()

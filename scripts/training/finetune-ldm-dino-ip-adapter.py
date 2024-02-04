@@ -271,116 +271,117 @@ class IPDataset(Dataset[IPBatch]):
             f"split {dataset_config.split}"
         )
         dataset_save_path: str | None = self.trainer.config.dataset.save_path
-
+        update_dataset: bool = False
         if dataset_save_path and os.path.exists(dataset_save_path):
             dataset = datasets.load_from_disk(self.trainer.config.dataset.save_path)
-            logger.info(
-                f"Dataset has {len(dataset)} elements"
-            )
-            return dataset
         else:
             dataset = datasets.load_dataset(  # type: ignore
                 path=dataset_config.hf_repo,
                 revision=dataset_config.revision,
                 split=dataset_config.split,
             )
-        logger.info(
-            f"Dataset has {len(dataset)} elements"
-        )
-
-        if dataset_config.download_images:
-            # download images from urls
-            dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
-            dataset = dataset.map(  # type: ignore
-                function=self.download_images,
-                input_columns=["url"],
-                remove_columns=["url"],
-                batched=True,
-                num_proc=8,  # FIXME: harcoded value
-                fn_kwargs={
-                    "dl_manager": dl_manager,
-                },
-                desc="Downloading images",  # type: ignore
+            logger.info(
+                f"Dataset has {len(dataset)} elements"
             )
-        else:
-            dataset = dataset.rename_column(dataset_config.image_column, "image")  # type: ignore
+
+            if dataset_config.download_images:
+                # download images from urls
+                dl_manager = datasets.DownloadManager()  # TODO: add a DownloadConfig
+                dataset = dataset.map(  # type: ignore
+                    function=self.download_images,
+                    input_columns=["url"],
+                    remove_columns=["url"],
+                    batched=True,
+                    num_proc=8,  # FIXME: harcoded value
+                    fn_kwargs={
+                        "dl_manager": dl_manager,
+                    },
+                    desc="Downloading images",  # type: ignore
+                )
+            else:
+                dataset = dataset.rename_column(dataset_config.image_column, "image")  # type: ignore
 
 
-        # cast the "image" column to Image feature type
-        dataset = dataset.cast_column(  # type: ignore
-            column="image",
-            feature=datasets.Image(),
-        )
-        # remove min size images
-        if dataset_config.filter_min_image_size:
-            dataset = dataset.filter( # type: ignore
-                function=self.filter_images,
+            # cast the "image" column to Image feature type
+            dataset = dataset.cast_column(  # type: ignore
+                column="image",
+                feature=datasets.Image(),
+            )
+            # remove min size images
+            if dataset_config.filter_min_image_size:
+                dataset = dataset.filter( # type: ignore
+                    function=self.filter_images,
+                    input_columns=["image"],
+                    batched=True,
+                    batch_size=10,  # FIXME: harcoded value
+                    num_proc=8,  # FIXME: harcoded value
+                    fn_kwargs={
+                        "min_size": dataset_config.resize_image_min_size,
+                    },
+                    desc="Capping image sizes",  # type: ignore
+                )
+            # limit max image size
+            dataset = dataset.map(  # type: ignore
+                function=self.resize_images,
                 input_columns=["image"],
                 batched=True,
                 batch_size=10,  # FIXME: harcoded value
                 num_proc=8,  # FIXME: harcoded value
                 fn_kwargs={
                     "min_size": dataset_config.resize_image_min_size,
+                    "max_size": dataset_config.resize_image_max_size,
                 },
                 desc="Capping image sizes",  # type: ignore
             )
-        # limit max image size
-        dataset = dataset.map(  # type: ignore
-            function=self.resize_images,
-            input_columns=["image"],
-            batched=True,
-            batch_size=10,  # FIXME: harcoded value
-            num_proc=8,  # FIXME: harcoded value
-            fn_kwargs={
-                "min_size": dataset_config.resize_image_min_size,
-                "max_size": dataset_config.resize_image_max_size,
-            },
-            desc="Capping image sizes",  # type: ignore
-        )
         # encode cond images
         self.trainer.prepare_models()
         if self.trainer.config.dataset.pre_encode:
+            if self.image_encoder_column not in dataset.features:
+                update_dataset = True
+                dataset = dataset.map(  # type: ignore
+                    function=self.encode_cond_images,
+                    input_columns=["image"],
+                    batched=True,
+                    batch_size=50,  # FIXME: harcoded value
+                    fn_kwargs={
+                        "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
+                        "image_encoder_column": self.image_encoder_column,
+                        "device": self.trainer.device,
+                        "dtype": self.trainer.dtype,
+                        "cond_resolution": self.cond_resolution
+                    },
+                    desc="Encoding conditional images into embeddings",  # type: ignore
+                )
+            if "lda_embedding" not in dataset.features:
+                update_dataset = True
+                dataset = dataset.map(  # type: ignore
+                    function=self.encode_lda_images,
+                    input_columns=["image"],
+                    batched=True,
+                    batch_size=50,  # FIXME: harcoded value
+                    fn_kwargs={
+                        "lda": self.trainer.lda,
+                        "random_crop_size": self.trainer.config.dataset.random_crop_size,
+                        "center_crop_size": self.trainer.config.dataset.center_crop_size,
+                        "horizontal_flip_probability": self.trainer.config.dataset.horizontal_flip_probability,
+                    },
+                    desc="Encoding lda images into embeddings",  # type: ignore
+                )
+        if "text_embedding" not in dataset.features:
+            update_dataset = True
+            # encode the captions into text embedding
+            dataset = dataset.rename_column(dataset_config.caption_column, "caption")  # type: ignore
             dataset = dataset.map(  # type: ignore
-                function=self.encode_cond_images,
-                input_columns=["image"],
+                function=self.encode_captions,
+                input_columns=["caption"],
+                remove_columns=["caption"],
                 batched=True,
                 batch_size=50,  # FIXME: harcoded value
                 fn_kwargs={
-                    "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
-                    "image_encoder_column": self.image_encoder_column,
-                    "device": self.trainer.device,
-                    "dtype": self.trainer.dtype,
-                    "cond_resolution": self.cond_resolution
+                    "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
                 },
-                desc="Encoding conditional images into embeddings",  # type: ignore
+                desc="Encoding captions into embeddings",  # type: ignore
             )
-            dataset = dataset.map(  # type: ignore
-                function=self.encode_lda_images,
-                input_columns=["image"],
-                batched=True,
-                batch_size=50,  # FIXME: harcoded value
-                fn_kwargs={
-                    "lda": self.trainer.lda,
-                    "random_crop_size": self.trainer.config.dataset.random_crop_size,
-                    "center_crop_size": self.trainer.config.dataset.center_crop_size,
-                    "horizontal_flip_probability": self.trainer.config.dataset.horizontal_flip_probability,
-                },
-                desc="Encoding lda images into embeddings",  # type: ignore
-            )
-
-        # encode the captions into text embedding
-        dataset = dataset.rename_column(dataset_config.caption_column, "caption")  # type: ignore
-        dataset = dataset.map(  # type: ignore
-            function=self.encode_captions,
-            input_columns=["caption"],
-            remove_columns=["caption"],
-            batched=True,
-            batch_size=50,  # FIXME: harcoded value
-            fn_kwargs={
-                "text_encoder": self.trainer.text_encoder  # weights must be loaded to get same hash everytime
-            },
-            desc="Encoding captions into embeddings",  # type: ignore
-        )
 
         # convert entries to torch tensors, except the image
         dataset.set_format(  # type: ignore
@@ -392,7 +393,7 @@ class IPDataset(Dataset[IPBatch]):
                 "lda_embedding"
             ],
         )
-        if dataset_save_path:
+        if dataset_save_path and update_dataset:
             dataset.save_to_disk(dataset_save_path)
         return dataset  # type: ignore
 
