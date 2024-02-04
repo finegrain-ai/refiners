@@ -40,11 +40,19 @@ DEFAULT_SAMPLING= {
     "palette_8": 8.0
 }
 
-class SamplingByPalette(BaseModel):
+class SamplingByPalette:
+    palette_1: float= 0.0
+    palette_2: float= 0.0
+    palette_3: float= 0.0
+    palette_4: float= 0.0
+    palette_5: float= 0.0
+    palette_6: float= 0.0
+    palette_7: float= 0.0
+    palette_8: float= 0.0
+    
     def __init__(self, sampling = DEFAULT_SAMPLING) -> None:
         for key in sampling:
-            setattr(self, key, sampling[key])
-        super().__init__()
+            self.__setattr__(key, sampling[key])
 
 
 class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):

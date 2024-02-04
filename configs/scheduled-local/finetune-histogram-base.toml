@@ -1,6 +1,6 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "online" # "online", "offline", "disabled"
+mode = "disabled" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
 name="base-10k"
@@ -53,7 +53,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[:24000]"
+split = "train"
 #random_crop = false
 
 [validation_dataset]
@@ -61,7 +61,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[24000:]"
+split = "train"
 
 [checkpointing]
 #save_folder = "ckpts"
