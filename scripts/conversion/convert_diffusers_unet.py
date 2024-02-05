@@ -39,7 +39,7 @@ def setup_converter(args: Args) -> ModelConverter:
     target.set_timestep(timestep=timestep)
     target.set_clip_text_embedding(clip_text_embedding=clip_text_embeddings)
     added_cond_kwargs = {}
-    if source_has_time_ids:
+    if isinstance(target, SDXLUNet):
         added_cond_kwargs = {"text_embeds": torch.randn(1, 1280), "time_ids": torch.randn(1, 6)}
         target.set_time_ids(time_ids=added_cond_kwargs["time_ids"])
         target.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])

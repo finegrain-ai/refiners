@@ -9,17 +9,15 @@ import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
 from refiners.foundationals.latent_diffusion.solvers import Solver
 
-T = TypeVar("T", bound="fl.Module")
-
 TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionModel")
 
 
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
         self,
-        unet: fl.Module,
+        unet: fl.Chain,
         lda: LatentDiffusionAutoencoder,
-        clip_text_encoder: fl.Module,
+        clip_text_encoder: fl.Chain,
         solver: Solver,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,

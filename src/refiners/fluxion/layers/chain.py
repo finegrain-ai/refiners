@@ -3,7 +3,7 @@ import re
 import sys
 import traceback
 from collections import defaultdict
-from typing import Any, Callable, Iterable, Iterator, TypeVar, cast, overload
+from typing import Any, Callable, Iterable, Iterator, Sequence, TypeVar, cast, overload
 
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
@@ -362,6 +362,48 @@ class Chain(ContextModule):
                 recurse=recurse,
             )
 
+    def layer(self, key: str | int | Sequence[str | int], layer_type: type[T] = Module) -> T:
+        """Access a layer of the Chain given its type.
+
+        Example:
+            ```py
+            # same as my_chain["Linear_2"], asserts it is a Linear
+            my_chain.layer("Linear_2", fl.Linear)
+
+
+            # same as my_chain[3], asserts it is a Linear
+            my_chain.layer(3, fl.Linear)
+
+            # probably won't work
+            my_chain.layer("Conv2d", fl.Linear)
+
+
+            # same as my_chain["foo"][42]["bar"],
+            # assuming bar is a MyType and all parents are Chains
+            my_chain.layer(("foo", 42, "bar"), fl.MyType)
+            ```
+
+        Args:
+            key: The key or path of the layer.
+            layer_type: The type of the layer.
+
+        Yields:
+            The layer.
+
+        Raises:
+            AssertionError: If the layer doesn't exist or the type is invalid.
+        """
+        if isinstance(key, (str, int)):
+            r = self[key]
+            assert isinstance(r, layer_type), f"layer {key} is {type(r)}, not {layer_type}"
+            return r
+        if len(key) == 0:
+            assert isinstance(self, layer_type), f"layer is {type(self)}, not {layer_type}"
+            return self
+        if len(key) == 1:
+            return self.layer(key[0], layer_type)
+        return self.layer(key[0], Chain).layer(key[1:], layer_type)
+
     def layers(
         self,
         layer_type: type[T],
@@ -576,6 +618,7 @@ class Chain(ContextModule):
         require extra GPU memory since the weights are in the leaves and hence not copied.
         """
         if hasattr(self, "_pre_structural_copy"):
+            assert callable(self._pre_structural_copy)
             self._pre_structural_copy()
 
         modules = [structural_copy(m) for m in self]
@@ -586,6 +629,7 @@ class Chain(ContextModule):
             clone.append(module=module)
 
         if hasattr(clone, "_post_structural_copy"):
+            assert callable(clone._post_structural_copy)
             clone._post_structural_copy(self)
 
         return clone

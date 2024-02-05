@@ -29,7 +29,7 @@ def convert(args: Args) -> dict[str, torch.Tensor]:
     )
     unet = SD1UNet(in_channels=4)
     adapter = SD1ControlnetAdapter(unet, name="mycn").inject()
-    controlnet = unet.Controlnet
+    controlnet = adapter.controlnet
 
     condition = torch.randn(1, 3, 512, 512)
     adapter.set_controlnet_condition(condition=condition)

@@ -1,11 +1,12 @@
+import contextlib
 import sys
 from collections import defaultdict
 from inspect import Parameter, signature
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, DefaultDict, Generator, Sequence, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, DefaultDict, Generator, Iterator, Sequence, TypedDict, TypeVar, cast
 
-from torch import device as Device, dtype as DType
+from torch import Tensor, device as Device, dtype as DType
 from torch.nn.modules.module import Module as TorchModule
 
 from refiners.fluxion.context import Context, ContextProvider
@@ -29,7 +30,13 @@ class Module(TorchModule):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, *kwargs)  # type: ignore[reportUnknownMemberType]
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> object:
+        # Note: PyTorch returns `Any` as of 2.2 and is considering
+        # going back to `Tensor | Module`, but the truth is it is
+        # impossible to type `__getattr__` correctly.
+        # Because PyTorch assumes its users write highly dynamic code,
+        # it returns Python's top type `Any`. In Refiners, static type
+        # checking is a core design value, hence we return `object` instead.
         return super().__getattr__(name=name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -220,9 +227,18 @@ class ContextModule(Module):
 
         return super().get_path(parent=parent or self.parent, top=top)
 
+    @contextlib.contextmanager
+    def no_parent_refresh(self) -> Iterator[None]:
+        _old_can_refresh_parent = self._can_refresh_parent
+        self._can_refresh_parent = False
+        yield
+        self._can_refresh_parent = _old_can_refresh_parent
+
 
 class WeightedModule(Module):
     """A module with a weight (Tensor) attribute."""
+
+    weight: Tensor
 
     @property
     def device(self) -> Device:

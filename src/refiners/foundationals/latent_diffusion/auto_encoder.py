@@ -157,7 +157,7 @@ class Decoder(Chain):
         )
         resnet_layers[0].insert(1, attention_layer)
         for _, layer in zip(range(3), resnet_layers[1:]):
-            channels: int = layer[-1].out_channels
+            channels: int = layer.layer(-1, Resnet).out_channels
             layer.insert(-1, Upsample(channels=channels, upsample_factor=2, device=device, dtype=dtype))
         super().__init__(
             Conv2d(

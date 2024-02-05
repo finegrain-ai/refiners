@@ -16,10 +16,11 @@ from tests.foundationals.segment_anything.utils import (
 )
 from torch import Tensor
 
+import refiners.fluxion.layers as fl
 from refiners.fluxion import manual_seed
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import image_to_tensor, load_tensors, no_grad
-from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention
+from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention, RelativePositionAttention
 from refiners.foundationals.segment_anything.model import SegmentAnythingH
 from refiners.foundationals.segment_anything.transformer import TwoWayTransformerLayer
 
@@ -104,17 +105,22 @@ def test_fused_self_attention(facebook_sam_h: FacebookSAM) -> None:
     manual_seed(seed=0)
     x = torch.randn(25, 14, 14, 1280, device=facebook_sam_h.device)
 
-    attention = cast(nn.Module, facebook_sam_h.image_encoder.blocks[0].attn)  # type: ignore
+    attention = cast(nn.Module, facebook_sam_h.image_encoder.blocks[0].attn)
 
     refiners_attention = FusedSelfAttention(
         embedding_dim=1280, num_heads=16, spatial_size=(14, 14), device=facebook_sam_h.device
     )
-    refiners_attention.Linear_1.weight = attention.qkv.weight  # type: ignore
-    refiners_attention.Linear_1.bias = attention.qkv.bias  # type: ignore
-    refiners_attention.Linear_2.weight = attention.proj.weight  # type: ignore
-    refiners_attention.Linear_2.bias = attention.proj.bias  # type: ignore
-    refiners_attention.RelativePositionAttention.horizontal_embedding = attention.rel_pos_w
-    refiners_attention.RelativePositionAttention.vertical_embedding = attention.rel_pos_h
+
+    rpa = refiners_attention.layer("RelativePositionAttention", RelativePositionAttention)
+    linear_1 = refiners_attention.layer("Linear_1", fl.Linear)
+    linear_2 = refiners_attention.layer("Linear_2", fl.Linear)
+
+    linear_1.weight = attention.qkv.weight
+    linear_1.bias = attention.qkv.bias
+    linear_2.weight = attention.proj.weight
+    linear_2.bias = attention.proj.bias
+    rpa.horizontal_embedding = attention.rel_pos_w
+    rpa.vertical_embedding = attention.rel_pos_h
 
     y_1 = attention(x)
     assert y_1.shape == x.shape

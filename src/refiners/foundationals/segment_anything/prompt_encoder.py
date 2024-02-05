@@ -188,6 +188,7 @@ class MaskEncoder(fl.Chain):
     def get_no_mask_dense_embedding(
         self, image_embedding_size: tuple[int, int], batch_size: int = 1
     ) -> Float[Tensor, "batch embedding_dim image_embedding_height image_embedding_width"]:
-        return self.no_mask_embedding.reshape(1, -1, 1, 1).expand(
+        no_mask_embedding = cast(Tensor, self.no_mask_embedding)
+        return no_mask_embedding.reshape(1, -1, 1, 1).expand(
             batch_size, -1, image_embedding_size[0], image_embedding_size[1]
         )

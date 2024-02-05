@@ -307,11 +307,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
     @property
     def image_key_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[1].Linear
+        return self.image_cross_attention.layer(("Distribute", 1, "Linear"), fl.Linear)
 
     @property
     def image_value_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[2].Linear
+        return self.image_cross_attention.layer(("Distribute", 2, "Linear"), fl.Linear)
 
     @property
     def scale(self) -> float:
