@@ -170,7 +170,12 @@ class IPDataset(Dataset[IPBatch]):
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
         """Resize the images such that their shortest side is between `min_size` and `max_size`."""
-        print([image.size for image in images])
+        rgb_images: list[Image.Image] = []
+        for image in images:
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            print(image.size)
+            rgb_images.append(image)
         return {
             "image": [
                 resize_image(
@@ -178,7 +183,7 @@ class IPDataset(Dataset[IPBatch]):
                     min_size=min_size,
                     max_size=max_size,
                 )
-                for image in images
+                for image in rgb_images
             ],
         }
     @staticmethod
@@ -216,8 +221,6 @@ class IPDataset(Dataset[IPBatch]):
         std: list[float] | None = None,
     ) -> Tensor:
         # Default mean and std are parameters from https://github.com/openai/CLIP
-        if image.mode != "RGB":
-            image = image.convert("RGB")
         return normalize(
             image_to_tensor(image.resize(size), device=device, dtype=dtype),
             mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
