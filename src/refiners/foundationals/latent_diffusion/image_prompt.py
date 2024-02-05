@@ -484,13 +484,10 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.set_context("ip_adapter", {"pooled_text_embedding": pooled_text_embedding})
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_image_embedding(self, image_prompt: Tensor) -> Tensor:
-        print("Image prompt shape ", image_prompt.shape)
         image_encoder = self.image_encoder
         image_embedding = image_encoder(image_prompt)
-        print("Image embedding shape ", image_embedding.shape)
 
         conditional_embedding = self.image_proj(image_embedding)
-        print("Image proj shape ", conditional_embedding.shape)
 
         if not self.fine_grained:
             negative_embedding = self.image_proj(zeros_like(image_embedding))
