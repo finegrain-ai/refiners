@@ -65,7 +65,9 @@ class StableDiffusion_XL(LatentDiffusionModel):
             dtype=dtype,
         )
 
-    def compute_clip_text_embedding(self, text: str, negative_text: str | None = None) -> tuple[Tensor, Tensor]:
+    def compute_clip_text_embedding(
+        self, text: str | list[str], negative_text: str | list[str] = ""
+    ) -> tuple[Tensor, Tensor]:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
         Args:
@@ -73,14 +75,13 @@ class StableDiffusion_XL(LatentDiffusionModel):
             negative_text: The negative prompt to compute the CLIP text embedding of.
                 If not provided, the negative prompt is assumed to be empty (i.e., `""`).
         """
-        conditional_embedding, conditional_pooled_embedding = self.clip_text_encoder(text)
-        if text == negative_text:
-            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0), torch.cat(
-                tensors=(conditional_pooled_embedding, conditional_pooled_embedding), dim=0
-            )
 
-        # TODO: when negative_text is None, use zero tensor?
-        negative_embedding, negative_pooled_embedding = self.clip_text_encoder(negative_text or "")
+        text = [text] if isinstance(text, str) else text
+        negative_text = [negative_text] if isinstance(negative_text, str) else negative_text
+        assert len(text) == len(negative_text), "The length of the text list and negative_text should be the same"
+
+        conditional_embedding, conditional_pooled_embedding = self.clip_text_encoder(text)
+        negative_embedding, negative_pooled_embedding = self.clip_text_encoder(negative_text)
 
         return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0), torch.cat(
             tensors=(negative_pooled_embedding, conditional_pooled_embedding), dim=0

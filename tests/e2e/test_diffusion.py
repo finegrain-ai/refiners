@@ -758,6 +758,63 @@ def test_diffusion_std_random_init(
 
 
 @no_grad()
+def test_diffusion_batch2(
+    sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2 = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    sd15.set_inference_steps(30)
+    step = sd15.steps[0]
+
+    manual_seed(2)
+    rand_b2 = torch.randn(2, 4, 64, 64, device=test_device)
+
+    x_b2 = sd15(
+        rand_b2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_b2,
+        condition_scale=7.5,
+    )
+
+    assert x_b2.shape == (2, 4, 64, 64)
+
+    rand_1 = rand_b2[0:1]
+    clip_text_embedding_1 = sd15.compute_clip_text_embedding(text=[prompt1], negative_text=[negative_prompt1])
+    x_1 = sd15(
+        rand_1,
+        step=step,
+        clip_text_embedding=clip_text_embedding_1,
+        condition_scale=7.5,
+    )
+
+    rand_2 = rand_b2[1:2]
+    clip_text_embedding_2 = sd15.compute_clip_text_embedding(text=[prompt2], negative_text=[negative_prompt2])
+    x_2 = sd15(
+        rand_2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_2,
+        condition_scale=7.5,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
+
+
+@no_grad()
 def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
@@ -836,7 +893,6 @@ def test_diffusion_std_random_init_float16(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
@@ -1263,6 +1319,69 @@ def test_diffusion_lora(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_batch2(sdxl_ddim: StableDiffusion_XL) -> None:
+    sdxl = sdxl_ddim
+
+    prompt1 = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
+    negative_prompt1 = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
+    prompt2 = "professional portrait photo of a boy"
+    negative_prompt2 = "black and white"
+
+    clip_text_embedding_b2, pooled_text_embedding_b2 = sdxl.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    time_ids = sdxl.default_time_ids
+    time_ids_b2 = sdxl.default_time_ids.repeat(2, 1)
+    sdxl.set_inference_steps(40)
+
+    manual_seed(seed=2)
+    x_b2 = torch.randn(2, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    x_1 = x_b2[0:1]
+    x_2 = x_b2[1:2]
+
+    x_b2 = sdxl(
+        x_b2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_b2,
+        pooled_text_embedding=pooled_text_embedding_b2,
+        time_ids=time_ids_b2,
+    )
+
+    clip_text_embedding_1, pooled_text_embedding_1 = sdxl.compute_clip_text_embedding(
+        text=prompt1, negative_text=negative_prompt1
+    )
+
+    x_1 = sdxl(
+        x_1,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_1,
+        pooled_text_embedding=pooled_text_embedding_1,
+        time_ids=time_ids,
+    )
+
+    clip_text_embedding_2, pooled_text_embedding_2 = sdxl.compute_clip_text_embedding(
+        text=prompt2, negative_text=negative_prompt2
+    )
+
+    x_2 = sdxl(
+        x_2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_2,
+        pooled_text_embedding=pooled_text_embedding_2,
+        time_ids=time_ids,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
 
 
 @no_grad()
