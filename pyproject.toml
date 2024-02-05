@@ -1,6 +1,6 @@
 [project]
 name = "refiners"
-version = "0.2.0"
+version = "0.3.0"
 description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
