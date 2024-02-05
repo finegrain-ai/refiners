@@ -85,13 +85,14 @@ def cat_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.
 
 
 def test_tokenizer_with_special_character():
-    clip_tokenizer = fl.Chain(CLIPTokenizer())
-    token_extender = TokenExtender(clip_tokenizer.CLIPTokenizer)
-    new_token_id = max(clip_tokenizer.CLIPTokenizer.token_to_id_mapping.values()) + 42
+    clip_tokenizer_chain = fl.Chain(CLIPTokenizer())
+    original_clip_tokenizer = clip_tokenizer_chain.layer("CLIPTokenizer", CLIPTokenizer)
+    token_extender = TokenExtender(original_clip_tokenizer)
+    new_token_id = max(original_clip_tokenizer.token_to_id_mapping.values()) + 42
     token_extender.add_token("*", new_token_id)
-    token_extender.inject(clip_tokenizer)
+    token_extender.inject(clip_tokenizer_chain)
 
-    adapted_clip_tokenizer = clip_tokenizer.ensure_find(CLIPTokenizer)
+    adapted_clip_tokenizer = clip_tokenizer_chain.ensure_find(CLIPTokenizer)
 
     assert torch.allclose(
         adapted_clip_tokenizer.encode("*"),

@@ -43,14 +43,12 @@ class Adapter(Generic[T]):
         ), "Call the Chain constructor in the setup_adapter context."
         self._target = [target]
 
-        if not isinstance(self.target, fl.ContextModule):
+        if isinstance(target, fl.ContextModule):
+            assert isinstance(target, fl.ContextModule)
+            with target.no_parent_refresh():
+                yield
+        else:
             yield
-            return
-
-        _old_can_refresh_parent = target._can_refresh_parent
-        target._can_refresh_parent = False
-        yield
-        target._can_refresh_parent = _old_can_refresh_parent
 
     def inject(self: TAdapter, parent: fl.Chain | None = None) -> TAdapter:
         """Inject the adapter.

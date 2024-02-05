@@ -72,7 +72,9 @@ class DoubleTextEncoder(fl.Chain):
             fl.Parallel(text_encoder_l[:-2], text_encoder_g),
             fl.Lambda(func=self.concatenate_embeddings),
         )
-        TextEncoderWithPooling(target=text_encoder_g, projection=projection).inject(parent=self.Parallel)
+        TextEncoderWithPooling(target=text_encoder_g, projection=projection).inject(
+            parent=self.layer("Parallel", fl.Parallel)
+        )
 
     def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 2048"], Float[Tensor, "1 1280"]]:
         return super().__call__(text)

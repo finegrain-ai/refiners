@@ -2,7 +2,7 @@ from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import ResidualAccumulator
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import MiddleBlock, SDXLUNet
 from refiners.foundationals.latent_diffusion.t2i_adapter import ConditionEncoderXL, T2IAdapter, T2IFeatures
 
 
@@ -31,18 +31,19 @@ class SDXLT2IAdapter(T2IAdapter[SDXLUNet]):
 
         # Note: `strict=False` because `residual_indices` is shorter than `_features` due to MiddleBlock (see below)
         for n, feat in zip(self.residual_indices, self._features, strict=False):
-            block = self.target.DownBlocks[n]
+            block = self.target.layer(("DownBlocks", n), fl.Chain)
             sanity_check_t2i(block)
             block.insert_before_type(ResidualAccumulator, feat)
 
         # Special case: the MiddleBlock has no ResidualAccumulator (this is done via a subsequent layer) so just append
-        sanity_check_t2i(self.target.MiddleBlock)
-        self.target.MiddleBlock.append(self._features[-1])
+        mid_block = self.target.layer("MiddleBlock", MiddleBlock)
+        sanity_check_t2i(mid_block)
+        mid_block.append(self._features[-1])
         return super().inject(parent)
 
     def eject(self: "SDXLT2IAdapter") -> None:
         # See `inject` re: `strict=False`
         for n, feat in zip(self.residual_indices, self._features, strict=False):
-            self.target.DownBlocks[n].remove(feat)
-        self.target.MiddleBlock.remove(self._features[-1])
+            self.target.layer(("DownBlocks", n), fl.Chain).remove(feat)
+        self.target.layer("MiddleBlock", MiddleBlock).remove(self._features[-1])
         super().eject()

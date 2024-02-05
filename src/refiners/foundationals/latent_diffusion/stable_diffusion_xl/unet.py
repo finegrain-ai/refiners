@@ -10,7 +10,7 @@ from refiners.foundationals.latent_diffusion.range_adapter import (
     RangeEncoder,
     compute_sinusoidal_embedding,
 )
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import (
+from refiners.foundationals.latent_diffusion.unet import (
     ResidualAccumulator,
     ResidualBlock,
     ResidualConcatenator,
@@ -267,9 +267,9 @@ class SDXLUNet(fl.Chain):
             OutputBlock(device=device, dtype=dtype),
         )
         for residual_block in self.layers(ResidualBlock):
-            chain = residual_block.Chain
+            chain = residual_block.layer("Chain", fl.Chain)
             RangeAdapter2d(
-                target=chain.Conv2d_1,
+                target=chain.layer("Conv2d_1", fl.Conv2d),
                 channels=residual_block.out_channels,
                 embedding_dim=1280,
                 context_key="timestep_embedding",

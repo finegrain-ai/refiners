@@ -10,9 +10,12 @@ def test_module_get_path() -> None:
         fl.Sum(),
     )
 
-    assert chain.Sum_1.Linear_2.get_path(parent=chain.Sum_1) == "Chain.Sum_1.Linear_2"
-    assert chain.Sum_1.Linear_2.get_path(parent=chain.Sum_1, top=chain.Sum_1) == "Sum.Linear_2"
-    assert chain.Sum_1.get_path() == "Chain.Sum_1"
+    sum_1 = chain.layer("Sum_1", fl.Sum)
+    linear_2 = sum_1.layer("Linear_2", fl.Linear)
+
+    assert linear_2.get_path(parent=sum_1) == "Chain.Sum_1.Linear_2"
+    assert linear_2.get_path(parent=sum_1, top=sum_1) == "Sum.Linear_2"
+    assert sum_1.get_path() == "Chain.Sum_1"
 
 
 def test_module_basic_attributes() -> None:
