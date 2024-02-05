@@ -197,14 +197,6 @@ class IPDataset(Dataset[IPBatch]):
         min_size: int = 512,
     ) -> dict[str, list[bool]]:
         """Resize the images such that their shortest side is between `min_size` and `max_size`."""
-        print([image.size for image in images])
-        print([
-                filter_image(
-                    image=image,
-                    min_size=min_size,
-                )
-                for image in images
-        ])
         return {
             "image": [
                 filter_image(
