@@ -670,6 +670,7 @@ def test_diffusion_std_random_init(
 
     ensure_similar_images(predicted_image, expected_image_std_random_init)
 
+
 @no_grad()
 def test_diffusion_batch2_no_concat(
     sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
@@ -681,7 +682,9 @@ def test_diffusion_batch2_no_concat(
     prompt2 = "a cute dog, detailed high-quality professional image"
     negative_prompt2 = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
-    clip_text_embedding = sd15.compute_clip_text_embedding(text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=False)
+    clip_text_embedding = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=False
+    )
 
     sd15.set_inference_steps(30)
 
@@ -695,10 +698,11 @@ def test_diffusion_batch2_no_concat(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    
+
     predicted_images = sd15.lda.latents_to_images(x)
     assert len(predicted_images) == 2
     ensure_similar_images(predicted_images[0], expected_image_std_random_init)
+
 
 @no_grad()
 def test_diffusion_batch2_concat(
@@ -711,7 +715,9 @@ def test_diffusion_batch2_concat(
     prompt2 = "a cute dog, detailed high-quality professional image"
     negative_prompt2 = "lowres, bad anatomy, bad hands, cropped, worst quality"
 
-    clip_text_embedding = sd15.compute_clip_text_embedding(text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=True)
+    clip_text_embedding = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=True
+    )
 
     sd15.set_inference_steps(30)
 
@@ -725,9 +731,9 @@ def test_diffusion_batch2_concat(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    
+
     predicted_images = sd15.lda.latents_to_images(x)
-    
+
     assert len(predicted_images) == 1
 
 
