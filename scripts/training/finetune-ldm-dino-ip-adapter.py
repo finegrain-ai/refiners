@@ -162,7 +162,18 @@ class IPDataset(Dataset[IPBatch]):
         return {
             "image": dl_manager.download(urls),  # type: ignore
         }
-
+    @staticmethod
+    def convert2rgb(
+        images: list[Image.Image],
+    ) -> dict[str, list[Image.Image]]:
+        rgb_images: list[Image.Image] = []
+        for image in images:
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            rgb_images.append(image)
+        return {
+            "image": rgb_images
+        }
     @staticmethod
     def resize_images(
         images: list[Image.Image],
@@ -170,12 +181,6 @@ class IPDataset(Dataset[IPBatch]):
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
         """Resize the images such that their shortest side is between `min_size` and `max_size`."""
-        rgb_images: list[Image.Image] = []
-        for image in images:
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            print(image.size)
-            rgb_images.append(image)
         return {
             "image": [
                 resize_image(
@@ -183,7 +188,7 @@ class IPDataset(Dataset[IPBatch]):
                     min_size=min_size,
                     max_size=max_size,
                 )
-                for image in rgb_images
+                for image in images
             ],
         }
     @staticmethod
@@ -192,6 +197,14 @@ class IPDataset(Dataset[IPBatch]):
         min_size: int = 512,
     ) -> dict[str, list[bool]]:
         """Resize the images such that their shortest side is between `min_size` and `max_size`."""
+        print([image.size for image in images])
+        print([
+                filter_image(
+                    image=image,
+                    min_size=min_size,
+                )
+                for image in images
+        ])
         return {
             "image": [
                 filter_image(
@@ -310,6 +323,14 @@ class IPDataset(Dataset[IPBatch]):
             dataset = dataset.cast_column(  # type: ignore
                 column="image",
                 feature=datasets.Image(),
+            )
+            dataset = dataset.map(
+                function=self.convert2rgb,
+                input_columns=["image"],
+                batched=True,
+                batch_size=10,  # FIXME: harcoded value
+                num_proc=8,  # FIXME: harcoded value
+                desc="Convert to rbg images",  # type: ignore
             )
             # remove min size images
             if dataset_config.filter_min_image_size:
