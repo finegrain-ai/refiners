@@ -521,7 +521,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             assert isinstance(encoder_clone[-1], fl.LayerNorm) # final normalization
             pooling_func:Callable[Tensor, Tensor] = lambda x: x[:, 0]
             encoder_clone.append(fl.Lambda(pooling_func))
-            encoder_clone.pop()
         return encoder_clone
     @staticmethod
     def convert_to_grid_features(image_encoder: CLIPImageEncoderH | ViT) -> CLIPImageEncoderH | ViT:
