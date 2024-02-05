@@ -73,7 +73,7 @@ pre_encode =  true
 image_column = "image"
 caption_column = "ai_description"
 download_images = true
-save_path = "/home/isamu/unsplash_pre_encode_unfiltered"
+save_path = "/home/isamu/unsplash_pre_encode"
 
 
 [checkpointing]
