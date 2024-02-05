@@ -36,6 +36,7 @@ from refiners.training_utils.callback import (
     GradientNormLogging,
     GradientValueClipping,
     MonitorLoss,
+    MonitorTime
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
@@ -314,6 +315,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return [
             ClockCallback(),
             MonitorLoss(),
+            MonitorTime(),
             GradientNormLogging(),
             GradientValueClipping(),
             GradientNormClipping(),
