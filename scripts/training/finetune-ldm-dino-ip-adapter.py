@@ -170,6 +170,7 @@ class IPDataset(Dataset[IPBatch]):
         max_size: int = 576,
     ) -> dict[str, list[Image.Image]]:
         """Resize the images such that their shortest side is between `min_size` and `max_size`."""
+        print([image.size for image in images])
         return {
             "image": [
                 resize_image(
@@ -318,7 +319,7 @@ class IPDataset(Dataset[IPBatch]):
                     fn_kwargs={
                         "min_size": dataset_config.resize_image_min_size,
                     },
-                    desc="Capping image sizes",  # type: ignore
+                    desc="Filtering image sizes",  # type: ignore
                 )
             # limit max image size
             dataset = dataset.map(  # type: ignore
