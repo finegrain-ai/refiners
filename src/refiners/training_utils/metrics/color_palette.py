@@ -9,7 +9,7 @@ from sklearn.neighbors import NearestNeighbors  # type: ignore
 from refiners.training_utils.datasets.color_palette import ColorPalette
 from refiners.fluxion.utils import tensor_to_image
 
-from torch import stack, empty, Tensor
+from torch import empty, Tensor, cat
 
 Logger = Callable[[Any], None]
 
@@ -34,8 +34,8 @@ class BatchHistogramPrompt:
 
     @classmethod
     def collate_fn(cls, batch: Sequence["BatchHistogramPrompt"]) -> "BatchHistogramPrompt":
-        source_histograms = stack([item.source_histograms for item in batch])
-        source_histogram_embeddings = stack([item.source_histogram_embeddings for item in batch])
+        source_histograms = cat([item.source_histograms for item in batch])
+        source_histogram_embeddings = cat([item.source_histogram_embeddings for item in batch])
         palettes = [palette for item in batch for palette in item.palettes]
         source_prompts = [prmpt for item in batch for prmpt in item.source_prompts]
         source_images = [image for item in batch for image in item.source_images]
@@ -45,7 +45,7 @@ class BatchHistogramPrompt:
             source_histogram_embeddings=source_histogram_embeddings,
             source_prompts=source_prompts,
             palettes=palettes,
-            text_embeddings=stack([item.text_embeddings for item in batch]),
+            text_embeddings=cat([item.text_embeddings for item in batch]),
             source_images=source_images
         )
 
@@ -124,8 +124,8 @@ class BatchHistogramResults(BatchHistogramPrompt):
         histo_prompts = [item.to_hist_prompt() for item in batch]
         histo_prompt = super().collate_fn(histo_prompts)
 
-        images = stack([item.images for item in batch])
-        result_histograms = stack([item.result_histograms for item in batch])
+        images = cat([item.images for item in batch])
+        result_histograms = cat([item.result_histograms for item in batch])
         return BatchHistogramResults(
             images=images,
             result_histograms=result_histograms,
@@ -211,8 +211,8 @@ def batch_image_palette_metrics(log: Logger, images_and_palettes: List[ImageAndP
 
 def batch_palette_metrics(log: Logger, images_and_palettes: BatchHistogramResults, prefix: str = "palette-img"):
     
-    images = [tensor_to_image(image) for image in images_and_palettes["images"].split(1)]
-    palettes = images_and_palettes["palettes"]
+    images = [tensor_to_image(image) for image in images_and_palettes.images.split(1)]
+    palettes = images_and_palettes.palettes
     
     if len(images) != len(palettes):
         raise ValueError("Images and palettes must have the same length")

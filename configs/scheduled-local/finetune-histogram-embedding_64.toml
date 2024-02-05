@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="base"
+name="embedding_64"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}
@@ -42,7 +42,7 @@ eps = 1e-8
 weight_decay = 1e-2
 
 [adapter]
-embedding_dim = 8
+embedding_dim = 64
 
 [scheduler]
 scheduler_type = "ConstantLR"

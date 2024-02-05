@@ -1,14 +1,18 @@
 from functools import cached_property
 from typing import Any, List, Tuple, TypedDict, Sequence
 
+import hashlib
+from pydantic import BaseModel
+
 from loguru import logger
 from PIL import Image, ImageDraw
 from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAutoEncoderConfig
 from refiners.training_utils.config import TrainingConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.wandb import WandbLoggable
-from torch import Tensor, randn, stack, cat, uint8, empty
+from torch import Tensor, randn, cat, uint8, empty
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
+
 from torch.utils.data import DataLoader
 
 import refiners.fluxion.layers as fl
@@ -17,9 +21,10 @@ from refiners.fluxion.adapters.histogram import (
     HistogramExtractor,
     SD1HistogramAdapter,
     ColorLoss,
-    histogram_to_histo_channels
+    histogram_to_histo_channels,
+    HistogramProjection
 )
-from refiners.fluxion.utils import images_to_tensor, save_to_safetensors
+from refiners.fluxion.utils import images_to_tensor, save_to_safetensors, tensor_to_image
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
@@ -33,6 +38,7 @@ from refiners.training_utils.trainers.latent_diffusion import (
     TestDiffusionBaseConfig,
 )
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
+from refiners.training_utils.trainers.trainer import scoped_seed
 
 Color = Tuple[int, int, int]
 Histogram = Tensor
@@ -51,13 +57,23 @@ class ImageAndHistogram(TypedDict):
 class ColorTrainingConfig(TrainingConfig):
     color_loss_weight: float = 1.0
 
+class AdapterConfig(BaseModel):
+    embedding_dim: int = 768
+
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     histogram_auto_encoder: HistogramAutoEncoderConfig
+    adapter: AdapterConfig
     test_cover_histogram: TestCoverHistogramConfig
     training: ColorTrainingConfig
     validation_dataset: HuggingfaceDatasetConfig
 
-
+def hash_tensor(image: Tensor) -> str:
+    str2 = ""
+    for i in range(image.shape[0]):
+        local_str = f"{image[i].sum()}-{image[i].mean()}-{image[i].std()}-{image[i].max()}-{image[i].min()}"
+        str2 += local_str
+    
+    return str(hash(str2))
 
 
 class HistogramLatentDiffusionTrainer(
@@ -95,10 +111,20 @@ class HistogramLatentDiffusionTrainer(
 
     @cached_property
     def histogram_adapter(self) -> SD1HistogramAdapter[Any]:
-        embedding_dim = self.histogram_auto_encoder.embedding_dim
+        embedding_dim = self.config.adapter.embedding_dim
             
         adapter = SD1HistogramAdapter(target=self.unet, embedding_dim=embedding_dim)
         return adapter
+    
+    @cached_property
+    def histogram_projection(self) -> HistogramProjection:   
+        embedding_dim = self.config.adapter.embedding_dim         
+        
+        return HistogramProjection(
+            embedding_dim=embedding_dim,
+            device=self.device,
+            dtype=self.dtype
+        )
 
     @cached_property
     def color_loss(self) -> ColorLoss:
@@ -117,7 +143,8 @@ class HistogramLatentDiffusionTrainer(
             "unet": self.unet,
             "text_encoder": self.text_encoder,
             "lda": self.lda,
-            "histogram_auto_encoder": self.histogram_auto_encoder
+            "histogram_auto_encoder": self.histogram_auto_encoder,
+            "histogram_projection": self.histogram_projection
         }
 
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
@@ -132,6 +159,7 @@ class HistogramLatentDiffusionTrainer(
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
         histogram_embeddings = self.histogram_auto_encoder.encode(histograms)
         histogram_embeddings = histogram_embeddings.reshape(histogram_embeddings.shape[0], 1, -1)
+        histogram_embeddings2 = self.histogram_projection(histogram_embeddings)
 
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
@@ -139,7 +167,7 @@ class HistogramLatentDiffusionTrainer(
         self.unet.set_timestep(timestep=timestep)
 
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
-        self.histogram_adapter.set_histogram_embedding(histogram_embeddings)
+        self.histogram_adapter.set_histogram_embedding(histogram_embeddings2)
 
         prediction = self.unet(noisy_latents)
 
@@ -186,7 +214,6 @@ class HistogramLatentDiffusionTrainer(
         
         for (prompt, prompt_embedding) in self.eval_prompts:
             for db_index, histogram, histogram_embedding, palette, image in self.eval_indices:
-                print(f"prompt_embedding: {prompt_embedding.shape}")
                 batch_histogram_prompt = BatchHistogramPrompt(
                     source_histogram_embeddings= histogram_embedding,
                     source_histograms= histogram,
@@ -210,10 +237,11 @@ class HistogramLatentDiffusionTrainer(
     def unconditionnal_text_embedding(self) -> Tensor:
         return self.text_encoder([""])
     
+    @scoped_seed(5)
     def compute_batch_evaluation(self, batch: BatchHistogramPrompt, same_seed: bool = True) -> BatchHistogramResults:
         batch_size = len(batch.source_prompts)
         
-        logger.info(f"Generating {batch_size} images for prompts: {batch.source_prompts}")
+        logger.info(f"Generating {batch_size} images for prompts/db_indexes: {batch.source_prompts}/{batch.db_indexes}")
         
         if same_seed:
             x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
@@ -221,21 +249,37 @@ class HistogramLatentDiffusionTrainer(
         else: 
             x = randn(batch_size, 4, 64, 64, dtype=self.dtype, device=self.device)
         
-        unconditionnal_text_emb = self.unconditionnal_text_embedding.repeat(batch_size, 1, 1)
-        cfg_clip_text_embedding = cat([batch.text_embeddings, unconditionnal_text_emb], dim=0)
+        # TO FIX: batch eval not working here
         
-        unconditionnal_histo_embedding = self.histogram_auto_encoder.unconditionnal_embedding_like(batch.source_histogram_embeddings)
-        cfg_histogram_embedding = cat([batch.source_histogram_embeddings, unconditionnal_histo_embedding], dim=0)
+        # uncode = self.unconditionnal_text_embedding
+        # unconditionnal_text_emb = uncode.repeat(batch_size, 1, 1)
+        # cfg_clip_text_embedding = cat([batch.text_embeddings, unconditionnal_text_emb], dim=0)
+        #unconditionnal_histo_embedding = self.histogram_auto_encoder.unconditionnal_embedding_like(batch.source_histogram_embeddings)
+        #cfg_histogram_embedding = cat([batch.source_histogram_embeddings, unconditionnal_histo_embedding], dim=0)
         
-        self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding)
+        
+        cfg_histogram_embedding = self.histogram_auto_encoder.compute_histogram_embedding(
+            batch.source_histograms[0:1],
+        )
+        cfg_histogram_embedding2 = self.histogram_projection(cfg_histogram_embedding)
+        self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding2)
+        
+        clip_text_embedding = self.sd.compute_clip_text_embedding(text=batch.source_prompts[0])
+
         for step in self.sd.steps:
             x = self.sd(
                 x,
                 step=step,
-                clip_text_embedding=cfg_clip_text_embedding,
+                clip_text_embedding=clip_text_embedding,
+                condition_scale = self.config.test_cover_histogram.condition_scale
             )
-        
-        image_tensors = (self.sd.lda.decode(x=x) + 1)/2
+
+        images = (self.sd.lda.decode(x) + 1 )/2
+        # for i in range(batch_size):
+        #     logger.info(f"eval_images/[{i}] {batch.source_prompts[i]}_{batch.db_indexes[i]} : "+
+        #                 f"img hash : {hash_tensor(images[i])},"+
+        #                 f"txt_hash: {clip_text_embedding.norm()},"+
+        #                 f"histo_hash: {cfg_histogram_embedding.norm()}")
         
         return BatchHistogramResults(
             source_histogram_embeddings = batch.source_histogram_embeddings,
@@ -243,8 +287,8 @@ class HistogramLatentDiffusionTrainer(
             source_prompts = batch.source_prompts,
             palettes = batch.palettes,
             text_embeddings = batch.text_embeddings,
-            images = image_tensors,
-            result_histograms = self.histogram_extractor(image_tensors),
+            images = images,
+            result_histograms = self.histogram_extractor(images),
             db_indexes= batch.db_indexes,
             source_images= batch.source_images
         )
@@ -258,20 +302,27 @@ class HistogramLatentDiffusionTrainer(
             raise ValueError("The histograms must have the same length.")
         
         ratio = width/len(res_histo)
+        semi_height = height//2
         
+        scale_ratio = 5
+                
         draw.line([
-            (i*ratio, res_histo[i]*height) for i in range(len(res_histo))
+            (i*ratio, (1-res_histo[i]*scale_ratio)*semi_height + semi_height) for i in range(len(res_histo))
         ], fill=color, width=4)
         
         draw.line([
-            (i*ratio, src_histo[i]*height) for i in range(len(src_histo))
+            (i*ratio, (1-src_histo[i]*scale_ratio)*semi_height) for i in range(len(src_histo))
         ], fill=color, width=1)
         
         return histo_img
     
     def draw_cover_image(self, batch: BatchHistogramResults) -> Image.Image:
         (batch_size, channels, height, width) = batch.images.shape
-        vertical_images = batch.images.view(1, channels, height*batch_size, width)
+        # for i in range(batch_size):
+        #     logger.info(f"draw_cover_image eval_images/{batch.source_prompts[i]}_{batch.db_indexes[i]} : img hash : {hash_tensor(batch.images[i])}, txt_hash: {hash_tensor(batch.text_embeddings[i])}, histo_hash: {hash_tensor(batch.source_histogram_embeddings[i])}")
+        
+        vertical_image = batch.images.permute(0,2,3,1).reshape(1, height*batch_size, width, channels).permute(0,3,1,2)
+        
         results_histograms = batch.result_histograms
         source_histograms = batch.source_histograms
         source_images = batch.source_images
@@ -279,7 +330,8 @@ class HistogramLatentDiffusionTrainer(
         join_canvas_image: Image.Image = Image.new(
             mode="RGB", size=(width + width//2, height * batch_size)
         )
-        res_image = (vertical_images * 255).to(dtype=uint8).permute(1, 2, 0).cpu().numpy()
+        res_image = tensor_to_image(vertical_image)
+        
         join_canvas_image.paste(res_image, box=(width//2, 0))
         
         res_histo_channels = histogram_to_histo_channels(results_histograms)
@@ -289,7 +341,7 @@ class HistogramLatentDiffusionTrainer(
         
         for i in range(batch_size):
             join_canvas_image.paste(source_images[i].resize((width//2, height//2)), box=(0, height *i))
-
+            
             for (color_id, color_name) in enumerate(colors):
                 image_curve = self.draw_curves(
                     res_histo_channels[color_id][i].cpu().tolist(), # type: ignore
@@ -302,6 +354,14 @@ class HistogramLatentDiffusionTrainer(
                 
         return join_canvas_image
     
+    def image_distances(self, batch: BatchHistogramResults) -> dict[str, float]:
+        images = batch.images
+        dist = 0
+        for i in range(images.shape[0]):
+            for j in range(i+1, images.shape[0]):
+                dist = dist + self.mse_loss(images[i], images[j])
+        
+        return dist.item()
     def compute_evaluation(
         self
     ) -> None:
@@ -326,11 +386,16 @@ class HistogramLatentDiffusionTrainer(
                     ])
         
         for prompt in per_prompts:
+            self.log(data={f"inter_prompt_distance/{prompt}": self.image_distances(per_prompts[prompt])})
             image = self.draw_cover_image(per_prompts[prompt])
             image_name = f"eval_images/{prompt}"
             images[image_name] = image
-        self.log(data=images)
+            
         all_results = BatchHistogramResults.collate_fn(list(per_prompts.values()))
+        
+        # images[f"eval_images/all"] = self.draw_cover_image(all_results)
+        self.log(data=images)
+
         self.batch_image_histogram_metrics(all_results, prefix="eval")
 
     @cached_property
@@ -341,8 +406,8 @@ class HistogramLatentDiffusionTrainer(
         palette = [item.color_palette for item in items]
         images = [item.image for item in items]
         histograms = self.histogram_extractor.images_to_histograms(images, device = self.device, dtype = self.dtype)
-        histogram_embeddings = self.histogram_auto_encoder(histograms)
-        return list(zip(indices, histograms, histogram_embeddings, palette, images))
+        histogram_embeddings = self.histogram_auto_encoder.encode(histograms).reshape(histograms.shape[0], 1, -1)
+        return list(zip(indices, histograms.split(1), histogram_embeddings.split(1), palette, images))
 
     @cached_property
     def histogram_extractor(self) -> HistogramExtractor:
@@ -357,15 +422,22 @@ class HistogramLatentDiffusionTrainer(
     ) -> None:
         
         self.log({f"{prefix}/mse": self.histogram_distance(
-            images_and_histograms.source_histograms, 
-            images_and_histograms.result_histograms
+            images_and_histograms.source_histograms.to(device=self.device), 
+            images_and_histograms.result_histograms.to(device=self.device)
         )})
         
-        self.log({f"{prefix}/rgb_distance": self.color_loss.image_vs_histo(
-                images_and_histograms.images,
-                images_and_histograms.source_histograms,
+        
+        
+        [red, green, blue] = self.color_loss.image_vs_histo(
+                images_and_histograms.images.to(device=self.device),
+                images_and_histograms.source_histograms.to(device=self.device),
                 self.config.histogram_auto_encoder.color_bits
-        ).item()})
+        )
+        
+        self.log({f"{prefix}/rgb_distance": (red+green+blue).item()})
+        self.log({f"{prefix}/red_distance": red.item()})
+        self.log({f"{prefix}/green_distance": green.item()})
+        self.log({f"{prefix}/blue_distance": blue.item()})
 
         batch_palette_metrics(self.log, images_and_histograms, prefix)
 
@@ -400,6 +472,9 @@ class SaveHistogram(Callback[HistogramLatentDiffusionTrainer]):
         adapter = model.parent
 
         tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
+        projection = {
+            f"histogram_projection.{i:03d}": w for i, w in enumerate(trainer.histogram_projection.weights)
+        }
 
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors", tensors=tensors
