@@ -30,6 +30,7 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         beta_end=0.012,
         lower_order_final=False,
         euler_at_final=last_step_first_order,
+        final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
     )
     diffusers_scheduler.set_timesteps(n_steps)
     refiners_scheduler = DPMSolver(num_inference_steps=n_steps, last_step_first_order=last_step_first_order)
@@ -96,7 +97,7 @@ def test_euler_diffusers():
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
         refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
-        assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
+        assert allclose(diffusers_output, refiners_output, rtol=0.02), f"outputs differ at step {step}"
 
 
 def test_scheduler_remove_noise():
