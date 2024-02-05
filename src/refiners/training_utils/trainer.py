@@ -227,9 +227,9 @@ class TrainingClock:
         self.end_time = time.time()
 
     @property
-    def time_elapsed(self) -> int:
+    def time_elapsed(self) -> float:
         assert self.start_time is not None, "Timer has not been started yet."
-        return int(time.time() - self.start_time)
+        return time.time() - self.start_time
 
     @cached_property
     def evalution_interval_steps(self) -> int:
@@ -581,7 +581,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.clock.start_timer()
         for batch in self.dataloader:
             data_time = self.clock.time_elapsed
+            print("data_time", data_time)
             self.data_time_m.update(data_time)
+            print("data_time avg", self.data_time_m.avg)
             self.clock.start_timer()
             self._call_callbacks(event_name="on_batch_begin")
             forward_time, backward_time = self.step(batch=batch)
