@@ -670,6 +670,66 @@ def test_diffusion_std_random_init(
 
     ensure_similar_images(predicted_image, expected_image_std_random_init)
 
+@no_grad()
+def test_diffusion_batch2_no_concat(
+    sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog, detailed high-quality professional image"
+    negative_prompt2 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=False)
+
+    sd15.set_inference_steps(30)
+
+    manual_seed(2)
+    x = torch.randn(2, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    
+    predicted_images = sd15.lda.latents_to_images(x)
+    assert len(predicted_images) == 2
+    ensure_similar_images(predicted_images[0], expected_image_std_random_init)
+
+@no_grad()
+def test_diffusion_batch2_concat(
+    sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog, detailed high-quality professional image"
+    negative_prompt2 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2], concat_batches=True)
+
+    sd15.set_inference_steps(30)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    
+    predicted_images = sd15.lda.latents_to_images(x)
+    
+    assert len(predicted_images) == 1
+
 
 @no_grad()
 def test_diffusion_std_random_init_euler(
@@ -750,7 +810,6 @@ def test_diffusion_std_random_init_float16(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
