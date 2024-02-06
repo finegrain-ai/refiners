@@ -84,3 +84,16 @@ class DoubleTextEncoder(fl.Chain):
         text_embedding_g, pooled_text_embedding = text_embedding_with_pooling
         text_embedding = cat((text_embedding_l, text_embedding_g), dim=-1)
         return text_embedding, pooled_text_embedding
+
+    def structural_copy(self: "DoubleTextEncoder") -> "DoubleTextEncoder":
+        old_tep = self.ensure_find(TextEncoderWithPooling)
+        old_tep.eject()
+        copy = super().structural_copy()
+        old_tep.inject()
+
+        new_text_encoder_g = copy.ensure_find(CLIPTextEncoderG)
+        projection = old_tep.layer(("Parallel", "Chain", "Linear"), fl.Linear)
+
+        new_tep = TextEncoderWithPooling(target=new_text_encoder_g, projection=projection)
+        new_tep.inject(copy.layer("Parallel", fl.Parallel))
+        return copy

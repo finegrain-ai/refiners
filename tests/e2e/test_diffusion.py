@@ -1590,10 +1590,14 @@ def test_diffusion_sdxl_ip_adapter_plus(
 
 
 @no_grad()
-def test_sdxl_random_init(
-    sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image, test_device: torch.device
+@pytest.mark.parametrize("structural_copy", [False, True])
+def test_diffusion_sdxl_random_init(
+    sdxl_ddim: StableDiffusion_XL,
+    expected_sdxl_ddim_random_init: Image.Image,
+    test_device: torch.device,
+    structural_copy: bool,
 ) -> None:
-    sdxl = sdxl_ddim
+    sdxl = sdxl_ddim.structural_copy() if structural_copy else sdxl_ddim
     expected_image = expected_sdxl_ddim_random_init
 
     prompt = "a cute cat, detailed high-quality professional image"
