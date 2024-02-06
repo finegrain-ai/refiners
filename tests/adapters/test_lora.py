@@ -11,11 +11,11 @@ def lora() -> LinearLora:
 
 
 @pytest.fixture
-def conv_lora() -> Lora:
+def conv_lora() -> Conv2dLora:
     return Conv2dLora("conv_test", in_channels=16, out_channels=8, kernel_size=(3, 1), rank=4)
 
 
-def test_properties(lora: LinearLora, conv_lora: Lora) -> None:
+def test_properties(lora: LinearLora, conv_lora: Conv2dLora) -> None:
     assert lora.name == "test"
     assert lora.rank == lora.down.out_features == lora.up.in_features == 16
     assert lora.scale == 1.0
@@ -27,7 +27,6 @@ def test_properties(lora: LinearLora, conv_lora: Lora) -> None:
     assert conv_lora.scale == 1.0
     assert conv_lora.in_channels == conv_lora.down.in_channels == 16
     assert conv_lora.out_channels == conv_lora.up.out_channels == 8
-    assert isinstance(conv_lora.down, fl.Conv2d) and isinstance(conv_lora.up, fl.Conv2d)
     assert conv_lora.kernel_size == (conv_lora.down.kernel_size[0], conv_lora.up.kernel_size[0]) == (3, 1)
     # padding is set so the spatial dimensions are preserved
     assert conv_lora.padding == (conv_lora.down.padding[0], conv_lora.up.padding[0]) == (0, 1)
@@ -40,12 +39,10 @@ def test_scale_setter(lora: LinearLora) -> None:
 
 
 def test_from_weights(lora: LinearLora, conv_lora: Conv2dLora) -> None:
-    assert isinstance(lora.down, fl.Linear) and isinstance(lora.up, fl.Linear)
     new_lora = LinearLora.from_weights("test", down=lora.down.weight, up=lora.up.weight)
     x = torch.randn(1, 320)
     assert torch.allclose(lora(x), new_lora(x))
 
-    assert isinstance(conv_lora.down, fl.Conv2d) and isinstance(conv_lora.up, fl.Conv2d)
     new_conv_lora = Conv2dLora.from_weights("conv_test", down=conv_lora.down.weight, up=conv_lora.up.weight)
     x = torch.randn(1, 16, 64, 64)
     assert torch.allclose(conv_lora(x), new_conv_lora(x))

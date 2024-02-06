@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar, cast
 
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn import Parameter as TorchParameter
@@ -7,8 +8,10 @@ from torch.nn.init import normal_, zeros_
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
 
+T = TypeVar("T", bound=fl.WeightedModule)
 
-class Lora(fl.Chain, ABC):
+
+class Lora(Generic[T], fl.Chain, ABC):
     """Low-Rank Adaptation (LoRA) layer.
 
     This layer is composed of two [`WeightedModule`][refiners.fluxion.layers.WeightedModule]:
@@ -55,9 +58,7 @@ class Lora(fl.Chain, ABC):
         zeros_(tensor=self.up.weight)
 
     @abstractmethod
-    def lora_layers(
-        self, device: Device | str | None = None, dtype: DType | None = None
-    ) -> tuple[fl.WeightedModule, fl.WeightedModule]:
+    def lora_layers(self, device: Device | str | None = None, dtype: DType | None = None) -> tuple[T, T]:
         """Create the down and up layers of the LoRA.
 
         Args:
@@ -67,18 +68,18 @@ class Lora(fl.Chain, ABC):
         ...
 
     @property
-    def down(self) -> fl.WeightedModule:
+    def down(self) -> T:
         """The down layer."""
         down_layer = self[0]
         assert isinstance(down_layer, fl.WeightedModule)
-        return down_layer
+        return cast(T, down_layer)
 
     @property
-    def up(self) -> fl.WeightedModule:
+    def up(self) -> T:
         """The up layer."""
         up_layer = self[1]
         assert isinstance(up_layer, fl.WeightedModule)
-        return up_layer
+        return cast(T, up_layer)
 
     @property
     def rank(self) -> int:
@@ -102,7 +103,7 @@ class Lora(fl.Chain, ABC):
         /,
         down: Tensor,
         up: Tensor,
-    ) -> "Lora":
+    ) -> "Lora[Any]":
         match (up.ndim, down.ndim):
             case (2, 2):
                 return LinearLora.from_weights(name, up=up, down=down)
@@ -112,14 +113,14 @@ class Lora(fl.Chain, ABC):
                 raise ValueError(f"Unsupported weight shapes: up={up.shape}, down={down.shape}")
 
     @classmethod
-    def from_dict(cls, name: str, /, state_dict: dict[str, Tensor]) -> dict[str, "Lora"]:
+    def from_dict(cls, name: str, /, state_dict: dict[str, Tensor]) -> dict[str, "Lora[Any]"]:
         """
         Create a dictionary of LoRA layers from a state dict.
 
         Expects the state dict to be a succession of down and up weights.
         """
         state_dict = {k: v for k, v in state_dict.items() if ".weight" in k}
-        loras: dict[str, Lora] = {}
+        loras: dict[str, Lora[Any]] = {}
         for down_key, down_tensor, up_tensor in zip(
             list(state_dict.keys())[::2], list(state_dict.values())[::2], list(state_dict.values())[1::2]
         ):
@@ -168,7 +169,7 @@ class Lora(fl.Chain, ABC):
         self.up.weight = TorchParameter(up_weight.to(device=self.device, dtype=self.dtype))
 
 
-class LinearLora(Lora):
+class LinearLora(Lora[fl.Linear]):
     """Low-Rank Adaptation (LoRA) layer for linear layers.
 
     This layer uses two [`Linear`][refiners.fluxion.layers.Linear] layers as its down and up layers.
@@ -254,7 +255,7 @@ class LinearLora(Lora):
         return False
 
 
-class Conv2dLora(Lora):
+class Conv2dLora(Lora[fl.Conv2d]):
     """Low-Rank Adaptation (LoRA) layer for 2D convolutional layers.
 
     This layer uses two [`Conv2d`][refiners.fluxion.layers.Conv2d] layers as its down and up layers.
@@ -374,7 +375,7 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
     This adapter simply sums the target layer with the given LoRA layers.
     """
 
-    def __init__(self, target: fl.WeightedModule, /, *loras: Lora) -> None:
+    def __init__(self, target: fl.WeightedModule, /, *loras: Lora[Any]) -> None:
         """Initialize the adapter.
 
         Args:
@@ -387,24 +388,24 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
     @property
     def names(self) -> list[str]:
         """The names of the LoRA layers."""
-        return [lora.name for lora in self.layers(Lora)]
+        return [lora.name for lora in self.layers(Lora[Any])]
 
     @property
-    def loras(self) -> dict[str, Lora]:
+    def loras(self) -> dict[str, Lora[Any]]:
         """The LoRA layers indexed by name."""
-        return {lora.name: lora for lora in self.layers(Lora)}
+        return {lora.name: lora for lora in self.layers(Lora[Any])}
 
     @property
     def scales(self) -> dict[str, float]:
         """The scales of the LoRA layers indexed by names."""
-        return {lora.name: lora.scale for lora in self.layers(Lora)}
+        return {lora.name: lora.scale for lora in self.layers(Lora[Any])}
 
     @scales.setter
     def scale(self, values: dict[str, float]) -> None:
         for name, value in values.items():
             self.loras[name].scale = value
 
-    def add_lora(self, lora: Lora, /) -> None:
+    def add_lora(self, lora: Lora[Any], /) -> None:
         """Add a LoRA layer to the adapter.
 
         Raises:
@@ -416,7 +417,7 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
         assert lora.name not in self.names, f"LoRA layer with name {lora.name} already exists"
         self.append(lora)
 
-    def remove_lora(self, name: str, /) -> Lora | None:
+    def remove_lora(self, name: str, /) -> Lora[Any] | None:
         """Remove a LoRA layer from the adapter.
 
         Note:
