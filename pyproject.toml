@@ -1,7 +1,7 @@
 [project]
 name = "refiners"
 version = "0.2.0"
-description = "The simplest way to train and run adapters on top of foundational models"
+description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
 dependencies = [
@@ -23,9 +23,6 @@ training = [
     "torchvision>=0.16.1",
     "loguru>=0.7.2",
     "wandb>=0.16.0",
-    # Added scipy as a work around until this PR gets merged:
-    # https://github.com/TimDettmers/bitsandbytes/pull/525
-    "scipy>=1.11.4",
     "datasets>=2.15.0",
     "tomli>=2.0.1"
 ]
@@ -55,11 +52,14 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright == 1.1.342",
-    "ruff>=0.0.292",
+    "pyright==1.1.349",
+    "ruff>=0.1.15",
     "docformatter>=1.7.5",
-    "pytest>=7.4.2",
-    "mkdocs-material>=9.5.3",
+    "pytest>=8.0.0",
+    "coverage>=7.4.1",
+    "mkdocs-material>=9.5.6",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-literate-nav>=0.6.1",
 ]
 
 
@@ -69,6 +69,14 @@ allow-direct-references = true
 [tool.rye.scripts]
 lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
+test-cov = "coverage run -m pytest"
+# Work around for "Couldn't parse" errors due to e.g. opencv-python:
+# https://github.com/nedbat/coveragepy/issues/1653
+build-html-cov = { cmd = "coverage html", env = { PYTHONWARNINGS = "ignore:Couldn't parse::coverage.report_core" } }
+serve-cov-report = { chain = [
+    "build-html-cov",
+    "python -m http.server 8080 -b 127.0.0.1 -d htmlcov",
+] }
 
 [tool.black]
 line-length = 120
@@ -76,7 +84,7 @@ line-length = 120
 [tool.ruff]
 src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
 select = [
-  "I", # isort
+    "I", # isort
 ]
 ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
@@ -99,3 +107,18 @@ include = ["src/refiners", "tests", "scripts"]
 strict = ["*"]
 exclude = ["**/__pycache__", "tests/weights"]
 reportMissingTypeStubs = "warning"
+
+[tool.coverage.run]
+branch = true
+source = ["src/refiners"]
+
+# Also apply to HTML output, where appropriate
+[tool.coverage.report]
+ignore_errors = true # see `build-html-cov` for details
+exclude_also = [
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

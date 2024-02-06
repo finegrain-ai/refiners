@@ -5,11 +5,8 @@ from torch import Tensor, bfloat16, device as Device, dtype as DType, float16, f
 from torch.autograd import backward
 from torch.nn import Module
 
-from refiners.foundationals.latent_diffusion.schedulers import Scheduler
-
 from .config import ModelConfig, TrainingConfig
 
-Hookable = Module | Scheduler
 WrappableMethod = Callable[..., Any]
 
 
@@ -19,7 +16,7 @@ class ShardingManager(ABC):
         ...
 
     @abstractmethod
-    def setup_model(self, model: Hookable, config: ModelConfig) -> None:
+    def setup_model(self, model: Module, config: ModelConfig) -> None:
         ...
 
     @abstractmethod
@@ -27,11 +24,11 @@ class ShardingManager(ABC):
         ...
 
     @abstractmethod
-    def add_device_hook(self, module: Hookable, device: Device, method_name: str) -> None:
+    def add_device_hook(self, module: Module, device: Device, method_name: str) -> None:
         ...
 
     @abstractmethod
-    def add_device_hooks(self, module: Hookable, device: Device) -> None:
+    def add_device_hooks(self, module: Module, device: Device) -> None:
         ...
 
     @property
@@ -65,7 +62,7 @@ class SimpleShardingManager(ShardingManager):
     def backward(self, tensor: Tensor):
         backward(tensor)
 
-    def setup_model(self, model: Hookable, config: ModelConfig) -> None:
+    def setup_model(self, model: Module, config: ModelConfig) -> None:
         if config.gpu_index is not None:
             device = Device(f"cuda:{config.gpu_index}")
         else:
@@ -80,7 +77,7 @@ class SimpleShardingManager(ShardingManager):
         self.add_device_hooks(model, device)
 
     # inspired from https://github.com/huggingface/accelerate/blob/6f05bbd41a179cc9a86238c7c6f3f4eded70fbd8/src/accelerate/hooks.py#L159C1-L170C18
-    def add_device_hooks(self, module: Hookable, device: Device) -> None:
+    def add_device_hooks(self, module: Module, device: Device) -> None:
         method_list: List[str] = []
         if hasattr(module, "forward") is True:
             method_list.append("forward")
@@ -94,6 +91,9 @@ class SimpleShardingManager(ShardingManager):
         if hasattr(module, "decode") is True:
             method_list.append("decode")
 
+        if hasattr(module, "add_noise") is True:
+            method_list.append("add_noise")
+            
         for method_name in method_list:
             self.add_device_hook(module, device, method_name)
 
@@ -109,7 +109,7 @@ class SimpleShardingManager(ShardingManager):
         else:
             return obj
 
-    def add_device_hook(self, module: Hookable, device: Device, method_name: str) -> None:
+    def add_device_hook(self, module: Module, device: Device, method_name: str) -> None:
         old_method = getattr(module, method_name)
         new_method = self.wrap_device(old_method, device)
         setattr(module, method_name, new_method)

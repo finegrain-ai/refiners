@@ -7,7 +7,7 @@ from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
+from refiners.foundationals.latent_diffusion.solvers import Solver
 
 T = TypeVar("T", bound="fl.Module")
 
@@ -16,16 +16,16 @@ TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionM
 
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
-        self, unet: fl.Module, lda: LatentDiffusionAutoencoder, clip_text_encoder: fl.Module, scheduler: Scheduler
+        self, unet: fl.Module, lda: LatentDiffusionAutoencoder, clip_text_encoder: fl.Module, solver: Solver
     ) -> None:
         super().__init__()
         self.unet = unet
         self.lda = lda
         self.clip_text_encoder = clip_text_encoder
-        self.scheduler = scheduler
+        self.solver = solver
 
     def set_inference_steps(self, num_steps: int, first_step: int = 0) -> None:
-        self.scheduler = self.scheduler.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
+        self.solver = self.solver.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
 
     def init_latents(
         self,
@@ -42,16 +42,16 @@ class LatentDiffusionModel(fl.Module, ABC):
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
         if init_image is None:
             return noise
-        encoded_image = self.lda.encode_image(image=init_image.resize(size=(width, height)))
-        return self.scheduler.add_noise(
+        encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
+        return self.solver.add_noise(
             x=encoded_image,
             noise=noise,
-            step=self.scheduler.first_inference_step,
+            step=self.solver.first_inference_step,
         )
 
     @property
     def steps(self) -> list[int]:
-        return self.scheduler.inference_steps
+        return self.solver.inference_steps
 
     @abstractmethod
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
@@ -74,13 +74,12 @@ class LatentDiffusionModel(fl.Module, ABC):
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
     ) -> Tensor:
-        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        timestep = self.solver.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
 
         latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
-
-        # scale latents for schedulers that need it
-        latents = self.scheduler.scale_model_input(latents, step=step)
+        # scale latents for solvers that need it
+        latents = self.solver.scale_model_input(latents, step=step)
         unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
 
         # classifier-free guidance
@@ -94,12 +93,12 @@ class LatentDiffusionModel(fl.Module, ABC):
                 x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
             )
 
-        return self.scheduler(x, predicted_noise=predicted_noise, step=step)
+        return self.solver(x, predicted_noise=predicted_noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:
         return self.__class__(
             unet=self.unet.structural_copy(),
             lda=self.lda.structural_copy(),
             clip_text_encoder=self.clip_text_encoder.structural_copy(),
-            scheduler=self.scheduler,
+            solver=self.solver
         )

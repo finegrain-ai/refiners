@@ -1,3 +1,0 @@
-# Latent Diffusion
-
-WIP

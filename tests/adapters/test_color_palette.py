@@ -1,6 +1,6 @@
 import torch
 
-from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, PalettesTokenizer
+from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, PalettesTokenizer, ColorPaletteExtractor
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 
 def test_colors_tokenizer() -> None:
@@ -212,3 +212,26 @@ def test_0_layer_color_palette_encoder() -> None:
     
     encoded_mix = color_palette_encoder([palette, empty_palette])
     assert encoded_mix.shape == torch.Size([2, max_colors, embedding_dim])
+
+
+from PIL import Image
+
+def test_palette_extractor() -> None:
+    size = (512, 512)
+    mode = 'RGB'
+    color = (255, 255, 255)  # White
+
+    white_image = Image.open("tests/fixtures/photo-1439246854758-f686a415d9da.jpeg").resize((512, 512))
+    palette_size = 8
+    color_palette_extractor = ColorPaletteExtractor(
+        size = palette_size,
+        color_space = 'oklab'
+    )
+    
+    palette = color_palette_extractor(white_image)
+    
+    assert len(palette) == palette_size
+    assert isinstance(palette[0], tuple)
+    assert isinstance(palette[0][1], int)
+    assert len(palette[0][0]) == 3
+    assert isinstance(palette[0][0][0], int)

@@ -10,10 +10,6 @@ from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLaten
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from loguru import logger
 
-Color = Tuple[int, int, int]
-
-ColorPalette = List[Color]
-
 @dataclass
 class ColorPaletteDatasetItem:
     color_palette: ColorPalette
@@ -29,15 +25,30 @@ class DatasetItem:
 
 TextEmbeddingColorPaletteLatentsBatch = List[ColorPaletteDatasetItem]
 
-class SamplingByPalette(BaseModel):
-    palette_1: float = 1.0
-    palette_2: float = 2.0
-    palette_3: float = 3.0
-    palette_4: float = 4.0
-    palette_5: float = 5.0
-    palette_6: float = 6.0
-    palette_7: float = 7.0
-    palette_8: float = 8.0
+DEFAULT_SAMPLING= {
+    "palette_1": 1.0,
+    "palette_2": 2.0,
+    "palette_3": 3.0,
+    "palette_4": 4.0,
+    "palette_5": 5.0,
+    "palette_6": 6.0,
+    "palette_7": 7.0,
+    "palette_8": 8.0
+}
+
+class SamplingByPalette:
+    palette_1: float= 0.0
+    palette_2: float= 0.0
+    palette_3: float= 0.0
+    palette_4: float= 0.0
+    palette_5: float= 0.0
+    palette_6: float= 0.0
+    palette_7: float= 0.0
+    palette_8: float= 0.0
+    
+    def __init__(self, sampling = DEFAULT_SAMPLING) -> None:
+        for key in sampling:
+            self.__setattr__(key, sampling[key])
 
 
 class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPaletteLatentsBatch]):
@@ -80,7 +91,13 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         
     def process_color_palette(self, item: DatasetItem) -> ColorPalette:
         choices = range(1, 9)
-        weights = np.array([getattr(self.sampling_by_palette, f"palette_{i}") for i in choices])
+        weights_list : List[float] = []
+        for i in choices:
+            if hasattr(self.sampling_by_palette, f"palette_{i}"):
+                weight = getattr(self.sampling_by_palette, f"palette_{i}")
+                weights_list.append(weight)
+        
+        weights = np.array(weights_list)
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])

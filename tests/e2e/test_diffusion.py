@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 from typing import Iterator
 from warnings import warn
@@ -6,6 +7,7 @@ import pytest
 import torch
 from PIL import Image
 
+from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
@@ -23,11 +25,17 @@ from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.schedulers import DDIM, EulerScheduler
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from tests.utils import ensure_similar_images
+
+
+@pytest.fixture(autouse=True)
+def ensure_gc():
+    # Avoid GPU OOMs
+    # See https://github.com/pytest-dev/pytest/discussions/8153#discussioncomment-214812
+    gc.collect()
 
 
 @pytest.fixture(scope="module")
@@ -101,6 +109,11 @@ def expected_image_ip_adapter_woman(ref_path: Path) -> Image.Image:
 
 
 @pytest.fixture
+def expected_image_ip_adapter_multi(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_image_ip_adapter_multi.png").convert("RGB")
+
+
+@pytest.fixture
 def expected_image_ip_adapter_plus_statue(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_image_ip_adapter_plus_statue.png").convert("RGB")
 
@@ -122,12 +135,17 @@ def expected_image_ip_adapter_controlnet(ref_path: Path) -> Image.Image:
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert(mode="RGB")
+    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init_sag(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert(mode="RGB")
+    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_sdxl_euler_random_init(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_cutecat_sdxl_euler_random_init.png").convert("RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -478,8 +496,8 @@ def sd15_ddim(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -496,8 +514,8 @@ def sd15_ddim_karras(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -514,8 +532,8 @@ def sd15_euler(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    euler_scheduler = EulerScheduler(num_inference_steps=30)
-    sd15 = StableDiffusion_1(scheduler=euler_scheduler, device=test_device)
+    euler_solver = Euler(num_inference_steps=30)
+    sd15 = StableDiffusion_1(solver=euler_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
     sd15.lda.load_from_safetensors(lda_weights)
@@ -532,8 +550,8 @@ def sd15_ddim_lda_ft_mse(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_scheduler = DDIM(num_inference_steps=20)
-    sd15 = StableDiffusion_1(scheduler=ddim_scheduler, device=test_device)
+    ddim_solver = DDIM(num_inference_steps=20)
+    sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
     sd15.lda.load_state_dict(load_from_safetensors(lda_ft_mse_weights))
@@ -586,8 +604,8 @@ def sdxl_ddim(
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    scheduler = DDIM(num_inference_steps=30)
-    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+    solver = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
     sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_weights)
@@ -604,14 +622,26 @@ def sdxl_ddim_lda_fp16_fix(
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    scheduler = DDIM(num_inference_steps=30)
-    sdxl = StableDiffusion_XL(scheduler=scheduler, device=test_device)
+    solver = DDIM(num_inference_steps=30)
+    sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
     sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_fp16_fix_weights)
     sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
 
     return sdxl
+
+
+@pytest.fixture
+def sdxl_euler_deterministic(sdxl_ddim: StableDiffusion_XL) -> StableDiffusion_XL:
+    return StableDiffusion_XL(
+        unet=sdxl_ddim.unet,
+        lda=sdxl_ddim.lda,
+        clip_text_encoder=sdxl_ddim.clip_text_encoder,
+        solver=Euler(num_inference_steps=30),
+        device=sdxl_ddim.device,
+        dtype=sdxl_ddim.dtype,
+    )
 
 
 @no_grad()
@@ -636,7 +666,7 @@ def test_diffusion_std_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init)
 
@@ -646,8 +676,8 @@ def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
     sd15 = sd15_euler
-    euler_scheduler = sd15_euler.scheduler
-    assert isinstance(euler_scheduler, EulerScheduler)
+    euler_solver = sd15_euler.solver
+    assert isinstance(euler_solver, Euler)
 
     prompt = "a cute cat, detailed high-quality professional image"
     negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
@@ -657,7 +687,7 @@ def test_diffusion_std_random_init_euler(
 
     manual_seed(2)
     x = torch.randn(1, 4, 64, 64, device=test_device)
-    x = x * euler_scheduler.init_noise_sigma
+    x = x * euler_solver.init_noise_sigma
 
     for step in sd15.steps:
         x = sd15(
@@ -666,7 +696,7 @@ def test_diffusion_std_random_init_euler(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init_euler)
 
@@ -691,7 +721,7 @@ def test_diffusion_karras_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_karras_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -719,7 +749,7 @@ def test_diffusion_std_random_init_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -747,7 +777,7 @@ def test_diffusion_std_random_init_sag(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_random_init_sag)
 
@@ -776,7 +806,7 @@ def test_diffusion_std_init_image(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_init_image)
 
@@ -793,7 +823,7 @@ def test_rectangular_init_latents(
     rect_init_image = cutecat_init.crop((0, 0, width, height))
     x = sd15.init_latents((height, width), rect_init_image)
 
-    assert sd15.lda.decode_latents(x).size == (width, height)
+    assert sd15.lda.latents_to_image(x).size == (width, height)
 
 
 @no_grad()
@@ -823,7 +853,7 @@ def test_diffusion_inpainting(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     # PSNR and SSIM values are large because with float32 we get large differences even v.s. ourselves.
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=25, min_ssim=0.95)
@@ -857,7 +887,7 @@ def test_diffusion_inpainting_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     # PSNR and SSIM values are large because float16 is even worse than float32.
     ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=20, min_ssim=0.92)
@@ -900,7 +930,7 @@ def test_diffusion_controlnet(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -943,7 +973,7 @@ def test_diffusion_controlnet_structural_copy(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -985,7 +1015,7 @@ def test_diffusion_controlnet_float16(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1039,7 +1069,7 @@ def test_diffusion_controlnet_stack(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_controlnet_stack, min_psnr=35, min_ssim=0.98)
 
@@ -1071,7 +1101,7 @@ def test_diffusion_lora(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1114,7 +1144,7 @@ def test_diffusion_sdxl_lora(
             condition_scale=guidance_scale,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1162,7 +1192,7 @@ def test_diffusion_sdxl_multiple_loras(
             condition_scale=guidance_scale,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1181,7 +1211,7 @@ def test_diffusion_refonly(
 
     refonly_adapter = ReferenceOnlyControlAdapter(sd15.unet).inject()
 
-    guide = sd15.lda.encode_image(condition_image_refonly)
+    guide = sd15.lda.image_to_latents(condition_image_refonly)
     guide = torch.cat((guide, guide))
 
     manual_seed(2)
@@ -1189,7 +1219,7 @@ def test_diffusion_refonly(
 
     for step in sd15.steps:
         noise = torch.randn(2, 4, 64, 64, device=test_device)
-        noised_guide = sd15.scheduler.add_noise(guide, noise, step)
+        noised_guide = sd15.solver.add_noise(guide, noise, step)
         refonly_adapter.set_controlnet_condition(noised_guide)
         x = sd15(
             x,
@@ -1198,7 +1228,7 @@ def test_diffusion_refonly(
             condition_scale=7.5,
         )
         torch.randn(2, 4, 64, 64, device=test_device)  # for SD Web UI reproductibility only
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     # min_psnr lowered to 33 because this reference image was generated without noise removal (see #192)
     ensure_similar_images(predicted_image, expected_image_refonly, min_psnr=33, min_ssim=0.99)
@@ -1223,7 +1253,7 @@ def test_diffusion_inpainting_refonly(
     sd15.set_inference_steps(30)
     sd15.set_inpainting_conditions(target_image_inpainting_refonly, mask_image_inpainting_refonly)
 
-    guide = sd15.lda.encode_image(scene_image_inpainting_refonly)
+    guide = sd15.lda.image_to_latents(scene_image_inpainting_refonly)
     guide = torch.cat((guide, guide))
 
     manual_seed(2)
@@ -1231,7 +1261,7 @@ def test_diffusion_inpainting_refonly(
 
     for step in sd15.steps:
         noise = torch.randn_like(guide)
-        noised_guide = sd15.scheduler.add_noise(guide, noise, step)
+        noised_guide = sd15.solver.add_noise(guide, noise, step)
         # See https://github.com/Mikubill/sd-webui-controlnet/pull/1275 ("1.1.170 reference-only begin to support
         # inpaint variation models")
         noised_guide = torch.cat([noised_guide, torch.zeros_like(noised_guide)[:, 0:1, :, :], guide], dim=1)
@@ -1243,7 +1273,7 @@ def test_diffusion_inpainting_refonly(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_inpainting_refonly, min_psnr=35, min_ssim=0.99)
 
@@ -1276,7 +1306,7 @@ def test_diffusion_textual_inversion_random_init(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
 
@@ -1321,9 +1351,49 @@ def test_diffusion_ip_adapter(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_woman)
+
+
+@no_grad()
+def test_diffusion_ip_adapter_multi(
+    sd15_ddim_lda_ft_mse: StableDiffusion_1,
+    ip_adapter_weights: Path,
+    image_encoder_weights: Path,
+    woman_image: Image.Image,
+    statue_image: Image.Image,
+    expected_image_ip_adapter_multi: Image.Image,
+    test_device: torch.device,
+):
+    sd15 = sd15_ddim_lda_ft_mse.to(dtype=torch.float16)
+
+    prompt = "best quality, high quality"
+    negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
+
+    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_weights))
+    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.inject()
+
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+    clip_image_embedding = ip_adapter.compute_clip_image_embedding([woman_image, statue_image], weights=[1.0, 1.4])
+    ip_adapter.set_clip_image_embedding(clip_image_embedding)
+
+    sd15.set_inference_steps(50)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.decode_latents(x)
+
+    ensure_similar_images(predicted_image, expected_image_ip_adapter_multi)
 
 
 @no_grad()
@@ -1370,7 +1440,7 @@ def test_diffusion_sdxl_ip_adapter(
         # See https://huggingface.co/madebyollin/sdxl-vae-fp16-fix: "SDXL-VAE generates NaNs in fp16 because the
         # internal activation values are too big"
         sdxl.lda.to(dtype=torch.float32)
-        predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
+        predicted_image = sdxl.lda.latents_to_image(x.to(dtype=torch.float32))
 
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_woman)
 
@@ -1426,7 +1496,7 @@ def test_diffusion_ip_adapter_controlnet(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_controlnet)
 
@@ -1467,7 +1537,7 @@ def test_diffusion_ip_adapter_plus(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_plus_statue, min_psnr=35, min_ssim=0.98)
 
@@ -1514,7 +1584,7 @@ def test_diffusion_sdxl_ip_adapter_plus(
             condition_scale=5,
         )
     sdxl.lda.to(dtype=torch.float32)
-    predicted_image = sdxl.lda.decode_latents(x.to(dtype=torch.float32))
+    predicted_image = sdxl.lda.latents_to_image(x.to(dtype=torch.float32))
 
     ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman)
 
@@ -1548,7 +1618,7 @@ def test_sdxl_random_init(
             time_ids=time_ids,
             condition_scale=5,
         )
-    predicted_image = sdxl.lda.decode_latents(x=x)
+    predicted_image = sdxl.lda.latents_to_image(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image, min_psnr=35, min_ssim=0.98)
 
@@ -1583,9 +1653,90 @@ def test_sdxl_random_init_sag(
             time_ids=time_ids,
             condition_scale=5,
         )
-    predicted_image = sdxl.lda.decode_latents(x=x)
+    predicted_image = sdxl.lda.latents_to_image(x=x)
 
     ensure_similar_images(img_1=predicted_image, img_2=expected_image)
+
+
+@no_grad()
+def test_diffusion_sdxl_sliced_attention(
+    sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init: Image.Image
+) -> None:
+    unet = sdxl_ddim.unet.structural_copy()
+    for layer in unet.layers(ScaledDotProductAttention):
+        layer.slice_size = 2048
+
+    sdxl = StableDiffusion_XL(
+        unet=unet,
+        lda=sdxl_ddim.lda,
+        clip_text_encoder=sdxl_ddim.clip_text_encoder,
+        solver=sdxl_ddim.solver,
+        device=sdxl_ddim.device,
+        dtype=sdxl_ddim.dtype,
+    )
+
+    expected_image = expected_sdxl_ddim_random_init
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+    sdxl.set_inference_steps(30)
+    manual_seed(2)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+
+    predicted_image = sdxl.lda.decode_latents(x)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_euler_deterministic(
+    sdxl_euler_deterministic: StableDiffusion_XL, expected_sdxl_euler_random_init: Image.Image
+) -> None:
+    sdxl = sdxl_euler_deterministic
+    assert isinstance(sdxl.solver, Euler)
+
+    expected_image = expected_sdxl_euler_random_init
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt, negative_text=negative_prompt
+    )
+    time_ids = sdxl.default_time_ids
+    sdxl.set_inference_steps(30)
+    manual_seed(2)
+    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+
+    # init latents must be scaled for Euler
+    # TODO make init_latents work
+    x = x * sdxl.solver.init_noise_sigma
+
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=5,
+        )
+
+    predicted_image = sdxl.lda.decode_latents(x)
+    ensure_similar_images(predicted_image, expected_image)
 
 
 @no_grad()
@@ -1615,7 +1766,7 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
             step=step,
             targets=[target_1, target_2],
         )
-    result = sd.lda.decode_latents(x=x)
+    result = sd.lda.latents_to_image(x=x)
     ensure_similar_images(img_1=result, img_2=expected_multi_diffusion, min_psnr=35, min_ssim=0.98)
 
 
@@ -1654,7 +1805,7 @@ def test_t2i_adapter_depth(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)
 
@@ -1702,7 +1853,7 @@ def test_t2i_adapter_xl_canny(
             time_ids=time_ids,
             condition_scale=7.5,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)
 
@@ -1741,7 +1892,7 @@ def test_restart(
                 condition_scale=8,
             )
 
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_restart, min_psnr=35, min_ssim=0.98)
 
@@ -1773,7 +1924,7 @@ def test_freeu(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_freeu)
 
@@ -1829,6 +1980,6 @@ def test_hello_world(
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)

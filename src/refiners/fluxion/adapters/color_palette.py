@@ -1,4 +1,5 @@
-from typing import Any, List, TypeVar
+from typing import Any, List, TypeVar, Tuple
+from tests.foundationals.segment_anything.utils import NDArray
 
 from torch import cat, ones
 from jaxtyping import Float, Int
@@ -171,9 +172,40 @@ class ColorPaletteMLPEncoder(fl.Chain):
             )
         )
 
-class ColorPaletteEncoder(fl.Chain):
- 
 
+Color = Tuple[int, int, int]
+ColorWeight = int
+
+ColorPaletteCluster = Tuple[Color, ColorWeight]
+
+ColorPalette = List[ColorPaletteCluster]
+
+from sklearn.cluster import KMeans
+import numpy as np
+from PIL import Image
+import time
+class ColorPaletteExtractor:
+    def __init__(
+        self,
+        size: int = 8,
+        color_space = 'rgb'
+    ) -> None:
+        self.size = size
+        self.color_space = color_space
+
+    def __call__(self, image: Image.Image) -> ColorPalette:
+        image_np = np.array(image)
+        pixels = image_np.reshape(-1, 3)
+        kmeans = KMeans(n_clusters=self.size).fit(pixels)       
+        counts = np.unique(kmeans.labels_, return_counts=True)[1]
+        palette = [
+            (
+                list(map(int, kmeans.cluster_centers_[i].tolist())),
+                counts[i].item()
+            ) for i in range(0, self.size)]
+        return palette
+
+class ColorPaletteEncoder(fl.Chain):
     def __init__(
         self,
         lda: SD1Autoencoder = SD1Autoencoder(),

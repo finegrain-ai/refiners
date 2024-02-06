@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+from typing import cast
 from warnings import warn
 
 import pytest
@@ -98,7 +99,8 @@ def test_count_learnable_parameters_with_params() -> None:
         nn.Parameter(torch.randn(5), requires_grad=False),
         nn.Parameter(torch.randn(3, 3), requires_grad=True),
     ]
-    assert count_learnable_parameters(params) == 13
+    # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+    assert count_learnable_parameters(cast(list[nn.Parameter], params)) == 13
 
 
 def test_count_learnable_parameters_with_model(mock_model: fl.Chain) -> None:
@@ -204,3 +206,49 @@ def test_warmup_lr(warmup_scheduler: WarmupScheduler) -> None:
     optimizer = warmup_scheduler.optimizer
     for group in optimizer.param_groups:
         assert group["lr"] == 0.1
+
+
+class MockTrainerWith2Models(Trainer[MockConfig, MockBatch]):
+    step_counter: int = 0
+
+    @cached_property
+    def mock_model1(self) -> MockModel:
+        return MockModel()
+
+    @cached_property
+    def mock_model2(self) -> MockModel:
+        return MockModel()
+
+    def load_dataset(self) -> Dataset[MockBatch]:
+        return MockDataset()
+
+    def load_models(self) -> dict[str, fl.Module]:
+        return {"mock_model1": self.mock_model1, "mock_model2": self.mock_model2}
+
+    def compute_loss(self, batch: MockBatch) -> Tensor:
+        self.step_counter += 1
+        inputs, targets = batch.inputs.to(self.device), batch.targets.to(self.device)
+        outputs = self.mock_model2(self.mock_model1(inputs))
+        return norm(outputs - targets)
+
+
+@pytest.fixture
+def mock_config_with_2_models(test_device: torch.device) -> MockConfig:
+    if not test_device.type == "cuda":
+        warn("only running on CUDA, skipping")
+        pytest.skip("Skipping test because test_device is not CUDA")
+    config = MockConfig.load_from_toml(Path(__file__).parent / "mock_config_with_2_models.toml")
+    config.training.gpu_index = test_device.index
+    return config
+
+
+@pytest.fixture
+def mock_trainer_with_2_models(mock_config_with_2_models: MockConfig) -> MockTrainerWith2Models:
+    return MockTrainerWith2Models(config=mock_config_with_2_models)
+
+
+def test_optimizer_parameters(mock_trainer_with_2_models: MockTrainerWith2Models) -> None:
+    assert (
+        len(mock_trainer_with_2_models.optimizer.param_groups) == 12
+    )  # 12 == (3 [linear layers] * 2 [bias + weights]) * 2 [models]
+    assert mock_trainer_with_2_models.optimizer.param_groups[0]["lr"] == 1e-5

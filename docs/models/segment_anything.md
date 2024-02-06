@@ -1,3 +1,0 @@
-# Segment Anything
-
-WIP

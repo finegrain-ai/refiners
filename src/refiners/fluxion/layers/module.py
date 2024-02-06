@@ -1,11 +1,16 @@
+from os import name
 import sys
 from collections import defaultdict
 from inspect import Parameter, signature
 from pathlib import Path
+from tkinter import Label
+from tkinter.tix import Tree
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, DefaultDict, Generator, Sequence, TypedDict, TypeVar, cast
 
-from torch import device as Device, dtype as DType
+from refiners.fluxion.topological_utils import match_trees, paths_to_tree, simplify_node
+
+from torch import device as Device, dtype as DType, Tensor
 from torch.nn.modules.module import Module as TorchModule
 
 from refiners.fluxion.context import Context, ContextProvider
@@ -17,7 +22,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Module")
 TContextModule = TypeVar("TContextModule", bound="ContextModule")
 BasicType = str | float | int | bool
-
 
 class Module(TorchModule):
     _parameters: dict[str, Any]
@@ -32,11 +36,25 @@ class Module(TorchModule):
 
     def __setattr__(self, name: str, value: Any) -> None:
         return super().__setattr__(name=name, value=value)
-
+    
     def load_from_safetensors(self, tensors_path: str | Path, strict: bool = True) -> "Module":
         state_dict = load_from_safetensors(tensors_path)
-        self.load_state_dict(state_dict, strict=strict)
+        try:
+            self.load_state_dict(state_dict, strict=strict)
+        except Exception as e:
+            self.topological_load_state_dict(state_dict, strict=strict)
         return self
+    
+    def topological_load_state_dict(self, state_dict : dict[str, Tensor], strict: bool = True) -> "Module":
+        tree1 = simplify_node(paths_to_tree(list(state_dict.keys())))
+        tree2 = simplify_node(paths_to_tree(list(self.state_dict().keys())))
+        assignement = match_trees(tree1, tree2)
+        assigned_state_dict = {v: state_dict[k] for k, v in assignement.items()}
+        self.load_state_dict(assigned_state_dict, strict=strict)
+        return self
+    
+    def get_class_name(self) -> str:
+        return self.__class__.__name__
 
     def named_modules(self, *args: Any, **kwargs: Any) -> "Generator[tuple[str, Module], None, None]":  # type: ignore
         return super().named_modules(*args)  # type: ignore
@@ -48,7 +66,7 @@ class Module(TorchModule):
         basic_attributes_str = ", ".join(
             f"{key}={value}" for key, value in self.basic_attributes(init_attrs_only=True).items()
         )
-        result = f"{self.__class__.__name__}({basic_attributes_str})"
+        result = f"{self.get_class_name()}({basic_attributes_str})"
         return result
 
     def __repr__(self) -> str:
@@ -59,7 +77,7 @@ class Module(TorchModule):
         tree = ModuleTree(module=self)
         print(tree._generate_tree_repr(tree.root, is_root=True, depth=depth))  # type: ignore[reportPrivateUsage]
 
-    def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType]:
+    def basic_attributes(self, init_attrs_only: bool = False) -> dict[str, BasicType | Sequence[BasicType]]:
         """Return a dictionary of basic attributes of the module.
 
         Basic attributes are public attributes made of basic types (int, float, str, bool) or a sequence of basic types.
@@ -81,7 +99,7 @@ class Module(TorchModule):
             return False
 
         return {
-            key: str(object=value)
+            key: value
             for key, value in self.__dict__.items()
             if is_basic_attribute(key=key, value=value)
             and (not init_attrs_only or (key in init_params and value != default_values.get(key)))

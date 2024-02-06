@@ -18,7 +18,7 @@ from refiners.foundationals.latent_diffusion import (
     SD1UNet,
     StableDiffusion_1,
 )
-from refiners.foundationals.latent_diffusion.schedulers import DDPM
+from refiners.foundationals.latent_diffusion.solvers import DDPM, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
@@ -34,7 +34,6 @@ class LatentDiffusionConfig(BaseModel):
     min_step: int = 0
     max_step: int = 999
 
-
 class TestDiffusionBaseConfig(BaseModel):
     seed: int = 0
     num_inference_steps: int = 30
@@ -43,24 +42,19 @@ class TestDiffusionBaseConfig(BaseModel):
     num_images_per_prompt: int = 1
     condition_scale: float = 7.5
 
-
 class TestDiffusionConfig(TestDiffusionBaseConfig):
     prompts: list[str]
-
 
 class FinetuneLatentDiffusionBaseConfig(BaseConfig):
     dataset: HuggingfaceDatasetConfig
     latent_diffusion: LatentDiffusionConfig
 
-
 class FinetuneLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     test_diffusion: TestDiffusionConfig
-
 
 ConfigType = TypeVar("ConfigType", bound=FinetuneLatentDiffusionBaseConfig)
 BatchType = TypeVar("BatchType", bound=Any)
 DiffusionConfigType = TypeVar("DiffusionConfigType", bound=FinetuneLatentDiffusionConfig)
-
 
 class CaptionImage(TypedDict):
     caption: str
@@ -93,15 +87,20 @@ class LatentDiffusionBaseTrainer(Trainer[ConfigType, BatchType]):
         ...
 
     @cached_property
-    def ddpm_scheduler(self) -> DDPM:
-        ddpm_scheduler = DDPM(num_inference_steps=1000, device=self.device)
-        self.sharding_manager.add_device_hook(ddpm_scheduler, ddpm_scheduler.device, "add_noise")
-        return ddpm_scheduler
+    def ddpm_solver(self) -> Solver:
+        ddpm_solver = DDPM(
+            num_inference_steps=1000,
+            device=self.device,
+        ).to(device=self.device)
+        
+        self.sharding_manager.add_device_hooks(ddpm_solver, ddpm_solver.device)
 
+        return ddpm_solver
+        
     def sample_timestep(self) -> Tensor:
         random_step = random.randint(a=self.config.latent_diffusion.min_step, b=self.config.latent_diffusion.max_step)
         self.current_step = random_step
-        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+        return self.ddpm_solver.timesteps[random_step].unsqueeze(dim=0)
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(size=size, offset_noise=self.config.latent_diffusion.offset_noise, dtype=dtype)
@@ -130,8 +129,7 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
         clip_text_embedding, latents = batch.text_embeddings, batch.latents
         timestep = self.sample_timestep()
         noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
-
+        noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
         self.unet.set_timestep(timestep=timestep)
         self.unet.set_clip_text_embedding(clip_text_embedding=clip_text_embedding)
 
@@ -155,21 +153,21 @@ class LatentDiffusionTrainer(LatentDiffusionBaseTrainer[DiffusionConfigType, Tex
                 clip_text_embedding = sd.compute_clip_text_embedding(text=prompt)
                 for step in sd.steps:
                     x = sd(x, step=step, clip_text_embedding=clip_text_embedding, condition_scale=condition_scale)
-                canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
+                canvas_image.paste(sd.lda.latents_to_image(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         self.log(data=images)
 
     @cached_property
     def sd(self) -> StableDiffusion_1:
-        scheduler = DPMSolver(
+        solver = DPMSolver(
             device=self.device,
             dtype=self.dtype,
             num_inference_steps=self.config.test_diffusion.num_inference_steps,
         )
 
-        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
+        self.sharding_manager.add_device_hooks(solver, solver.device)
 
-        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
+        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, solver=solver)
 
 
 def sample_noise(

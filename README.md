@@ -6,7 +6,7 @@
   <img alt="Finegrain Refiners Library" width="352" height="128" style="max-width: 100%;">
 </picture>
 
-**The simplest way to train and run adapters on top of foundational models** ([dive in!](https://blog.finegrain.ai/posts/simplifying-ai-code/))
+**The simplest way to train and run adapters on top of foundation models** ([dive in!](https://blog.finegrain.ai/posts/simplifying-ai-code/))
 
 ______________________________________________________________________
 
@@ -19,7 +19,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
-- Added [Euler's method](https://arxiv.org/abs/2206.00364) to schedulers (contributed by [@israfelsr](https://github.com/israfelsr))
+- Added [Euler's method](https://arxiv.org/abs/2206.00364) to solvers (contributed by [@israfelsr](https://github.com/israfelsr))
 - Added [DINOv2](https://github.com/facebookresearch/dinov2) for high-performance visual features (contributed by [@Laurent2916](https://github.com/Laurent2916))
 - Added [FreeU](https://github.com/ChenyangSi/FreeU) for improved quality at no cost (contributed by [@isamu-isozaki](https://github.com/isamu-isozaki))
 - Added [Restart Sampling](https://github.com/Newbeeer/diffusion_restart_sampling) for improved image generation ([example](https://github.com/Newbeeer/diffusion_restart_sampling/issues/4))
@@ -27,8 +27,8 @@ ______________________________________________________________________
 - Added [T2I-Adapter](https://github.com/TencentARC/T2I-Adapter) for extra guidance ([example](https://github.com/TencentARC/T2I-Adapter/discussions/93))
 - Added [MultiDiffusion](https://github.com/omerbt/MultiDiffusion) for e.g. panorama images
 - Added [IP-Adapter](https://github.com/tencent-ailab/IP-Adapter), aka image prompt ([example](https://github.com/tencent-ailab/IP-Adapter/issues/92))
-- Added [Segment Anything](https://github.com/facebookresearch/segment-anything) to foundational models
-- Added [SDXL 1.0](https://github.com/Stability-AI/generative-models) to foundational models
+- Added [Segment Anything](https://github.com/facebookresearch/segment-anything) to foundation models
+- Added [SDXL 1.0](https://github.com/Stability-AI/generative-models) to foundation models
 - Made possible to add new concepts to the CLIP text encoder, e.g. via [Textual Inversion](https://arxiv.org/abs/2208.01618)
 
 ## Getting Started
@@ -175,7 +175,7 @@ At [Finegrain](https://finegrain.ai), we're on a mission to automate product pho
 
 That's why we're building Refiners.
 
-It's a framework to easily bridge the last mile quality gap of foundational models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
+It's a framework to easily bridge the last mile quality gap of foundation models like Stable Diffusion or Segment Anything Model (SAM), by adapting them to specific tasks with lightweight trainable and composable patches.
 
 We decided to build Refiners in the open. 
 
@@ -349,7 +349,7 @@ We took inspiration from these great projects:
 ```bibtex
 @misc{the-finegrain-team-2023-refiners,
   author = {Benjamin Trom and Pierre Chapuis and Cédric Deltheil},
-  title = {Refiners: The simplest way to train and run adapters on top of foundational models},
+  title = {Refiners: The simplest way to train and run adapters on top of foundation models},
   year = {2023},
   publisher = {GitHub},
   journal = {GitHub repository},

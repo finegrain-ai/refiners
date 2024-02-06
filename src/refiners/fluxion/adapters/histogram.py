@@ -1,7 +1,8 @@
 from typing import Any, List, TypeVar
+from refiners.foundationals.dinov2.vit import FeedForward
 
-from torch import Tensor, cat, device as Device, dtype as DType, histogramdd, nn, stack, zeros_like
-from torch.nn import init
+from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like
+from torch.nn import init, L1Loss
 from torch.nn.functional import mse_loss as _mse_loss
 
 import refiners.fluxion.layers as fl
@@ -12,7 +13,97 @@ from refiners.foundationals.latent_diffusion.image_prompt import CrossAttentionA
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDXLUNet
 from PIL import Image
-from refiners.fluxion.utils import image_to_tensor
+from refiners.fluxion.utils import images_to_tensor
+from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
+
+def images_to_histo_channels(images: List[Image.Image], color_bits: int = 8) -> List[Tensor]:
+    img_tensor = images_to_tensor(images)
+    sorted_channels = tensor_to_sorted_channels(img_tensor)
+    return sorted_channels_to_histo_channels(sorted_channels, color_bits=color_bits)
+    
+
+def tensor_to_sorted_channels(image: Tensor, color_bits: int = 8, extended : bool = False) -> List[Tensor]:
+    sorted_channels: List[Tensor] = []
+    channels: List[Tensor] = image.split(1, dim=1)
+    if extended:
+        [red, green, blue] = channels
+        channels = [
+            red,
+            green, 
+            blue,
+            (red+green)/2,
+            (red+blue)/2,
+            (green+blue)/2
+        ]
+    
+    for channel in channels:
+        # We extract RGB curves
+        sorted_channel, _ = sort(flatten(channel, 1))
+        sorted_channels.append(sorted_channel)
+    return sorted_channels
+
+def sorted_channels_to_histo_channels(sorted_channels: List[Tensor], color_bits: int = 8) -> List[Tensor]:
+    histos: List[Tensor] = []
+    for channel in sorted_channels:
+        histograms: List[Tensor] = []
+        for i in range(channel.shape[0]):
+            elem = channel[i]
+            histo, _ = histogram(
+                        elem.cpu(),
+                        bins=2**color_bits,
+                        range= (0.0,1.0)
+                    )
+            histograms.append(histo/elem.numel())
+        histo = stack(histograms)
+        histos.append(histo.to(device = channel.device))
+    return histos
+
+def histogram_to_histo_channels(histogram: Tensor) -> List[Tensor]:
+    red = histogram.sum(dim=(2,3))
+    green = histogram.sum(dim=(1,3))
+    blue = histogram.sum(dim=(1,2))
+    
+    return [red, green, blue]
+
+def expand_channels(rgb_channels : list[Tensor]) -> List[Tensor]:
+    if len(rgb_channels) != 3:
+        raise ValueError("3 channels expected")
+    [red, green, blue] = rgb_channels
+    return [
+        red,
+        green,
+        blue
+    ]
+    
+
+class ColorLoss(fl.Module):
+    def __init__(self):
+        super().__init__()
+        self.l1_loss = L1Loss()
+
+    def forward(self, actual: Tensor, expected: Tensor) -> Tensor:
+        assert actual.shape == expected.shape, f"Shapes should match {actual.shape}/{expected.shape}"
+        assert actual.shape[1] == 3, f"3 channels (R,G,B) image expected"
+        actual_channels = tensor_to_sorted_channels(actual, extended=True)
+        expected_channels = tensor_to_sorted_channels(expected, extended=True)
+        
+        actual_channels_tensor = cat([
+            channel.unsqueeze(1) for channel in actual_channels
+        ], dim=1)
+        
+        expected_channels_tensor = cat([
+            channel.unsqueeze(1) for channel in expected_channels
+        ], dim=1)
+        
+        return self.l1_loss(actual_channels_tensor, expected_channels_tensor)
+    
+    def image_vs_histo(self, image: Tensor, histo: Tensor, color_bits: int) -> List[Tensor]:
+        actual_channels = tensor_to_sorted_channels(image, extended=False)
+        histo_channels = histogram_to_histo_channels(histo)
+        image_histo_channels = sorted_channels_to_histo_channels(actual_channels, color_bits=color_bits)
+        return [
+            self.l1_loss(histo_chan, image_histo_channels[i]) for i, histo_chan in enumerate(histo_channels)
+        ]
 
 class HistogramDistance(fl.Chain):
     def __init__(
@@ -39,9 +130,13 @@ class HistogramExtractor(fl.Chain):
         batch_size = x.shape[0]
         num_pixels = x.shape[1] * x.shape[2]
         histograms: List[Tensor] = []
+        device = x.device
+        # x is a [0, 1] normalized image
+        x = x * (self.color_size - 1)
+
         for i in range(batch_size):
             hist_dd = histogramdd(
-                x[i],
+                x[i].cpu(),
                 bins=2**self.color_bits,
                 range=[
                     0,
@@ -55,15 +150,10 @@ class HistogramExtractor(fl.Chain):
             hist = hist_dd.hist / num_pixels
             histograms.append(hist)
 
-        return stack(histograms)
+        return stack(histograms).to(device)
     
-    def images_to_histograms(self, images: List[Image.Image]) -> Tensor:
-        tensors = []
-        for image in images:
-            tensor = image_to_tensor(image, device=self.device, dtype=self.dtype) * (self.color_size - 1)
-            tensors.append(tensor)
-        images_tensor = cat(tensors, dim=0)
-        return self(images_tensor)
+    def images_to_histograms(self, images: List[Image.Image], device: Device | None = None, dtype : DType | None = None) -> Tensor:
+        return self(images_to_tensor(images, device=device, dtype = dtype))
 
 
 class Patch3dEncoder(fl.Chain):
@@ -295,6 +385,27 @@ class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 
+
+class HistogramProjection(fl.Chain):
+    def __init__(
+        self,
+        in_features: int = 64,
+        embedding_dim: int = 768,
+        num_tokens: int = 4,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(
+            fl.Linear(
+                in_features=in_features,
+                out_features=embedding_dim * num_tokens,
+                device=device,
+                dtype=dtype,
+            ),
+            fl.Reshape(num_tokens, embedding_dim),
+            fl.LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
+        )
+
 class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
     # Prevent PyTorch module registration
     _histogram_encoder: list[HistogramEncoder]
@@ -302,7 +413,7 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
     def __init__(
         self,
         target: TSDNet,
-        histogram_encoder: HistogramEncoder,
+        embedding_dim: int = 768,
         scale: float = 1.0,
         device: Device | str | None = None,
         dtype: DType | None = None,
@@ -310,10 +421,8 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
         with self.setup_adapter(target):
             super().__init__(target)
 
-        self._histogram_encoder = [histogram_encoder]
-
         self.sub_adapters: list[CrossAttentionAdapter] = [
-            HistogramCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=histogram_encoder.embedding_dim)
+            HistogramCrossAttentionAdapter(target=cross_attn, scale=scale, embedding_dim=embedding_dim)
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
 
@@ -345,7 +454,3 @@ class SD1HistogramAdapter(fl.Chain, Adapter[TSDNet]):
 
     def set_histogram_embedding(self, histogram_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"histogram_embedding": histogram_embedding})
-
-    @property
-    def histogram_encoder(self) -> HistogramEncoder:
-        return self._histogram_encoder[0]
