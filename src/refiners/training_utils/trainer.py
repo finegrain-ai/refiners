@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
+import torch
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack
+from torch import Tensor, cuda, device as Device, dtype as DType, get_rng_state, set_rng_state, stack
 from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
@@ -298,9 +299,16 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def device(self) -> Device:
-        selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
+        selected_device = Device(self.config.training.device)
         logger.info(f"Using device: {selected_device}")
         return selected_device
+
+    @cached_property
+    def dtype(self) -> DType:
+        dtype = getattr(torch, self.config.training.dtype, None)
+        assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
+        logger.info(f"Using dtype: {dtype}")
+        return dtype
 
     @property
     def parameters(self) -> list[Parameter]:

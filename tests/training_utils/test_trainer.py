@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 from typing import cast
-from warnings import warn
 
 import pytest
 import torch
@@ -76,12 +75,8 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
 
 
 @pytest.fixture
-def mock_config(test_device: torch.device) -> MockConfig:
-    if not test_device.type == "cuda":
-        warn("only running on CUDA, skipping")
-        pytest.skip("Skipping test because test_device is not CUDA")
+def mock_config() -> MockConfig:
     config = MockConfig.load_from_toml(Path(__file__).parent / "mock_config.toml")
-    config.training.gpu_index = test_device.index
     return config
 
 
