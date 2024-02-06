@@ -1624,7 +1624,7 @@ def test_sdxl_random_init(
 
 
 @no_grad()
-def test_sdxl_random_init_sag(
+def test_diffusion_sdxl_random_init_sag(
     sdxl_ddim: StableDiffusion_XL, expected_sdxl_ddim_random_init_sag: Image.Image, test_device: torch.device
 ) -> None:
     sdxl = sdxl_ddim
