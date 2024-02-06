@@ -14,6 +14,16 @@ dependencies = [
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
+classifiers = [
+  "Typing :: Typed",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "License :: OSI Approved :: MIT License"
+]
 
 [project.optional-dependencies]
 training = [
