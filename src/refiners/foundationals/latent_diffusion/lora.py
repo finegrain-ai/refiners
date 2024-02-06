@@ -1,3 +1,4 @@
+from typing import Any
 from warnings import warn
 
 from torch import Tensor
@@ -106,7 +107,7 @@ class SDLoraManager:
         for name, lora_tensors in tensors.items():
             self.add_loras(name, tensors=lora_tensors, scale=scale[name] if scale else 1.0)
 
-    def add_loras_to_text_encoder(self, loras: dict[str, Lora], /) -> None:
+    def add_loras_to_text_encoder(self, loras: dict[str, Lora[Any]], /) -> None:
         """Add multiple LoRAs to the text encoder.
 
         Args:
@@ -116,7 +117,7 @@ class SDLoraManager:
         text_encoder_loras = {key: loras[key] for key in loras.keys() if "text" in key}
         SDLoraManager.auto_attach(text_encoder_loras, self.clip_text_encoder)
 
-    def add_loras_to_unet(self, loras: dict[str, Lora], /) -> None:
+    def add_loras_to_unet(self, loras: dict[str, Lora[Any]], /) -> None:
         """Add multiple LoRAs to the U-Net.
 
         Args:
@@ -147,7 +148,7 @@ class SDLoraManager:
         for lora_adapter in self.lora_adapters:
             lora_adapter.eject()
 
-    def get_loras_by_name(self, name: str, /) -> list[Lora]:
+    def get_loras_by_name(self, name: str, /) -> list[Lora[Any]]:
         """Get the LoRA layers with the given name.
 
         Args:
@@ -190,9 +191,9 @@ class SDLoraManager:
                 lora.scale = scale
 
     @property
-    def loras(self) -> list[Lora]:
+    def loras(self) -> list[Lora[Any]]:
         """List of all the LoRA layers managed by the SDLoraManager."""
-        return list(self.unet.layers(Lora)) + list(self.clip_text_encoder.layers(Lora))
+        return list(self.unet.layers(Lora[Any])) + list(self.clip_text_encoder.layers(Lora[Any]))
 
     @property
     def names(self) -> list[str]:
@@ -239,12 +240,12 @@ class SDLoraManager:
 
     @staticmethod
     def auto_attach(
-        loras: dict[str, Lora],
+        loras: dict[str, Lora[Any]],
         target: fl.Chain,
         /,
         exclude: list[str] | None = None,
     ) -> None:
-        failed_loras: dict[str, Lora] = {}
+        failed_loras: dict[str, Lora[Any]] = {}
         for key, lora in loras.items():
             if attach := lora.auto_attach(target, exclude=exclude):
                 adapter, parent = attach
