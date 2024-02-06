@@ -4,7 +4,8 @@ train = true
 [training]
 duration = "100:epoch"
 seed = 0
-gpu_index = 0
+device = "cpu"
+dtype = "float32"
 batch_size = 4
 gradient_accumulation = "4:step"
 clip_grad_norm = 1.0

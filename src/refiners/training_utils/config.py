@@ -50,9 +50,10 @@ def parse_number_unit_field(value: str | int | dict[str, str | int]) -> TimeValu
 
 
 class TrainingConfig(BaseModel):
+    device: str = "cpu"
+    dtype: str = "float32"
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
-    gpu_index: int = 0
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
     clip_grad_norm: float | None = None
