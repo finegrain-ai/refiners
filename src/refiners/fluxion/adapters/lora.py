@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, Iterator, TypeVar, cast
 
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn import Parameter as TorchParameter
@@ -386,19 +386,24 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
             super().__init__(target, *loras)
 
     @property
+    def lora_layers(self) -> Iterator[Lora[Any]]:
+        """The LoRA layers."""
+        return cast(Iterator[Lora[Any]], self.layers(Lora))
+
+    @property
     def names(self) -> list[str]:
         """The names of the LoRA layers."""
-        return [lora.name for lora in self.layers(Lora[Any])]
+        return [lora.name for lora in self.lora_layers]
 
     @property
     def loras(self) -> dict[str, Lora[Any]]:
         """The LoRA layers indexed by name."""
-        return {lora.name: lora for lora in self.layers(Lora[Any])}
+        return {lora.name: lora for lora in self.lora_layers}
 
     @property
     def scales(self) -> dict[str, float]:
         """The scales of the LoRA layers indexed by names."""
-        return {lora.name: lora.scale for lora in self.layers(Lora[Any])}
+        return {lora.name: lora.scale for lora in self.lora_layers}
 
     @scales.setter
     def scale(self, values: dict[str, float]) -> None:
