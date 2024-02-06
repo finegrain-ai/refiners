@@ -5,12 +5,11 @@ from refiners.fluxion.utils import load_from_safetensors
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, randn, tensor, cat
+from torch import Tensor, randn
 import numpy as np
-from refiners.fluxion.utils import image_to_tensor
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter
+from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter, ColorPaletteExtractor
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
@@ -129,14 +128,18 @@ class ColorPaletteLatentDiffusionTrainer(
             "lda": self.lda,
             "color_palette_encoder": self.color_palette_encoder,
         }
-
+        
+    def color_palette_extractor(self) -> ColorPaletteExtractor:
+        return ColorPaletteExtractor(
+            size=self.config.color_palette.max_colors
+        )
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
         
         texts = [item.text for item in batch]
         text_embeddings = self.text_encoder(texts)
         
         latents = self.lda.encode_images([item.image for item in batch])
-        color_palettes = [item.color_palette for item in batch]
+        color_palettes = [self.color_palette_extractor(item.image) for item in batch]
         
         color_palette_embeddings = self.color_palette_encoder(
             color_palettes
@@ -152,11 +155,6 @@ class ColorPaletteLatentDiffusionTrainer(
 
         prediction = self.unet(noisy_latents)
         loss = self.mse_loss(prediction, noise)
-        
-        predicted_latents = self.ddpm_solver.remove_noise(x=noisy_latents, noise=prediction, step=self.current_step)
-        predicted_image = self.lda.decode(x=predicted_latents)
-        images_tensor = x = (x + 1) / 2
-        
         
         return loss
 

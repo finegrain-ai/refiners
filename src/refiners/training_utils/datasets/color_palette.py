@@ -1,14 +1,12 @@
 import random
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
-from pydantic import BaseModel
-from torch import Tensor, tensor, empty
 from PIL import Image
 from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsBaseDataset
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
-from loguru import logger
+from refiners.fluxion.adapters.color_palette import ColorPalette
 
 @dataclass
 class ColorPaletteDatasetItem:
@@ -46,7 +44,7 @@ class SamplingByPalette:
     palette_7: float= 0.0
     palette_8: float= 0.0
     
-    def __init__(self, sampling = DEFAULT_SAMPLING) -> None:
+    def __init__(self, sampling: dict[str, float] = DEFAULT_SAMPLING) -> None:
         for key in sampling:
             self.__setattr__(key, sampling[key])
 
@@ -69,7 +67,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         item : DatasetItem = self.hf_dataset[index]
 
         resized_image = self.resize_image(
-            image=item["image"],
+            image=item.image,
             min_size=self.config.resize_image_min_size,
             max_size=self.config.resize_image_max_size,
         )
@@ -77,7 +75,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         image = self.process_image(resized_image)
         
         caption_key = self.config.caption_key
-        caption = item[caption_key]
+        caption = getattr(item, caption_key)
         (caption_processed, conditional_flag) = self.process_caption(caption)   
         
         return [
@@ -88,9 +86,9 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
                 conditional_flag=conditional_flag
             )
         ]
-        
-    def process_color_palette(self, item: DatasetItem) -> ColorPalette:
-        choices = range(1, 9)
+    
+    def random_palette_size(self) -> int:
+        choices = range(1, 9)        
         weights_list : List[float] = []
         for i in choices:
             if hasattr(self.sampling_by_palette, f"palette_{i}"):
@@ -101,9 +99,17 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
-        palette: ColorPalette = item[f"palettes"][str(palette_index)]
-        
+        return palette_index
+    
+    def process_color_palette(self, item: DatasetItem) -> ColorPalette:
+        palette: ColorPalette = item.palettes[str(self.random_palette_size())]
         return palette
+
+    def extract_color_palette(self, item: DatasetItem) -> ColorPalette:
+        
+        palette: ColorPalette = item.palettes[str(self.random_palette_size())]
+        return palette 
+       
     def get_color_palette(self, index: int) -> ColorPalette:
         item = self.hf_dataset[index]
         return self.process_color_palette(item)

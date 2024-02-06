@@ -1,9 +1,8 @@
-from typing import Any, List, TypeVar, Tuple
-from tests.foundationals.segment_anything.utils import NDArray
+from typing import Any, List, TypeVar
 
 from torch import cat, ones
-from jaxtyping import Float, Int
-from torch import Tensor, device as Device, dtype as DType, tensor, zeros
+from jaxtyping import Float
+from torch import Tensor, device as Device, dtype as DType, tensor, zeros, float32
 from torch.nn import init, Parameter
 from torch.nn.functional import pad
 
@@ -17,6 +16,13 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
+
+Color = tuple[int, int, int]
+ColorWeight = int
+
+ColorPaletteCluster = tuple[Color, ColorWeight]
+
+ColorPalette = list[ColorPaletteCluster]
 
 class PalettesTokenizer(fl.Module):
     _lda: list[SD1Autoencoder]
@@ -37,24 +43,30 @@ class PalettesTokenizer(fl.Module):
         super().__init__()
         self.max_colors = max_colors
     
-    def forward(self, palettes: List[List[List[float]]]) -> Float[Tensor, "*batch max_colors 4"]:
+    def forward(self, palettes: List[ColorPalette]) -> Float[Tensor, "*batch max_colors 5"]:
         tensors = [self._forward(palette) for palette in palettes]
         return cat(tensors, dim=0)
 
-    def _forward(self, palette: List[List[float]]) -> Float[Tensor, "*batch max_colors 4"]:
-        if len(palette) == 0:
-            tensor_palette = zeros(1, 0, 3)
-        else:
-            tensor_palette = tensor([palette])
+    def _forward(self, palette: ColorPalette) -> Float[Tensor, "*batch max_colors 5"]:
         
+        if len(palette) == 0:
+            tensor_source = zeros(1, 0, 4)
+        else:
+            tensor_source = tensor([[[cluster[0][0], cluster[0][1], cluster[0][2], cluster[1]] for cluster in palette]], dtype=float32)
+        
+        tensor_weight = tensor_source[:, :, 3:4]
+        tensor_colors = tensor_source[:, :, :3]
+
         if self.use_lda:
-            tensor_palette = self.lda_encode(tensor_palette)
+            tensor_colors = self.lda_encode(tensor_colors)
+
+        tensor_palette = cat((tensor_colors, tensor_weight), dim=2)
         
         colors = self.add_channel(tensor_palette)
         colors = self.zero_right_padding(colors)
         return colors
 
-    def add_channel(self, x: Float[Tensor, "*batch colors 4"]) -> Float[Tensor, "*batch colors_with_end 5"]:
+    def add_channel(self, x: Float[Tensor, "*batch colors 5"]) -> Float[Tensor, "*batch colors_with_end 6"]:
         return cat((x, ones(x.shape[0], x.shape[1], 1)), dim=2)
 
     def zero_right_padding(
@@ -92,7 +104,7 @@ class ColorEncoder(fl.Chain):
         eps: float = 1e-5,
         dtype: DType | None = None,
     ) -> None:
-        in_features = 5 if use_lda else 4
+        in_features = 6 if use_lda else 5
         super().__init__(
             fl.Linear(in_features=in_features, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=eps, device=device, dtype=dtype),
@@ -173,36 +185,32 @@ class ColorPaletteMLPEncoder(fl.Chain):
         )
 
 
-Color = Tuple[int, int, int]
-ColorWeight = int
 
-ColorPaletteCluster = Tuple[Color, ColorWeight]
 
-ColorPalette = List[ColorPaletteCluster]
-
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans # type: ignore
 import numpy as np
 from PIL import Image
-import time
 class ColorPaletteExtractor:
     def __init__(
         self,
         size: int = 8,
-        color_space = 'rgb'
     ) -> None:
         self.size = size
-        self.color_space = color_space
 
     def __call__(self, image: Image.Image) -> ColorPalette:
         image_np = np.array(image)
         pixels = image_np.reshape(-1, 3)
-        kmeans = KMeans(n_clusters=self.size).fit(pixels)       
-        counts = np.unique(kmeans.labels_, return_counts=True)[1]
-        palette = [
-            (
-                list(map(int, kmeans.cluster_centers_[i].tolist())),
-                counts[i].item()
-            ) for i in range(0, self.size)]
+        kmeans = KMeans(n_clusters=self.size).fit(pixels) # type: ignore 
+        counts = np.unique(kmeans.labels_, return_counts=True)[1] # type: ignore
+        palette : ColorPalette = []
+        for i in range(0, self.size):
+            center_float : tuple[float, float, float] = kmeans.cluster_centers_[i] # type: ignore
+            center : Color = tuple(center_float.astype(int)) # type: ignore
+            color_cluster: ColorPaletteCluster = (
+                center,
+                int(counts[i].item()) # type: ignore
+            )
+            palette.append(color_cluster)
         return palette
 
 class ColorPaletteEncoder(fl.Chain):
@@ -256,20 +264,20 @@ class ColorPaletteEncoder(fl.Chain):
                 use_lda=use_lda,
             ),
             fl.Converter(),
-            fl.Sum(
-                    ColorEncoder(
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        use_lda=use_lda,
-                        dtype=dtype,
-                    ),
-                    PositionalEncoder(
-                        max_sequence_length=max_colors,
-                        embedding_dim=embedding_dim,
-                        device=device,
-                        dtype=dtype,
-                    ),
+            # fl.Sum(
+            ColorEncoder(
+                embedding_dim=embedding_dim,
+                device=device,
+                use_lda=use_lda,
+                dtype=dtype,
             ),
+            #         PositionalEncoder(
+            #             max_sequence_length=max_colors,
+            #             embedding_dim=embedding_dim,
+            #             device=device,
+            #             dtype=dtype,
+            #         ),
+            # ),
             encoder_body,
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
@@ -414,7 +422,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
             print('weights', weights.keys())
 
             for i, cross_attn in enumerate(self.sub_adapters):
-                cross_attention_weights: list[Tensor] = []
+                # cross_attention_weights: list[Tensor] = []
                 
                 ## Tmp code
                 index = i*2
@@ -436,7 +444,7 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
     def weights(self) -> List[Tensor]:
         weights: List[Tensor] = []
         for adapter in self.sub_adapters:
-            weights.append(adapter.weights)
+            weights.extend(adapter.weights)
         return weights
 
     def zero_init(self) -> None:
