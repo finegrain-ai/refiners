@@ -3,7 +3,7 @@ import re
 import sys
 import traceback
 from collections import defaultdict
-from typing import Any, Callable, Iterable, Iterator, Sequence, TypeVar, cast, overload
+from typing import Any, Callable, Iterable, Iterator, Sequence, TypeVar, cast, get_origin, overload
 
 import torch
 from torch import Tensor, cat, device as Device, dtype as DType
@@ -349,6 +349,10 @@ class Chain(ContextModule):
         Yields:
             Each module that matches the predicate.
         """
+
+        if get_origin(predicate) is not None:
+            raise ValueError(f"subscripted generics cannot be used as predicates")
+
         if isinstance(predicate, type):
             # if the predicate is a Module type
             # build a predicate function that matches the type

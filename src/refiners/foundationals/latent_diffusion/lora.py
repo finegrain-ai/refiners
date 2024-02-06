@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Iterator, cast
 from warnings import warn
 
 from torch import Tensor
@@ -193,7 +193,9 @@ class SDLoraManager:
     @property
     def loras(self) -> list[Lora[Any]]:
         """List of all the LoRA layers managed by the SDLoraManager."""
-        return list(self.unet.layers(Lora[Any])) + list(self.clip_text_encoder.layers(Lora[Any]))
+        unet_layers = cast(Iterator[Lora[Any]], self.unet.layers(Lora))
+        text_encoder_layers = cast(Iterator[Lora[Any]], self.clip_text_encoder.layers(Lora))
+        return [*unet_layers, *text_encoder_layers]
 
     @property
     def names(self) -> list[str]:
