@@ -1,10 +1,11 @@
 from functools import cached_property
 from typing import Any, List, TypedDict
-from refiners.fluxion.utils import load_from_safetensors
+from refiners.fluxion.utils import load_from_safetensors, tensor_to_images
 
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
+from src.refiners.training_utils.trainers.histogram import HistogramLatentDiffusionTrainer
 from torch import Tensor, randn
 import numpy as np
 
@@ -18,7 +19,7 @@ from refiners.foundationals.latent_diffusion import (
 )
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
-from refiners.training_utils.metrics.color_palette import ImageAndPalette, batch_image_palette_metrics
+from refiners.training_utils.metrics.color_palette import BatchHistogramPrompt, ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
@@ -61,9 +62,9 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     test_color_palette: TestColorPaletteConfig
 
-class ColorPaletteLatentDiffusionTrainer(
-    LatentDiffusionBaseTrainer[ColorPaletteLatentDiffusionConfig, TextEmbeddingColorPaletteLatentsBatch]
-):
+
+
+class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
@@ -111,15 +112,6 @@ class ColorPaletteLatentDiffusionTrainer(
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
         self.callbacks.extend((LoadColorPalette(), SaveColorPalette(), GradientNormLayerLogging()))
-
-    def load_dataset(self) -> ColorPaletteDataset:
-        return ColorPaletteDataset(
-            config=self.config.dataset
-		)
-    
-    @cached_property
-    def dataset(self) -> ColorPaletteDataset:  # type: ignore
-        return self.load_dataset() 
     
     def load_models(self) -> dict[str, fl.Module]:
         return {
@@ -128,11 +120,13 @@ class ColorPaletteLatentDiffusionTrainer(
             "lda": self.lda,
             "color_palette_encoder": self.color_palette_encoder,
         }
-        
+    
+    @cached_property
     def color_palette_extractor(self) -> ColorPaletteExtractor:
         return ColorPaletteExtractor(
             size=self.config.color_palette.max_colors
         )
+        
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
         
         texts = [item.text for item in batch]
@@ -157,64 +151,40 @@ class ColorPaletteLatentDiffusionTrainer(
         loss = self.mse_loss(prediction, noise)
         
         return loss
-
-    @cached_property
-    def sd(self) -> StableDiffusion_1:
-        scheduler = DPMSolver(
-            device=self.device, num_inference_steps=self.config.test_color_palette.num_inference_steps, dtype=self.dtype
-        )
-
-        self.sharding_manager.add_device_hooks(scheduler, scheduler.device)
-
-        return StableDiffusion_1(unet=self.unet, lda=self.lda, clip_text_encoder=self.text_encoder, scheduler=scheduler)
     
-    @scoped_seed(42)
-    def compute_deterministic_prompt_evaluation(
-        self, prompt: ColorPalettePromptConfig, num_images_per_prompt: int, img_size: int = 512
-    ) -> ImageAndPalette:
-        return self.compute_prompt_evaluation(prompt, num_images_per_prompt, img_size=img_size)
-        
-    def compute_prompt_evaluation(
-        self, 
-        prompt: ColorPalettePromptConfig, 
-        num_images_per_prompt: int, 
-        img_size: int = 512,
-        cfg_clip_text_embedding: Tensor | None = None
-    ) -> ImageAndPalette:
-        sd = self.sd
-        palette_img_size = img_size // self.config.color_palette.max_colors
-        canvas_image: Image.Image = Image.new(
-            mode="RGB", size=(img_size * num_images_per_prompt, img_size + palette_img_size)
+    def set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
+        self.color_palette_adapter.set_color_palette_embedding(
+            self.color_palette_encoder.compute_color_palette_embedding(
+                batch.color_palette
+            )
         )
-        for i in range(num_images_per_prompt):
-            logger.info(
-                f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt.text} and palette {prompt.color_palette}"
-            )
-            x = randn(1, 4, 64, 64, dtype=self.dtype, device=self.device)
+    
+    def draw_palette(self, palette: ColorPalette, width: int, height: int) -> Image.Image:
+        palette_img = Image.new(mode="RGB", size=(width, height))
+        for i, (color, _) in enumerate(palette):
+            palette_img.paste(color, box=(i*height, 0))
+        return palette_img
+    
+    def draw_cover_image(self, batch: BatchHistogramResults) -> Image.Image:
+        (batch_size, channels, height, width) = batch.images.shape
+        
+        palette_img_size = width // self.config.color_palette.max_colors
+        source_images = batch.source_images
+
+        join_canvas_image: Image.Image = Image.new(
+            mode="RGB", size=(2*width, (height+palette_img_size) * batch_size)
+        )
+        images = tensor_to_images(batch.images)
+        for i, image in enumerate(images):
+            join_canvas_image.paste(source_images[i], box=(0, i*(height+palette_img_size)))
+            join_canvas_image.paste(image, box=(width, i*(height+palette_img_size)))
+            palette_out = self.palette_extractor(image)
+            palette_out_img = self.draw_palette(palette_out, width, palette_img_size)
+            palette_in_img = self.draw_palette(batch.palettes[i], width, palette_img_size)
             
-            if cfg_clip_text_embedding is None:
-                cfg_clip_text_embedding = sd.compute_clip_text_embedding(text=prompt.text).to(device=self.device)
-            
-            
-            cfg_color_palette_embedding = self.color_palette_encoder.compute_color_palette_embedding(
-                prompt.color_palette
-            )
-
-            self.color_palette_adapter.set_color_palette_embedding(cfg_color_palette_embedding)
-
-            for step in sd.steps:
-                x = sd(
-                    x,
-                    step=step,
-                    clip_text_embedding=cfg_clip_text_embedding,
-                )
-            canvas_image.paste(sd.lda.decode_latents(x=x), box=(img_size * i, 0))
-            for index, palette in enumerate(prompt.color_palette):
-                color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), palette, dtype=np.uint8))  # type: ignore
-                canvas_image.paste(color_box, box=(img_size * i + palette_img_size * index, img_size))
-
-        return ImageAndPalette(image=canvas_image, palette=prompt.color_palette)
-
+            join_canvas_image.paste(palette_in_img, box=(0, i*(height+palette_img_size) + height))
+            join_canvas_image.paste(palette_out_img, box=(width, i*(height+palette_img_size) + height))
+        return join_canvas_image
     def compute_edge_case_evaluation(
         self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int
     ) -> List[ImageAndPalette]:

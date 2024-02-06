@@ -237,6 +237,21 @@ class HistogramLatentDiffusionTrainer(
     def unconditionnal_text_embedding(self) -> Tensor:
         return self.text_encoder([""])
     
+    def eval_set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
+        cfg_histogram_embedding = self.histogram_auto_encoder.compute_histogram_embedding(
+            batch.source_histograms[0:1],
+        )
+        cfg_histogram_embedding2 = self.histogram_projection(cfg_histogram_embedding)
+        self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding2)
+              
+        # TO FIX: batch eval not working here
+        
+        # uncode = self.unconditionnal_text_embedding
+        # unconditionnal_text_emb = uncode.repeat(batch_size, 1, 1)
+        # cfg_clip_text_embedding = cat([batch.text_embeddings, unconditionnal_text_emb], dim=0)
+        #unconditionnal_histo_embedding = self.histogram_auto_encoder.unconditionnal_embedding_like(batch.source_histogram_embeddings)
+        #cfg_histogram_embedding = cat([batch.source_histogram_embeddings, unconditionnal_histo_embedding], dim=0)
+
     @scoped_seed(5)
     def compute_batch_evaluation(self, batch: BatchHistogramPrompt, same_seed: bool = True) -> BatchHistogramResults:
         batch_size = len(batch.source_prompts)
@@ -248,21 +263,8 @@ class HistogramLatentDiffusionTrainer(
             x = x.repeat(batch_size, 1, 1, 1)
         else: 
             x = randn(batch_size, 4, 64, 64, dtype=self.dtype, device=self.device)
-        
-        # TO FIX: batch eval not working here
-        
-        # uncode = self.unconditionnal_text_embedding
-        # unconditionnal_text_emb = uncode.repeat(batch_size, 1, 1)
-        # cfg_clip_text_embedding = cat([batch.text_embeddings, unconditionnal_text_emb], dim=0)
-        #unconditionnal_histo_embedding = self.histogram_auto_encoder.unconditionnal_embedding_like(batch.source_histogram_embeddings)
-        #cfg_histogram_embedding = cat([batch.source_histogram_embeddings, unconditionnal_histo_embedding], dim=0)
-        
-        
-        cfg_histogram_embedding = self.histogram_auto_encoder.compute_histogram_embedding(
-            batch.source_histograms[0:1],
-        )
-        cfg_histogram_embedding2 = self.histogram_projection(cfg_histogram_embedding)
-        self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding2)
+
+        self.eval_set_adapter_values(batch)
         
         clip_text_embedding = self.sd.compute_clip_text_embedding(text=batch.source_prompts[0])
 
