@@ -13,8 +13,6 @@ __all__ = [
     "GradientNormClipping",
     "GradientValueClipping",
     "ClockCallback",
-    "GradientNormLogging",
-    "MonitorLoss",
 ]
 
 
@@ -153,31 +151,6 @@ class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
         logger.info("Evaluation ended.")
 
 
-class MonitorLoss(Callback["Trainer[BaseConfig, Any]"]):
-    def on_train_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.epoch_losses: list[float] = []
-        self.iteration_losses: list[float] = []
-
-    def on_compute_loss_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        loss_value = trainer.loss.detach().cpu().item()
-        self.epoch_losses.append(loss_value)
-        self.iteration_losses.append(loss_value)
-        trainer.log(data={"step_loss": loss_value})
-
-    def on_optimizer_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
-        trainer.log(data={"average_iteration_loss": avg_iteration_loss})
-        self.iteration_losses = []
-
-    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
-        trainer.log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
-        self.epoch_losses = []
-
-    def on_lr_scheduler_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
-
-
 class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         clip_norm = trainer.config.training.clip_grad_norm
@@ -192,8 +165,3 @@ class GradientValueClipping(Callback["Trainer[BaseConfig, Any]"]):
         clip_value = trainer.config.training.clip_grad_value
         if clip_value is not None:
             clip_gradient_value(parameters=trainer.learnable_parameters, clip_value=clip_value)
-
-
-class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
-    def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.log(data={"total_grad_norm": trainer.total_gradient_norm})

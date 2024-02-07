@@ -24,10 +24,3 @@ warmup = "20:step"
 
 [dropout]
 dropout = 0.0
-
-[checkpointing]
-save_interval = "10:epoch"
-
-[wandb]
-mode = "disabled"
-project = "mock_project"

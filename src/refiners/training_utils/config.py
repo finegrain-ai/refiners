@@ -196,37 +196,15 @@ class DropoutConfig(BaseModel):
                 apply_dropout(module=model, probability=self.dropout_probability)
 
 
-class WandbConfig(BaseModel):
-    mode: Literal["online", "offline", "disabled"] = "online"
-    project: str
-    entity: str = "finegrain"
-    name: str | None = None
-    tags: list[str] = []
-    group: str | None = None
-    job_type: str | None = None
-    notes: str | None = None
-
-
-class CheckpointingConfig(BaseModel):
-    save_folder: Path | None = None
-    save_interval: TimeValue = {"number": 1, "unit": TimeUnit.EPOCH}
-
-    @validator("save_interval", pre=True)
-    def parse_field(cls, value: Any) -> TimeValue:
-        return parse_number_unit_field(value)
-
-
 T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
     models: dict[str, ModelConfig]
-    wandb: WandbConfig
     training: TrainingConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     dropout: DropoutConfig
-    checkpointing: CheckpointingConfig
 
     @classmethod
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:

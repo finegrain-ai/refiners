@@ -119,7 +119,6 @@ def training_clock() -> TrainingClock:
         gradient_accumulation={"number": 1, "unit": TimeUnit.EPOCH},
         evaluation_interval={"number": 1, "unit": TimeUnit.EPOCH},
         lr_scheduler_interval={"number": 1, "unit": TimeUnit.EPOCH},
-        checkpointing_save_interval={"number": 1, "unit": TimeUnit.EPOCH},
     )
 
 
@@ -153,10 +152,8 @@ def test_timer_functionality(training_clock: TrainingClock) -> None:
 def test_state_based_properties(training_clock: TrainingClock) -> None:
     training_clock.step = 5  # Halfway through the first epoch
     assert not training_clock.is_evaluation_step  # Assuming evaluation every epoch
-    assert not training_clock.is_checkpointing_step
     training_clock.step = 10  # End of the first epoch
     assert training_clock.is_evaluation_step
-    assert training_clock.is_checkpointing_step
 
 
 def test_mock_trainer_initialization(mock_config: MockConfig, mock_trainer: MockTrainer) -> None:
