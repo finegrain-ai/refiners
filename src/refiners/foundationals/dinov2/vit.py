@@ -227,9 +227,10 @@ class Registers(fl.Concatenate):
 
 
 class ViT(fl.Chain):
-    """Vision Transformer (ViT).
+    """Vision Transformer (ViT) model.
 
-    see https://arxiv.org/abs/2010.11929v2
+    See [[arXiv:2010.11929] An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](https://arxiv.org/abs/2010.11929)
+    for more details.
     """
 
     def __init__(
@@ -245,6 +246,20 @@ class ViT(fl.Chain):
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
+        """Initialize a Vision Transformer (ViT) model.
+
+        Args:
+            embedding_dim: The dimension of the embedding.
+            patch_size: The size of the patches.
+            image_size: The size of the input image.
+            num_layers: The number of layers.
+            num_heads: The number of heads.
+            norm_eps: The epsilon value for normalization.
+            mlp_ratio: The ratio for the multi-layer perceptron (MLP).
+            num_registers: The number of registers.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         num_patches = image_size // patch_size
         self.embedding_dim = embedding_dim
         self.patch_size = patch_size

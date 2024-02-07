@@ -100,3 +100,24 @@ def test_double_text_encoder(diffusers_sdxl: DiffusersSDXL, double_text_encoder:
 
     assert torch.allclose(input=negative_double_embedding, other=negative_prompt_embeds, rtol=1e-3, atol=1e-3)
     assert torch.allclose(input=negative_pooled_embedding, other=negative_pooled_prompt_embeds, rtol=1e-3, atol=1e-3)
+
+
+@no_grad()
+def test_double_text_encoder_batch2(diffusers_sdxl: DiffusersSDXL, double_text_encoder: DoubleTextEncoder) -> None:
+    manual_seed(seed=0)
+    prompt1 = "A photo of a pizza."
+    prompt2 = "A giant duck."
+
+    double_embedding_b2, pooled_embedding_b2 = double_text_encoder([prompt1, prompt2])
+
+    assert double_embedding_b2.shape == torch.Size([2, 77, 2048])
+    assert pooled_embedding_b2.shape == torch.Size([2, 1280])
+
+    double_embedding_1, pooled_embedding_1 = double_text_encoder(prompt1)
+    double_embedding_2, pooled_embedding_2 = double_text_encoder(prompt2)
+
+    assert torch.allclose(input=double_embedding_1, other=double_embedding_b2[0:1], rtol=1e-3, atol=1e-3)
+    assert torch.allclose(input=pooled_embedding_1, other=pooled_embedding_b2[0:1], rtol=1e-3, atol=1e-3)
+
+    assert torch.allclose(input=double_embedding_2, other=double_embedding_b2[1:2], rtol=1e-3, atol=1e-3)
+    assert torch.allclose(input=pooled_embedding_2, other=pooled_embedding_b2[1:2], rtol=1e-3, atol=1e-3)

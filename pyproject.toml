@@ -1,6 +1,6 @@
 [project]
 name = "refiners"
-version = "0.2.0"
+version = "0.3.0"
 description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
@@ -10,7 +10,7 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
-    "scikit-learn[training]>=1.4.0",
+    "ruff>=0.2.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -24,10 +24,11 @@ training = [
     "loguru>=0.7.2",
     "wandb>=0.16.0",
     "datasets>=2.15.0",
-    "tomli>=2.0.1"
+    "tomli>=2.0.1",
+    "scikit-learn[training]>=1.4.0"
 ]
 test = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
     "invisible-watermark>=0.2.0",
@@ -37,11 +38,18 @@ test = [
     "segment-anything-py>=1.0",
 ]
 conversion = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
     "requests>=2.26.0",
     "tqdm>=4.62.3",
+]
+doc = [
+    # required by mkdocs to format the signatures
+    "black>=24.1.1",
+    "mkdocs-material>=9.5.6",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-literate-nav>=0.6.1",
 ]
 
 [build-system]
@@ -57,9 +65,6 @@ dev-dependencies = [
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
-    "mkdocs-material>=9.5.6",
-    "mkdocstrings[python]>=0.24.0",
-    "mkdocs-literate-nav>=0.6.1",
 ]
 
 
@@ -83,6 +88,9 @@ line-length = 120
 
 [tool.ruff]
 src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
+line-length = 120
+
+[tool.ruff.lint]
 select = [
     "I", # isort
 ]
@@ -90,7 +98,6 @@ ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
     "E731", # do-not-assign-lambda
 ]
-line-length = 120
 
 [tool.ruff.lint.isort]
 # Allow this kind of import on a single line:

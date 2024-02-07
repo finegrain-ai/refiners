@@ -7,6 +7,8 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 
 
 class SDXLIPAdapter(IPAdapter[SDXLUNet]):
+    """Image Prompt adapter for the Stable Diffusion XL U-Net model."""
+
     def __init__(
         self,
         target: SDXLUNet,
@@ -16,6 +18,16 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
         fine_grained: bool = False,
         weights: dict[str, Tensor] | None = None,
     ) -> None:
+        """Initialize the adapter.
+
+        Args:
+            target: The SDXLUNet model to adapt.
+            clip_image_encoder: The CLIP image encoder to use.
+            image_proj: The image projection to use.
+            scale: The scale to use for the image prompt.
+            fine_grained: Whether to use fine-grained image prompt.
+            weights: The weights of the IPAdapter.
+        """
         clip_image_encoder = clip_image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
         if image_proj is None:

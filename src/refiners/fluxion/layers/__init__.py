@@ -1,5 +1,19 @@
-from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
-from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d, SelfAttention3d
+from refiners.fluxion.layers.activations import (
+    GLU,
+    Activation,
+    GeLU,
+    GeLUApproximation,
+    ReLU,
+    Sigmoid,
+    SiLU,
+)
+from refiners.fluxion.layers.attentions import (
+    Attention,
+    ScaledDotProductAttention,
+    SelfAttention,
+    SelfAttention2d,
+    SelfAttention3d
+)
 from refiners.fluxion.layers.basics import (
     Cos,
     Flatten,
@@ -49,13 +63,15 @@ __all__ = [
     "GroupNorm",
     "LayerNorm2d",
     "InstanceNorm2d",
+    "Activation",
     "GeLU",
+    "GeLUApproximation",
     "GLU",
     "SiLU",
     "ReLU",
-    "ApproximateGeLU",
     "Sigmoid",
     "Attention",
+    "ScaledDotProductAttention",
     "SelfAttention",
     "SelfAttention2d",
     "SelfAttention3d",

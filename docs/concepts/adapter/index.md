@@ -8,7 +8,7 @@ Adapters are the final and most high-level abstraction in Refiners. They are the
 
 An Adapter is [generally](#higher-level-adapters) a Chain that replaces a Module (the target) in another Chain (the parent). Typically the target will become a child of the adapter.
 
-In code terms, `Adapter` is a generic mixin. Adapters subclass `type(parent)` and `Adapter[type(target)]`. For instance, if you adapt a Conv2d in a Sum, the definition of the Adapter could look like:
+In code terms, [`Adapter`][refiners.fluxion.adapters.Adapter] is a generic mixin. Adapters subclass `type(parent)` and `Adapter[type(target)]`. For instance, if you adapt a `Conv2d` in a `Sum`, the definition of the Adapter could look like:
 
 ```py
 class MyAdapter(fl.Sum, fl.Adapter[fl.Conv2d]):
@@ -68,7 +68,7 @@ Starting from the same model as earlier, let us assume we want to:
 - invert the order of the Linear and Chain B in Chain A ;
 - replace the first child block of chain B with the original Chain A.
 
-This Adapter that will perform a `structural_copy` of part of its target, which means it will duplicate all Chain nodes but keep pointers to the same `WeightedModule`s, and hence not use extra GPU memory.
+This Adapter that will perform a [`structural_copy`][refiners.fluxion.layers.Chain.structural_copy] of part of its target, which means it will duplicate all Chain nodes but keep pointers to the same [`WeightedModule`][refiners.fluxion.layers.WeightedModule]s, and hence not use extra GPU memory.
 
 ```py
 class MyAdapter(fl.Chain, fl.Adapter[fl.Chain]):
@@ -98,7 +98,7 @@ Note that the Linear is in the Chain twice now, but that does not matter as long
 
 As before, we can call eject the adapter to go back to the original model.
 
-## A real-world example: LoraAdapter
+## A real-world example: [LoraAdapter][refiners.fluxion.adapters.LoraAdapter]
 
 A popular example of adaptation is [LoRA](https://arxiv.org/abs/2106.09685). You can check out [how we implement it in Refiners](https://github.com/finegrain-ai/refiners/blob/main/src/refiners/fluxion/adapters/lora.py).
 

@@ -34,6 +34,7 @@ plugins:
           import:
             - https://docs.python.org/3/objects.inv
             - https://pytorch.org/docs/master/objects.inv
+            - https://docs.kidger.site/jaxtyping/objects.inv
           options:
             show_bases: true
             show_source: true
@@ -49,12 +50,14 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             signature_crossrefs: true
+watch:
+  - src/refiners
 extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - Refiners: index.md
-    - home/why.md
+    - Welcome: index.md
+    - Manifesto: home/why.md
   - Getting started:
     - getting-started/recommended.md
     - getting-started/advanced.md
