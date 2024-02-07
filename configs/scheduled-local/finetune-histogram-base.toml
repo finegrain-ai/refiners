@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="base"
+name="embedding_768"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}
@@ -23,7 +23,7 @@ n_down_samples = 5
 color_bits = 6
 
 [training]
-duration = "18001:step"
+duration = "40001:step"
 seed = 0
 gpu_index = 0
 batch_size = 1
@@ -42,7 +42,7 @@ eps = 1e-8
 weight_decay = 1e-2
 
 [adapter]
-embedding_dim = 8
+embedding_dim = 768
 
 [scheduler]
 scheduler_type = "ConstantLR"
@@ -69,15 +69,15 @@ split = "train"
 
 [checkpointing]
 #save_folder = "ckpts"
-save_interval = "6000:step"
+save_interval = "5000:step"
 
-[test_cover_histogram]
+[evaluation]
 num_inference_steps = 30
 histogram_db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",
-     "An oil painting",
+    "An oil painting",
      "A photography of a beautiful woman",
      "A pair of shoes",
      "A group of working people"

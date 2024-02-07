@@ -212,6 +212,9 @@ class ColorPaletteExtractor:
             )
             palette.append(color_cluster)
         return palette
+    def distance(self, a: ColorPalette, b: ColorPalette) -> float:
+        #TO DO
+        raise NotImplementedError
 
 class ColorPaletteEncoder(fl.Chain):
     def __init__(

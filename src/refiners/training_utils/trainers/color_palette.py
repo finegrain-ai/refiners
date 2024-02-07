@@ -5,24 +5,21 @@ from refiners.fluxion.utils import load_from_safetensors, tensor_to_images
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from src.refiners.training_utils.trainers.histogram import HistogramLatentDiffusionTrainer
-from torch import Tensor, randn
+from refiners.training_utils.trainers.histogram import Color, HistogramLatentDiffusionConfig, AbstractColorTrainer
+from torch import Tensor
 import numpy as np
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter, ColorPaletteExtractor
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
-    DPMSolver,
-    StableDiffusion_1,
     SD1UNet
 )
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
-from refiners.training_utils.metrics.color_palette import BatchHistogramPrompt, ImageAndPalette, batch_image_palette_metrics
+from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt, BatchColorPaletteResults, BatchHistogramPrompt, BatchHistogramResults, ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
-    LatentDiffusionBaseTrainer,
     TestDiffusionBaseConfig,
 )
 from refiners.training_utils.wandb import WandbLoggable
@@ -51,8 +48,7 @@ class LatentPrompt(TypedDict):
     color_palette_embedding: Tensor
 
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
-    prompts: list[ColorPalettePromptConfig]
-    num_palette_sample: int = 0
+    histogram_db_indexes: List[int]
 
 class ImageAndPalette(TypedDict):
     image: Image.Image
@@ -60,11 +56,11 @@ class ImageAndPalette(TypedDict):
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
-    test_color_palette: TestColorPaletteConfig
+    evaluation: TestColorPaletteConfig
 
 
 
-class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
+class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults]):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
@@ -81,7 +77,11 @@ class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
             device=self.device,
         )
         return encoder
-
+    @cached_property
+    def color_palette_extractor(self) -> ColorPaletteExtractor:
+        return ColorPaletteExtractor(
+            size=self.config.color_palette.max_colors
+        )
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
         
@@ -107,7 +107,7 @@ class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
 
     def __init__(
         self,
-        config: ColorPaletteLatentDiffusionConfig,
+        config: HistogramLatentDiffusionConfig,
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
@@ -122,17 +122,58 @@ class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
         }
     
     @cached_property
-    def color_palette_extractor(self) -> ColorPaletteExtractor:
-        return ColorPaletteExtractor(
-            size=self.config.color_palette.max_colors
-        )
+    def eval_dataset(self) -> list[BatchColorPalettePrompt]:
+        dataset = self.dataset
+        indices = self.config.evaluation.histogram_db_indexes
+        items = [dataset[i][0] for i in indices]
+        palette = [self.color_palette_extractor(item.image) for item in items]
+        images = [item.image for item in items]
+        eval_indices = list(zip(indices, palette, images))
         
+        evaluations : list[BatchColorPalettePrompt] = []
+        prompts_list = [(prompt, self.text_encoder(prompt)) for prompt in self.config.evaluation.prompts]
+
+        for (prompt, prompt_embedding) in prompts_list:
+            for db_index, palette, image in eval_indices:
+                batch_prompt = BatchColorPalettePrompt(
+                    source_prompts= [prompt],
+                    db_indexes= [db_index],
+                    source_palettes= [palette],
+                    text_embeddings= prompt_embedding,
+                    source_images= [image]
+                )
+                evaluations.append(batch_prompt)
+        
+        print(f"Eval dataset size: {len(evaluations)}")
+        return evaluations
+    
+    def build_results(self, batch: BatchColorPalettePrompt, result_images: Tensor) -> BatchColorPaletteResults:
+        
+        return BatchColorPaletteResults(
+            source_prompts=batch.source_prompts,
+            db_indexes=batch.db_indexes,
+            source_palettes=batch.source_palettes,
+            result_images=result_images,
+            source_images=batch.source_images,
+            result_palettes=[self.color_palette_extractor(image) for image in tensor_to_images(result_images)],
+            text_embeddings=batch.text_embeddings
+        )
+    
+    def collate_results(self, batch: list[BatchColorPaletteResults]) -> BatchColorPaletteResults:
+        return BatchColorPaletteResults.collate_fn(batch)
+    
+    def empty(self) -> BatchColorPaletteResults:
+        return BatchColorPaletteResults.empty()
+    
+    def collate_prompts(self, batch: list[BatchColorPalettePrompt]) -> BatchColorPalettePrompt:
+        return BatchColorPalettePrompt.collate_fn(batch)
+    
     def compute_loss(self, batch: TextEmbeddingColorPaletteLatentsBatch) -> Tensor:
         
         texts = [item.text for item in batch]
         text_embeddings = self.text_encoder(texts)
         
-        latents = self.lda.encode_images([item.image for item in batch])
+        latents = self.lda.images_to_latents([item.image for item in batch])
         color_palettes = [self.color_palette_extractor(item.image) for item in batch]
         
         color_palette_embeddings = self.color_palette_encoder(
@@ -152,21 +193,22 @@ class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
         
         return loss
     
-    def set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
+    def eval_set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
         self.color_palette_adapter.set_color_palette_embedding(
             self.color_palette_encoder.compute_color_palette_embedding(
-                batch.color_palette
+                batch.source_palettes[0]
             )
         )
     
-    def draw_palette(self, palette: ColorPalette, width: int, height: int) -> Image.Image:
-        palette_img = Image.new(mode="RGB", size=(width, height))
+    def draw_palette(self, palette: ColorPalette, width: int, palette_img_size: int) -> Image.Image:
+        palette_img = Image.new(mode="RGB", size=(width, palette_img_size))
         for i, (color, _) in enumerate(palette):
-            palette_img.paste(color, box=(i*height, 0))
+            color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), color, dtype=np.uint8)) # type: ignore
+            palette_img.paste(color_box, box=(i*palette_img_size, 0))
         return palette_img
     
-    def draw_cover_image(self, batch: BatchHistogramResults) -> Image.Image:
-        (batch_size, channels, height, width) = batch.images.shape
+    def draw_cover_image(self, batch: BatchColorPaletteResults) -> Image.Image:
+        (batch_size, channels, height, width) = batch.result_images.shape
         
         palette_img_size = width // self.config.color_palette.max_colors
         source_images = batch.source_images
@@ -174,81 +216,44 @@ class ColorPaletteLatentDiffusionTrainer(HistogramLatentDiffusionTrainer):
         join_canvas_image: Image.Image = Image.new(
             mode="RGB", size=(2*width, (height+palette_img_size) * batch_size)
         )
-        images = tensor_to_images(batch.images)
+        images = tensor_to_images(batch.result_images)
         for i, image in enumerate(images):
             join_canvas_image.paste(source_images[i], box=(0, i*(height+palette_img_size)))
             join_canvas_image.paste(image, box=(width, i*(height+palette_img_size)))
-            palette_out = self.palette_extractor(image)
+            palette_out = self.color_palette_extractor(image)
             palette_out_img = self.draw_palette(palette_out, width, palette_img_size)
-            palette_in_img = self.draw_palette(batch.palettes[i], width, palette_img_size)
+            palette_in_img = self.draw_palette(batch.source_palettes[i], width, palette_img_size)
             
             join_canvas_image.paste(palette_in_img, box=(0, i*(height+palette_img_size) + height))
             join_canvas_image.paste(palette_out_img, box=(width, i*(height+palette_img_size) + height))
         return join_canvas_image
-    def compute_edge_case_evaluation(
-        self, prompts: List[ColorPalettePromptConfig], num_images_per_prompt: int
-    ) -> List[ImageAndPalette]:
-        images: dict[str, WandbLoggable] = {}
-        images_and_palettes: List[ImageAndPalette] = []
+    
+    # def palette_distance(self, source: list[ColorPalette], result: list[ColorPalette]) -> float:
+    #     if len(source) != len(result):
+    #         raise ValueError("The source and result palettes must have the same length.")
         
-        for prompt in prompts:
-            image_name = f"edge_case/{prompt.text.replace(' ', '_')} : {str(prompt.color_palette)}"
-            image_and_palette = self.compute_deterministic_prompt_evaluation(prompt, num_images_per_prompt)
-            images[image_name] = image_and_palette["image"]
-            images_and_palettes.append(image_and_palette)
-
-        self.log(data=images)
-        return images_and_palettes
-
-    @cached_property
-    def eval_indices(self) -> list[tuple[int, ColorPalette, str]]:
-        l = self.dataset_length
-        size = self.config.test_color_palette.num_palette_sample
-        indices = list(np.random.choice(l, size=size, replace=False)) # type: ignore
-        indices : List[int] = list(map(int, indices)) # type: ignore
-        palettes = [self.dataset.get_color_palette(i) for i in indices]
-        captions = [self.dataset.get_caption(i) for i in indices]
-        return list(zip(indices, palettes, captions))
-
-    def batch_image_palette_metrics(self, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
-        batch_image_palette_metrics(self.log, images_and_palettes, prefix)
-
-    def compute_db_samples_evaluation(self, num_images_per_prompt: int, img_size: int = 512) -> List[ImageAndPalette]:
-        images: dict[str, WandbLoggable] = {}
-        images_and_palettes: List[ImageAndPalette] = []
-        palette_img_size = img_size // self.config.color_palette.max_colors
-
-        for (db_index, palette, caption) in self.eval_indices:
-            prompt = ColorPalettePromptConfig(text=caption, color_palette=palette)
-            image_and_palette = self.compute_prompt_evaluation(prompt, 1, img_size=img_size)
-
-            image = self.dataset.get_image(db_index)
-            resized_image = image.resize((img_size, img_size))
-            join_canvas_image: Image.Image = Image.new(mode="RGB", size=(img_size, img_size * 2 + palette_img_size))
-            join_canvas_image.paste(image_and_palette["image"], box=(0, 0))
-            join_canvas_image.paste(resized_image, box=(0, img_size + palette_img_size))
-            image_name = f"db_samples/{db_index}_{caption}"
-
-            images[image_name] = join_canvas_image
-            images_and_palettes.append(image_and_palette)
-
-        self.log(data=images)
-        return images_and_palettes
-
-    def compute_evaluation(self) -> None:
-        prompts = self.config.test_color_palette.prompts
-        num_images_per_prompt = self.config.test_color_palette.num_images_per_prompt
-        images_and_palettes: List[ImageAndPalette] = []
-        if len(prompts) > 0:
-            images_and_palettes = self.compute_edge_case_evaluation(prompts, num_images_per_prompt)
-            self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-edge")
-
-        num_palette_sample = self.config.test_color_palette.num_palette_sample
-        if num_palette_sample > 0:
-            images_and_palettes = self.compute_db_samples_evaluation(num_images_per_prompt)
-            self.batch_image_palette_metrics(images_and_palettes, prefix="palette-image-samples")
-
-
+    #     distance = 0.0
+    #     for i in range(len(source)):
+    #         distance += self.color_palette_extractor.distance(source[i], result[i])
+            
+    #     return distance
+    
+    def batch_metrics(self, results: BatchColorPaletteResults, prefix: str = "palette-img") -> None:
+        Color = tuple[int, int, int]
+        palettes : list[list[Color]] = []
+        for p in results.source_palettes:
+            colors : list[Color] = []
+            for color_cluster in p:
+                colors.append(color_cluster[0])
+            palettes.append(colors)
+        
+        images = tensor_to_images(results.result_images)
+        batch_image_palette_metrics(
+            self.log, 
+            [{"image": image, "palette": palette} for image, palette in zip(images, palettes)], 
+            prefix
+        )
+    
 class LoadColorPalette(Callback[ColorPaletteLatentDiffusionTrainer]):
     def on_train_begin(self, trainer: ColorPaletteLatentDiffusionTrainer) -> None:
         adapter = trainer.color_palette_adapter

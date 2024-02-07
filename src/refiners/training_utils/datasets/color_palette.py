@@ -64,10 +64,10 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
 
     def __getitem__(self, index: int) -> TextEmbeddingColorPaletteLatentsBatch:
         
-        item : DatasetItem = self.hf_dataset[index]
-
+        item = self.hf_dataset[index]
+        
         resized_image = self.resize_image(
-            image=item.image,
+            image=item['image'],
             min_size=self.config.resize_image_min_size,
             max_size=self.config.resize_image_max_size,
         )
@@ -75,7 +75,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         image = self.process_image(resized_image)
         
         caption_key = self.config.caption_key
-        caption = getattr(item, caption_key)
+        caption = item[caption_key]
         (caption_processed, conditional_flag) = self.process_caption(caption)   
         
         return [
@@ -102,7 +102,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         return palette_index
     
     def process_color_palette(self, item: DatasetItem) -> ColorPalette:
-        palette: ColorPalette = item.palettes[str(self.random_palette_size())]
+        palette: ColorPalette = item['palettes'][str(self.random_palette_size())]
         return palette
 
     def extract_color_palette(self, item: DatasetItem) -> ColorPalette:

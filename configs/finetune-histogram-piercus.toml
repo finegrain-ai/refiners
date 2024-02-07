@@ -64,11 +64,13 @@ save_interval = "10000:step"
 [test_histogram]
 num_inference_steps = 30
 use_short_prompts = false
+histogram_db_indexes = [0, 1, 2, 3]
 prompts = [
-       {"text" = "a cute cat", "histogram_db_index" = 0},
-       {"text" = "a cute cat", "histogram_db_index" = 1},
-       {"text" = "a cute cat", "histogram_db_index" = 2},
-       {"text" = "a cute cat", "histogram_db_index" = 3}
+     "A Bustling City Street",
+     "A cute cat",
+     "An oil painting",
+     "A photography of a beautiful woman",
+     "A pair of shoes",
+     "A group of working people"
 ]
-num_samples = 8
 condition_scale = 1.0 # deactivate cause negative sampling not well defined
