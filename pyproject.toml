@@ -138,3 +138,7 @@ exclude_also = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.typos.default]
+extend-words = { adaptee = "adaptee" }
+extend-ignore-identifiers-re = ["NDArray*"]
