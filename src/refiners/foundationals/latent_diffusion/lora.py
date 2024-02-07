@@ -131,7 +131,7 @@ class SDLoraManager:
         SDLoraManager.auto_attach(unet_loras, self.unet, exclude=exclude)
 
     def remove_loras(self, *names: str) -> None:
-        """Remove mulitple LoRAs from the target.
+        """Remove multiple LoRAs from the target.
 
         Args:
             names: The names of the LoRAs to remove.
@@ -179,7 +179,7 @@ class SDLoraManager:
         self.update_scales({name: scale})
 
     def update_scales(self, scales: dict[str, float], /) -> None:
-        """Update the scales of mulitple LoRAs.
+        """Update the scales of multiple LoRAs.
 
         Args:
             scales: The scales to update.
