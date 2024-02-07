@@ -140,6 +140,11 @@ class DPMSolver(Solver):
         return denoised_x
 
     def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+        # sharding manager related hacks
+        return self.forward(x=x, predicted_noise=predicted_noise, step=step, generator=generator)
+    
+    def forward(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+
         """Apply one step of the backward diffusion process.
 
         Note:

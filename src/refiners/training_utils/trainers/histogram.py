@@ -10,9 +10,8 @@ from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAut
 from refiners.training_utils.config import TrainingConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.wandb import WandbLoggable
-from torch import Tensor, randn, cat, uint8, empty, tensor
+from torch import Tensor, randn, tensor
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
-from refiners.fluxion.adapters.color_palette import ColorPaletteExtractor
 
 from torch.utils.data import DataLoader
 
@@ -120,7 +119,7 @@ class AbstractColorTrainer(
         
         return DataLoader(
             dataset=evaluations, 
-            batch_size=self.config.training.batch_size, 
+            batch_size=self.config.evaluation.batch_size, 
             shuffle=False,
             collate_fn=self.collate_prompts, 
             num_workers=self.config.training.num_workers
@@ -144,7 +143,9 @@ class AbstractColorTrainer(
 
         self.eval_set_adapter_values(batch)
         
-        clip_text_embedding = self.sd.compute_clip_text_embedding(text=batch.source_prompts[0])
+        clip_text_embedding = self.sd.compute_clip_text_embedding(text=batch.source_prompts)
+        
+        logger.info(f"Generating steps")
 
         for step in self.sd.steps:
             x = self.sd(
@@ -160,7 +161,8 @@ class AbstractColorTrainer(
         #                 f"img hash : {hash_tensor(images[i])},"+
         #                 f"txt_hash: {clip_text_embedding.norm()},"+
         #                 f"histo_hash: {cfg_histogram_embedding.norm()}")
-        
+        logger.info(f"Generation done")
+
         return self.build_results(batch, images)
     
     def build_results(self, batch: PromptType, images: Tensor) -> ResultType:
@@ -412,7 +414,7 @@ class HistogramLatentDiffusionTrainer(
  
     def eval_set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
         cfg_histogram_embedding = self.histogram_auto_encoder.compute_histogram_embedding(
-            batch.source_histograms[0:1],
+            batch.source_histograms
         )
         cfg_histogram_embedding2 = self.histogram_projection(cfg_histogram_embedding)
         self.histogram_adapter.set_histogram_embedding(cfg_histogram_embedding2)

@@ -1,3 +1,4 @@
+from operator import neg
 from typing import Any, List, TypeVar
 
 from torch import cat, ones
@@ -18,7 +19,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 Color = tuple[int, int, int]
-ColorWeight = int
+ColorWeight = float
 
 ColorPaletteCluster = tuple[Color, ColorWeight]
 
@@ -197,18 +198,22 @@ class ColorPaletteExtractor:
     ) -> None:
         self.size = size
 
-    def __call__(self, image: Image.Image) -> ColorPalette:
+    def __call__(self, image: Image.Image, size: int | None = None) -> ColorPalette:
+        if size is None:
+            size = self.size
         image_np = np.array(image)
         pixels = image_np.reshape(-1, 3)
-        kmeans = KMeans(n_clusters=self.size).fit(pixels) # type: ignore 
+        kmeans = KMeans(n_clusters=size).fit(pixels) # type: ignore 
         counts = np.unique(kmeans.labels_, return_counts=True)[1] # type: ignore
         palette : ColorPalette = []
-        for i in range(0, self.size):
+        total = pixels.shape[0]
+        for i in range(0, size):
             center_float : tuple[float, float, float] = kmeans.cluster_centers_[i] # type: ignore
             center : Color = tuple(center_float.astype(int)) # type: ignore
+            count = float(counts[i].item())
             color_cluster: ColorPaletteCluster = (
                 center,
-                int(counts[i].item()) # type: ignore
+                count / total
             )
             palette.append(color_cluster)
         return palette
@@ -287,14 +292,20 @@ class ColorPaletteEncoder(fl.Chain):
     
     def compute_color_palette_embedding(
         self,
-        x: List[List[int]],
-        negative_color_palette: List[List[int]] = [],
+        x: List[List[List[int]]] = [],
+        negative_color_palette: List[List[List[int]]] | None = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
-        conditional_embedding = self([x])
-        negative_embedding = self([negative_color_palette])
+        
+        conditional_embedding = self(x)
+        if negative_color_palette is None:
+            negative_color_palette = [[]]*len(x)
+        
+        if len(negative_color_palette) != len(x):
+            raise ValueError("The negative_color_palette must have the same length as the input color palette")
+        
+        negative_embedding = self(negative_color_palette)
         return cat(tensors=(negative_embedding, conditional_embedding), dim=0)
-
-
+    
 class PaletteCrossAttention(fl.Chain):
     def __init__(self, text_cross_attention: fl.Attention, embedding_dim: int = 768, scale: float = 1.0) -> None:
         self._scale = scale
@@ -422,8 +433,6 @@ class SD1ColorPaletteAdapter(fl.Chain, Adapter[TSDNet]):
             }
             self._color_palette_encoder[0].load_state_dict(color_palette_state_dict)
             
-            print('weights', weights.keys())
-
             for i, cross_attn in enumerate(self.sub_adapters):
                 # cross_attention_weights: list[Tensor] = []
                 

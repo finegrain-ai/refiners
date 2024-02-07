@@ -49,6 +49,7 @@ class LatentPrompt(TypedDict):
 
 class TestColorPaletteConfig(TestDiffusionBaseConfig):
     histogram_db_indexes: List[int]
+    batch_size: int = 1
 
 class ImageAndPalette(TypedDict):
     image: Image.Image
@@ -57,8 +58,6 @@ class ImageAndPalette(TypedDict):
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     evaluation: TestColorPaletteConfig
-
-
 
 class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults]):
     @cached_property
@@ -126,7 +125,8 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         dataset = self.dataset
         indices = self.config.evaluation.histogram_db_indexes
         items = [dataset[i][0] for i in indices]
-        palette = [self.color_palette_extractor(item.image) for item in items]
+        
+        palette = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
         images = [item.image for item in items]
         eval_indices = list(zip(indices, palette, images))
         
@@ -155,7 +155,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
             source_palettes=batch.source_palettes,
             result_images=result_images,
             source_images=batch.source_images,
-            result_palettes=[self.color_palette_extractor(image) for image in tensor_to_images(result_images)],
+            result_palettes=[self.color_palette_extractor(image, size=len(batch.source_palettes[i])) for i, image in enumerate(tensor_to_images(result_images))],
             text_embeddings=batch.text_embeddings
         )
     
@@ -174,7 +174,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         text_embeddings = self.text_encoder(texts)
         
         latents = self.lda.images_to_latents([item.image for item in batch])
-        color_palettes = [self.color_palette_extractor(item.image) for item in batch]
+        color_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in batch]
         
         color_palette_embeddings = self.color_palette_encoder(
             color_palettes
@@ -196,13 +196,15 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
     def eval_set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
         self.color_palette_adapter.set_color_palette_embedding(
             self.color_palette_encoder.compute_color_palette_embedding(
-                batch.source_palettes[0]
+                batch.source_palettes
             )
         )
     
     def draw_palette(self, palette: ColorPalette, width: int, palette_img_size: int) -> Image.Image:
         palette_img = Image.new(mode="RGB", size=(width, palette_img_size))
-        for i, (color, _) in enumerate(palette):
+        # sort the palette by weight
+        palette_sorted = sorted(palette, key=lambda x: x[1], reverse=True)
+        for i, (color, weight) in enumerate(palette_sorted):
             color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), color, dtype=np.uint8)) # type: ignore
             palette_img.paste(color_box, box=(i*palette_img_size, 0))
         return palette_img
@@ -220,7 +222,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         for i, image in enumerate(images):
             join_canvas_image.paste(source_images[i], box=(0, i*(height+palette_img_size)))
             join_canvas_image.paste(image, box=(width, i*(height+palette_img_size)))
-            palette_out = self.color_palette_extractor(image)
+            palette_out = batch.result_palettes[i]
             palette_out_img = self.draw_palette(palette_out, width, palette_img_size)
             palette_in_img = self.draw_palette(batch.source_palettes[i], width, palette_img_size)
             
