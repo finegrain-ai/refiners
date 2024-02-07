@@ -66,8 +66,12 @@ class AbstractColorPrompt:
             opts[key] = getattr(self, key)[indices]
             
         return self.__class__(**opts)
-
-class AsbtractColorResults(Generic[PromptType], AbstractColorPrompt):
+    
+    def get_prompt(self: PromptType, prompt: str) -> PromptType:
+        indices = [i for i, p in enumerate(self.source_prompts) if p == prompt]
+        return self.get_indices(indices)
+    
+class AbstractColorResults(Generic[PromptType], AbstractColorPrompt):
     __prompt_type: Type[PromptType]
     
     def to_prompt(self) -> PromptType:
@@ -81,13 +85,14 @@ class AsbtractColorResults(Generic[PromptType], AbstractColorPrompt):
         return self.__prompt_type()
 
 
+
 class BatchColorPalettePrompt(AbstractColorPrompt):
     _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
     _tensor_keys: dict[str, tuple[int, ...]] = {
         "text_embeddings": (77, 768)
     }
 
-class BatchColorPaletteResults(AsbtractColorResults[BatchColorPalettePrompt]):    
+class BatchColorPaletteResults(AbstractColorResults[BatchColorPalettePrompt]):    
     _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes", "result_palettes"]
     _tensor_keys: dict[str, tuple[int, ...]] = {
         "text_embeddings": (77, 768),
@@ -102,7 +107,7 @@ class BatchHistogramPrompt(AbstractColorPrompt):
         "text_embeddings": (77, 768),
     }
 
-class BatchHistogramResults(AsbtractColorResults[AbstractColorPrompt]):
+class BatchHistogramResults(AbstractColorResults[AbstractColorPrompt]):
     _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
     _tensor_keys: dict[str, tuple[int, ...]] = {
         "source_histogram_embeddings": (8, 2, 2, 2),
@@ -191,6 +196,8 @@ def batch_palette_metrics(log: Logger, images_and_palettes: BatchHistogramResult
     
     if len(images) != len(palettes):
         raise ValueError("Images and palettes must have the same length")
+    
+    print("palettes", palettes)
     
     return batch_image_palette_metrics(
         log,

@@ -1,6 +1,6 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "online" # "online", "offline", "disabled"
+mode = "offline" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
 name="embedding_768"
@@ -74,7 +74,7 @@ use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
-histogram_db_indexes = [0, 1, 2, 3]
+histogram_db_indexes = [0]#, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",

@@ -495,7 +495,7 @@ class SelfAttention3d(SelfAttention):
         channels: int,
         num_heads: int = 1,
         use_bias: bool = True,
-        is_causal: bool | None = None,
+        is_causal: bool = False,
         is_optimized: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None,

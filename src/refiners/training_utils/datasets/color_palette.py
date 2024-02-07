@@ -102,7 +102,8 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         return palette_index
     
     def process_color_palette(self, item: DatasetItem) -> ColorPalette:
-        palette: ColorPalette = item['palettes'][str(self.random_palette_size())]
+        palette_color: list[Color] = item['palettes'][str(self.random_palette_size())]
+        palette: ColorPalette = [(color, 1.0/len(palette_color)) for color in palette_color]
         return palette
 
     def extract_color_palette(self, item: DatasetItem) -> ColorPalette:

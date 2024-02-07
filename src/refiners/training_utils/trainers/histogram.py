@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAutoEncoderConfig
 from refiners.training_utils.config import TrainingConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
-from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer
+from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
 from torch import Tensor
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
 
@@ -32,9 +32,6 @@ from refiners.training_utils.trainers.latent_diffusion import (
 Color = Tuple[int, int, int]
 Histogram = Tensor
 
-class TestCoverHistogramConfig(TestDiffusionBaseConfig):
-    histogram_db_indexes: List[int]
-
 
 class ImageAndHistogram(TypedDict):
     image: Image.Image
@@ -51,7 +48,7 @@ class AdapterConfig(BaseModel):
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     histogram_auto_encoder: HistogramAutoEncoderConfig
     adapter: AdapterConfig
-    evaluation: TestCoverHistogramConfig
+    evaluation: ColorTrainerEvaluationConfig
     training: ColorTrainingConfig
     validation_dataset: HuggingfaceDatasetConfig
 
@@ -141,7 +138,7 @@ class HistogramLatentDiffusionTrainer(
                     source_histograms= histogram, # type: ignore
                     source_prompts= [prompt],
                     db_indexes= [db_index],
-                    palettes= [palette],
+                    source_palettes= [palette],
                     text_embeddings= prompt_embedding, # type: ignore
                     source_images= [image]
                 )
@@ -179,7 +176,7 @@ class HistogramLatentDiffusionTrainer(
             source_histogram_embeddings = batch.source_histogram_embeddings,
             source_histograms = batch.source_histograms,
             source_prompts = batch.source_prompts,
-            palettes = batch.palettes,
+            source_palettes = batch.source_palettes,
             text_embeddings = batch.text_embeddings,
             result_images = result_images,
             result_histograms = self.histogram_extractor(result_images),

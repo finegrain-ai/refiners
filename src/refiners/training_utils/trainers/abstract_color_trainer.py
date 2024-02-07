@@ -3,7 +3,7 @@ from typing import Generic, TypeVar
 
 from loguru import logger
 from refiners.training_utils.wandb import WandbLoggable
-from src.refiners.training_utils.metrics.color_palette import AbstractColorPrompt, AbstractColorResults
+from refiners.training_utils.metrics.color_palette import AbstractColorPrompt, AbstractColorResults
 from torch import Tensor, randn, tensor
 
 from torch.utils.data import DataLoader
