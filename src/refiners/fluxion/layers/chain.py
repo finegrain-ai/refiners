@@ -55,7 +55,7 @@ class Chain(ContextModule):
 
     This layer is the main building block of Fluxion.
     It is used to compose other layers in a sequential manner.
-    Similary to [`torch.nn.Sequential`][torch.nn.Sequential],
+    Similarly to [`torch.nn.Sequential`][torch.nn.Sequential],
     it calls each of its sub-layers in order, chaining their outputs as inputs to the next sublayer.
     However, it also provides additional methods to manipulate its sub-layers and their context.
 

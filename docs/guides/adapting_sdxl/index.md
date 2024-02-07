@@ -364,7 +364,7 @@ python scripts/conversion/convert_diffusers_ip_adapter.py --from ip-adapter-plus
 
 This will download and convert both IP-Adapter and CLIP Image Encoder pretrained weights.
 
-Then, in your Python code, simply instantiate a [`SDXLIPAdapter`][refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt.SDXLIPAdapter] targetting our `sdxl.unet`, and inject it using a simple `.inject()` call:
+Then, in your Python code, simply instantiate a [`SDXLIPAdapter`][refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt.SDXLIPAdapter] targeting our `sdxl.unet`, and inject it using a simple `.inject()` call:
 
 ```py
 # IP-Adapter
