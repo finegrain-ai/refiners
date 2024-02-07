@@ -292,8 +292,8 @@ class ColorPaletteEncoder(fl.Chain):
     
     def compute_color_palette_embedding(
         self,
-        x: List[List[List[int]]] = [],
-        negative_color_palette: List[List[List[int]]] | None = None,
+        x: List[ColorPalette] = [],
+        negative_color_palette: List[ColorPalette] | None = None,
     ) -> Float[Tensor, "cfg_batch n_colors 3"]:
         
         conditional_embedding = self(x)

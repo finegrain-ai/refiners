@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, Tuple, TypedDict, Sequence
+from typing import Any, Callable, List, Tuple, TypeVar, TypedDict, Sequence, Type, Generic, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -6,253 +6,114 @@ from PIL import Image
 from sklearn.metrics import ndcg_score  # type: ignore
 from sklearn.neighbors import NearestNeighbors  # type: ignore
 
-from refiners.training_utils.datasets.color_palette import ColorPalette
-from refiners.fluxion.utils import tensor_to_image
+from refiners.fluxion.utils import tensor_to_images
+from refiners.fluxion.adapters.color_palette import Color, ColorPalette
 
 from torch import empty, Tensor, cat
 
-Logger = Callable[[Any], None]
-
-class BatchColorPalettePrompt:
-    def __init__(
-        self,
-        source_prompts: List[str],
-        source_palettes: List[ColorPalette],
-        text_embeddings: Tensor,
-        db_indexes: List[int],
-        source_images: List[Image.Image]
-    ) -> None:
-        self.source_prompts = source_prompts
-        self.source_palettes = source_palettes
-        self.text_embeddings = text_embeddings
-        self.db_indexes = db_indexes
-        self.source_images = source_images
-
-    @classmethod
-    def collate_fn(cls, batch: Sequence["BatchColorPalettePrompt"]) -> "BatchColorPalettePrompt":
-        source_palettes = [source_palette for item in batch for source_palette in item.source_palettes]
-        source_prompts = [prmpt for item in batch for prmpt in item.source_prompts]
-        source_images = [image for item in batch for image in item.source_images]
-        return BatchColorPalettePrompt(
-            db_indexes=[index for item in batch for index in item.db_indexes],
-            source_palettes=source_palettes,
-            source_prompts=source_prompts,
-            text_embeddings=cat([item.text_embeddings for item in batch]),
-            source_images=source_images
-        )
-
-class BatchColorPaletteResults(BatchColorPalettePrompt):
-    
-    result_images: Tensor
-    result_palettes: List[ColorPalette]
-    
-    def __init__(
-        self,
-        result_images: Tensor,
-        result_palettes: List[ColorPalette],
-        source_palettes: List[ColorPalette],
-        source_prompts: List[str],
-        text_embeddings: Tensor,
-        source_images: List[Image.Image],
-        db_indexes: List[int]
-    ) -> None:
-        super().__init__(
-            source_palettes=source_palettes,
-            source_prompts=source_prompts,
-            text_embeddings=text_embeddings,
-            db_indexes=db_indexes,
-            source_images=source_images
-        )
-
-        self.result_images = result_images
-        self.result_palettes = result_palettes
-
-    def get_prompt(self, prompt: str) -> "BatchColorPaletteResults":
-        indices = [i for i, p in enumerate(self.source_prompts) if p == prompt]
-
-        return BatchColorPaletteResults(
-            result_images=self.result_images[indices],
-            result_palettes=[self.result_palettes[i] for i in indices],
-            source_prompts=[prompt for _ in indices],
-            source_palettes=[self.source_palettes[i] for i in indices],
-            text_embeddings=self.text_embeddings[indices],
-            db_indexes=[self.db_indexes[i] for i in indices],
-            source_images=[self.source_images[i] for i in indices]
-        )
-
-    @classmethod
-    def empty(cls) -> "BatchColorPaletteResults":
-        return BatchColorPaletteResults(
-            result_palettes=[],
-            source_palettes=[],
-            result_images=empty((0, 3, 512, 512)),
-            source_prompts=[],
-            text_embeddings=empty((0, 77, 768)),
-            db_indexes=[],
-            source_images=[]
-        )
-
-    def to_prompt(self) -> BatchColorPalettePrompt:
-        return BatchColorPalettePrompt(
-            source_prompts=self.source_prompts,
-            source_palettes=self.source_palettes,
-            text_embeddings=self.text_embeddings,
-            db_indexes=self.db_indexes,
-            source_images=self.source_images
-        )
-
-    @classmethod
-    def collate_fn(cls, batch: Sequence["BatchColorPaletteResults"]) -> "BatchColorPaletteResults":
-        prompts = [item.to_prompt() for item in batch]
-        prompt = super().collate_fn(prompts)
-
-        result_images = cat([item.result_images for item in batch])
-        result_palettes = [palette for item in batch for palette in item.result_palettes]
-        return BatchColorPaletteResults(
-            result_images=result_images,
-            result_palettes = result_palettes,
-            source_prompts=prompt.source_prompts,
-            source_palettes=prompt.source_palettes,
-            text_embeddings=prompt.text_embeddings,
-            db_indexes=prompt.db_indexes,
-            source_images=prompt.source_images
-        )
-
-
-class BatchHistogramPrompt:
-    def __init__(
-        self,
-        source_histogram_embeddings: Tensor,
-        source_histograms: Tensor,
-        source_prompts: List[str],
-        palettes: List[ColorPalette],
-        text_embeddings: Tensor,
-        db_indexes: List[int],
-        source_images: List[Image.Image]
-    ) -> None:
-        self.source_histogram_embeddings = source_histogram_embeddings
-        self.source_histograms = source_histograms
-        self.source_prompts = source_prompts
-        self.palettes = palettes
-        self.text_embeddings = text_embeddings
-        self.db_indexes = db_indexes
-        self.source_images = source_images
-
-    @classmethod
-    def collate_fn(cls, batch: Sequence["BatchHistogramPrompt"]) -> "BatchHistogramPrompt":
-        source_histograms = cat([item.source_histograms for item in batch])
-        source_histogram_embeddings = cat([item.source_histogram_embeddings for item in batch])
-        palettes = [palette for item in batch for palette in item.palettes]
-        source_prompts = [prmpt for item in batch for prmpt in item.source_prompts]
-        source_images = [image for item in batch for image in item.source_images]
-        return BatchHistogramPrompt(
-            db_indexes=[index for item in batch for index in item.db_indexes],
-            source_histograms=source_histograms,
-            source_histogram_embeddings=source_histogram_embeddings,
-            source_prompts=source_prompts,
-            palettes=palettes,
-            text_embeddings=cat([item.text_embeddings for item in batch]),
-            source_images=source_images
-        )
-
-
-class BatchHistogramResults(BatchHistogramPrompt):
-    result_images: Tensor
-    result_histograms: Tensor
-
-    def __init__(
-        self,
-        result_images: Tensor,
-        result_histograms: Tensor,
-        source_histogram_embeddings: Tensor,
-        source_histograms: Tensor,
-        source_prompts: List[str],
-        palettes: List[ColorPalette],
-        text_embeddings: Tensor,
-        source_images: List[Image.Image],
-        db_indexes: List[int]
-    ) -> None:
-        super().__init__(
-            source_histogram_embeddings=source_histogram_embeddings,
-            source_histograms=source_histograms,
-            source_prompts=source_prompts,
-            palettes=palettes,
-            text_embeddings=text_embeddings,
-            db_indexes=db_indexes,
-            source_images=source_images
-        )
-
-        self.result_images = result_images
-        self.result_histograms = result_histograms
-
-    def get_prompt(self, prompt: str) -> "BatchHistogramResults":
-        indices = [i for i, p in enumerate(self.source_prompts) if p == prompt]
-
-        return BatchHistogramResults(
-            result_images=self.result_images[indices],
-            result_histograms=self.result_histograms[indices],
-            source_histogram_embeddings=self.source_histogram_embeddings[indices],
-            source_histograms=self.source_histograms[indices],
-            source_prompts=[prompt for _ in indices],
-            palettes=[self.palettes[i] for i in indices],
-            text_embeddings=self.text_embeddings[indices],
-            db_indexes=[self.db_indexes[i] for i in indices],
-            source_images=[self.source_images[i] for i in indices]
-        )
-
-    @classmethod
-    def empty(cls) -> "BatchHistogramResults":
-        return BatchHistogramResults(
-            result_images=empty((0, 3, 512, 512)),
-            result_histograms=empty((0, 64, 64, 64)),
-            source_histogram_embeddings=empty((0, 8, 2, 2, 2)),
-            source_histograms=empty((0, 64, 64, 64)),
-            source_prompts=[],
-            palettes=[],
-            text_embeddings=empty((0, 77, 768)),
-            db_indexes=[],
-            source_images=[]
-        )
-
-    def to_hist_prompt(self) -> BatchHistogramPrompt:
-        return BatchHistogramPrompt(
-            source_histogram_embeddings=self.source_histogram_embeddings,
-            source_histograms=self.source_histograms,
-            source_prompts=self.source_prompts,
-            palettes=self.palettes,
-            text_embeddings=self.text_embeddings,
-            db_indexes=self.db_indexes,
-            source_images=self.source_images
-        )
-
-    @classmethod
-    def collate_fn(cls, batch: Sequence["BatchHistogramResults"]) -> "BatchHistogramResults":
-        histo_prompts = [item.to_hist_prompt() for item in batch]
-        histo_prompt = super().collate_fn(histo_prompts)
-
-        result_images = cat([item.result_images for item in batch])
-        result_histograms = cat([item.result_histograms for item in batch])
-        return BatchHistogramResults(
-            result_images=result_images,
-            result_histograms=result_histograms,
-            source_histograms=histo_prompt.source_histograms,
-            source_histogram_embeddings=histo_prompt.source_histogram_embeddings,
-            source_prompts=histo_prompt.source_prompts,
-            palettes=histo_prompt.palettes,
-            text_embeddings=histo_prompt.text_embeddings,
-            db_indexes=histo_prompt.db_indexes,
-            source_images=histo_prompt.source_images
-        )
-
-
-
 class ImageAndPalette(TypedDict):
     image: Image.Image
-    palette: ColorPalette
+    palette: list[Color]
+    
+Logger = Callable[[Any], None]
 
+CollatableProps = list[Any] | Tensor
+
+PromptType = TypeVar('PromptType', bound='AbstractColorPrompt')
+
+class AbstractColorPrompt:
+    _list_keys: list[str] = []
+    _tensor_keys: dict[str, tuple[int, ...]] = {}
+    
+    def __init__(
+        self,
+        **kwargs : CollatableProps
+    ) -> None:
+        for key in self.__class__._list_keys:
+            setattr(self, key, kwargs[key])
+        for key in self.__class__._tensor_keys:
+            setattr(self, key, kwargs[key])
+
+    @classmethod
+    def collate_fn(cls: Type[PromptType], batch: Sequence["AbstractColorPrompt"]) -> PromptType:
+        opts : dict[str, CollatableProps] = {}
+        for key in cls._list_keys:
+            opts[key] = [prop for item in batch for prop in getattr(item, key)]
+        for key in cls._tensor_keys:
+            opts[key] = cat([getattr(item, key) for item in batch])
+            
+        return cls(**opts)
+    
+    @classmethod
+    def empty(cls: Type[PromptType]) -> PromptType:
+        opts : dict[str, CollatableProps] = {}
+        
+        for key in cls._list_keys:
+            opts[key] = []
+        for key in cls._tensor_keys:
+            size = cls._tensor_keys[key]
+            tensor = empty((0,)+ size)
+            opts[key] = tensor
+            
+        return cls(**opts)
+
+    def get_indices(self: PromptType, indices: list[int]) -> PromptType:
+        opts : dict[str, CollatableProps] = {}
+        
+        for key in self.__class__._list_keys:
+            opts[key] = [getattr(self, key)[i] for i in indices]
+        for key in self._tensor_keys:
+            opts[key] = getattr(self, key)[indices]
+            
+        return self.__class__(**opts)
+
+class AsbtractColorResults(Generic[PromptType], AbstractColorPrompt):
+    __prompt_type: Type[PromptType]
+    
+    def to_prompt(self) -> PromptType:
+        opts : dict[str, CollatableProps] = {}
+        
+        for key in self.__prompt_type._list_keys:
+            opts[key] = getattr(self, key)
+        for key in self.__prompt_type._tensor_keys:
+            opts[key] = getattr(self, key)
+        
+        return self.__prompt_type()
+
+
+class BatchColorPalettePrompt(AbstractColorPrompt):
+    _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
+    _tensor_keys: dict[str, tuple[int, ...]] = {
+        "text_embeddings": (77, 768)
+    }
+
+class BatchColorPaletteResults(AsbtractColorResults[BatchColorPalettePrompt]):    
+    _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes", "result_palettes"]
+    _tensor_keys: dict[str, tuple[int, ...]] = {
+        "text_embeddings": (77, 768),
+        "result_images": (3, 512, 512)
+    }
+
+class BatchHistogramPrompt(AbstractColorPrompt):
+    _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
+    _tensor_keys: dict[str, tuple[int, ...]] = {
+        "source_histogram_embeddings": (8, 2, 2, 2),
+        "source_histograms": (64, 64, 64),
+        "text_embeddings": (77, 768),
+    }
+
+class BatchHistogramResults(AsbtractColorResults[AbstractColorPrompt]):
+    _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
+    _tensor_keys: dict[str, tuple[int, ...]] = {
+        "source_histogram_embeddings": (8, 2, 2, 2),
+        "source_histograms": (64, 64, 64),
+        "text_embeddings": (77, 768),
+        "result_images": (3, 512, 512),
+        "result_histograms": (64, 64, 64)
+    }
 
 def image_palette_metrics(
-    image: Image.Image, palette: ColorPalette, img_size: Tuple[int, int] = (256, 256), sampling_size: int = 1000
+    image: Image.Image, palette: list[Color], img_size: Tuple[int, int] = (256, 256), sampling_size: int = 1000
 ):
     resized_img = image.resize(img_size)
     Point = npt.NDArray[np.float64]
@@ -289,7 +150,7 @@ def image_palette_metrics(
     return ([y_true_ranking], [counts], distances_list)
 
 
-def batch_image_palette_metrics(log: Logger, images_and_palettes: List[ImageAndPalette], prefix: str = "palette-img"):
+def batch_image_palette_metrics(log: Logger, images_and_palettes: list[ImageAndPalette], prefix: str = "palette-img"):
     per_num: dict[int, Any] = {}
     for image_and_palette in images_and_palettes:
         palette = image_and_palette["palette"]
@@ -317,14 +178,25 @@ def batch_image_palette_metrics(log: Logger, images_and_palettes: List[ImageAndP
 
 def batch_palette_metrics(log: Logger, images_and_palettes: BatchHistogramResults, prefix: str = "palette-img"):
     
-    images = [tensor_to_image(image) for image in images_and_palettes.result_images.split(1)]
-    palettes = images_and_palettes.palettes
+    source_palettes = cast(list[ColorPalette], images_and_palettes.source_palettes) # type: ignore
+    palettes: list[list[Color]] = []
+    for p in source_palettes: # type: ignore
+        colors : list[Color] = []
+        sorted_clusters = sorted(p, key=lambda x: x[1], reverse=True)
+        for sorted_clusters in p:
+            colors.append(sorted_clusters[0])
+        palettes.append(colors)
+    
+    images = tensor_to_images(images_and_palettes.result_images) # type: ignore
     
     if len(images) != len(palettes):
         raise ValueError("Images and palettes must have the same length")
     
     return batch_image_palette_metrics(
-        log, 
-        [{"image": image, "palette": palette} for image, palette in zip(images, palettes)], 
+        log,
+        [
+            ImageAndPalette({"image": image, "palette": palette})
+            for image, palette in zip(images, palettes)
+        ],
         prefix
     )

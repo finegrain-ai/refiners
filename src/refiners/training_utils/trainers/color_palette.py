@@ -5,28 +5,24 @@ from refiners.fluxion.utils import load_from_safetensors, tensor_to_images
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from refiners.training_utils.trainers.histogram import Color, HistogramLatentDiffusionConfig, AbstractColorTrainer
+from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer
 from torch import Tensor
 import numpy as np
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.adapters.color_palette import ColorPaletteEncoder, SD1ColorPaletteAdapter, ColorPaletteExtractor
+from refiners.fluxion.adapters.color_palette import Color, ColorPaletteEncoder, SD1ColorPaletteAdapter, ColorPaletteExtractor
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion import (
     SD1UNet
 )
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
-from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt, BatchColorPaletteResults, BatchHistogramPrompt, BatchHistogramResults, ImageAndPalette, batch_image_palette_metrics
+from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt, BatchColorPaletteResults, ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     TestDiffusionBaseConfig,
 )
-from refiners.training_utils.wandb import WandbLoggable
-from refiners.training_utils.datasets.color_palette import ColorPalette, ColorPaletteDataset, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.callback import GradientNormLayerLogging
-
-from refiners.training_utils.trainers.trainer import scoped_seed
 
 class ColorPaletteConfig(BaseModel):
     feedforward_dim: int = 3072
@@ -47,19 +43,11 @@ class LatentPrompt(TypedDict):
     text: str
     color_palette_embedding: Tensor
 
-class TestColorPaletteConfig(TestDiffusionBaseConfig):
-    histogram_db_indexes: List[int]
-    batch_size: int = 1
-
-class ImageAndPalette(TypedDict):
-    image: Image.Image
-    palette: ColorPalette   
-
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     evaluation: TestColorPaletteConfig
 
-class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults]):
+class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults, ColorPaletteLatentDiffusionConfig]):
     @cached_property
     def color_palette_encoder(self) -> ColorPaletteEncoder:
         assert (
@@ -106,7 +94,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
 
     def __init__(
         self,
-        config: HistogramLatentDiffusionConfig,
+        config: ColorPaletteLatentDiffusionConfig,
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
@@ -193,7 +181,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         
         return loss
     
-    def eval_set_adapter_values(self, batch: BatchHistogramPrompt) -> None:
+    def eval_set_adapter_values(self, batch: BatchColorPalettePrompt) -> None:
         self.color_palette_adapter.set_color_palette_embedding(
             self.color_palette_encoder.compute_color_palette_embedding(
                 batch.source_palettes
@@ -204,13 +192,13 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         palette_img = Image.new(mode="RGB", size=(width, palette_img_size))
         # sort the palette by weight
         palette_sorted = sorted(palette, key=lambda x: x[1], reverse=True)
-        for i, (color, weight) in enumerate(palette_sorted):
+        for i, (color, _) in enumerate(palette_sorted):
             color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), color, dtype=np.uint8)) # type: ignore
             palette_img.paste(color_box, box=(i*palette_img_size, 0))
         return palette_img
     
     def draw_cover_image(self, batch: BatchColorPaletteResults) -> Image.Image:
-        (batch_size, channels, height, width) = batch.result_images.shape
+        (batch_size, _, height, width) = batch.result_images.shape
         
         palette_img_size = width // self.config.color_palette.max_colors
         source_images = batch.source_images
@@ -241,18 +229,21 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
     #     return distance
     
     def batch_metrics(self, results: BatchColorPaletteResults, prefix: str = "palette-img") -> None:
-        Color = tuple[int, int, int]
         palettes : list[list[Color]] = []
         for p in results.source_palettes:
             colors : list[Color] = []
-            for color_cluster in p:
+            sorted_clusters = sorted(p, key=lambda x: x[1], reverse=True)
+            for sorted_clusters in p:
                 colors.append(color_cluster[0])
             palettes.append(colors)
         
         images = tensor_to_images(results.result_images)
         batch_image_palette_metrics(
             self.log, 
-            [{"image": image, "palette": palette} for image, palette in zip(images, palettes)], 
+            [
+                ImageAndPalette({"image": image, "palette": palette})
+                for image, palette in zip(images, palettes)
+            ], 
             prefix
         )
     
