@@ -204,7 +204,7 @@ class LatentDiffusionTrainer(Trainer[ConfigType, TextEmbeddingLatentsBatch]):
                     )
                 canvas_image.paste(sd.lda.latents_to_image(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
-        self.log(data=images)
+        # TODO: wandb_log images
 
 
 def sample_noise(
@@ -257,4 +257,4 @@ class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
                 log_data[f"average_loss_timestep_bin_{bin_index * 100}"] = avg_loss
                 self.timestep_bins[bin_index] = []
 
-        trainer.log(data=log_data)
+        # TODO: wandb_log log_data

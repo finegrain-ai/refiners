@@ -2,7 +2,6 @@ import random
 import time
 from abc import ABC, abstractmethod
 from functools import cached_property, wraps
-from pathlib import Path
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
@@ -33,13 +32,10 @@ from refiners.training_utils.callback import (
     Callback,
     ClockCallback,
     GradientNormClipping,
-    GradientNormLogging,
     GradientValueClipping,
-    MonitorLoss,
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
-from refiners.training_utils.wandb import WandbLoggable, WandbLogger
 
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
 
@@ -130,7 +126,6 @@ class TrainingClock:
         gradient_accumulation: TimeValue,
         evaluation_interval: TimeValue,
         lr_scheduler_interval: TimeValue,
-        checkpointing_save_interval: TimeValue,
     ) -> None:
         self.dataset_length = dataset_length
         self.batch_size = batch_size
@@ -138,7 +133,6 @@ class TrainingClock:
         self.gradient_accumulation = gradient_accumulation
         self.evaluation_interval = evaluation_interval
         self.lr_scheduler_interval = lr_scheduler_interval
-        self.checkpointing_save_interval = checkpointing_save_interval
         self.num_batches_per_epoch = dataset_length // batch_size
         self.start_time = None
         self.end_time = None
@@ -225,12 +219,6 @@ class TrainingClock:
             number=self.lr_scheduler_interval["number"], unit=self.lr_scheduler_interval["unit"]
         )
 
-    @cached_property
-    def checkpointing_save_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.checkpointing_save_interval["number"], unit=self.checkpointing_save_interval["unit"]
-        )
-
     @property
     def is_optimizer_step(self) -> bool:
         return self.num_minibatches_processed == self.num_step_per_iteration
@@ -246,10 +234,6 @@ class TrainingClock:
     @property
     def is_evaluation_step(self) -> bool:
         return self.step % self.evaluation_interval_steps == 0
-
-    @property
-    def is_checkpointing_step(self) -> bool:
-        return self.step % self.checkpointing_save_interval_steps == 0
 
 
 def compute_grad_norm(parameters: Iterable[Parameter]) -> float:
@@ -276,26 +260,34 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             evaluation_interval=config.training.evaluation_interval,
             gradient_accumulation=config.training.gradient_accumulation,
             lr_scheduler_interval=config.scheduler.update_interval,
-            checkpointing_save_interval=config.checkpointing.save_interval,
         )
         self.callbacks = callbacks or []
         self.callbacks += self.default_callbacks()
         self._call_callbacks(event_name="on_init_begin")
-        self.load_wandb()
         self.load_models()
         self.prepare_models()
-        self.prepare_checkpointing()
         self._call_callbacks(event_name="on_init_end")
 
     def default_callbacks(self) -> list[Callback[Any]]:
-        return [
+        callbacks: list[Callback[Any]] = [
             ClockCallback(),
-            MonitorLoss(),
-            GradientNormLogging(),
             GradientValueClipping(),
             GradientNormClipping(),
             DropoutCallback(),
         ]
+
+        # look for any Callback that might be a property of the Trainer
+        for attr_name in dir(self):
+            if "__" in attr_name:
+                continue
+
+            try:
+                attr = getattr(self, attr_name)
+            except AssertionError:
+                continue
+            if isinstance(attr, Callback):
+                callbacks.append(cast(Callback[Any], attr))
+        return callbacks
 
     @cached_property
     def device(self) -> Device:
@@ -417,13 +409,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         for model in self.models.values():
             model.eval()
 
-    def log(self, data: dict[str, WandbLoggable]) -> None:
-        self.wandb.log(data=data, step=self.clock.step)
-
-    def load_wandb(self) -> None:
-        init_config = {**self.config.wandb.model_dump(), "config": self.config.model_dump()}
-        self.wandb = WandbLogger(init_config=init_config)
-
     def prepare_model(self, model_name: str) -> None:
         model = self.models[model_name]
         if (checkpoint := self.config.models[model_name].checkpoint) is not None:
@@ -438,18 +423,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         assert self.models, "No models found."
         for model_name in self.models:
             self.prepare_model(model_name=model_name)
-
-    def prepare_checkpointing(self) -> None:
-        if self.config.checkpointing.save_folder is not None:
-            assert self.config.checkpointing.save_folder.is_dir()
-            self.checkpoints_save_folder = (
-                self.config.checkpointing.save_folder / self.wandb.project_name / self.wandb.run_name
-            )
-            self.checkpoints_save_folder.mkdir(parents=True, exist_ok=False)
-            logger.info(f"Checkpointing enabled: {self.checkpoints_save_folder}")
-        else:
-            self.checkpoints_save_folder = None
-            logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")
 
     @abstractmethod
     def load_models(self) -> dict[str, fl.Module]:
@@ -475,15 +448,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=collate_fn
         )
 
-    @property
-    def checkpointing_enabled(self) -> bool:
-        return self.checkpoints_save_folder is not None
-
-    @property
-    def ensure_checkpoints_save_folder(self) -> Path:
-        assert self.checkpoints_save_folder is not None
-        return self.checkpoints_save_folder
-
     @abstractmethod
     def compute_loss(self, batch: Batch) -> Tensor:
         ...
@@ -508,8 +472,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
         if self.clock.is_evaluation_step:
             self.evaluate()
-        if self.checkpointing_enabled and self.clock.is_checkpointing_step:
-            self._call_callbacks(event_name="on_checkpoint_save")
 
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""
