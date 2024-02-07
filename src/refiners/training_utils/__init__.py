@@ -4,6 +4,9 @@ from importlib.metadata import requires
 
 from packaging.requirements import Requirement
 
+from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.trainer import Trainer
+
 refiners_requires = requires("refiners")
 assert refiners_requires is not None
 
@@ -21,3 +24,9 @@ for dep in refiners_requires:
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+__all__ = [
+    "Trainer",
+    "BaseConfig",
+]

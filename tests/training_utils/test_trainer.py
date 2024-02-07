@@ -7,7 +7,6 @@ import pytest
 import torch
 from torch import Tensor, nn
 from torch.optim import SGD
-from torch.utils.data import Dataset
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
@@ -27,20 +26,6 @@ class MockBatch:
     targets: torch.Tensor
 
 
-class MockDataset(Dataset[MockBatch]):
-    def __len__(self):
-        return 20
-
-    def __getitem__(self, _: int) -> MockBatch:
-        return MockBatch(inputs=torch.randn(1, 10), targets=torch.randn(1, 10))
-
-    def collate_fn(self, batch: list[MockBatch]) -> MockBatch:
-        return MockBatch(
-            inputs=torch.cat([b.inputs for b in batch]),
-            targets=torch.cat([b.targets for b in batch]),
-        )
-
-
 class MockConfig(BaseConfig):
     pass
 
@@ -57,12 +42,22 @@ class MockModel(fl.Chain):
 class MockTrainer(Trainer[MockConfig, MockBatch]):
     step_counter: int = 0
 
+    @property
+    def dataset_length(self) -> int:
+        return 20
+
+    def get_item(self, _: int) -> MockBatch:
+        return MockBatch(inputs=torch.randn(1, 10), targets=torch.randn(1, 10))
+
+    def collate_fn(self, batch: list[MockBatch]) -> MockBatch:
+        return MockBatch(
+            inputs=torch.cat([b.inputs for b in batch]),
+            targets=torch.cat([b.targets for b in batch]),
+        )
+
     @cached_property
     def mock_model(self) -> MockModel:
         return MockModel()
-
-    def load_dataset(self) -> Dataset[MockBatch]:
-        return MockDataset()
 
     def load_models(self) -> dict[str, fl.Module]:
         return {"mock_model": self.mock_model}
