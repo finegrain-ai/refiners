@@ -42,7 +42,7 @@ jobs:
 
       - name: rye sync
         if: steps.changes.outputs.sources == 'true'
-        run: rye sync --all-features
+        run: rye sync --no-lock --all-features
 
       - name: ruff format
         if: steps.changes.outputs.sources == 'true'
