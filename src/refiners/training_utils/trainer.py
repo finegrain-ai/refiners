@@ -1,6 +1,6 @@
 import random
 import time
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
@@ -250,6 +250,23 @@ Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
+class _Dataset(Dataset[Batch]):
+    """
+    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`]
+    """
+
+    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
+        assert length > 0, "Dataset length must be greater than 0."
+        self.length = length
+        self.get_item = get_item
+
+    def __getitem__(self, index: int) -> Batch:
+        return self.get_item(index)
+
+    def __len__(self) -> int:
+        return self.length
+
+
 class Trainer(Generic[ConfigType, Batch], ABC):
     def __init__(self, config: ConfigType, callbacks: list[Callback[Any]] | None = None) -> None:
         self.config = config
@@ -429,23 +446,44 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         ...
 
     @abstractmethod
-    def load_dataset(self) -> Dataset[Batch]:
+    def get_item(self, _: int) -> Batch:
+        """
+        Returns a batch of data.
+
+        This function is used by the dataloader to fetch a batch of data.
+        """
+        ...
+
+    @abstractproperty
+    def dataset_length(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        This is used to compute the number of batches per epoch.
+        """
+        ...
+
+    @abstractmethod
+    def collate_fn(self, batch: list[Batch]) -> Batch:
+        """
+        Collate function for the dataloader.
+
+        This function is used to tell the dataloader how to combine a list of
+        batches into a single batch.
+        """
         ...
 
     @cached_property
     def dataset(self) -> Dataset[Batch]:
-        return self.load_dataset()
+        """
+        Returns the dataset constructed with the `get_item` method.
+        """
+        return _Dataset(get_item=self.get_item, length=self.dataset_length)
 
     @cached_property
-    def dataset_length(self) -> int:
-        assert hasattr(self.dataset, "__len__"), "The dataset must implement the `__len__` method."
-        return len(self.dataset)  # type: ignore
-
-    @cached_property
-    def dataloader(self) -> DataLoader[Batch]:
-        collate_fn = getattr(self.dataset, "collate_fn", None)
+    def dataloader(self) -> DataLoader[Any]:
         return DataLoader(
-            dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=collate_fn
+            dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=self.collate_fn
         )
 
     @abstractmethod
