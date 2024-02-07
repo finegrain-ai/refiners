@@ -245,8 +245,8 @@ class SDLoraManager:
         # get the suffix and score for `key` (default: no suffix, highest score = 5)
         (sfx, score) = next(((k, v) for k, v in key_char_order.items() if key.endswith(k)), ("", 5))
 
-        # return tuple of: (padded key prefix, score)
-        return (SDLoraManager.pad(key.removesuffix(sfx)), score)
+        padded_key_prefix = SDLoraManager.pad(key.removesuffix(sfx))
+        return (padded_key_prefix, score)
 
     @staticmethod
     def auto_attach(
