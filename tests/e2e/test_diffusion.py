@@ -703,6 +703,7 @@ def test_diffusion_batch2(
     assert len(predicted_images) == 2
     ensure_similar_images(predicted_images[0], expected_image_std_random_init)
 
+
 @no_grad()
 def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
