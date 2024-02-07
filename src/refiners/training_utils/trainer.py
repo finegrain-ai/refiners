@@ -252,7 +252,7 @@ ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 class _Dataset(Dataset[Batch]):
     """
-    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`]
+    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
     """
 
     def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
