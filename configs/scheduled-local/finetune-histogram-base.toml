@@ -74,7 +74,7 @@ use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
-histogram_db_indexes = [0]#, 1, 2, 3]
+histogram_db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",
