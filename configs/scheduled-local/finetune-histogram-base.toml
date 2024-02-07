@@ -70,6 +70,7 @@ split = "train"
 [checkpointing]
 #save_folder = "ckpts"
 save_interval = "5000:step"
+use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
@@ -77,7 +78,7 @@ histogram_db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",
-    "An oil painting",
+     "An oil painting",
      "A photography of a beautiful woman",
      "A pair of shoes",
      "A group of working people"

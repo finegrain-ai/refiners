@@ -12,6 +12,9 @@ lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", gpu_in
 histogram_auto_encoder = {gpu_index=0, train = false, checkpoint = "tmp/step1900.safetensors"}
 histogram_projection = {gpu_index=0, train = true}
 
+[adapters]
+histogram_adapter = {checkpoint = "./tmp/converted-mlp-step4998.safetensors"}
+
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
 offset_noise = 0.1
