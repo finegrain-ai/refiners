@@ -69,7 +69,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         )
 
     def compute_clip_text_embedding(
-        self, text: str | list[str], negative_text: str | list[str] = "", concat_batches: bool = True
+        self, text: str | list[str], negative_text: str | list[str] = ""
     ) -> Tensor:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
@@ -91,14 +91,6 @@ class StableDiffusion_1(LatentDiffusionModel):
                 negative_text = [negative_text] * len(text)
 
             negative_embedding = self.clip_text_encoder(negative_text)
-
-        batch_size = conditional_embedding.shape[0]
-
-        if batch_size > 1 and concat_batches:
-            # As for image prompt
-            # Create a longer text tokens sequence
-            negative_embedding = cat(negative_embedding.chunk(batch_size), dim=1)
-            conditional_embedding = cat(conditional_embedding.chunk(batch_size), dim=1)
 
         return cat((negative_embedding, conditional_embedding))
 
