@@ -1,9 +1,9 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "offline" # "online", "offline", "disabled"
+mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="embedding_768"
+name="embedding_768_2"
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", gpu_index=0, train = false}

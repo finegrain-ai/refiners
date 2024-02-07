@@ -33,6 +33,7 @@ class ColorPaletteConfig(BaseModel):
     use_only_trigger_probability: float = 0.0
     max_colors: int
     mode : str = "transformer"
+    weighted_palette: bool = False
     without_caption_probability: float = 0.17
 
 class ColorPalettePromptConfig(BaseModel):
@@ -59,6 +60,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
             embedding_dim=self.config.color_palette.embedding_dim,
             num_layers=self.config.color_palette.num_layers,
             mode=self.config.color_palette.mode,
+            weighted_palette=self.config.color_palette.weighted_palette,
             num_attention_heads=self.config.color_palette.num_attention_heads,
             feedforward_dim=self.config.color_palette.feedforward_dim,
             device=self.device,

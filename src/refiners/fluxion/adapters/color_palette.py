@@ -35,12 +35,14 @@ class PalettesTokenizer(fl.Module):
     def __init__(
         self,
         max_colors: int,
+        weighted_palette: bool = False,
         lda: SD1Autoencoder,
         use_lda: bool = False
     ) -> None:
         
         self._lda = [lda]
         self.use_lda = use_lda
+        self.weighted_palette = weighted_palette
         super().__init__()
         self.max_colors = max_colors
     
@@ -60,8 +62,11 @@ class PalettesTokenizer(fl.Module):
 
         if self.use_lda:
             tensor_colors = self.lda_encode(tensor_colors)
-
-        tensor_palette = cat((tensor_colors, tensor_weight), dim=2)
+        
+        if self.weighted_palette:
+            tensor_palette = cat((tensor_colors, tensor_weight), dim=2)
+        else:
+            tensor_palette = tensor_colors
         
         colors = self.add_channel(tensor_palette)
         colors = self.zero_right_padding(colors)
@@ -100,12 +105,17 @@ class ColorEncoder(fl.Chain):
     def __init__(
         self,
         embedding_dim: int,
+        weighted_palette: bool = False,
         use_lda : bool = False,
         device: Device | str | None = None,
         eps: float = 1e-5,
         dtype: DType | None = None,
     ) -> None:
-        in_features = 6 if use_lda else 5
+        in_features = 4
+        if use_lda:
+            in_features += 1
+        if weighted_palette:
+            in_features += 1
         super().__init__(
             fl.Linear(in_features=in_features, out_features=embedding_dim, bias=True, device=device, dtype=dtype),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=eps, device=device, dtype=dtype),
@@ -236,6 +246,7 @@ class ColorPaletteEncoder(fl.Chain):
         layer_norm_eps: float = 1e-5,
         mode: str = 'transformer',
         use_lda: bool = False,
+        weighted_palette: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -264,6 +275,31 @@ class ColorPaletteEncoder(fl.Chain):
             )
         else:
             raise ValueError(f"Unknown mode {mode}")
+        
+        if weighted_palette:
+            encoder = ColorEncoder(
+                embedding_dim=embedding_dim,
+                device=device,
+                weighted_palette=weighted_palette,
+                use_lda=use_lda,
+                dtype=dtype,
+            )
+        else:
+            encoder =  fl.Sum(
+                ColorEncoder(
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    use_lda=use_lda,
+                    weighted_palette=weighted_palette,
+                    dtype=dtype,
+                ),
+                PositionalEncoder(
+                    max_sequence_length=max_colors,
+                    embedding_dim=embedding_dim,
+                    device=device,
+                    dtype=dtype,
+                ),
+            )
 
         super().__init__(
             PalettesTokenizer(
@@ -272,20 +308,7 @@ class ColorPaletteEncoder(fl.Chain):
                 use_lda=use_lda,
             ),
             fl.Converter(),
-            # fl.Sum(
-            ColorEncoder(
-                embedding_dim=embedding_dim,
-                device=device,
-                use_lda=use_lda,
-                dtype=dtype,
-            ),
-            #         PositionalEncoder(
-            #             max_sequence_length=max_colors,
-            #             embedding_dim=embedding_dim,
-            #             device=device,
-            #             dtype=dtype,
-            #         ),
-            # ),
+            encoder,
             encoder_body,
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
         )
