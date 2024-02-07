@@ -65,7 +65,9 @@ class StableDiffusion_XL(LatentDiffusionModel):
             dtype=dtype,
         )
 
-    def compute_clip_text_embedding(self, text: str, negative_text: str | None = None) -> tuple[Tensor, Tensor]:
+    def compute_clip_text_embedding(
+        self, text: str | list[str], negative_text: str | list[str] | None = None
+    ) -> tuple[Tensor, Tensor]:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
         Args:
