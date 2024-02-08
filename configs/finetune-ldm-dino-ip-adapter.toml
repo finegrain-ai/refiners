@@ -23,7 +23,7 @@ scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false
 use_timestep_embedding = false
-fine_grained = false
+fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 
