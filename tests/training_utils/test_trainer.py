@@ -82,7 +82,7 @@ def mock_trainer(mock_config: MockConfig) -> MockTrainer:
 
 @pytest.fixture
 def mock_trainer_short(mock_config: MockConfig) -> MockTrainer:
-    mock_config_short = mock_config.copy()
+    mock_config_short = mock_config.model_copy(deep=True)
     mock_config_short.training.duration = {"number": 3, "unit": TimeUnit.STEP}
     return MockTrainer(config=mock_config_short)
 
