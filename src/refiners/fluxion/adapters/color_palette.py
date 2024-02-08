@@ -39,7 +39,6 @@ class PalettesTokenizer(fl.Module):
         weighted_palette: bool = False,
         use_lda: bool = False
     ) -> None:
-        
         self._lda = [lda]
         self.use_lda = use_lda
         self.weighted_palette = weighted_palette
@@ -205,8 +204,10 @@ class ColorPaletteExtractor:
     def __init__(
         self,
         size: int = 8,
+        weighted_palette: bool = False,
     ) -> None:
         self.size = size
+        self.weighted_palette = weighted_palette
 
     def __call__(self, image: Image.Image, size: int | None = None) -> ColorPalette:
         if size is None:
@@ -223,10 +224,11 @@ class ColorPaletteExtractor:
             count = float(counts[i].item())
             color_cluster: ColorPaletteCluster = (
                 center,
-                count / total
+                count / total if self.weighted_palette else 1.0 / size
             )
             palette.append(color_cluster)
-        return palette
+        sorted_palette = sorted(palette, key=lambda x: x[1], reverse=True)
+        return sorted_palette
     def distance(self, a: ColorPalette, b: ColorPalette) -> float:
         #TO DO
         raise NotImplementedError
@@ -304,6 +306,7 @@ class ColorPaletteEncoder(fl.Chain):
         super().__init__(
             PalettesTokenizer(
                 max_colors=max_colors,
+                weighted_palette=weighted_palette,
                 lda=lda,
                 use_lda=use_lda,
             ),

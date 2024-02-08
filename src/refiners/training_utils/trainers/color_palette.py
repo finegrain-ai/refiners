@@ -5,7 +5,7 @@ from refiners.fluxion.utils import load_from_safetensors, tensor_to_images
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer
+from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
 from torch import Tensor
 import numpy as np
 
@@ -21,7 +21,7 @@ from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     TestDiffusionBaseConfig,
 )
-from refiners.training_utils.datasets.color_palette import ColorPalette, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.callback import GradientNormLayerLogging
 
 class ColorPaletteConfig(BaseModel):
@@ -46,7 +46,8 @@ class LatentPrompt(TypedDict):
 
 class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
-    evaluation: TestColorPaletteConfig
+    evaluation: ColorTrainerEvaluationConfig
+    dataset: ColorDatasetConfig
 
 class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults, ColorPaletteLatentDiffusionConfig]):
     @cached_property
@@ -69,7 +70,8 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
     @cached_property
     def color_palette_extractor(self) -> ColorPaletteExtractor:
         return ColorPaletteExtractor(
-            size=self.config.color_palette.max_colors
+            size=self.config.color_palette.max_colors,
+            weighted_palette=self.config.color_palette.weighted_palette
         )
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
@@ -115,7 +117,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         dataset = self.dataset
         indices = self.config.evaluation.histogram_db_indexes
         items = [dataset[i][0] for i in indices]
-        
+        print(f"color palette lenght : {[len(item.color_palette) for item in items]}")
         palette = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
         images = [item.image for item in items]
         eval_indices = list(zip(indices, palette, images))
@@ -192,11 +194,15 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
     
     def draw_palette(self, palette: ColorPalette, width: int, palette_img_size: int) -> Image.Image:
         palette_img = Image.new(mode="RGB", size=(width, palette_img_size))
+        
         # sort the palette by weight
-        palette_sorted = sorted(palette, key=lambda x: x[1], reverse=True)
-        for i, (color, _) in enumerate(palette_sorted):
-            color_box = Image.fromarray(np.full((palette_img_size, palette_img_size, 3), color, dtype=np.uint8)) # type: ignore
-            palette_img.paste(color_box, box=(i*palette_img_size, 0))
+        current_x = 0
+        for (color, weight) in palette:
+            box_width = int(weight*width)            
+            color_box = Image.fromarray(np.full((palette_img_size, box_width, 3), color, dtype=np.uint8)) # type: ignore
+            palette_img.paste(color_box, box=(current_x, 0))
+            current_x+=box_width
+            
         return palette_img
     
     def draw_cover_image(self, batch: BatchColorPaletteResults) -> Image.Image:
@@ -233,11 +239,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
     def batch_metrics(self, results: BatchColorPaletteResults, prefix: str = "palette-img") -> None:
         palettes : list[list[Color]] = []
         for p in results.source_palettes:
-            colors : list[Color] = []
-            sorted_clusters = sorted(p, key=lambda x: x[1], reverse=True)
-            for sorted_clusters in p:
-                colors.append(color_cluster[0])
-            palettes.append(colors)
+            palettes.append([cluster[0] for cluster in p])
         
         images = tensor_to_images(results.result_images)
         batch_image_palette_metrics(

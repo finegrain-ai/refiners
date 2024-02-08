@@ -17,7 +17,7 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
 )
 
-from refiners.training_utils.datasets.color_palette import ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
@@ -40,7 +40,7 @@ class ColorTrainerEvaluationConfig(TestDiffusionBaseConfig):
 
 class ColorTrainerConfig(FinetuneLatentDiffusionBaseConfig):
     evaluation: ColorTrainerEvaluationConfig
-
+    dataset: ColorDatasetConfig
 
 PromptType = TypeVar("PromptType", bound=AbstractColorPrompt)
 ResultType = TypeVar("ResultType", bound=AbstractColorResults)
@@ -53,13 +53,7 @@ class AbstractColorTrainer(
 ):
     def load_dataset(self) -> ColorPaletteDataset:
         return ColorPaletteDataset(
-            config=self.config.dataset,
-            # use only palette 8 here
-            sampling_by_palette = SamplingByPalette(
-                sampling={
-                    "palette_8": 1.0
-                }
-            )
+            config=self.config.dataset
 		)
 
     @cached_property

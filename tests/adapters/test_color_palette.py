@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1
 
 def test_colors_tokenizer() -> None:
     max_colors = 10
-    tokenizer = PalettesTokenizer(max_colors=max_colors, lda=SD1Autoencoder())
+    tokenizer = PalettesTokenizer(max_colors=max_colors, lda=SD1Autoencoder(), weighted_palette=True)
 
     batch_size = 5
 
@@ -16,6 +16,13 @@ def test_colors_tokenizer() -> None:
     assert isinstance(color_tokens.shape, torch.Size)
     assert color_tokens.shape == torch.Size([batch_size, max_colors, 5])
 
+    tokenizer2 = PalettesTokenizer(max_colors=max_colors, lda=SD1Autoencoder(), weighted_palette=False)
+
+    batch_size = 5
+
+    color_tokens2 = tokenizer2(empty_palettes)
+    assert isinstance(color_tokens2.shape, torch.Size)
+    assert color_tokens2.shape == torch.Size([batch_size, max_colors, 4])
 
 def test_color_palette_encoder() -> None:
     device = "cuda:0"
@@ -228,6 +235,6 @@ def test_palette_extractor() -> None:
     
     assert len(palette) == palette_size
     assert isinstance(palette[0], tuple)
-    assert isinstance(palette[0][1], int)
+    assert isinstance(palette[0][1], float)
     assert len(palette[0][0]) == 3
 #    assert isinstance(palette[0][0][0], int)

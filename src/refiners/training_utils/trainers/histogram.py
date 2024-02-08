@@ -22,7 +22,7 @@ from refiners.fluxion.adapters.histogram import (
 )
 from refiners.fluxion.utils import images_to_tensor, save_to_safetensors, tensor_to_image
 from refiners.training_utils.callback import Callback, GradientNormLayerLogging
-from refiners.training_utils.datasets.color_palette import ColorPalette, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorPalette, ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.metrics.color_palette import batch_palette_metrics, BatchHistogramPrompt, BatchHistogramResults
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
@@ -57,6 +57,17 @@ class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
 class HistogramLatentDiffusionTrainer(
     AbstractColorTrainer[BatchHistogramPrompt, BatchHistogramResults, HistogramLatentDiffusionConfig],
 ):
+    
+    def load_dataset(self) -> ColorPaletteDataset:
+        return ColorPaletteDataset(
+            config=self.config.dataset,
+            # use only palette 8 here
+            sampling_by_palette = SamplingByPalette(
+                sampling={
+                    "palette_8": 1.0
+                }
+            )
+		)
     
     def batch_metrics(self, results: BatchHistogramResults, prefix: str = "histogram-img") -> None:
         

@@ -1,12 +1,24 @@
 import random
 from dataclasses import dataclass
-from typing import List
+from typing import List, Callable
 
 import numpy as np
 from PIL import Image
 from refiners.training_utils.datasets.latent_diffusion import TextEmbeddingLatentsBaseDataset
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.fluxion.adapters.color_palette import ColorPalette
+
+from pydantic import BaseModel
+
+class ColorJitterConfig(BaseModel):
+    brightness: float = 0.0
+    contrast: float = 0.0
+    saturation: float = 0.0
+    hue: float = 0.0
+
+class ColorDatasetConfig(HuggingfaceDatasetConfig):
+    color_jitter: ColorJitterConfig | None = None
+    grayscale: float = 0.0
 
 @dataclass
 class ColorPaletteDatasetItem:
@@ -20,6 +32,8 @@ class DatasetItem:
     palettes: dict[str, ColorPalette]
     image: Image.Image
 
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ColorJitter, RandomGrayscale# type: ignore
+from torch.nn import Module as TorchModule
 
 TextEmbeddingColorPaletteLatentsBatch = List[ColorPaletteDatasetItem]
 
@@ -99,12 +113,28 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
+        print('palette_index', palette_index, weights_list)
         return palette_index
     
     def process_color_palette(self, item: DatasetItem) -> ColorPalette:
         palette_color: list[Color] = item['palettes'][str(self.random_palette_size())]
         palette: ColorPalette = [(color, 1.0/len(palette_color)) for color in palette_color]
         return palette
+
+    def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
+        # TODO: make this configurable and add other transforms
+        transforms: list[TorchModule] = []
+        if self.config.random_crop:
+            transforms.append(RandomCrop(size=512))
+        if self.config.horizontal_flip:
+            transforms.append(RandomHorizontalFlip(p=0.5))
+        if self.config.color_jitter is not None:
+            transforms.append(ColorJitter(brightness=self.config.color_jitter.brightness, contrast=self.config.color_jitter.contrast, saturation=self.config.color_jitter.saturation, hue=self.config.color_jitter.hue))
+        if self.config.grayscale > 0:
+            transforms.append(RandomGrayscale(p=self.config.grayscale))            
+        if not transforms:
+            return lambda image: image
+        return Compose(transforms)
 
     def extract_color_palette(self, item: DatasetItem) -> ColorPalette:
         
