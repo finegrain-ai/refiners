@@ -291,10 +291,13 @@ def test_setattr_dont_register() -> None:
     assert module_keys(chain=chain) == ["Linear_1", "Linear_2"]
 
 
-EXPECTED_TREE = (
-    "(CHAIN)\n    ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) (x2)\n    └── (CHAIN)\n        ├── Linear(in_features=1,"
-    " out_features=1, device=cpu, dtype=float32) #1\n        └── Linear(in_features=2, out_features=1, device=cpu, dtype=float32) #2"
-)
+EXPECTED_TREE = """
+(CHAIN)
+    ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) (x2)
+    └── (CHAIN)
+        ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) #1
+        └── Linear(in_features=2, out_features=1, device=cpu, dtype=float32) #2
+    """.strip()
 
 
 def test_debug_print() -> None:
