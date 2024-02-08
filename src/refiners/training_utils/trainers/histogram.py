@@ -9,6 +9,7 @@ from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAut
 from refiners.training_utils.config import TrainingConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
 from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from torch import Tensor
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
 
@@ -28,6 +29,7 @@ from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     TestDiffusionBaseConfig,
 )
+from refiners.fluxion.adapters.histogram import HistogramExtractor
 
 Color = Tuple[int, int, int]
 Histogram = Tensor
@@ -53,6 +55,34 @@ class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     validation_dataset: HuggingfaceDatasetConfig
 
 
+
+class GridEvalHistogramDataset(GridEvalDataset[BatchHistogramPrompt]):
+    __prompt_type__ = BatchHistogramPrompt
+    
+    def __init__(self, 
+            db_indexes: list[int], 
+            hf_dataset: ColorPaletteDataset, 
+            prompts: list[str], 
+            text_encoder: CLIPTextEncoderL, 
+            histogram_extractor: HistogramExtractor,
+            histogram_auto_encoder: HistogramAutoEncoder,
+        ) -> None:
+        super().__init__(dataset=dataset, config=config)
+        self.histogram_extractor = histogram_extractor
+        self.histogram_auto_encoder = histogram_auto_encoder
+        
+    def process_item(self, item: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
+        if len(items) != 1:
+            raise ValueError("The items must have length 1.")
+        
+        histograms = self.histogram_extractor.images_to_histograms(images)
+        histogram_embeddings = self.histogram_auto_encoder.encode(histograms).reshape(histograms.shape[0], 1, -1)
+        
+        return {
+            "source_palettes": [items[0].palette],
+            "source_histogram_embeddings": histogram_embeddings,
+            "source_histograms": histograms
+        }
 
 class HistogramLatentDiffusionTrainer(
     AbstractColorTrainer[BatchHistogramPrompt, BatchHistogramResults, HistogramLatentDiffusionConfig],
@@ -133,7 +163,7 @@ class HistogramLatentDiffusionTrainer(
     @cached_property
     def eval_dataset(self) -> list[BatchHistogramPrompt]:
         dataset = self.dataset
-        indices = self.config.evaluation.histogram_db_indexes
+        indices = self.config.evaluation.db_indexes
         items = [dataset[i][0] for i in indices]
         palette = [item.color_palette for item in items]
         images = [item.image for item in items]

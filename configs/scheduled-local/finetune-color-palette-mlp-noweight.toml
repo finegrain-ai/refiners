@@ -1,6 +1,6 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "offline" # "online", "offline", "disabled"
+mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
 name = "mlp-not-weighted"
@@ -28,7 +28,7 @@ embedding_dim = 10
 weighted_palette = false
 
 [training]
-duration = "5000:step"
+duration = "2000:step"
 seed = 0
 batch_size = 1
 gradient_accumulation = "1:step"
@@ -61,20 +61,18 @@ caption_key = "ai_description"
 split = "train"
 
 [checkpointing]
-save_interval = "5000:step"
+save_interval = "2000:step"
 use_wandb = true
 
 [evaluation]
 batch_size = 3
 num_inference_steps = 30
 use_short_prompts = false
-histogram_db_indexes = [0, 1, 2, 3, 4, 5, 6, 7]
+histogram_db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",
      "An oil painting",
-     "A photography of a beautiful woman",
-     "A pair of shoes",
-     "A group of working people"
+     "A photography of a beautiful woman"
 ]
 condition_scale = 7.5

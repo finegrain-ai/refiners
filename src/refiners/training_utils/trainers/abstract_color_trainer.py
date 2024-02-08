@@ -1,9 +1,10 @@
 from functools import cached_property
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Type, Any
 
 from loguru import logger
 from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.metrics.color_palette import AbstractColorPrompt, AbstractColorResults
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from torch import Tensor, randn, tensor
 
 from torch.utils.data import DataLoader
@@ -17,7 +18,7 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1,
 )
 
-from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPaletteDataset, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
     LatentDiffusionBaseTrainer,
@@ -33,19 +34,50 @@ from refiners.training_utils.trainers.trainer import scoped_seed
     
 #     return str(hash(str2))
 
+from torch.utils.data import Dataset
 
 class ColorTrainerEvaluationConfig(TestDiffusionBaseConfig):
-    histogram_db_indexes: list[int]
+    db_indexes: list[int]
     batch_size: int = 1
 
 class ColorTrainerConfig(FinetuneLatentDiffusionBaseConfig):
     evaluation: ColorTrainerEvaluationConfig
-    dataset: ColorDatasetConfig
+    dataset: ColorDatasetConfig # type: ignore
+    eval_dataset: ColorDatasetConfig
 
 PromptType = TypeVar("PromptType", bound=AbstractColorPrompt)
-ResultType = TypeVar("ResultType", bound=AbstractColorResults)
+ResultType = TypeVar("ResultType", bound=AbstractColorResults) 
 ConfigType = TypeVar("ConfigType", bound = ColorTrainerConfig)
 
+class GridEvalDataset(Generic[PromptType], Dataset):
+    
+    __prompt_type__ : Type[PromptType]
+    
+    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, prompts: list[str], text_encoder: CLIPTextEncoderL):
+        self.db_indexes = db_indexes
+        self.hf_dataset = hf_dataset
+        self.prompts = prompts
+        self.text_encoder = text_encoder
+        self.prompt_embeddings : list[Tensor] = [self.text_encoder(prompt) for prompt in prompts]
+
+    def __len__(self):
+        return len(self.db_indexes) * len(self.prompts)
+
+    def __getitem__(self, index: int) -> PromptType:
+        db_index = self.db_indexes[index // len(self.prompts)]
+        prompt = self.prompts[index % len(self.prompts)]
+        batch = self.hf_dataset[db_index]
+        args = self.process_item(batch)
+        return self.__class__.__prompt_type__(
+            db_indexes=[db_index], 
+            prompts=[prompt],
+            source_images=[batch[0].image]
+            prompt_embeddings=[self.prompt_embeddings[index % len(self.prompts)]],
+            **args
+        )
+        
+    def process_item(self, items: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
+        ...
 
 class AbstractColorTrainer(
     Generic[PromptType, ResultType, ConfigType],
@@ -54,7 +86,7 @@ class AbstractColorTrainer(
     def load_dataset(self) -> ColorPaletteDataset:
         return ColorPaletteDataset(
             config=self.config.dataset
-		)
+        )
 
     @cached_property
     def dataset(self) -> ColorPaletteDataset:  # type: ignore
@@ -191,5 +223,16 @@ class AbstractColorTrainer(
 
 
     @cached_property
-    def eval_dataset(self) -> list[PromptType]:
-        ...
+    def grid_eval_dataset(self) -> GridEvalDataset[PromptType]:
+        return GridEvalDataset(
+            db_indexes=self.config.evaluation.db_indexes,
+            hf_dataset=self.eval_dataset,
+            prompts=self.config.evaluation.prompts
+        )
+    
+    @cached_property
+    def eval_dataset(self) -> ColorPaletteDataset:
+        return ColorPaletteDataset(
+            config=self.config.eval_dataset
+        )
+        

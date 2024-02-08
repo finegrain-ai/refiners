@@ -68,7 +68,8 @@ class AbstractColorPrompt:
         return self.__class__(**opts)
     
     def get_prompt(self: PromptType, prompt: str) -> PromptType:
-        indices = [i for i, p in enumerate(self.source_prompts) if p == prompt]
+        prompts = cast(list[str], getattr(self, "source_prompts"))
+        indices = [i for i, p in enumerate(prompts) if p == prompt]
         return self.get_indices(indices)
     
 class AbstractColorResults(Generic[PromptType], AbstractColorPrompt):

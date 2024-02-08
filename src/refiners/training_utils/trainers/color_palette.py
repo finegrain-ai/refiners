@@ -1,11 +1,15 @@
 from functools import cached_property
-from typing import Any, List, TypedDict
+from typing import Any, TypedDict
 from refiners.fluxion.utils import load_from_safetensors, tensor_to_images
 
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
+from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt
+from refiners.training_utils.trainers.abstract_color_trainer import GridEvalDataset
+from src.refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from src.refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 from torch import Tensor
 import numpy as np
 
@@ -19,7 +23,6 @@ from refiners.training_utils.callback import Callback
 from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt, BatchColorPaletteResults, ImageAndPalette, batch_image_palette_metrics
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
-    TestDiffusionBaseConfig,
 )
 from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.callback import GradientNormLayerLogging
@@ -48,6 +51,21 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     evaluation: ColorTrainerEvaluationConfig
     dataset: ColorDatasetConfig
+
+class GridEvalPaletteDataset(GridEvalDataset[BatchColorPalettePrompt]):
+    __prompt_type__ = BatchColorPalettePrompt
+    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, prompts: list[str], text_encoder: CLIPTextEncoderL, color_palette_extractor: ColorPaletteExtractor):
+        super().__init__(db_indexes, hf_dataset, prompts, text_encoder)
+        self.color_palette_extractor = color_palette_extractor
+    def process_item(self, items: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
+        
+        if len(items) != 1:
+            raise ValueError("The items must have length 1.")
+        
+        source_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
+        return {
+            "source_palettes": source_palettes
+        }
 
 class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPalettePrompt, BatchColorPaletteResults, ColorPaletteLatentDiffusionConfig]):
     @cached_property
@@ -113,31 +131,40 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         }
     
     @cached_property
-    def eval_dataset(self) -> list[BatchColorPalettePrompt]:
-        dataset = self.dataset
-        indices = self.config.evaluation.histogram_db_indexes
-        items = [dataset[i][0] for i in indices]
-        print(f"color palette lenght : {[len(item.color_palette) for item in items]}")
-        palette = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
-        images = [item.image for item in items]
-        eval_indices = list(zip(indices, palette, images))
+    def grid_eval_dataset(self) -> GridEvalDataset[BatchColorPalettePrompt]:
+        return GridEvalPaletteDataset(
+            db_indexes=self.config.evaluation.db_indexes,
+            hf_dataset=self.eval_dataset,
+            prompts=self.config.evaluation.prompts,
+            text_encoder=self.text_encoder,
+            color_palette_extractor=self.color_palette_extractor
+        )
+    
+    # def eval_dataset(self) -> list[BatchColorPalettePrompt]:
+    #     dataset = self.dataset
+    #     indices = self.config.evaluation.db_indexes
+    #     items = [dataset[i][0] for i in indices]
+    #     print(f"color palette lenght : {[len(item.color_palette) for item in items]}")
+    #     palette = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
+    #     images = [item.image for item in items]
+    #     eval_indices = list(zip(indices, palette, images))
         
-        evaluations : list[BatchColorPalettePrompt] = []
-        prompts_list = [(prompt, self.text_encoder(prompt)) for prompt in self.config.evaluation.prompts]
+    #     evaluations : list[BatchColorPalettePrompt] = []
+    #     prompts_list = [(prompt, self.text_encoder(prompt)) for prompt in self.config.evaluation.prompts]
 
-        for (prompt, prompt_embedding) in prompts_list:
-            for db_index, palette, image in eval_indices:
-                batch_prompt = BatchColorPalettePrompt(
-                    source_prompts= [prompt],
-                    db_indexes= [db_index],
-                    source_palettes= [palette],
-                    text_embeddings= prompt_embedding,
-                    source_images= [image]
-                )
-                evaluations.append(batch_prompt)
+    #     for (prompt, prompt_embedding) in prompts_list:
+    #         for db_index, palette, image in eval_indices:
+    #             batch_prompt = BatchColorPalettePrompt(
+    #                 source_prompts= [prompt],
+    #                 db_indexes= [db_index],
+    #                 source_palettes= [palette],
+    #                 text_embeddings= prompt_embedding,
+    #                 source_images= [image]
+    #             )
+    #             evaluations.append(batch_prompt)
         
-        print(f"Eval dataset size: {len(evaluations)}")
-        return evaluations
+    #     print(f"Eval dataset size: {len(evaluations)}")
+    #     return evaluations
     
     def build_results(self, batch: BatchColorPalettePrompt, result_images: Tensor) -> BatchColorPaletteResults:
         

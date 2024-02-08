@@ -3,7 +3,7 @@
 # Path to the directory containing the config files
 config_dir="./configs/scheduled-local"
 prefix=""
-script="./scripts/training/finetune-ldm-histogram.py"
+script="./scripts/training/finetune-ldm-color-palette.py"
 # Log file path
 log_file="./tmp/schedule-log.txt"
 

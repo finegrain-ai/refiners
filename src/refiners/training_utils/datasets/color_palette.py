@@ -113,7 +113,6 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         sum = weights.sum()
         probabilities = weights / sum
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
-        print('palette_index', palette_index, weights_list)
         return palette_index
     
     def process_color_palette(self, item: DatasetItem) -> ColorPalette:
