@@ -271,6 +271,7 @@ class IPDataset(Dataset[IPBatch]):
         return {
             "lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]
         }
+    @no_grad()
     def load_huggingface_dataset(self) -> datasets.Dataset:
         """Load the dataset from Hugging Face and apply some pre-processing."""
         dataset_config = self.trainer.config.dataset
