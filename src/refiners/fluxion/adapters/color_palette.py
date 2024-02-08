@@ -212,6 +212,10 @@ class ColorPaletteExtractor:
     def __call__(self, image: Image.Image, size: int | None = None) -> ColorPalette:
         if size is None:
             size = self.size
+        
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        
         image_np = np.array(image)
         pixels = image_np.reshape(-1, 3)
         kmeans = KMeans(n_clusters=size).fit(pixels) # type: ignore 
