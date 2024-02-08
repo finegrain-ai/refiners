@@ -112,8 +112,6 @@ class AbstractColorTrainer(
         
         clip_text_embedding = self.sd.compute_clip_text_embedding(text=batch.source_prompts)
         
-        logger.info(f"Generating steps")
-
         for step in self.sd.steps:
             x = self.sd(
                 x,
@@ -128,8 +126,6 @@ class AbstractColorTrainer(
         #                 f"img hash : {hash_tensor(images[i])},"+
         #                 f"txt_hash: {clip_text_embedding.norm()},"+
         #                 f"histo_hash: {cfg_histogram_embedding.norm()}")
-        logger.info(f"Generation done")
-
         return self.build_results(batch, images)
     
     def build_results(self, batch: PromptType, result_images: Tensor) -> ResultType:
