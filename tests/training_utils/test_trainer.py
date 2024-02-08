@@ -81,6 +81,13 @@ def mock_trainer(mock_config: MockConfig) -> MockTrainer:
 
 
 @pytest.fixture
+def mock_trainer_short(mock_config: MockConfig) -> MockTrainer:
+    mock_config_short = mock_config.copy()
+    mock_config_short.training.duration = {"number": 3, "unit": TimeUnit.STEP}
+    return MockTrainer(config=mock_config_short)
+
+
+@pytest.fixture
 def mock_model() -> fl.Chain:
     return MockModel()
 
@@ -174,6 +181,18 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     assert clock.step == config.training.duration["number"] * clock.num_batches_per_epoch
 
     assert mock_trainer.step_counter == mock_trainer.clock.step
+
+
+def test_training_short_cycle(mock_trainer_short: MockTrainer) -> None:
+    clock = mock_trainer_short.clock
+    config = mock_trainer_short.config
+
+    assert mock_trainer_short.step_counter == 0
+    assert mock_trainer_short.clock.epoch == 0
+
+    mock_trainer_short.train()
+
+    assert clock.step == config.training.duration["number"]
 
 
 @pytest.fixture
