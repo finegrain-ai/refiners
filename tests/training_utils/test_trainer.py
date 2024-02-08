@@ -46,7 +46,7 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
     def dataset_length(self) -> int:
         return 20
 
-    def get_item(self, _: int) -> MockBatch:
+    def get_item(self, index: int) -> MockBatch:
         return MockBatch(inputs=torch.randn(1, 10), targets=torch.randn(1, 10))
 
     def collate_fn(self, batch: list[MockBatch]) -> MockBatch:
