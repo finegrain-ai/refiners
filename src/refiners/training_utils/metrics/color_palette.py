@@ -196,9 +196,7 @@ def batch_palette_metrics(log: Logger, images_and_palettes: BatchHistogramResult
     
     if len(images) != len(palettes):
         raise ValueError("Images and palettes must have the same length")
-    
-    print("palettes", palettes)
-    
+        
     return batch_image_palette_metrics(
         log,
         [

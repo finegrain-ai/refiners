@@ -35,8 +35,8 @@ class PalettesTokenizer(fl.Module):
     def __init__(
         self,
         max_colors: int,
-        weighted_palette: bool = False,
         lda: SD1Autoencoder,
+        weighted_palette: bool = False,
         use_lda: bool = False
     ) -> None:
         

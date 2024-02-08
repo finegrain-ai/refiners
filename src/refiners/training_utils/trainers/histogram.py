@@ -338,10 +338,10 @@ class SaveHistogram(Callback[HistogramLatentDiffusionTrainer]):
             raise ValueError("The model must have a parent.")
         adapter = model.parent
 
-        tensors = {f"unet.{i:03d}": w for i, w in enumerate(adapter.weights)}
+        tensors = {f"unet.{i}": p for i, p in adapter.named_parameters() if p.requires_grad}
         
         projection = {
-            f"histogram_projection.{i:03d}": w for i, w in enumerate(trainer.histogram_projection.weights)
+            f"histogram_projection.{i}": w for i, w in trainer.histogram_projection.state_dict().items()
         }
         
         tensors.update(projection)
