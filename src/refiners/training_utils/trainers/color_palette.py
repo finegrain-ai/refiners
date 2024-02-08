@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
 from refiners.training_utils.metrics.color_palette import BatchColorPalettePrompt
 from refiners.training_utils.trainers.abstract_color_trainer import GridEvalDataset
-from src.refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
-from src.refiners.training_utils.datasets.color_palette import ColorPaletteDataset
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
+from refiners.training_utils.datasets.color_palette import ColorPaletteDataset
 from torch import Tensor
 import numpy as np
 
@@ -51,11 +51,12 @@ class ColorPaletteLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     color_palette: ColorPaletteConfig
     evaluation: ColorTrainerEvaluationConfig
     dataset: ColorDatasetConfig
+    eval_dataset: ColorDatasetConfig
 
 class GridEvalPaletteDataset(GridEvalDataset[BatchColorPalettePrompt]):
     __prompt_type__ = BatchColorPalettePrompt
-    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, prompts: list[str], text_encoder: CLIPTextEncoderL, color_palette_extractor: ColorPaletteExtractor):
-        super().__init__(db_indexes, hf_dataset, prompts, text_encoder)
+    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, source_prompts: list[str], text_encoder: CLIPTextEncoderL, color_palette_extractor: ColorPaletteExtractor):
+        super().__init__(db_indexes, hf_dataset, source_prompts, text_encoder)
         self.color_palette_extractor = color_palette_extractor
     def process_item(self, items: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
         
@@ -135,7 +136,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
         return GridEvalPaletteDataset(
             db_indexes=self.config.evaluation.db_indexes,
             hf_dataset=self.eval_dataset,
-            prompts=self.config.evaluation.prompts,
+            source_prompts=self.config.evaluation.prompts,
             text_encoder=self.text_encoder,
             color_palette_extractor=self.color_palette_extractor
         )

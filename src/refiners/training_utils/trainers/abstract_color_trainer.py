@@ -49,30 +49,30 @@ PromptType = TypeVar("PromptType", bound=AbstractColorPrompt)
 ResultType = TypeVar("ResultType", bound=AbstractColorResults) 
 ConfigType = TypeVar("ConfigType", bound = ColorTrainerConfig)
 
-class GridEvalDataset(Generic[PromptType], Dataset):
+class GridEvalDataset(Generic[PromptType], Dataset[PromptType]):
     
     __prompt_type__ : Type[PromptType]
     
-    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, prompts: list[str], text_encoder: CLIPTextEncoderL):
+    def __init__(self, db_indexes: list[int], hf_dataset: ColorPaletteDataset, source_prompts: list[str], text_encoder: CLIPTextEncoderL):
         self.db_indexes = db_indexes
         self.hf_dataset = hf_dataset
-        self.prompts = prompts
+        self.source_prompts = source_prompts
         self.text_encoder = text_encoder
-        self.prompt_embeddings : list[Tensor] = [self.text_encoder(prompt) for prompt in prompts]
+        self.text_embeddings : list[Tensor] = [self.text_encoder(prompt) for prompt in source_prompts]
 
     def __len__(self):
-        return len(self.db_indexes) * len(self.prompts)
+        return len(self.db_indexes) * len(self.source_prompts)
 
     def __getitem__(self, index: int) -> PromptType:
-        db_index = self.db_indexes[index // len(self.prompts)]
-        prompt = self.prompts[index % len(self.prompts)]
+        db_index = self.db_indexes[index // len(self.source_prompts)]
+        source_prompt = self.source_prompts[index % len(self.source_prompts)]
         batch = self.hf_dataset[db_index]
         args = self.process_item(batch)
         return self.__class__.__prompt_type__(
             db_indexes=[db_index], 
-            prompts=[prompt],
-            source_images=[batch[0].image]
-            prompt_embeddings=[self.prompt_embeddings[index % len(self.prompts)]],
+            source_prompts=[source_prompt],
+            source_images=[batch[0].image],
+            text_embeddings=self.text_embeddings[index % len(self.source_prompts)],
             **args
         )
         
@@ -107,11 +107,9 @@ class AbstractColorTrainer(
     
     @cached_property
     def eval_dataloader(self) -> DataLoader[PromptType]:
-                
-        evaluations = self.eval_dataset
-        
+                        
         return DataLoader(
-            dataset=evaluations, 
+            dataset=self.grid_eval_dataset, 
             batch_size=self.config.evaluation.batch_size, 
             shuffle=False,
             collate_fn=self.collate_prompts, 
@@ -227,7 +225,7 @@ class AbstractColorTrainer(
         return GridEvalDataset(
             db_indexes=self.config.evaluation.db_indexes,
             hf_dataset=self.eval_dataset,
-            prompts=self.config.evaluation.prompts
+            source_prompts=self.config.evaluation.prompts
         )
     
     @cached_property

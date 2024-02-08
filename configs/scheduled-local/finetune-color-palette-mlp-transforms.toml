@@ -28,7 +28,7 @@ embedding_dim = 10
 weighted_palette = true
 
 [training]
-duration = "2000:step"
+duration = "2:epoch"
 seed = 0
 batch_size = 1
 gradient_accumulation = "1:step"
@@ -58,9 +58,8 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[:4]"
+split = "train[4:]"
 color_jitter = {hue=0.5}
-
 
 [eval_dataset]
 hf_repo = "1aurent/unsplash-lite-palette"
@@ -70,13 +69,14 @@ caption_key = "ai_description"
 split = "train[0:4]"
 
 [checkpointing]
-save_interval = "2000:step"
+save_interval = "10000:step"
 use_wandb = true
 
 [evaluation]
 batch_size = 3
 num_inference_steps = 30
 use_short_prompts = false
+db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",

@@ -61,14 +61,21 @@ caption_key = "ai_description"
 split = "train"
 
 [checkpointing]
-save_interval = "2000:step"
+save_interval = "10000:step"
 use_wandb = true
+
+[eval_dataset]
+hf_repo = "1aurent/unsplash-lite-palette"
+revision = "main"
+resize_image_max_size = 512
+caption_key = "ai_description"
+split = "train[0:4]"
 
 [evaluation]
 batch_size = 3
 num_inference_steps = 30
 use_short_prompts = false
-histogram_db_indexes = [0, 1, 2, 3]
+db_indexes = [0, 1, 2, 3]
 prompts = [
      "A Bustling City Street",
      "A cute cat",

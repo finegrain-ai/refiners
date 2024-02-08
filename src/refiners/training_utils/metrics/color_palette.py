@@ -30,17 +30,35 @@ class AbstractColorPrompt:
         **kwargs : CollatableProps
     ) -> None:
         for key in self.__class__._list_keys:
+            if key not in kwargs:
+                raise ValueError(f"Key {key} is not present in {kwargs}")
             setattr(self, key, kwargs[key])
         for key in self.__class__._tensor_keys:
+            if key not in kwargs:
+                raise ValueError(f"Key {key} is not present in {kwargs}")
             setattr(self, key, kwargs[key])
 
     @classmethod
     def collate_fn(cls: Type[PromptType], batch: Sequence["AbstractColorPrompt"]) -> PromptType:
         opts : dict[str, CollatableProps] = {}
         for key in cls._list_keys:
-            opts[key] = [prop for item in batch for prop in getattr(item, key)]
+            opts[key] : list[Any] = []
+
+            for item in batch:
+                if not hasattr(item, key):
+                    raise ValueError(f"Key {key} is not present in {item}")
+                for prop in getattr(item, key):
+                    opts[key].append(prop)
         for key in cls._tensor_keys:
-            opts[key] = cat([getattr(item, key) for item in batch])
+            lst : list[Tensor] = []
+            for item in batch:
+                if not hasattr(item, key):
+                    raise ValueError(f"Key {key} is not present in {item}")
+                tensor = getattr(item, key)
+                if not isinstance(tensor, Tensor):
+                    raise ValueError(f"Key {key}, {tensor} should be a tensor")
+                lst.append(tensor)
+            opts[key] = cat(lst)
             
         return cls(**opts)
     
