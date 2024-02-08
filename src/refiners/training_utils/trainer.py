@@ -446,7 +446,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         ...
 
     @abstractmethod
-    def get_item(self, _: int) -> Batch:
+    def get_item(self, index: int) -> Batch:
         """
         Returns a batch of data.
 
