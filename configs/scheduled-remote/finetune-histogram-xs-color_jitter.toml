@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="xs"
+name="xs-hue-0.2"
 tags = ["l4", "remote"]
 
 [models]
@@ -64,6 +64,7 @@ resize_image_max_size = 512
 caption_key = "ai_description"
 split = "train[4:]"
 #random_crop = false
+color_jitter = {hue=0.2}
 
 [eval_dataset]
 hf_repo = "1aurent/unsplash-lite-palette"

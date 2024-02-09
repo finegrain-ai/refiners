@@ -26,13 +26,14 @@ color_bits = 6
 [training]
 duration = "2000:step"
 seed = 0
-batch_size = 8
+batch_size = 4
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
 evaluation_interval = "500:step"
 evaluation_seed = 1
 color_loss_weight = 0.1
+dtype = "bfloat16"
 
 [optimizer]
 optimizer = "AdamW" # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
@@ -42,10 +43,10 @@ eps = 1e-8
 weight_decay = 1e-2
 
 [adapter]
-embedding_dim = 20
+embedding_dim = 40
 num_tokens = 4
 num_layers = 2
-feedforward_dim = 40
+feedforward_dim = 80
 
 [scheduler]
 scheduler_type = "ConstantLR"
