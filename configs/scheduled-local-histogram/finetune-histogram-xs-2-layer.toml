@@ -1,17 +1,17 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "online" # "online", "offline", "disabled"
+mode = "disabled" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="embedding_768"
-tags = ["l4", "remote"]
+name="xs"
+tags = ["l4", "local"]
 
 [models]
-unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
-text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
-lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
-histogram_auto_encoder = {train = false, checkpoint = "tmp/step1900.safetensors"}
-histogram_projection = {train = true}
+unet = {gpu_index = 0, checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
+text_encoder = {gpu_index = 1,checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
+lda = {gpu_index = 1, checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
+histogram_auto_encoder = {gpu_index = 0, train = false, checkpoint = "tmp/step1900.safetensors"}
+histogram_projection = {gpu_index = 0, train = true, learning_rate = 1e-2}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
@@ -24,9 +24,9 @@ n_down_samples = 5
 color_bits = 6
 
 [training]
-duration = "5:epoch"
+duration = "100:step"
 seed = 0
-batch_size = 6
+batch_size = 1
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
@@ -42,7 +42,10 @@ eps = 1e-8
 weight_decay = 1e-2
 
 [adapter]
-embedding_dim = 768
+embedding_dim = 10
+num_tokens = 1
+num_layers = 2
+feedforward_dim = 20
 
 [scheduler]
 scheduler_type = "ConstantLR"
@@ -58,15 +61,15 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train"
+split = "train[4:]"
 #random_crop = false
 
-[validation_dataset]
+[eval_dataset]
 hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train"
+split = "train[0:4]"
 
 [checkpointing]
 #save_folder = "ckpts"
@@ -75,14 +78,15 @@ use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
-histogram_db_indexes = [0, 1, 2, 3]
-batch_size = 10
+db_indexes = [0]#, 1, 2, 3]
+batch_size = 1
 prompts = [
-     "A Bustling City Street",
-     "A cute cat",
-     "An oil painting",
-     "A photography of a beautiful woman",
-     "A pair of shoes",
-     "A group of working people"
+     "A Bustling City Street"
+#,
+#     "A cute cat",
+#     "An oil painting",
+#     "A photography of a beautiful woman",
+#     "A pair of shoes",
+#     "A group of working people"
 ]
 condition_scale = 7.5 

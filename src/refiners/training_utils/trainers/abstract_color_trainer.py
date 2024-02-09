@@ -225,7 +225,8 @@ class AbstractColorTrainer(
         return GridEvalDataset(
             db_indexes=self.config.evaluation.db_indexes,
             hf_dataset=self.eval_dataset,
-            source_prompts=self.config.evaluation.prompts
+            source_prompts=self.config.evaluation.prompts,
+            text_encoder=self.text_encoder
         )
     
     @cached_property

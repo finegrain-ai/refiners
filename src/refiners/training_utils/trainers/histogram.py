@@ -8,10 +8,11 @@ from PIL import Image, ImageDraw
 from refiners.training_utils.trainers.histogram_auto_encoder import HistogramAutoEncoderConfig
 from refiners.training_utils.config import TrainingConfig
 from refiners.training_utils.huggingface_datasets import HuggingfaceDatasetConfig
-from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig
+from refiners.training_utils.trainers.abstract_color_trainer import AbstractColorTrainer, ColorTrainerEvaluationConfig, GridEvalDataset
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from torch import Tensor
 from refiners.fluxion.adapters.histogram_auto_encoder import HistogramAutoEncoder
+from refiners.fluxion.adapters.color_palette import ColorPaletteExtractor
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.histogram import (
@@ -23,7 +24,7 @@ from refiners.fluxion.adapters.histogram import (
 )
 from refiners.fluxion.utils import images_to_tensor, save_to_safetensors, tensor_to_image
 from refiners.training_utils.callback import Callback, GradientNormLayerLogging
-from refiners.training_utils.datasets.color_palette import ColorPalette, ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
+from refiners.training_utils.datasets.color_palette import ColorDatasetConfig, ColorPalette, ColorPaletteDataset, SamplingByPalette, TextEmbeddingColorPaletteLatentsBatch
 from refiners.training_utils.metrics.color_palette import batch_palette_metrics, BatchHistogramPrompt, BatchHistogramResults
 from refiners.training_utils.trainers.latent_diffusion import (
     FinetuneLatentDiffusionBaseConfig,
@@ -40,21 +41,22 @@ class ImageAndHistogram(TypedDict):
     histogram: Histogram
     palette: ColorPalette
 
-
 class ColorTrainingConfig(TrainingConfig):
     color_loss_weight: float = 1.0
 
 class AdapterConfig(BaseModel):
     embedding_dim: int = 768
+    num_tokens: int = 4
+    num_layers: int = 0
+    feedforward_dim: int = 768
 
 class HistogramLatentDiffusionConfig(FinetuneLatentDiffusionBaseConfig):
     histogram_auto_encoder: HistogramAutoEncoderConfig
     adapter: AdapterConfig
+    dataset: ColorDatasetConfig
     evaluation: ColorTrainerEvaluationConfig
     training: ColorTrainingConfig
-    validation_dataset: HuggingfaceDatasetConfig
-
-
+    eval_dataset: ColorDatasetConfig
 
 class GridEvalHistogramDataset(GridEvalDataset[BatchHistogramPrompt]):
     __prompt_type__ = BatchHistogramPrompt
@@ -62,24 +64,27 @@ class GridEvalHistogramDataset(GridEvalDataset[BatchHistogramPrompt]):
     def __init__(self, 
             db_indexes: list[int], 
             hf_dataset: ColorPaletteDataset, 
-            prompts: list[str], 
+            source_prompts: list[str], 
             text_encoder: CLIPTextEncoderL, 
             histogram_extractor: HistogramExtractor,
             histogram_auto_encoder: HistogramAutoEncoder,
+            color_palette_extractor: ColorPaletteExtractor
         ) -> None:
-        super().__init__(dataset=dataset, config=config)
+        super().__init__(db_indexes=db_indexes, hf_dataset=hf_dataset, source_prompts=source_prompts, text_encoder=text_encoder)
         self.histogram_extractor = histogram_extractor
         self.histogram_auto_encoder = histogram_auto_encoder
+        self.color_palette_extractor = color_palette_extractor
         
-    def process_item(self, item: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
+    def process_item(self, items: TextEmbeddingColorPaletteLatentsBatch) -> dict[str, Any]:
         if len(items) != 1:
             raise ValueError("The items must have length 1.")
         
-        histograms = self.histogram_extractor.images_to_histograms(images)
+        histograms = self.histogram_extractor.images_to_histograms([item.image for item in items])
         histogram_embeddings = self.histogram_auto_encoder.encode(histograms).reshape(histograms.shape[0], 1, -1)
-        
+        source_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
+
         return {
-            "source_palettes": [items[0].palette],
+            "source_palettes": source_palettes,
             "source_histogram_embeddings": histogram_embeddings,
             "source_histograms": histograms
         }
@@ -87,6 +92,23 @@ class GridEvalHistogramDataset(GridEvalDataset[BatchHistogramPrompt]):
 class HistogramLatentDiffusionTrainer(
     AbstractColorTrainer[BatchHistogramPrompt, BatchHistogramResults, HistogramLatentDiffusionConfig],
 ):
+    
+    
+    @cached_property
+    def grid_eval_dataset(self) -> GridEvalDataset[BatchHistogramPrompt]:
+        return GridEvalHistogramDataset(
+            db_indexes=self.config.evaluation.db_indexes,
+            hf_dataset=self.eval_dataset,
+            source_prompts=self.config.evaluation.prompts,
+            text_encoder=self.text_encoder,
+            histogram_extractor=self.histogram_extractor,
+            histogram_auto_encoder=self.histogram_auto_encoder,
+            color_palette_extractor=self.color_palette_extractor
+        )
+    
+    @cached_property
+    def color_palette_extractor(self) -> ColorPaletteExtractor:
+        return ColorPaletteExtractor(size = 8)
     
     def load_dataset(self) -> ColorPaletteDataset:
         return ColorPaletteDataset(
@@ -149,9 +171,12 @@ class HistogramLatentDiffusionTrainer(
     @cached_property
     def histogram_projection(self) -> HistogramProjection:   
         embedding_dim = self.config.adapter.embedding_dim         
-        
+
         return HistogramProjection(
             embedding_dim=embedding_dim,
+            feedforward_dim=self.config.adapter.feedforward_dim,
+            num_layers=self.config.adapter.num_layers,
+            num_tokens=self.config.adapter.num_tokens,
             device=self.device,
             dtype=self.dtype
         )
@@ -160,31 +185,31 @@ class HistogramLatentDiffusionTrainer(
     def color_loss(self) -> ColorLoss:
         return ColorLoss()
     
-    @cached_property
-    def eval_dataset(self) -> list[BatchHistogramPrompt]:
-        dataset = self.dataset
-        indices = self.config.evaluation.db_indexes
-        items = [dataset[i][0] for i in indices]
-        palette = [item.color_palette for item in items]
-        images = [item.image for item in items]
-        histograms = self.histogram_extractor.images_to_histograms(images, device = self.device, dtype = self.dtype)
-        histogram_embeddings = self.histogram_auto_encoder.encode(histograms).reshape(histograms.shape[0], 1, -1)
-        eval_indices = list(zip(indices, histograms.split(1), histogram_embeddings.split(1), palette, images)) # type: ignore
-        evaluations : list[BatchHistogramPrompt] = []
-        prompts_list = [(prompt, self.text_encoder(prompt)) for prompt in self.config.evaluation.prompts]
-        for (prompt, prompt_embedding) in prompts_list:
-            for db_index, histogram, histogram_embedding, palette, image in eval_indices: # type: ignore
-                batch_histogram_prompt = BatchHistogramPrompt(
-                    source_histogram_embeddings= histogram_embedding,  # type: ignore
-                    source_histograms= histogram, # type: ignore
-                    source_prompts= [prompt],
-                    db_indexes= [db_index],
-                    source_palettes= [palette],
-                    text_embeddings= prompt_embedding, # type: ignore
-                    source_images= [image]
-                )
-                evaluations.append(batch_histogram_prompt)
-        return evaluations
+    # @cached_property
+    # def eval_dataset(self) -> list[BatchHistogramPrompt]:
+    #     dataset = self.dataset
+    #     indices = self.config.evaluation.db_indexes
+    #     items = [dataset[i][0] for i in indices]
+    #     palette = [item.color_palette for item in items]
+    #     images = [item.image for item in items]
+    #     histograms = self.histogram_extractor.images_to_histograms(images, device = self.device, dtype = self.dtype)
+    #     histogram_embeddings = self.histogram_auto_encoder.encode(histograms).reshape(histograms.shape[0], 1, -1)
+    #     eval_indices = list(zip(indices, histograms.split(1), histogram_embeddings.split(1), palette, images)) # type: ignore
+    #     evaluations : list[BatchHistogramPrompt] = []
+    #     prompts_list = [(prompt, self.text_encoder(prompt)) for prompt in self.config.evaluation.prompts]
+    #     for (prompt, prompt_embedding) in prompts_list:
+    #         for db_index, histogram, histogram_embedding, palette, image in eval_indices: # type: ignore
+    #             batch_histogram_prompt = BatchHistogramPrompt(
+    #                 source_histogram_embeddings= histogram_embedding,  # type: ignore
+    #                 source_histograms= histogram, # type: ignore
+    #                 source_prompts= [prompt],
+    #                 db_indexes= [db_index],
+    #                 source_palettes= [palette],
+    #                 text_embeddings= prompt_embedding, # type: ignore
+    #                 source_images= [image]
+    #             )
+    #             evaluations.append(batch_histogram_prompt)
+    #     return evaluations
     
     def collate_results(self, batch: list[BatchHistogramResults]) -> BatchHistogramResults:
         return BatchHistogramResults.collate_fn(batch)

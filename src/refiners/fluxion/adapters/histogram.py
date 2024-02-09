@@ -385,6 +385,43 @@ class HistogramCrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 TSDNet = TypeVar("TSDNet", bound="SD1UNet | SDXLUNet")
 
 
+class ColorPaletteMLPEncoder(fl.Chain):
+
+    def __init__(
+        self,
+        embedding_dim: int = 768,
+        num_layers: int = 2,
+        feedforward_dim: int = 20,
+        layer_norm_eps: float = 1e-5,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        # self._lda = [lda]
+        self.embedding_dim = embedding_dim
+        self.num_layers = num_layers
+        self.feedforward_dim = feedforward_dim
+        self.layer_norm_eps = layer_norm_eps
+        
+        super().__init__(
+            *(
+                fl.Chain(
+                    fl.LayerNorm(
+                        normalized_shape=embedding_dim,
+                        eps=layer_norm_eps,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    FeedForward(
+                        embedding_dim=embedding_dim,
+                        feedforward_dim=feedforward_dim,
+                        device=device,
+                        dtype=dtype,
+                    )
+                )
+                for _ in range(num_layers)
+            )
+        )
+
 
 class HistogramProjection(fl.Chain):
     def __init__(
@@ -392,15 +429,38 @@ class HistogramProjection(fl.Chain):
         in_features: int = 64,
         embedding_dim: int = 768,
         num_tokens: int = 4,
+        num_layers: int = 2,
+        feedforward_dim: int = 2048,
+        layer_norm_eps: float = 1e-5,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
+        
+        features = embedding_dim * num_tokens
+        
         super().__init__(
             fl.Linear(
                 in_features=in_features,
-                out_features=embedding_dim * num_tokens,
+                out_features=features,
                 device=device,
                 dtype=dtype,
+            ),
+            *(
+                fl.Chain(
+                    fl.LayerNorm(
+                        normalized_shape=features,
+                        eps=layer_norm_eps,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    FeedForward(
+                        embedding_dim=features,
+                        feedforward_dim=feedforward_dim,
+                        device=device,
+                        dtype=dtype,
+                    )
+                )
+                for _ in range(num_layers)
             ),
             fl.Reshape(num_tokens, embedding_dim),
             fl.LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
