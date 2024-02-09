@@ -91,7 +91,6 @@ pyyaml==6.0.1
 pyyaml-env-tag==0.1
 regex==2023.12.25
 requests==2.31.0
-ruff==0.2.0
 safetensors==0.4.2
 scipy==1.12.0
 segment-anything-py==1.0
