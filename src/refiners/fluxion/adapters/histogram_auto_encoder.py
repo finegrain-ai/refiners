@@ -1,8 +1,10 @@
 from PIL import Image
+from refiners.fluxion.layers.converter import Converter
 from torch import Tensor, device as Device, dtype as DType, zeros_like, cat
 from refiners.fluxion.layers.basics import Unsqueeze, Squeeze
 from refiners.foundationals.latent_diffusion.auto_encoder import Encoder, Decoder
 from refiners.fluxion.layers import Chain
+
 
 
 class HistogramAutoEncoder(Chain):
@@ -27,6 +29,7 @@ class HistogramAutoEncoder(Chain):
         
         super().__init__(
             Chain(
+                Converter(),
                 Unsqueeze(dim=1),
                 Encoder(
                     spatial_dims = spatial_dims, 

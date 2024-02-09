@@ -1,7 +1,7 @@
 from typing import Any, List, TypeVar
 from refiners.foundationals.dinov2.vit import FeedForward
 
-from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like
+from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like, float32
 from torch.nn import init, L1Loss
 from torch.nn.functional import mse_loss as _mse_loss
 
@@ -49,13 +49,13 @@ def sorted_channels_to_histo_channels(sorted_channels: List[Tensor], color_bits:
         for i in range(channel.shape[0]):
             elem = channel[i]
             histo, _ = histogram(
-                        elem.cpu(),
+                        elem.to(dtype=float32).cpu(),
                         bins=2**color_bits,
                         range= (0.0,1.0)
                     )
             histograms.append(histo/elem.numel())
         histo = stack(histograms)
-        histos.append(histo.to(device = channel.device))
+        histos.append(histo.to(device = channel.device, dtype=channel.dtype))
     return histos
 
 def histogram_to_histo_channels(histogram: Tensor) -> List[Tensor]:
@@ -131,12 +131,13 @@ class HistogramExtractor(fl.Chain):
         num_pixels = x.shape[1] * x.shape[2]
         histograms: List[Tensor] = []
         device = x.device
+        dtype = x.dtype
         # x is a [0, 1] normalized image
         x = x * (self.color_size - 1)
 
         for i in range(batch_size):
             hist_dd = histogramdd(
-                x[i].cpu(),
+                x[i].to(dtype=float32).cpu(),
                 bins=2**self.color_bits,
                 range=[
                     0,
@@ -150,7 +151,7 @@ class HistogramExtractor(fl.Chain):
             hist = hist_dd.hist / num_pixels
             histograms.append(hist)
 
-        return stack(histograms).to(device)
+        return stack(histograms).to(device, dtype)
     
     def images_to_histograms(self, images: List[Image.Image], device: Device | None = None, dtype : DType | None = None) -> Tensor:
         return self(images_to_tensor(images, device=device, dtype = dtype))
