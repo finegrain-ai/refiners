@@ -10,19 +10,18 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
-    "ruff>=0.2.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
 classifiers = [
-  "Typing :: Typed",
-  "Intended Audience :: Developers",
-  "Intended Audience :: Science/Research",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Scientific/Engineering :: Artificial Intelligence",
-  "License :: OSI Approved :: MIT License"
+    "Typing :: Typed",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
 ]
 
 [project.optional-dependencies]
@@ -70,10 +69,11 @@ build-backend = "hatchling.build"
 managed = true
 dev-dependencies = [
     "pyright==1.1.349",
-    "ruff>=0.1.15",
+    "ruff>=0.2.0",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
+    "typos>=1.18.2",
 ]
 
 
