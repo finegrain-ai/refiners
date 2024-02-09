@@ -78,6 +78,7 @@ class DatasetConfig(BaseModel):
     caption_column: str = "caption"
     download_images: bool = True
     save_path: str | None = None
+    dataset_length: int | None = None
 
 # Adapted from https://github.com/huggingface/open-muse
 def _init_learnable_weights(module: Module, initializer_range: float):
@@ -310,7 +311,8 @@ class IPDataset(Dataset[IPBatch]):
                 )
             else:
                 dataset = dataset.rename_column(dataset_config.image_column, "image")  # type: ignore
-
+            if dataset_config.dataset_length is not None:
+                dataset = dataset.select(list(range(dataset_config.dataset_length)))
 
             # cast the "image" column to Image feature type
             dataset = dataset.cast_column(  # type: ignore
