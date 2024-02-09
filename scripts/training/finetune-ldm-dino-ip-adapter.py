@@ -291,6 +291,8 @@ class IPDataset(Dataset[IPBatch]):
                 revision=dataset_config.revision,
                 split=dataset_config.split,
             )
+            if dataset_config.dataset_length is not None:
+                dataset = dataset.select(list(range(dataset_config.dataset_length)))
             logger.info(
                 f"Dataset has {len(dataset)} elements"
             )
@@ -311,8 +313,6 @@ class IPDataset(Dataset[IPBatch]):
                 )
             else:
                 dataset = dataset.rename_column(dataset_config.image_column, "image")  # type: ignore
-            if dataset_config.dataset_length is not None:
-                dataset = dataset.select(list(range(dataset_config.dataset_length)))
 
             # cast the "image" column to Image feature type
             dataset = dataset.cast_column(  # type: ignore
