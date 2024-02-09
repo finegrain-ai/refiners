@@ -2,8 +2,8 @@
 
 # Path to the directory containing the config files
 config_dir="./configs/scheduled-remote"
-prefix="finetune-color-palette-schedule-"
-script="./scripts/training/finetune-ldm-color-palette.py"
+prefix="finetune-histogram-"
+script="./scripts/training/finetune-ldm-histogram.py"
 # Log file path
 log_file="./tmp/schedule-log.txt"
 
