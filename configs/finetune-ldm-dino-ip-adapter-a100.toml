@@ -1,0 +1,92 @@
+script = "finetune-ldm-ip-adapter.py" # not used for now
+
+[wandb]
+mode = "online"                         # "online", "offline", "disabled"
+entity = "isamu"
+project = "finetune-ldm-ip-adapter"
+
+[models]
+unet = { checkpoint = "tests/weights/unet.safetensors", train = false, compile = false }
+text_encoder = { checkpoint = "tests/weights/CLIPTextEncoderL.safetensors", train = false, compile = false }
+lda = { checkpoint = "tests/weights/lda.safetensors", train = false, compile = false }
+image_encoder = { checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors", train = false, compile = false }
+adapter = { train = true, compile = false }
+image_proj = { train = true, compile = false }
+
+[ldm]
+offset_noise = 0.0
+
+[adapter]
+image_encoder_type = "dinov2_vitl14_reg4"
+resolution = 518
+scale = 1.0
+inference_scale = 1.0
+use_pooled_text_embedding = false
+use_timestep_embedding = false
+fine_grained = true
+initialize_model = true
+initializer_range = 0.02
+
+[training]
+duration = "1000000:step"
+seed = 9752
+gpu_index = 0
+batch_size = 16
+gradient_accumulation = "1:step"
+evaluation_interval = "250:step"
+evaluation_seed = 9752
+mixed_precision = "float32"
+
+[optimizer]
+optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
+learning_rate = 1e-5
+betas = [0.9, 0.999]
+eps = 1e-8
+weight_decay = 1e-2
+
+[scheduler]
+scheduler_type = "ConstantLR"
+update_interval = "1:step"
+# max_steps = 2000
+# eta_min = 1e-6
+# warmup = "500:step"
+
+[dropout]
+dropout_probability = 0
+use_gyro_dropout = false
+
+[dataset]
+hf_repo = "1aurent/unsplash-lite-palette"
+revision = "main"
+split = "train"
+horizontal_flip_probability = 0.0
+resize_image_min_size = 512
+resize_image_max_size = 518
+random_crop_size = 512
+center_crop_size = 512
+filter_min_image_size = false
+image_drop_rate = 0.05
+text_drop_rate = 0.05
+text_and_image_drop_rate = 0.05
+to_wds = false
+pre_encode =  true
+image_column = "image"
+caption_column = "ai_description"
+download_images = true
+save_path = "/home/isamu/unsplash_pre_encode"
+
+
+[checkpointing]
+# save_folder = "/path/to/ckpts"
+save_interval = "250:step"
+
+[test_ldm]
+num_inference_steps = 30
+prompts = [
+    "A dog flying over a castle",
+    "Cute cats watching a tv"
+]
+validation_image_paths = [
+    "tests/weights/frida.jpg",
+    "tests/weights/cute_cats.jpg"
+]
