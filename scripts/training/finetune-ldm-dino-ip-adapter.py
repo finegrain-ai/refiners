@@ -553,7 +553,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def image_proj(self) -> ImageProjection | PerceiverResampler:
         assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
-        image_proj = get_sd1_image_proj(self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias)
+        image_proj = get_sd1_image_proj(
+            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
+        )
         return image_proj.to(self.device, dtype=self.dtype)
 
     @cached_property
@@ -796,10 +798,7 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
         tensors: dict[str, Tensor] = {}
         tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
         for i, cross_attention_adapter in enumerate(cross_attention_adapters):
-            tensors |= {
-                f"ip_adapter.{i+1}.{key}": value
-                for key, value in cross_attention_adapter.state_dict().items()
-            }
+            tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
         if trainer.config.adapter.use_pooled_text_embedding:
             tensors |= {
                 f"pooled_text_embedding_proj.{key}": value
