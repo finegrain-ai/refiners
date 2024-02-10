@@ -149,21 +149,21 @@ class Attention(Chain):
                 Linear(
                     in_features=self.embedding_dim,
                     out_features=self.inner_dim,
-                    bias=self.use_bias,
+                    use_bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
                 Linear(
                     in_features=self.key_embedding_dim,
                     out_features=self.inner_dim,
-                    bias=self.use_bias,
+                    use_bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
                 Linear(
                     in_features=self.value_embedding_dim,
                     out_features=self.inner_dim,
-                    bias=self.use_bias,
+                    use_bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
@@ -172,7 +172,7 @@ class Attention(Chain):
             Linear(
                 in_features=self.inner_dim,
                 out_features=self.embedding_dim,
-                bias=True,
+                use_bias=True,
                 device=device,
                 dtype=dtype,
             ),
