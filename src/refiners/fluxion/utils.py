@@ -229,8 +229,7 @@ def load_tensors(path: Path | str, /, device: Device | str = "cpu") -> dict[str,
         tensors = torch.load(path, map_location=device, weights_only=True)  # type: ignore
 
     assert isinstance(tensors, dict) and all(
-        isinstance(key, str) and isinstance(value, Tensor)
-        for key, value in tensors.items()  # type: ignore
+        isinstance(key, str) and isinstance(value, Tensor) for key, value in tensors.items()  # type: ignore
     ), "Invalid tensor file, expected a dict[str, Tensor]"
 
     return cast(dict[str, Tensor], tensors)

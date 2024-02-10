@@ -150,6 +150,7 @@ class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
     def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         logger.info("Evaluation ended.")
 
+
 class MonitorTime(Callback["Trainer[BaseConfig, Any]"]):
     def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         batch_time, forward_time, backprop_time, data_time = (
@@ -167,6 +168,7 @@ class MonitorTime(Callback["Trainer[BaseConfig, Any]"]):
                     "data_time": data_time,
                 }
             )
+
 
 class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:

@@ -96,6 +96,7 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
 
     return decorator
 
+
 # Ported from open-muse
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -112,6 +113,7 @@ class AverageMeter(object):
         self.sum += val
         self.count += 1
         self.avg = self.sum / self.count
+
 
 class WarmupScheduler(LRScheduler):
     _step_count: int  # defined by LRScheduler
@@ -312,7 +314,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             GradientValueClipping(),
             GradientNormClipping(),
             DropoutCallback(),
-            MonitorTime()
+            MonitorTime(),
         ]
 
         # look for any Callback that might be a property of the Trainer
@@ -567,12 +569,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
-        forward_time = time.time()-start
+        forward_time = time.time() - start
         self.forward_time_m.update(forward_time)
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
-        backward_time = time.time()-start
+        backward_time = time.time() - start
         self.backprop_time_m.update(backward_time)
         return forward_time, backward_time
 
@@ -583,11 +585,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_batch_begin")
-            data_time = time.time()-start
+            data_time = time.time() - start
             self.data_time_m.update(data_time)
             forward_time, backward_time = self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
-            batch_time = data_time+forward_time+backward_time
+            batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
 
     @staticmethod

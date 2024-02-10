@@ -165,7 +165,8 @@ class MiddleBlock(fl.Chain):
 class SD1UNet(fl.Chain):
     """Stable Diffusion 1.5 U-Net.
 
-    See [[arXiv:2112.10752] High-Resolution Image Synthesis with Latent Diffusion Models](https://arxiv.org/abs/2112.10752) for more details."""
+    See [[arXiv:2112.10752] High-Resolution Image Synthesis with Latent Diffusion Models](https://arxiv.org/abs/2112.10752) for more details.
+    """
 
     def __init__(
         self,
