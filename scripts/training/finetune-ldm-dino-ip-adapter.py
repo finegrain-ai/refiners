@@ -763,12 +763,12 @@ class ComputeParamNorm(Callback[AdapterLatentDiffusionTrainer]):
                 if param.grad is not None:
                     data = param.data.detach()
                     data_norm = (data.norm(p=2) / data.numel()).item()
-                    trainer.log(data={"grad_norm/" + name: data_norm})
+                    trainer.log(data={"param_norm/" + name: data_norm})
             for name, param in trainer.image_proj.named_parameters():
                 if param.grad is not None:
                     data = param.data.detach()
                     data_norm = (data.norm(p=2) / data.numel()).item()
-                    trainer.log(data={"grad_norm/" + name: data_norm})
+                    trainer.log(data={"param_norm/" + name: data_norm})
         return super().on_backward_end(trainer)
 
 
