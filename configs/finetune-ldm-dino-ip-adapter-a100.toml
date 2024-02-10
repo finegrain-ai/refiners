@@ -81,7 +81,7 @@ dataset_length = 15000
 
 [checkpointing]
 save_folder = "/home/isamu/checkpoints"
-save_interval = "1000:step"
+save_interval = "1:step"
 
 [test_ldm]
 num_inference_steps = 30

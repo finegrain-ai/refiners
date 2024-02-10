@@ -790,7 +790,7 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
 
     def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         adapter = trainer.adapter
-        cross_attention_adapters = trainer.adapter.cross_attention_adapters
+        cross_attention_adapters = trainer.adapter.sub_adapters
         image_proj = trainer.adapter.image_proj
 
         tensors: dict[str, Tensor] = {}
