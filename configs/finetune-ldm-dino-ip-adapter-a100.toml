@@ -85,6 +85,7 @@ save_interval = "250:step"
 
 [test_ldm]
 num_inference_steps = 30
+num_images_per_prompt = 4
 prompts = [
     "A dog flying over a castle",
     "Cute cats watching a tv"
