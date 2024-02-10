@@ -795,10 +795,10 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
 
         tensors: dict[str, Tensor] = {}
         tensors |= {f"SD1IPAdapter.{key}": value for key, value in adapter.state_dict().items()}
-        tensors |= {key: value for key, value in image_proj.state_dict().items()}
+        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
         for i, cross_attention_adapter in enumerate(cross_attention_adapters):
             tensors |= {
-                f"CrossAttentionAdapter_{i+1}.{key}": value
+                f"ip_adapter.{i+1}.{key}": value
                 for key, value in cross_attention_adapter.state_dict().items()
             }
         if trainer.config.adapter.use_pooled_text_embedding:
