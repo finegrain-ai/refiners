@@ -1,9 +1,9 @@
 [models.mock_model1]
-train = true
+requires_grad = true
 learning_rate = 1e-5
 
 [models.mock_model2]
-train = true
+requires_grad = true
 
 [training]
 duration = "100:epoch"
@@ -17,18 +17,10 @@ evaluation_seed = 1
 [optimizer]
 optimizer = "SGD"
 learning_rate = 1
-momentum = 0.9
 
 [scheduler]
 scheduler_type = "ConstantLR"
 update_interval = "1:step"
 
 [dropout]
-dropout = 0.0
-
-[checkpointing]
-save_interval = "10:epoch"
-
-[wandb]
-mode = "disabled"
-project = "mock_project"
+dropout_probability = 0.0
