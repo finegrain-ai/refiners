@@ -794,16 +794,16 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
         image_proj = trainer.adapter.image_proj
 
         tensors: dict[str, Tensor] = {}
-        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
+        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items() if value.requires_grad}
         for i, cross_attention_adapter in enumerate(cross_attention_adapters):
             tensors |= {
                 f"ip_adapter.{i+1}.{key}": value
-                for key, value in cross_attention_adapter.state_dict().items()
+                for key, value in cross_attention_adapter.state_dict().items() if value.requires_grad
             }
         if trainer.config.adapter.use_pooled_text_embedding:
             tensors |= {
                 f"pooled_text_embedding_proj.{key}": value
-                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
+                for key, value in adapter.pooled_text_embedding_proj.state_dict().items() if value.requires_grad
             }
         print("Num parameters ", len(tensors.keys()))
         print(tensors.keys())
