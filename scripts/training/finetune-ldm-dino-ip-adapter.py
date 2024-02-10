@@ -78,7 +78,7 @@ class AdapterConfig(BaseModel):
     fine_grained: bool = False
     initialize_model: bool = True
     initializer_range: float = 0.02
-    use_bias = False
+    use_bias: bool = False
 
 
 class DatasetConfig(BaseModel):
