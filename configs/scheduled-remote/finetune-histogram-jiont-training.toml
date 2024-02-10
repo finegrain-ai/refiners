@@ -64,7 +64,6 @@ resize_image_max_size = 512
 caption_key = "ai_description"
 split = "train[4:]"
 #random_crop = false
-color_jitter = {hue=0.2}
 
 [eval_dataset]
 hf_repo = "1aurent/unsplash-lite-palette"
@@ -80,8 +79,8 @@ use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
-db_indexes = [0, 1]#, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ]
-batch_size = 8
+db_indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]#, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+batch_size = 16
 prompts = [
      "A Bustling City Street",
      "A cute cat",
