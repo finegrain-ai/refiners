@@ -130,7 +130,7 @@ def _init_learnable_weights(module: Module, initializer_range: float):
     elif isinstance(module, (LayerNorm)):
         if hasattr(module, "weight") and module.weight.requires_grad:
             module.weight.data.fill_(1.0)
-        if hasattr(module, "bias") and module.bias.requires_grad:
+        if hasattr(module, "bias") and module.bias is not None and module.bias.requires_grad:
             module.bias.data.zero_()
 
 
