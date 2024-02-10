@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="xs-0l"
+name="xs-0l-joint-training"
 tags = ["l4", "remote"]
 
 [models]

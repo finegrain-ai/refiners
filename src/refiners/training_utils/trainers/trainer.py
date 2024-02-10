@@ -388,10 +388,13 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def named_gradient_norm(self) -> list[tuple[str, float]]:
         """Returns the total gradient norm for all learnable parameters in all models"""
-        return [
-            (param[0], compute_grad_norm(parameters=[param[1]], device=self.device))
-            for param in self.named_learnable_parameters
-        ]
+        list: list[tuple[str, float]] = []
+        for param in self.named_learnable_parameters:  
+            if param[1].grad is not None:
+                list.append((param[0], compute_grad_norm(parameters=[param[1]], device=self.device)))
+            # else:
+            #     print(f"Gradient for {param[0]} is None")
+        return list
 
     @cached_property
     def optimizer(self) -> Optimizer:
