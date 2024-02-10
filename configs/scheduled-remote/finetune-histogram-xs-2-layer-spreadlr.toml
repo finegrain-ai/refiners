@@ -62,7 +62,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[200:]"
+split = "train[4:]"
 #random_crop = false
 color_jitter = {hue=0.2}
 
@@ -71,7 +71,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[0:200]"
+split = "train[0:4]"
 
 [checkpointing]
 #save_folder = "ckpts"
