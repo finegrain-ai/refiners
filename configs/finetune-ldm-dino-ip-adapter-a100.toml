@@ -26,7 +26,7 @@ use_timestep_embedding = false
 fine_grained = true
 initialize_model = true
 initializer_range = 0.02
-use_bias = False
+use_bias = false
 
 [training]
 duration = "1000000:step"
