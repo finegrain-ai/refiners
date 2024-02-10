@@ -34,7 +34,7 @@ seed = 9752
 gpu_index = 0
 batch_size = 20
 gradient_accumulation = "1:step"
-evaluation_interval = "250:step"
+evaluation_interval = "1000:step"
 evaluation_seed = 9752
 mixed_precision = "bfloat16"
 dataset_workers=4
@@ -75,13 +75,13 @@ pre_encode =  true
 image_column = "image"
 caption_column = "ai_description"
 download_images = true
-save_path = "/home/isamu/unsplash_pre_encode"
+save_path = "/home/isamu/unsplash_pre_encode_15k"
 dataset_length = 15000
 
 
 [checkpointing]
-# save_folder = "/path/to/ckpts"
-save_interval = "250:step"
+save_folder = "/home/isamu/checkpoints"
+save_interval = "1000:step"
 
 [test_ldm]
 num_inference_steps = 30
