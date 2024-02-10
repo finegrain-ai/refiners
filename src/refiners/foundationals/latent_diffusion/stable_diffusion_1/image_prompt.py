@@ -6,13 +6,21 @@ from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.dinov2 import ViT
 
-def get_sd1_image_proj(image_encoder: CLIPImageEncoderH | ViT, target: SD1UNet, cross_attn_2d: CrossAttentionBlock2d, fine_grained: bool) -> ImageProjection | PerceiverResampler:
+
+def get_sd1_image_proj(
+    image_encoder: CLIPImageEncoderH | ViT,
+    target: SD1UNet,
+    cross_attn_2d: CrossAttentionBlock2d,
+    fine_grained: bool,
+    use_bias: bool,
+) -> ImageProjection | PerceiverResampler:
     return (
         ImageProjection(
             image_embedding_dim=image_encoder.output_dim,
             clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
             device=target.device,
             dtype=target.dtype,
+            use_bias=use_bias,
         )
         if not fine_grained
         else PerceiverResampler(
@@ -25,8 +33,11 @@ def get_sd1_image_proj(image_encoder: CLIPImageEncoderH | ViT, target: SD1UNet, 
             output_dim=cross_attn_2d.context_embedding_dim,
             device=target.device,
             dtype=target.dtype,
+            use_bias=use_bias,
         )
     )
+
+
 class SD1IPAdapter(IPAdapter[SD1UNet]):
     def __init__(
         self,
@@ -39,12 +50,13 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
         strict: bool = True,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
+        use_bias: bool = True,
     ) -> None:
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
         if image_proj is None:
             cross_attn_2d = target.ensure_find(CrossAttentionBlock2d)
-            image_proj = get_sd1_image_proj(image_encoder, target, cross_attn_2d, fine_grained)
+            image_proj = get_sd1_image_proj(image_encoder, target, cross_attn_2d, fine_grained, use_bias)
         elif fine_grained:
             assert isinstance(image_proj, PerceiverResampler)
 
@@ -57,5 +69,6 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             weights=weights,
             strict=strict,
             use_timestep_embedding=use_timestep_embedding,
-            use_pooled_text_embedding=use_pooled_text_embedding
+            use_pooled_text_embedding=use_pooled_text_embedding,
+            use_bias=use_bias,
         )

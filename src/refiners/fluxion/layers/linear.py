@@ -12,7 +12,7 @@ class Linear(_Linear, WeightedModule):
         self,
         in_features: int,
         out_features: int,
-        bias: bool = True,
+        use_bias: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -21,7 +21,7 @@ class Linear(_Linear, WeightedModule):
         super().__init__(  # type: ignore
             in_features=in_features,
             out_features=out_features,
-            bias=bias,
+            use_bias=use_bias,
             device=device,
             dtype=dtype,
         )

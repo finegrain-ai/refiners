@@ -19,6 +19,7 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
         strict: bool = True,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
+        use_bias: bool = True,
     ) -> None:
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
@@ -30,6 +31,7 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
                     clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
                     device=target.device,
                     dtype=target.dtype,
+                    use_bias=use_bias,
                 )
                 if not fine_grained
                 else PerceiverResampler(
@@ -42,6 +44,7 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
                     output_dim=cross_attn_2d.context_embedding_dim,
                     device=target.device,
                     dtype=target.dtype,
+                    use_bias=use_bias,
                 )
             )
         elif fine_grained:
@@ -56,5 +59,6 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
             weights=weights,
             strict=strict,
             use_timestep_embedding=use_timestep_embedding,
-            use_pooled_text_embedding=use_pooled_text_embedding
+            use_pooled_text_embedding=use_pooled_text_embedding,
+            use_bias=use_bias,
         )

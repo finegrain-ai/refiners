@@ -30,7 +30,11 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
                         target[-2:],
                         projection
                         or fl.Linear(
-                            in_features=1280, out_features=1280, bias=False, device=target.device, dtype=target.dtype
+                            in_features=1280,
+                            out_features=1280,
+                            use_bias=False,
+                            device=target.device,
+                            dtype=target.dtype,
                         ),
                         fl.Lambda(func=self.pool),
                     ),

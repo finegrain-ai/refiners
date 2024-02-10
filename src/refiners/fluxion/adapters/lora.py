@@ -143,14 +143,14 @@ class LinearLora(Lora):
             fl.Linear(
                 in_features=self.in_features,
                 out_features=self.rank,
-                bias=False,
+                use_bias=False,
                 device=device,
                 dtype=dtype,
             ),
             fl.Linear(
                 in_features=self.rank,
                 out_features=self.out_features,
-                bias=False,
+                use_bias=False,
                 device=device,
                 dtype=dtype,
             ),
@@ -215,10 +215,13 @@ class Conv2dLora(Lora):
                 if layer.stride != (self.stride[0], self.stride[0]):
                     self.down.stride = layer.stride
 
-                return LoraAdapter(
-                    target=layer,
-                    lora=self,
-                ), parent
+                return (
+                    LoraAdapter(
+                        target=layer,
+                        lora=self,
+                    ),
+                    parent,
+                )
 
     def lora_layers(
         self, device: Device | str | None = None, dtype: DType | None = None

@@ -7,7 +7,19 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 import numpy as np
 from loguru import logger
-from torch import Tensor, cuda, device as Device, get_rng_state, set_rng_state, stack, dtype as DType, float32, bfloat16, float16, compile
+from torch import (
+    Tensor,
+    cuda,
+    device as Device,
+    get_rng_state,
+    set_rng_state,
+    stack,
+    dtype as DType,
+    float32,
+    bfloat16,
+    float16,
+    compile,
+)
 from torch.autograd import backward
 from torch.nn import Parameter
 from torch.optim import Optimizer
@@ -36,12 +48,14 @@ from refiners.training_utils.callback import (
     GradientNormLogging,
     GradientValueClipping,
     MonitorLoss,
-    MonitorTime
+    MonitorTime,
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
 from refiners.training_utils.wandb import WandbLoggable, WandbLogger
+
 __all__ = ["seed_everything", "scoped_seed", "Trainer"]
+
 
 # Ported from open-muse
 class AverageMeter(object):
@@ -56,11 +70,12 @@ class AverageMeter(object):
         self.sum: float = 0
         self.count: int = 0
 
-    def update(self, val:float, n: int=1):
+    def update(self, val: float, n: int = 1):
         self.val = val
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
 
 def count_learnable_parameters(parameters: Iterable[Parameter]) -> int:
     return sum(p.numel() for p in parameters if p.requires_grad)
@@ -308,9 +323,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.prepare_models()
         self.prepare_checkpointing()
         self._call_callbacks(event_name="on_init_end")
+
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
         return instance.config.training.seed
+
     def default_callbacks(self) -> list[Callback[Any]]:
         return [
             ClockCallback(),
@@ -327,6 +344,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
         logger.info(f"Using device: {selected_device}")
         return selected_device
+
     @cached_property
     def dtype(self) -> DType:
         weight_dtype = float32
@@ -335,6 +353,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         elif self.config.training.mixed_precision == "bf16":
             weight_dtype = bfloat16
         return weight_dtype
+
     @property
     def parameters(self) -> list[Parameter]:
         """Returns a list of all parameters in all models"""
@@ -381,11 +400,13 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
         optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
         return optimizer
+
     @cached_property
     def scaler(self) -> GradScaler | None:
         if self.config.training.mixed_precision == "no":
             return None
         return GradScaler()
+
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
         config = self.config.scheduler
@@ -400,7 +421,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case SchedulerType.EXPONENTIAL_LR:
                 lr_scheduler = ExponentialLR(optimizer=self.optimizer, gamma=config.gamma)
             case SchedulerType.COSINE_ANNEALING_LR:
-                lr_scheduler = CosineAnnealingLR(optimizer=self.optimizer, T_max=config.max_steps, eta_min=config.eta_min)
+                lr_scheduler = CosineAnnealingLR(
+                    optimizer=self.optimizer, T_max=config.max_steps, eta_min=config.eta_min
+                )
             case SchedulerType.REDUCE_LR_ON_PLATEAU:
                 lr_scheduler = cast(
                     LRScheduler,
@@ -423,7 +446,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use MultiplicativeLR"
                 lr_scheduler = MultiplicativeLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
             case SchedulerType.COSINE_ANNEALING_WARM_RESTARTS:
-                lr_scheduler = CosineAnnealingWarmRestarts(optimizer=self.optimizer, T_0=config.max_steps, eta_min=config.eta_min)
+                lr_scheduler = CosineAnnealingWarmRestarts(
+                    optimizer=self.optimizer, T_0=config.max_steps, eta_min=config.eta_min
+                )
             case SchedulerType.CYCLIC_LR:
                 lr_scheduler = CyclicLR(optimizer=self.optimizer, base_lr=config.base_lr, max_lr=config.max_lr)
             case SchedulerType.MULTI_STEP_LR:
@@ -506,11 +531,16 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dataset_length(self) -> int:
         assert hasattr(self.dataset, "__len__"), "The dataset must implement the `__len__` method."
         return len(self.dataset)  # type: ignore
+
     @cached_property
     def dataloader(self) -> DataLoader[Batch]:
         collate_fn = getattr(self.dataset, "collate_fn", None)
         return DataLoader(
-            dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=collate_fn
+            dataset=self.dataset,
+            batch_size=self.config.training.batch_size,
+            num_workers=self.config.training.dataset_workers,
+            shuffle=True,
+            collate_fn=collate_fn,
         )
 
     @property
@@ -534,7 +564,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
         if self.scaler is not None:
-            self.scaler.scale(scaled_loss).backward() # type: ignore
+            self.scaler.scale(scaled_loss).backward()  # type: ignore
         else:
             backward(tensors=scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
@@ -586,9 +616,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_batch_begin")
             forward_time, backward_time = self.step(batch=batch)
             self.clock.start_timer()
-            batch_time = data_time+forward_time+backward_time
+            batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
             self._call_callbacks(event_name="on_batch_end")
+
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
         """Train the model."""
@@ -615,6 +646,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.compute_evaluation()
         self._call_callbacks(event_name="on_evaluate_end")
         self.set_models_to_train_mode()
+
     @scoped_seed(seed=get_training_seed)
     def _call_callbacks(self, event_name: str) -> None:
         for callback in self.callbacks:

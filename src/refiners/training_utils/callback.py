@@ -180,11 +180,24 @@ class MonitorLoss(Callback["Trainer[BaseConfig, Any]"]):
         if trainer.clock.is_evaluation_step:
             trainer.log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
 
+
 class MonitorTime(Callback["Trainer[BaseConfig, Any]"]):
     def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        batch_time, forward_time, backprop_time, data_time = trainer.batch_time_m.avg, trainer.forward_time_m.avg, trainer.backprop_time_m.avg, trainer.data_time_m.avg
+        batch_time, forward_time, backprop_time, data_time = (
+            trainer.batch_time_m.avg,
+            trainer.forward_time_m.avg,
+            trainer.backprop_time_m.avg,
+            trainer.data_time_m.avg,
+        )
         if trainer.clock.is_evaluation_step:
-            trainer.log(data={"batch_time": batch_time, "forward_time": forward_time, "backprop_time": backprop_time, "data_time": data_time})
+            trainer.log(
+                data={
+                    "batch_time": batch_time,
+                    "forward_time": forward_time,
+                    "backprop_time": backprop_time,
+                    "data_time": data_time,
+                }
+            )
 
 
 class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):

@@ -7,7 +7,19 @@ import datasets
 from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
-from torch import Tensor, cat, device as Device, dtype as DType, randn, zeros_like, exp, ones_like, stack, randn_like, no_grad
+from torch import (
+    Tensor,
+    cat,
+    device as Device,
+    dtype as DType,
+    randn,
+    zeros_like,
+    exp,
+    ones_like,
+    stack,
+    randn_like,
+    no_grad,
+)
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
 from torch.nn.init import trunc_normal_
@@ -15,7 +27,15 @@ from torch.nn.functional import mse_loss
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, CenterCrop, Resize
-from refiners.foundationals.dinov2 import DINOv2_small, DINOv2_small_reg, DINOv2_base, DINOv2_base_reg, DINOv2_large, DINOv2_large_reg, ViT
+from refiners.foundationals.dinov2 import (
+    DINOv2_small,
+    DINOv2_small_reg,
+    DINOv2_base,
+    DINOv2_base_reg,
+    DINOv2_large,
+    DINOv2_large_reg,
+    ViT,
+)
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.fluxion.utils import image_to_tensor, normalize
@@ -40,11 +60,14 @@ from refiners.training_utils.trainer import Trainer, scoped_seed
 from refiners.training_utils.wandb import WandbLoggable
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
+
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
+
 class AdapterConfig(BaseModel):
     """Configuration for the IP adapter."""
+
     image_encoder_type: str
     checkpoint: str | None = None
     resolution: int = 518
@@ -55,6 +78,7 @@ class AdapterConfig(BaseModel):
     fine_grained: bool = False
     initialize_model: bool = True
     initializer_range: float = 0.02
+    use_bias = False
 
 
 class DatasetConfig(BaseModel):
@@ -72,48 +96,48 @@ class DatasetConfig(BaseModel):
     image_drop_rate: float = 0.05
     text_drop_rate: float = 0.05
     text_and_image_drop_rate: float = 0.05
-    to_wds: bool = False # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
-    pre_encode: bool = False # TODO
+    to_wds: bool = False  # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
+    pre_encode: bool = False  # TODO
     image_column: str = "image"
     caption_column: str = "caption"
     download_images: bool = True
     save_path: str | None = None
     dataset_length: int | None = None
 
+
 # Adapted from https://github.com/huggingface/open-muse
 def _init_learnable_weights(module: Module, initializer_range: float):
-        """
-        Initialize the weights according to the original implementation.
-        https://github.com/google-research/maskgit/blob/main/maskgit/nets/maskgit_transformer.py#L37
-        """
+    """
+    Initialize the weights according to the original implementation.
+    https://github.com/google-research/maskgit/blob/main/maskgit/nets/maskgit_transformer.py#L37
+    """
 
-        # TODO: make this configurable
-        if isinstance(module, Linear):
-            if module.weight.requires_grad:
-                if initializer_range == 0:
-                    module.weight.data.zero_()
-                else:
-                    trunc_normal_(module.weight, std=initializer_range)
-            if module.bias is not None and module.bias.requires_grad:
-                module.bias.data.zero_()
-        elif isinstance(module, Embedding):
-            if module.weight.requires_grad:
-                if initializer_range == 0:
-                    module.weight.data.zero_()
-                else:
-                    trunc_normal_(module.weight, std=initializer_range)
-        elif isinstance(module, (LayerNorm)):
-            if hasattr(module, "weight") and module.weight.requires_grad:
-                module.weight.data.fill_(1.0)
-            if hasattr(module, "bias") and module.bias.requires_grad:
-                module.bias.data.zero_()
+    # TODO: make this configurable
+    if isinstance(module, Linear):
+        if module.weight.requires_grad:
+            if initializer_range == 0:
+                module.weight.data.zero_()
+            else:
+                trunc_normal_(module.weight, std=initializer_range)
+        if module.bias is not None and module.bias.requires_grad:
+            module.bias.data.zero_()
+    elif isinstance(module, Embedding):
+        if module.weight.requires_grad:
+            if initializer_range == 0:
+                module.weight.data.zero_()
+            else:
+                trunc_normal_(module.weight, std=initializer_range)
+    elif isinstance(module, (LayerNorm)):
+        if hasattr(module, "weight") and module.weight.requires_grad:
+            module.weight.data.fill_(1.0)
+        if hasattr(module, "bias") and module.bias.requires_grad:
+            module.bias.data.zero_()
+
 
 class TestIPDiffusionConfig(TestDiffusionConfig):
     """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
 
     validation_image_paths: List[str]
-
-
 
 
 class AdapterLatentDiffusionConfig(BaseConfig):
@@ -143,6 +167,7 @@ class IPDataset(Dataset[IPBatch]):
     Transforms the data from the HuggingFace dataset into `IPBatch`.
     The `collate_fn` is used by the trainer to batch the data.
     """
+
     @no_grad()
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
         super().__init__()
@@ -164,6 +189,7 @@ class IPDataset(Dataset[IPBatch]):
         return {
             "image": dl_manager.download(urls),  # type: ignore
         }
+
     @staticmethod
     def convert2rgb(
         images: list[Image.Image],
@@ -173,9 +199,8 @@ class IPDataset(Dataset[IPBatch]):
             if image.mode != "RGB":
                 image = image.convert("RGB")
             rgb_images.append(image)
-        return {
-            "image": rgb_images
-        }
+        return {"image": rgb_images}
+
     @staticmethod
     def resize_images(
         images: list[Image.Image],
@@ -193,6 +218,7 @@ class IPDataset(Dataset[IPBatch]):
                 for image in images
             ],
         }
+
     @staticmethod
     def filter_images(
         images: list[Image.Image],
@@ -218,6 +244,7 @@ class IPDataset(Dataset[IPBatch]):
         return {
             "text_embedding": [text_encoder(caption) for caption in captions],
         }
+
     @staticmethod
     def cond_transform(
         image: Image.Image,
@@ -233,6 +260,7 @@ class IPDataset(Dataset[IPBatch]):
             mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
             std=[0.26862954, 0.26130258, 0.27577711] if std is None else std,
         )
+
     @staticmethod
     def encode_cond_images(
         images: list[Image.Image],
@@ -242,10 +270,11 @@ class IPDataset(Dataset[IPBatch]):
         dtype: DType,
         cond_resolution: int,
     ) -> dict[str, list[Tensor]]:
-        cond_images = [IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images]
-        return {
-            image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]
-        }
+        cond_images = [
+            IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images
+        ]
+        return {image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]}
+
     @staticmethod
     def encode_lda_images(
         images: list[Image.Image],
@@ -270,9 +299,8 @@ class IPDataset(Dataset[IPBatch]):
             )
         image_compose = Compose(image_transforms)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
-        return {
-            "lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]
-        }
+        return {"lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]}
+
     @no_grad()
     def load_huggingface_dataset(self) -> datasets.Dataset:
         """Load the dataset from Hugging Face and apply some pre-processing."""
@@ -294,9 +322,7 @@ class IPDataset(Dataset[IPBatch]):
             )
             if dataset_config.dataset_length is not None:
                 dataset = dataset.select(list(range(dataset_config.dataset_length)))
-            logger.info(
-                f"Dataset has {len(dataset)} elements"
-            )
+            logger.info(f"Dataset has {len(dataset)} elements")
 
             if dataset_config.download_images:
                 # download images from urls
@@ -330,7 +356,7 @@ class IPDataset(Dataset[IPBatch]):
             )
             # remove min size images
             if dataset_config.filter_min_image_size:
-                dataset = dataset.filter( # type: ignore
+                dataset = dataset.filter(  # type: ignore
                     function=self.filter_images,
                     input_columns=["image"],
                     batched=True,
@@ -369,7 +395,7 @@ class IPDataset(Dataset[IPBatch]):
                         "image_encoder_column": self.image_encoder_column,
                         "device": self.trainer.device,
                         "dtype": self.trainer.dtype,
-                        "cond_resolution": self.cond_resolution
+                        "cond_resolution": self.cond_resolution,
                     },
                     desc="Encoding conditional images into embeddings",  # type: ignore
                 )
@@ -408,11 +434,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset.set_format(  # type: ignore
             type="torch",
             output_all_columns=True,
-            columns=[
-                "text_embedding",
-                self.image_encoder_column,
-                "lda_embedding"
-            ],
+            columns=["text_embedding", self.image_encoder_column, "lda_embedding"],
         )
         if dataset_save_path and update_dataset:
             dataset.save_to_disk(dataset_save_path)
@@ -423,7 +445,9 @@ class IPDataset(Dataset[IPBatch]):
         dataset_config = self.trainer.config.dataset
         if not self.trainer.config.dataset.pre_encode:
             image = data["image"]
-            cond_image = self.cond_transform(image, self.trainer.device, self.trainer.dtype, (self.cond_resolution, self.cond_resolution))
+            cond_image = self.cond_transform(
+                image, self.trainer.device, self.trainer.dtype, (self.cond_resolution, self.cond_resolution)
+            )
             image_embedding = self.trainer.adapter.image_encoder(cond_image)
             # apply augmentation to the image
             image_transforms: list[Module] = []
@@ -453,10 +477,11 @@ class IPDataset(Dataset[IPBatch]):
             image_embedding = zeros_like(image_embedding)
         elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
             text_embedding = self.empty_text_embedding
-        elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate):
+        elif rand_num < (
+            dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate
+        ):
             text_embedding = self.empty_text_embedding
             image_embedding = zeros_like(image_embedding)
-
 
         return IPBatch(
             latent=latent,
@@ -486,13 +511,13 @@ class IPDataset(Dataset[IPBatch]):
 
 
 class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
-
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
         return SD1Autoencoder(
             device=self.device,
         ).to(self.device, dtype=self.dtype)
+
     @cached_property
     def unet(self) -> SD1UNet:
         assert self.config.models["unet"] is not None, "The config must contain a unet entry."
@@ -500,12 +525,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
         ).to(self.device, dtype=self.dtype)
+
     @cached_property
     def text_encoder(self) -> CLIPTextEncoderL:
         assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
         return CLIPTextEncoderL(
             device=self.device,
         ).to(self.device, dtype=self.dtype)
+
     @cached_property
     def image_encoder(self) -> ViT:
         assert self.config.models["image_encoder"] is not None, "The config must contain an image_encoder entry."
@@ -521,6 +548,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
         return image_encoder_cls().to(self.device, dtype=self.dtype)
+
     @cached_property
     def image_proj(self) -> ImageProjection | PerceiverResampler:
         assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
@@ -534,7 +562,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # A bit of hacky method to initialize model with weights.Potentially refactor this
         ip_adapter = SD1IPAdapter(
             target=self.unet,
-            weights=load_from_safetensors(self.config.adapter.checkpoint) if self.config.adapter.checkpoint is not None else None,
+            weights=load_from_safetensors(self.config.adapter.checkpoint)
+            if self.config.adapter.checkpoint is not None
+            else None,
             strict=False,
             fine_grained=self.config.adapter.fine_grained,
             scale=self.config.adapter.scale,
@@ -542,6 +572,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_pooled_text_embedding=self.config.adapter.use_pooled_text_embedding,
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
+            use_bias=self.config.adapter.use_bias,
         )
         return ip_adapter.to(self.device, dtype=self.dtype)
 
@@ -554,7 +585,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
-        return  exp(self.ddpm_scheduler.signal_to_noise_ratios)**2
+        return exp(self.ddpm_scheduler.signal_to_noise_ratios) ** 2
+
     @scoped_seed(seed=Trainer.get_training_seed)
     def load_models(self) -> dict[str, fl.Module]:
         return {
@@ -565,6 +597,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             "image_proj": self.image_proj,
             "adapter": self.adapter,
         }
+
     def load_dataset(self) -> IPDataset:
         return IPDataset(trainer=self)
 
@@ -624,7 +657,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
 
             mse_loss_weights = (
-                stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0] / signal_to_noise_ratios
+                stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
+                / signal_to_noise_ratios
             )
 
             loss = mse_loss(prediction.float(), noise.float(), reduction="none")
@@ -661,7 +695,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
             cond_resolution = self.config.adapter.resolution
-            image_embedding = self.adapter.compute_image_embedding(self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)))
+            image_embedding = self.adapter.compute_image_embedding(
+                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution))
+            )
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
@@ -687,17 +723,22 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # if initializing after, the on_init_end methods do not get called for the extended callbacks
         if callbacks is None:
             callbacks = []
-        callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm()))
+        callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm(), ComputeParamNorm()))
         super().__init__(config=config, callbacks=callbacks)
+
 
 class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
+
     def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         trainer.image_encoder.requires_grad_(False)
         trainer.unet.requires_grad_(False)
         return super().on_init_end(trainer)
+
+
 class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
+
     def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
         if trainer.clock.is_evaluation_step:
             for name, param in trainer.adapter.named_parameters():
@@ -712,6 +753,25 @@ class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
                     trainer.log(data={"grad_norm/" + name: grad_norm})
         return super().on_backward_end(trainer)
 
+
+class ComputeParamNorm(Callback[AdapterLatentDiffusionTrainer]):
+    """Callback to compute gradient norm"""
+
+    def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
+        if trainer.clock.is_evaluation_step:
+            for name, param in trainer.adapter.named_parameters():
+                if param.grad is not None:
+                    data = param.data.detach()
+                    data_norm = (data.norm(p=2) / data.numel()).item()
+                    trainer.log(data={"grad_norm/" + name: data_norm})
+            for name, param in trainer.image_proj.named_parameters():
+                if param.grad is not None:
+                    data = param.data.detach()
+                    data_norm = (data.norm(p=2) / data.numel()).item()
+                    trainer.log(data={"grad_norm/" + name: data_norm})
+        return super().on_backward_end(trainer)
+
+
 class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to load the adapter at the beginning of the training."""
 
@@ -723,7 +783,6 @@ class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
                 if trainer.config.models[model_name].train:
                     for module in model.modules():
                         _init_learnable_weights(module, trainer.config.adapter.initializer_range)
-
 
 
 class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):

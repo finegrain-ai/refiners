@@ -245,9 +245,11 @@ def resize_image(image: Image.Image, min_size: int = 512, max_size: int = 576) -
             image = image.resize(size=(int(min_size * image.size[0] / image.size[1]), min_size))
     return image
 
+
 def filter_image(image: Image.Image, min_size: int = 512) -> bool:
     image_min_size = min(image.size)
     return image_min_size >= min_size
+
 
 class MonitorTimestepLoss(Callback[LatentDiffusionTrainer[Any]]):
     def on_train_begin(self, trainer: LatentDiffusionTrainer[Any]) -> None:

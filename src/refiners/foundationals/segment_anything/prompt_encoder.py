@@ -22,7 +22,7 @@ class CoordinateEncoder(fl.Chain):
 
         super().__init__(
             fl.Multiply(scale=2, bias=-1),
-            fl.Linear(in_features=2, out_features=num_positional_features, bias=False, device=device, dtype=dtype),
+            fl.Linear(in_features=2, out_features=num_positional_features, use_bias=False, device=device, dtype=dtype),
             fl.Multiply(scale=2 * torch.pi * self.scale),
             fl.Concatenate(fl.Sin(), fl.Cos(), dim=-1),
         )
