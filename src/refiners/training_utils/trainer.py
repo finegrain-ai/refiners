@@ -581,7 +581,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.clock.start_timer()
         for batch in self.dataloader:
             data_time = self.clock.time_elapsed
-            print("data_time", data_time)
             self.data_time_m.update(data_time)
             self.clock.start_timer()
             self._call_callbacks(event_name="on_batch_begin")
