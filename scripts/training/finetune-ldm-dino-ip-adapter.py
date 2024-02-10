@@ -806,6 +806,8 @@ class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
                 f"pooled_text_embedding_proj.{key}": value
                 for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
             }
+        print("Num parameters ", len(tensors.keys()))
+        print(tensors.keys())
         save_to_safetensors(
             path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
             tensors=tensors,
