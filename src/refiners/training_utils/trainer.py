@@ -510,7 +510,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dataloader(self) -> DataLoader[Batch]:
         collate_fn = getattr(self.dataset, "collate_fn", None)
         return DataLoader(
-            dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=collate_fn
+            dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=collate_fn
         )
 
     @property
