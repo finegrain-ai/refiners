@@ -95,6 +95,22 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
 
     return decorator
 
+# Ported from open-muse
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.avg: float = 0
+        self.sum: float = 0
+        self.count: int = 0
+
+    def update(self, val: float):
+        self.sum += val
+        self.count += 1
+        self.avg = self.sum / self.count
 
 class WarmupScheduler(LRScheduler):
     _step_count: int  # defined by LRScheduler
@@ -278,6 +294,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             gradient_accumulation=config.training.gradient_accumulation,
             lr_scheduler_interval=config.scheduler.update_interval,
         )
+        self.batch_time_m = AverageMeter()
+        self.forward_time_m = AverageMeter()
+        self.backprop_time_m = AverageMeter()
+        self.data_time_m = AverageMeter()
         self.callbacks = callbacks or []
         self.callbacks += self.default_callbacks()
         self._call_callbacks(event_name="on_init_begin")
@@ -539,22 +559,34 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.clock.is_evaluation_step:
             self.evaluate()
 
-    def step(self, batch: Batch) -> None:
+    def step(self, batch: Batch) -> tuple[float, float]:
         """Perform a single training step."""
+        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
+        forward_time = time.time()-start
+        self.forward_time_m.update(forward_time)
+        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
+        backward_time = time.time()-start
+        self.backprop_time_m.update(backward_time)
+        return forward_time, backward_time
 
     def epoch(self) -> None:
         """Perform a single epoch."""
+        start = time.time()
         for batch in self.dataloader:
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_batch_begin")
-            self.step(batch=batch)
+            data_time = time.time()-start
+            self.data_time_m.update(data_time)
+            forward_time, backward_time = self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
+            batch_time = data_time+forward_time+backward_time
+            self.batch_time_m.update(batch_time)
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
