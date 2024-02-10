@@ -153,6 +153,7 @@ class IPDataset(Dataset[IPBatch]):
         self.image_encoder_column += "_embedding"
         self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
+        self.empty_text_embedding = self.trainer.text_encoder("").cpu().float()
 
     @staticmethod
     def download_images(
@@ -417,10 +418,6 @@ class IPDataset(Dataset[IPBatch]):
             dataset.save_to_disk(dataset_save_path)
         return dataset  # type: ignore
 
-    @cached_property
-    def empty_text_embedding(self) -> Tensor:
-        """Return an empty text embedding."""
-        return self.trainer.text_encoder("").cpu().float()
     def transform(self, data: dict[str, Any]) -> IPBatch:
         """Apply transforms to data."""
         dataset_config = self.trainer.config.dataset
