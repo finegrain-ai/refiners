@@ -420,7 +420,7 @@ class IPDataset(Dataset[IPBatch]):
     @cached_property
     def empty_text_embedding(self) -> Tensor:
         """Return an empty text embedding."""
-        return self.trainer.text_encoder("")
+        return self.trainer.text_encoder("").cpu().float()
     def transform(self, data: dict[str, Any]) -> IPBatch:
         """Apply transforms to data."""
         dataset_config = self.trainer.config.dataset
