@@ -1,35 +1,9 @@
 from jaxtyping import Float
 from torch import Tensor, device as Device, dtype as DType, nn, ones, sqrt, zeros
-from torch.nn import Parameter
-from torch.nn.functional import layer_norm
 from refiners.fluxion.layers.module import Module, WeightedModule
 
 
-# layer norm without bias
-class LayerNormTorch(Module):
-    def __init__(
-        self,
-        normalized_shape: int | list[int],
-        eps: float = 0.00001,
-        use_bias: bool = True,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
-    ) -> None:
-        super().__init__()
-        if isinstance(normalized_shape, int):
-            self.dim = (normalized_shape,)
-        else:
-            self.dim = tuple(normalized_shape)
-
-        self.weight = Parameter(ones(self.dim)).to(device, dtype)
-        self.bias = Parameter(zeros(self.dim)).to(device, dtype) if use_bias else None
-        self.eps = eps
-
-    def forward(self, x: Tensor) -> Tensor:
-        return layer_norm(x, self.dim, self.weight, self.bias, self.eps)
-
-
-class LayerNorm(LayerNormTorch, WeightedModule):
+class LayerNorm(nn.LayerNorm, WeightedModule):
     def __init__(
         self,
         normalized_shape: int | list[int],
@@ -41,7 +15,7 @@ class LayerNorm(LayerNormTorch, WeightedModule):
         super().__init__(  # type: ignore
             normalized_shape=normalized_shape,
             eps=eps,
-            use_bias=use_bias,
+            bias=use_bias,
             device=device,
             dtype=dtype,
         )
