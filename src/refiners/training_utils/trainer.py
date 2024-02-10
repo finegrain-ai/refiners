@@ -459,7 +459,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             model.load_from_safetensors(tensors_path=checkpoint)
         else:
             logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
-        model.requires_grad_(requires_grad=self.config.models[model_name].train)
+        if (requires_grad := self.config.models[model_name].requires_grad) is not None:
+            model.requires_grad_(requires_grad=requires_grad)
         model.to(self.device)
         model.zero_grad()
 

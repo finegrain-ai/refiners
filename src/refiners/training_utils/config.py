@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable, Literal, Type, TypeVar
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, ConfigDict, validator
 from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
 from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
@@ -66,6 +66,8 @@ class TrainingConfig(BaseModel):
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
 
+    model_config = ConfigDict(extra="forbid")
+
     @validator("duration", "gradient_accumulation", "evaluation_interval", pre=True)
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
@@ -112,6 +114,8 @@ class SchedulerConfig(BaseModel):
     max_lr: float | list[float] = 0
     eta_min: float = 0
 
+    model_config = ConfigDict(extra="forbid")
+
     @validator("update_interval", "warmup", pre=True)
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
@@ -123,6 +127,8 @@ class OptimizerConfig(BaseModel):
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
     weight_decay: float = 0.0
+
+    model_config = ConfigDict(extra="forbid")
 
     def get(self, params: ParamsT) -> Optimizer:
         match self.optimizer:
@@ -178,11 +184,15 @@ class OptimizerConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     checkpoint: Path | None = None
-    train: bool = True
+    # If None, then requires_grad will NOT be changed when loading the model
+    # this can be useful if you want to train only a part of the model
+    requires_grad: bool | None = None
     learning_rate: float | None = None
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GyroDropoutConfig(BaseModel):
@@ -191,10 +201,14 @@ class GyroDropoutConfig(BaseModel):
     iters_per_epoch: int = 512
     num_features_threshold: float = 5e5
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class DropoutConfig(BaseModel):
     dropout_probability: float = 0.0
     gyro_dropout: GyroDropoutConfig | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
     def apply_dropout(self, model: fl.Chain) -> None:
         if self.dropout_probability > 0.0:
@@ -213,6 +227,8 @@ class BaseConfig(BaseModel):
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     dropout: DropoutConfig
+
+    model_config = ConfigDict(extra="forbid")
 
     @classmethod
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:
