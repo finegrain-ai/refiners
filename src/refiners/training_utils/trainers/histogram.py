@@ -239,7 +239,6 @@ class HistogramLatentDiffusionTrainer(
     
     def build_results(self, batch: BatchHistogramPrompt, result_images: Tensor) -> BatchHistogramResults:
         return BatchHistogramResults(
-            source_histogram_embeddings = batch.source_histogram_embeddings,
             source_histograms = batch.source_histograms,
             source_prompts = batch.source_prompts,
             source_palettes = batch.source_palettes,

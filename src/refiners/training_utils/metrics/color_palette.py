@@ -121,7 +121,6 @@ class BatchColorPaletteResults(AbstractColorResults[BatchColorPalettePrompt]):
 class BatchHistogramPrompt(AbstractColorPrompt):
     _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
     _tensor_keys: dict[str, tuple[int, ...]] = {
-        "source_histogram_embeddings": (8, 2, 2, 2),
         "source_histograms": (64, 64, 64),
         "text_embeddings": (77, 768),
     }
@@ -129,7 +128,6 @@ class BatchHistogramPrompt(AbstractColorPrompt):
 class BatchHistogramResults(AbstractColorResults[AbstractColorPrompt]):
     _list_keys: List[str] = ["source_palettes", "source_prompts", "source_images", "db_indexes"]
     _tensor_keys: dict[str, tuple[int, ...]] = {
-        "source_histogram_embeddings": (8, 2, 2, 2),
         "source_histograms": (64, 64, 64),
         "text_embeddings": (77, 768),
         "result_images": (3, 512, 512),
