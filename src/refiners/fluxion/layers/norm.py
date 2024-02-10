@@ -15,17 +15,14 @@ class LayerNormTorch(Module):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
-        super().__init__(
-            device=device,
-            dtype=dtype,
-        )
+        super().__init__()
         if isinstance(normalized_shape, int):
             self.dim = (normalized_shape,)
         else:
             self.dim = tuple(normalized_shape)
 
-        self.weight = Parameter(ones(self.dim))
-        self.bias = Parameter(zeros(self.dim)) if bias else None
+        self.weight = Parameter(ones(self.dim)).to(device, dtype)
+        self.bias = Parameter(zeros(self.dim)).to(device, dtype) if use_bias else None
         self.eps = eps
 
     def forward(self, x: Tensor) -> Tensor:
