@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 import wandb
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
@@ -86,6 +86,8 @@ class WandbConfig(BaseModel):
     magic: bool | None = None
     anonymous: Literal["never", "allow", "must"] | None = None
     id: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 AnyTrainer = Trainer[BaseConfig, Any]

@@ -1,5 +1,6 @@
 [models.mock_model]
-train = true
+requires_grad = true
+
 
 [training]
 duration = "100:epoch"
@@ -15,7 +16,6 @@ evaluation_seed = 1
 [optimizer]
 optimizer = "SGD"
 learning_rate = 1
-momentum = 0.9
 
 [scheduler]
 scheduler_type = "ConstantLR"
@@ -23,4 +23,4 @@ update_interval = "1:step"
 warmup = "20:step"
 
 [dropout]
-dropout = 0.0
+dropout_probability = 0.0

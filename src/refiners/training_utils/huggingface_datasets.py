@@ -1,7 +1,7 @@
 from typing import Any, Generic, Protocol, TypeVar, cast
 
 from datasets import VerificationMode, load_dataset as _load_dataset  # type: ignore
-from pydantic import BaseModel  # type: ignore
+from pydantic import BaseModel, ConfigDict  # type: ignore
 
 __all__ = ["load_hf_dataset", "HuggingfaceDataset"]
 
@@ -34,3 +34,5 @@ class HuggingfaceDatasetConfig(BaseModel):
     use_verification: bool = False
     resize_image_min_size: int = 512
     resize_image_max_size: int = 576
+
+    model_config = ConfigDict(extra="forbid")
