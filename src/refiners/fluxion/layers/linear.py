@@ -21,7 +21,7 @@ class Linear(_Linear, WeightedModule):
         super().__init__(  # type: ignore
             in_features=in_features,
             out_features=out_features,
-            use_bias=use_bias,
+            bias=use_bias,
             device=device,
             dtype=dtype,
         )
