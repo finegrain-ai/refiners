@@ -1,15 +1,13 @@
 from abc import ABC
-from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal
 
 import wandb
 from PIL import Image
-from pydantic import BaseModel, ConfigDict
 
-from refiners.training_utils.callback import Callback
+from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.config import BaseConfig
-from refiners.training_utils.trainer import Trainer
+from refiners.training_utils.trainer import Trainer, register_callback
 
 number = float | int
 WandbLoggable = number | Image.Image | list[number] | dict[str, list[number]]
@@ -64,7 +62,7 @@ class WandbLogger:
         return self.wandb_run.name or ""  # type: ignore
 
 
-class WandbConfig(BaseModel):
+class WandbConfig(CallbackConfig):
     """
     Wandb configuration.
 
@@ -87,18 +85,16 @@ class WandbConfig(BaseModel):
     anonymous: Literal["never", "allow", "must"] | None = None
     id: str | None = None
 
-    model_config = ConfigDict(extra="forbid")
-
 
 AnyTrainer = Trainer[BaseConfig, Any]
 
 
 class WandbCallback(Callback["TrainerWithWandb"]):
-    epoch_losses: list[float]
-    iteration_losses: list[float]
-
-    def on_init_begin(self, trainer: "TrainerWithWandb") -> None:
-        trainer.load_wandb()
+    def __init__(self, config: WandbConfig, /, trainer_config: dict[str, Any]) -> None:
+        self.config = config
+        self.epoch_losses: list[float] = []
+        self.iteration_losses: list[float] = []
+        self.logger = WandbLogger({**config.model_dump(), "config": trainer_config})
 
     def on_train_begin(self, trainer: "TrainerWithWandb") -> None:
         self.epoch_losses = []
@@ -131,19 +127,13 @@ class WandbMixin(ABC):
     config: Any
     wandb_logger: WandbLogger
 
-    def load_wandb(self) -> None:
-        wandb_config = getattr(self.config, "wandb", None)
-        assert wandb_config is not None and isinstance(wandb_config, WandbConfig), "Wandb config is not set"
-        init_config = {**wandb_config.model_dump(), "config": self.config.model_dump()}
-        self.wandb_logger = WandbLogger(init_config=init_config)
+    @register_callback()
+    def wandb(self, config: WandbConfig) -> WandbCallback:
+        return WandbCallback(config, trainer_config=self.config.model_dump())
 
     def wandb_log(self, data: dict[str, WandbLoggable]) -> None:
         assert isinstance(self, Trainer), "WandbMixin must be mixed with a Trainer"
-        self.wandb_logger.log(data=data, step=self.clock.step)
-
-    @cached_property
-    def wandb_callback(self) -> WandbCallback:
-        return WandbCallback()
+        self.wandb.logger.log(data=data, step=self.clock.step)
 
 
 class TrainerWithWandb(AnyTrainer, WandbMixin, ABC):
