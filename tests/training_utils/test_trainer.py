@@ -27,8 +27,12 @@ class MockBatch:
     targets: torch.Tensor
 
 
+class MockModelConfig(ModelConfig):
+    use_activation: bool
+
+
 class MockConfig(BaseConfig):
-    mock_model: ModelConfig
+    mock_model: MockModelConfig
 
 
 class MockModel(fl.Chain):
@@ -38,6 +42,10 @@ class MockModel(fl.Chain):
             fl.Linear(10, 10),
             fl.Linear(10, 10),
         )
+
+    def add_activation(self) -> None:
+        self.insert(1, fl.SiLU())
+        self.insert(3, fl.SiLU())
 
 
 class MockTrainer(Trainer[MockConfig, MockBatch]):
@@ -57,8 +65,11 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
         )
 
     @register_model()
-    def mock_model(self, config: ModelConfig) -> MockModel:
-        return MockModel()
+    def mock_model(self, config: MockModelConfig) -> MockModel:
+        model = MockModel()
+        if config.use_activation:
+            model.add_activation()
+        return model
 
     def compute_loss(self, batch: MockBatch) -> Tensor:
         self.step_counter += 1

@@ -92,12 +92,13 @@ class ModelItem:
 
 ModelRegistry = dict[str, ModelItem]
 ModuleT = TypeVar("ModuleT", bound=fl.Module)
+ModelConfigT = TypeVar("ModelConfigT", bound=ModelConfig)
 
 
 def register_model():
-    def decorator(func: Callable[[Any, ModelConfig], ModuleT]) -> ModuleT:
+    def decorator(func: Callable[[Any, ModelConfigT], ModuleT]) -> ModuleT:
         @wraps(func)
-        def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfig) -> fl.Module:
+        def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
             model = model.to(self.device, dtype=self.dtype)
@@ -117,12 +118,13 @@ def register_model():
 
 CallbackRegistry = dict[str, Callback[Any]]
 CallbackT = TypeVar("CallbackT", bound=Callback[Any])
+CallbackConfigT = TypeVar("CallbackConfigT", bound=CallbackConfig)
 
 
 def register_callback():
-    def decorator(func: Callable[[Any, Any], CallbackT]) -> CallbackT:
+    def decorator(func: Callable[[Any, CallbackConfigT], CallbackT]) -> CallbackT:
         @wraps(func)
-        def wrapper(self: "Trainer[BaseConfig, Any]", config: Any) -> CallbackT:
+        def wrapper(self: "Trainer[BaseConfig, Any]", config: CallbackConfigT) -> CallbackT:
             name = func.__name__
             callback = func(self, config)
             self.callbacks[name] = callback
