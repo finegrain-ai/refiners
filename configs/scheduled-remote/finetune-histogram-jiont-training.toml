@@ -24,7 +24,7 @@ n_down_samples = 5
 color_bits = 6
 
 [training]
-duration = "1:epoch"
+duration = "5:epoch"
 seed = 0
 batch_size = 4
 gradient_accumulation = "1:step"
