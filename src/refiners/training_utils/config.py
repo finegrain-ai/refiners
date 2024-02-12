@@ -9,49 +9,15 @@ from prodigyopt import Prodigy  # type: ignore
 from pydantic import BaseModel, ConfigDict, validator
 from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
-from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
 
-import refiners.fluxion.layers as fl
-from refiners.training_utils.dropout import apply_dropout, apply_gyro_dropout
+from refiners.training_utils.clock import ClockConfig
+from refiners.training_utils.common import TimeUnit, TimeValue, parse_number_unit_field
+from refiners.training_utils.gradient_clipping import GradientClippingConfig
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
 # See https://github.com/pytorch/pytorch/pull/111114
 ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
-
-__all__ = [
-    "parse_number_unit_field",
-    "TimeUnit",
-    "TimeValue",
-    "TrainingConfig",
-    "OptimizerConfig",
-    "Optimizers",
-]
-
-
-class TimeUnit(Enum):
-    STEP = "step"
-    EPOCH = "epoch"
-    ITERATION = "iteration"
-    DEFAULT = "step"
-
-
-class TimeValue(TypedDict):
-    number: int
-    unit: TimeUnit
-
-
-def parse_number_unit_field(value: str | int | dict[str, str | int]) -> TimeValue:
-    match value:
-        case str(value_str):
-            number, unit = value_str.split(sep=":")
-            return {"number": int(number.strip()), "unit": TimeUnit(value=unit.strip().lower())}
-        case int(number):
-            return {"number": number, "unit": TimeUnit.DEFAULT}
-        case {"number": int(number), "unit": str(unit)}:
-            return {"number": number, "unit": TimeUnit(value=unit.lower())}
-        case _:
-            raise ValueError(f"Unsupported value format: {value}")
 
 
 class TrainingConfig(BaseModel):
@@ -61,8 +27,6 @@ class TrainingConfig(BaseModel):
     seed: int = 0
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
-    clip_grad_norm: float | None = None
-    clip_grad_value: float | None = None
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
 
@@ -195,29 +159,6 @@ class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class GyroDropoutConfig(BaseModel):
-    total_subnetworks: int = 512
-    concurrent_subnetworks: int = 64
-    iters_per_epoch: int = 512
-    num_features_threshold: float = 5e5
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class DropoutConfig(BaseModel):
-    dropout_probability: float = 0.0
-    gyro_dropout: GyroDropoutConfig | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    def apply_dropout(self, model: fl.Chain) -> None:
-        if self.dropout_probability > 0.0:
-            if self.gyro_dropout is not None:
-                apply_gyro_dropout(module=model, probability=self.dropout_probability, **self.gyro_dropout.model_dump())
-            else:
-                apply_dropout(module=model, probability=self.dropout_probability)
-
-
 T = TypeVar("T", bound="BaseConfig")
 
 
@@ -226,7 +167,8 @@ class BaseConfig(BaseModel):
     training: TrainingConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
-    dropout: DropoutConfig
+    clock: ClockConfig = ClockConfig()
+    gradient_clipping: GradientClippingConfig = GradientClippingConfig()
 
     model_config = ConfigDict(extra="forbid")
 

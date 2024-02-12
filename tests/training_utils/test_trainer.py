@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from functools import cached_property
 from pathlib import Path
 from typing import cast
 
@@ -10,13 +9,15 @@ from torch.optim import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
-from refiners.training_utils.config import BaseConfig, TimeUnit
+from refiners.training_utils.common import TimeUnit, count_learnable_parameters, human_readable_number
+from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.training_utils.trainer import (
     Trainer,
     TrainingClock,
     WarmupScheduler,
     count_learnable_parameters,
     human_readable_number,
+    register_model,
 )
 
 
@@ -55,12 +56,9 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
             targets=torch.cat([b.targets for b in batch]),
         )
 
-    @cached_property
-    def mock_model(self) -> MockModel:
+    @register_model()
+    def mock_model(self, config: ModelConfig) -> MockModel:
         return MockModel()
-
-    def load_models(self) -> dict[str, fl.Module]:
-        return {"mock_model": self.mock_model}
 
     def compute_loss(self, batch: MockBatch) -> Tensor:
         self.step_counter += 1
@@ -217,16 +215,13 @@ def test_warmup_lr(warmup_scheduler: WarmupScheduler) -> None:
 
 
 class MockTrainerWith2Models(MockTrainer):
-    @cached_property
-    def mock_model1(self) -> MockModel:
+    @register_model()
+    def mock_model1(self, config: ModelConfig) -> MockModel:
         return MockModel()
 
-    @cached_property
-    def mock_model2(self) -> MockModel:
+    @register_model()
+    def mock_model2(self, config: ModelConfig) -> MockModel:
         return MockModel()
-
-    def load_models(self) -> dict[str, fl.Module]:
-        return {"mock_model1": self.mock_model1, "mock_model2": self.mock_model2}
 
     def compute_loss(self, batch: MockBatch) -> Tensor:
         self.step_counter += 1
@@ -246,7 +241,5 @@ def mock_trainer_2_models(mock_config_2_models: MockConfig) -> MockTrainerWith2M
 
 
 def test_optimizer_parameters(mock_trainer_2_models: MockTrainerWith2Models) -> None:
-    assert (
-        len(mock_trainer_2_models.optimizer.param_groups) == 12
-    )  # 12 == (3 [linear layers] * 2 [bias + weights]) * 2 [models]
+    assert len(mock_trainer_2_models.optimizer.param_groups) == 2
     assert mock_trainer_2_models.optimizer.param_groups[0]["lr"] == 1e-5
