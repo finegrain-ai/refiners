@@ -28,7 +28,7 @@ class MockBatch:
 
 
 class MockConfig(BaseConfig):
-    pass
+    mock_model: ModelConfig
 
 
 class MockModel(fl.Chain):
@@ -230,9 +230,14 @@ class MockTrainerWith2Models(MockTrainer):
         return norm(outputs - targets)
 
 
+class MockConfig_2_Models(BaseConfig):
+    mock_model1: ModelConfig
+    mock_model2: ModelConfig
+
+
 @pytest.fixture
-def mock_config_2_models(test_device: torch.device) -> MockConfig:
-    return MockConfig.load_from_toml(Path(__file__).parent / "mock_config_2_models.toml")
+def mock_config_2_models() -> MockConfig_2_Models:
+    return MockConfig_2_Models.load_from_toml(Path(__file__).parent / "mock_config_2_models.toml")
 
 
 @pytest.fixture

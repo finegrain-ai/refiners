@@ -1,4 +1,4 @@
-[models.mock_model]
+[mock_model]
 requires_grad = true
 
 [clock]
