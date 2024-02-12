@@ -1,5 +1,6 @@
 [mock_model]
 requires_grad = true
+use_activation = true
 
 [clock]
 verbose = false
