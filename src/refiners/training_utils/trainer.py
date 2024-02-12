@@ -430,7 +430,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             registered_callback(config)
 
     def _load_models(self) -> None:
-        for name, config in self.config.models.items():
+        for name, config in self.config:
+            if not isinstance(config, ModelConfig):
+                continue
             try:
                 registered_model = getattr(self, name)
             except AttributeError:
