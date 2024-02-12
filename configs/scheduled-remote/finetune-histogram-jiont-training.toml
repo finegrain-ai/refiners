@@ -3,7 +3,7 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="xs-0l-joint-training"
+name="no-color-loss"
 tags = ["l4", "remote"]
 
 [models]
@@ -24,7 +24,7 @@ n_down_samples = 5
 color_bits = 6
 
 [training]
-duration = "10:epoch"
+duration = "1:epoch"
 seed = 0
 batch_size = 4
 gradient_accumulation = "1:step"
@@ -32,7 +32,7 @@ clip_grad_norm = 1.0
 # clip_grad_value = 1.0
 evaluation_interval = "500:step"
 evaluation_seed = 1
-color_loss_weight = 0.1
+color_loss_weight = 0
 dtype = "bfloat16"
 
 [optimizer]
