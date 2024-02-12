@@ -147,7 +147,6 @@ class OptimizerConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    checkpoint: Path | None = None
     # If None, then requires_grad will NOT be changed when loading the model
     # this can be useful if you want to train only a part of the model
     requires_grad: bool | None = None
@@ -163,7 +162,6 @@ T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
-    models: dict[str, ModelConfig]
     training: TrainingConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
