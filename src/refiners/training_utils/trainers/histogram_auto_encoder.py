@@ -30,6 +30,8 @@ class HistogramAutoEncoderConfig(BaseModel):
     resnet_sizes: list[int]
     n_down_samples: int
     color_bits: int
+    num_groups: int = 4
+    loss: str = "kl_div"
 
 class TrainHistogramAutoEncoderConfig(BaseConfig):
     dataset: ColorDatasetConfig
@@ -81,6 +83,7 @@ class HistogramAutoEncoderTrainer(
     def histogram_auto_encoder(self) -> HistogramAutoEncoder:
         assert self.config.models["histogram_auto_encoder"] is not None, "The config must contain a histogram entry."
         autoencoder = HistogramAutoEncoder(
+            num_groups=self.config.histogram_auto_encoder.num_groups,
             latent_dim=self.config.histogram_auto_encoder.latent_dim, 
             resnet_sizes=self.config.histogram_auto_encoder.resnet_sizes,
             n_down_samples=self.config.histogram_auto_encoder.n_down_samples,
@@ -111,8 +114,13 @@ class HistogramAutoEncoderTrainer(
         
         if isnan(actual).any():
             raise ValueError("The autoencoder produced NaNs.")
-
-        loss = self.histogram_distance(actual, expected)
+        
+        if self.config.histogram_auto_encoder.loss == "mse":
+            loss = self.histogram_distance(actual, expected)
+        elif self.config.histogram_auto_encoder.loss == "kl_div":
+            loss = self.histogram_distance.kl_div(actual, expected)
+        else:
+            raise ValueError(f"Unknown loss {self.config.histogram_auto_encoder.loss}")
 
         return loss
 

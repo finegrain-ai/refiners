@@ -3,14 +3,16 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histo-autoencoder"
-name = "4-32"
+name = "4_16-32-b8-lr5e-3-mse"
 tags = ["autoencoder"]
 
 [histogram_auto_encoder]
-latent_dim = 64
-resnet_sizes = [4, 4, 4, 4, 4, 4, 4]
+latent_dim = 32
+resnet_sizes = [4, 4, 8, 8, 16, 16, 16]
 n_down_samples = 6
 color_bits = 6
+num_groups = 4
+loss = "mse"
 
 [models]
 histogram_auto_encoder = {train = true}
@@ -19,7 +21,7 @@ histogram_auto_encoder = {train = true}
 duration = "1:epoch"
 seed = 0
 gpu_index = 1
-batch_size = 64
+batch_size = 8
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
@@ -57,5 +59,5 @@ caption_key = "ai_description"
 split = "train[:10]"
 
 [checkpointing]
-save_interval = "100:step"
+save_interval = "1000:step"
 use_wandb = true
