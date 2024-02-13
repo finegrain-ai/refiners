@@ -43,8 +43,8 @@ from refiners.fluxion.utils import image_to_tensor, normalize
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter, get_sd1_image_proj
-from refiners.foundationals.latent_diffusion.schedulers.ddpm import DDPM
-from refiners.foundationals.latent_diffusion.schedulers.dpm_solver import DPMSolver
+from refiners.foundationals.latent_diffusion.solvers.ddpm import DDPM
+from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
 from refiners.training_utils.callback import Callback
 from refiners.training_utils.config import BaseConfig
