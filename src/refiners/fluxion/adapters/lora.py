@@ -330,31 +330,6 @@ class Conv2dLora(Lora[fl.Conv2d]):
         lora.load_weights(down_weight=down, up_weight=up)
         return lora
 
-<<<<<<< HEAD
-    def auto_attach(self, target: Chain, exclude: list[str] | None = None) -> "tuple[LoraAdapter, fl.Chain]  | None":
-        for layer, parent in target.walk(fl.Conv2d):
-            if isinstance(parent, Lora) or isinstance(parent, LoraAdapter):
-                continue
-
-            if exclude is not None and any(
-                [any([p.__class__.__name__ == e for p in parent.get_parents() + [parent]]) for e in exclude]
-            ):
-                continue
-
-            if layer.in_channels == self.in_channels and layer.out_channels == self.out_channels:
-                if layer.stride != (self.stride[0], self.stride[0]):
-                    self.down.stride = layer.stride
-
-                return (
-                    LoraAdapter(
-                        target=layer,
-                        lora=self,
-                    ),
-                    parent,
-                )
-
-=======
->>>>>>> 3488273f503283bfe0273fa4008aafd643789df3
     def lora_layers(
         self, device: Device | str | None = None, dtype: DType | None = None
     ) -> tuple[fl.Conv2d, fl.Conv2d]:
