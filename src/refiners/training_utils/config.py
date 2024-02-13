@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable, Literal, Type, TypeVar
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
-from pydantic import BaseModel, ConfigDict, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
@@ -32,7 +32,7 @@ class TrainingConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    @validator("duration", "gradient_accumulation", "evaluation_interval", pre=True)
+    @field_validator("duration", "gradient_accumulation", "evaluation_interval", mode="before")
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
@@ -80,7 +80,7 @@ class SchedulerConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    @validator("update_interval", "warmup", pre=True)
+    @field_validator("update_interval", "warmup", mode="before")
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
