@@ -44,7 +44,7 @@ class LayerNorm(_LayerNorm, WeightedModule):
             normalized_shape=normalized_shape,
             eps=eps,
             elementwise_affine=True,  # otherwise not a WeightedModule
-            bias=bias,
+            # bias=bias,
             device=device,
             dtype=dtype,
         )

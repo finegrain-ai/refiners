@@ -158,6 +158,7 @@ class ModelConfig(BaseModel):
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
+    checkpoint: str | None = None
 
 
     model_config = ConfigDict(extra="forbid")

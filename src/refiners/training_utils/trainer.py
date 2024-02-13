@@ -41,12 +41,6 @@ from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
 from refiners.training_utils.callback import (
     Callback,
-    ClockCallback,
-    GradientNormClipping,
-    GradientNormLogging,
-    GradientValueClipping,
-    MonitorLoss,
-    MonitorTime,
     CallbackConfig,
 )
 from refiners.training_utils.clock import ClockConfig, TrainingClock
@@ -138,6 +132,8 @@ def register_model():
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
+            if config.checkpoint is not None:
+                model.load_from_safetensors(config.checkpoint)
             model = model.to(self.device, dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
@@ -525,7 +521,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 )
             assert callable(registered_callback)
             registered_callback(config)
-
+    @scoped_seed(seed=get_training_seed)
     def _load_models(self) -> None:
         for name, config in self.config:
             if not isinstance(config, ModelConfig):

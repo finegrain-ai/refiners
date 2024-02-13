@@ -46,8 +46,8 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt imp
 from refiners.foundationals.latent_diffusion.solvers.ddpm import DDPM
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
-from refiners.training_utils.callback import Callback
-from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.callback import Callback, CallbackConfig
+from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, PerceiverResampler
 from refiners.training_utils.latent_diffusion import (
     LatentDiffusionConfig,
@@ -56,8 +56,8 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
     filter_image,
 )
-from refiners.training_utils.trainer import scoped_seed
-from refiners.training_utils.wandb import WandbLoggable, TrainerWithWandb
+from refiners.training_utils.trainer import register_model, Trainer, register_callback
+from refiners.training_utils.wandb import WandbLoggable, WandbMixin
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 
@@ -510,32 +510,28 @@ class IPDataset(Dataset[IPBatch]):
         return len(self.dataset)
 
 
-class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfig, IPBatch]):
-    @cached_property
-    def lda(self) -> SD1Autoencoder:
-        assert self.config.models["lda"] is not None, "The config must contain a lda entry."
+class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch], WandbMixin):
+    @register_model()
+    def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
         return SD1Autoencoder(
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
-    @cached_property
-    def unet(self) -> SD1UNet:
-        assert self.config.models["unet"] is not None, "The config must contain a unet entry."
+    @register_model()
+    def unet(self, unet_config: ModelConfig) -> SD1UNet:
         return SD1UNet(
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
-    @cached_property
-    def text_encoder(self) -> CLIPTextEncoderL:
-        assert self.config.models["text_encoder"] is not None, "The config must contain a text_encoder entry."
+    @register_model()
+    def text_encoder(self, text_encoder_config: ModelConfig) -> CLIPTextEncoderL:
         return CLIPTextEncoderL(
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
-    @cached_property
-    def image_encoder(self) -> ViT:
-        assert self.config.models["image_encoder"] is not None, "The config must contain an image_encoder entry."
+    @register_model()
+    def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
         image_encoder_cls = DINOv2_base
         if self.config.adapter.image_encoder_type == "dinov2_vitl14_reg4":
             image_encoder_cls = DINOv2_large_reg
@@ -547,21 +543,22 @@ class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfi
             image_encoder_cls = DINOv2_small_reg
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
-        return image_encoder_cls().to(self.device, dtype=self.dtype)
+        return image_encoder_cls()
 
-    @cached_property
-    def image_proj(self) -> ImageProjection | PerceiverResampler:
-        assert self.config.models["image_proj"] is not None, "The config must contain an image_encoder entry."
+    @register_model()
+    def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
         )
-        return image_proj.to(self.device, dtype=self.dtype)
+        for module in image_proj.modules():
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        return image_proj
 
-    @cached_property
-    def adapter(self) -> SD1IPAdapter:
+    @register_model()
+    def adapter(self, adapter_config: ModelConfig) -> SD1IPAdapter:
         assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
-        # A bit of hacky method to initialize model with weights.Potentially refactor this
+        # At the point this gets called the unet, image_encoder, and image_proj will get called thanks to @register_model
         ip_adapter = SD1IPAdapter(
             target=self.unet,
             weights=load_from_safetensors(self.config.adapter.checkpoint)
@@ -576,7 +573,10 @@ class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfi
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
         )
-        return ip_adapter.to(self.device, dtype=self.dtype)
+        ip_adapter.inject()
+        for module in ip_adapter.modules():
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        return ip_adapter
 
     @cached_property
     def ddpm_scheduler(self) -> DDPM:
@@ -589,16 +589,6 @@ class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfi
     def signal_to_noise_ratios(self) -> Tensor:
         return exp(self.ddpm_scheduler.signal_to_noise_ratios) ** 2
 
-    @scoped_seed(seed=Trainer.get_training_seed)
-    def load_models(self) -> dict[str, fl.Module]:
-        return {
-            "lda": self.lda,
-            "unet": self.unet,
-            "text_encoder": self.text_encoder,
-            "image_encoder": self.image_encoder,
-            "image_proj": self.image_proj,
-            "adapter": self.adapter,
-        }
 
     def load_dataset(self) -> IPDataset:
         return IPDataset(trainer=self)
@@ -716,29 +706,25 @@ class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfi
         # log images to wandb
         self.log(data=images)
         self.adapter.scale = self.config.adapter.scale
-
+    @register_callback()
+    def compute_grad_norms(self, config: CallbackConfig) -> ComputeGradNormCallback:
+        return ComputeGradNormCallback()
+    @register_callback()
+    def compute_parm_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
+        return ComputeParamNormCallback()
+    @register_callback()
+    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
+        return SaveAdapterCallback()
     def __init__(
         self,
         config: AdapterLatentDiffusionConfig,
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         # if initializing after, the on_init_end methods do not get called for the extended callbacks
-        if callbacks is None:
-            callbacks = []
-        callbacks.extend((IPSubmodulesFreeze(), LoadAdapter(), SaveAdapter(), ComputeGradNorm(), ComputeParamNorm()))
-        super().__init__(config=config, callbacks=callbacks)
+        super().__init__(config=config)
 
 
-class IPSubmodulesFreeze(Callback[AdapterLatentDiffusionTrainer]):
-    """Callback to compute gradient norm"""
-
-    def on_init_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        trainer.image_encoder.requires_grad_(False)
-        trainer.unet.requires_grad_(False)
-        return super().on_init_end(trainer)
-
-
-class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
+class ComputeGradNormCallback(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
 
     def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
@@ -756,7 +742,7 @@ class ComputeGradNorm(Callback[AdapterLatentDiffusionTrainer]):
         return super().on_backward_end(trainer)
 
 
-class ComputeParamNorm(Callback[AdapterLatentDiffusionTrainer]):
+class ComputeParamNormCallback(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to compute gradient norm"""
 
     def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
@@ -774,20 +760,7 @@ class ComputeParamNorm(Callback[AdapterLatentDiffusionTrainer]):
         return super().on_backward_end(trainer)
 
 
-class LoadAdapter(Callback[AdapterLatentDiffusionTrainer]):
-    """Callback to load the adapter at the beginning of the training."""
-
-    def on_train_begin(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        trainer.adapter.inject()
-        if trainer.config.adapter.initialize_model:
-            for model_name in trainer.models:
-                model = trainer.models[model_name]
-                if trainer.config.models[model_name].train:
-                    for module in model.modules():
-                        _init_learnable_weights(module, trainer.config.adapter.initializer_range)
-
-
-class SaveAdapter(Callback[AdapterLatentDiffusionTrainer]):
+class SaveAdapterCallback(Callback[AdapterLatentDiffusionTrainer]):
     """Callback to save the adapter when a checkpoint is saved."""
 
     def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
