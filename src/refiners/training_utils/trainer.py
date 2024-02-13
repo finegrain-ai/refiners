@@ -191,10 +191,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.forward_time_m = AverageMeter()
         self.backprop_time_m = AverageMeter()
         self.data_time_m = AverageMeter()
+        self.global_step: int = 0
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
         self._load_models()
         self._call_callbacks(event_name="on_init_end")
+        self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
 
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
@@ -407,32 +409,35 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        if self.scaler is not None:
-            self.scaler.scale(scaled_loss).backward()  # type: ignore
-        else:
-            backward(tensors=scaled_loss)
-        self._call_callbacks(event_name="on_backward_end")
-        if self.clock.is_optimizer_step:
-            self._call_callbacks(event_name="on_optimizer_step_begin")
+        self.current_loss += scaled_loss
+        if self.global_step % self.clock.num_step_per_iteration == 0:
             if self.scaler is not None:
-                # logic from accelerator
-                scale_before = self.scaler.get_scale()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                scale_after = self.scaler.get_scale()
-                # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
-                if scale_after < scale_before:
-                    logger.info("Overflow in optimizer caused optimizer to skip")
+                self.scaler.scale(scaled_loss).backward()  # type: ignore
             else:
-                self.optimizer.step()
-            self.optimizer.zero_grad()
-            self._call_callbacks(event_name="on_optimizer_step_end")
-        if self.clock.is_lr_scheduler_step:
-            self._call_callbacks(event_name="on_lr_scheduler_step_begin")
-            self.lr_scheduler.step()
-            self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        if self.clock.is_evaluation_step:
-            self.evaluate()
+                backward(tensors=scaled_loss)
+            self._call_callbacks(event_name="on_backward_end")
+            if self.clock.is_optimizer_step:
+                self._call_callbacks(event_name="on_optimizer_step_begin")
+                if self.scaler is not None:
+                    # logic from accelerator
+                    scale_before = self.scaler.get_scale()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                    scale_after = self.scaler.get_scale()
+                    # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+                    if scale_after < scale_before:
+                        logger.info("Overflow in optimizer caused optimizer to skip")
+                else:
+                    self.optimizer.step()
+                self.optimizer.zero_grad()
+                self._call_callbacks(event_name="on_optimizer_step_end")
+            if self.clock.is_lr_scheduler_step:
+                self._call_callbacks(event_name="on_lr_scheduler_step_begin")
+                self.lr_scheduler.step()
+                self._call_callbacks(event_name="on_lr_scheduler_step_end")
+            if self.clock.is_evaluation_step:
+                self.evaluate()
+            self.current_loss[:] = 0
 
     def step(self, batch: Batch) -> tuple[int, int]:
         """Perform a single training step."""
@@ -451,6 +456,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def epoch(self) -> None:
         """Perform a single epoch."""
         self.clock.start_timer()
+        self.global_step = 1
         for batch in self.dataloader:
             if self.clock.done:
                 break
@@ -463,6 +469,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
             self._call_callbacks(event_name="on_batch_end")
+            self.global_step += 1
+
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
         return instance.config.training.seed

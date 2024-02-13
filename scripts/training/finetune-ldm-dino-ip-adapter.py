@@ -56,8 +56,8 @@ from refiners.training_utils.latent_diffusion import (
     sample_noise,
     filter_image,
 )
-from refiners.training_utils.trainer import Trainer, scoped_seed
-from refiners.training_utils.wandb import WandbLoggable
+from refiners.training_utils.trainer import scoped_seed
+from refiners.training_utils.wandb import WandbLoggable, TrainerWithWandb
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 
@@ -510,7 +510,7 @@ class IPDataset(Dataset[IPBatch]):
         return len(self.dataset)
 
 
-class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch]):
+class AdapterLatentDiffusionTrainer(TrainerWithWandb[AdapterLatentDiffusionConfig, IPBatch]):
     @cached_property
     def lda(self) -> SD1Autoencoder:
         assert self.config.models["lda"] is not None, "The config must contain a lda entry."
