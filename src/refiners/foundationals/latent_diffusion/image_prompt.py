@@ -38,12 +38,12 @@ class ImageProjection(fl.Chain):
             fl.Linear(
                 in_features=image_embedding_dim,
                 out_features=clip_text_embedding_dim * num_tokens,
-                use_bias=use_bias,
+                bias=use_bias,
                 device=device,
                 dtype=dtype,
             ),
             fl.Reshape(num_tokens, clip_text_embedding_dim),
-            fl.LayerNorm(normalized_shape=clip_text_embedding_dim, use_bias=use_bias, device=device, dtype=dtype),
+            fl.LayerNorm(normalized_shape=clip_text_embedding_dim, bias=use_bias, device=device, dtype=dtype),
         )
 
 
@@ -61,7 +61,7 @@ class FeedForward(fl.Chain):
             fl.Linear(
                 in_features=self.embedding_dim,
                 out_features=self.feedforward_dim,
-                use_bias=False,
+                bias=False,
                 device=device,
                 dtype=dtype,
             ),
@@ -69,7 +69,7 @@ class FeedForward(fl.Chain):
             fl.Linear(
                 in_features=self.feedforward_dim,
                 out_features=self.embedding_dim,
-                use_bias=False,
+                bias=False,
                 device=device,
                 dtype=dtype,
             ),
@@ -131,8 +131,8 @@ class PerceiverAttention(fl.Chain):
         self.inner_dim = head_dim * num_heads
         super().__init__(
             fl.Distribute(
-                fl.LayerNorm(normalized_shape=self.embedding_dim, use_bias=use_bias, device=device, dtype=dtype),
-                fl.LayerNorm(normalized_shape=self.embedding_dim, use_bias=use_bias, device=device, dtype=dtype),
+                fl.LayerNorm(normalized_shape=self.embedding_dim, bias=use_bias, device=device, dtype=dtype),
+                fl.LayerNorm(normalized_shape=self.embedding_dim, bias=use_bias, device=device, dtype=dtype),
             ),
             fl.Parallel(
                 fl.Chain(
@@ -140,7 +140,7 @@ class PerceiverAttention(fl.Chain):
                     fl.Linear(
                         in_features=self.embedding_dim,
                         out_features=2 * self.inner_dim,
-                        use_bias=False,
+                        bias=False,
                         device=device,
                         dtype=dtype,
                     ),  # Wkv
@@ -150,7 +150,7 @@ class PerceiverAttention(fl.Chain):
                     fl.Linear(
                         in_features=self.embedding_dim,
                         out_features=self.inner_dim,
-                        use_bias=False,
+                        bias=False,
                         device=device,
                         dtype=dtype,
                     ),  # Wq
@@ -158,7 +158,7 @@ class PerceiverAttention(fl.Chain):
             ),
             PerceiverScaledDotProductAttention(head_dim=head_dim, num_heads=num_heads),
             fl.Linear(
-                in_features=self.inner_dim, out_features=self.embedding_dim, use_bias=False, device=device, dtype=dtype
+                in_features=self.inner_dim, out_features=self.embedding_dim, bias=False, device=device, dtype=dtype
             ),
         )
 
@@ -206,7 +206,7 @@ class PerceiverResampler(fl.Chain):
         self.output_dim = output_dim
         self.feedforward_dim = 4 * self.latents_dim
         super().__init__(
-            fl.Linear(in_features=input_dim, out_features=latents_dim, use_bias=use_bias, device=device, dtype=dtype),
+            fl.Linear(in_features=input_dim, out_features=latents_dim, bias=use_bias, device=device, dtype=dtype),
             fl.SetContext(context="perceiver_resampler", key="x"),
             LatentsToken(num_tokens, latents_dim, device=device, dtype=dtype),
             Transformer(
@@ -223,7 +223,7 @@ class PerceiverResampler(fl.Chain):
                         ),
                     ),
                     fl.Residual(
-                        fl.LayerNorm(normalized_shape=latents_dim, use_bias=use_bias, device=device, dtype=dtype),
+                        fl.LayerNorm(normalized_shape=latents_dim, bias=use_bias, device=device, dtype=dtype),
                         FeedForward(
                             embedding_dim=latents_dim, feedforward_dim=self.feedforward_dim, device=device, dtype=dtype
                         ),
@@ -231,8 +231,8 @@ class PerceiverResampler(fl.Chain):
                 )
                 for _ in range(num_attention_layers)
             ),
-            fl.Linear(in_features=latents_dim, out_features=output_dim, use_bias=use_bias, device=device, dtype=dtype),
-            fl.LayerNorm(normalized_shape=output_dim, use_bias=use_bias, device=device, dtype=dtype),
+            fl.Linear(in_features=latents_dim, out_features=output_dim, bias=use_bias, device=device, dtype=dtype),
+            fl.LayerNorm(normalized_shape=output_dim, bias=use_bias, device=device, dtype=dtype),
         )
 
     def init_context(self) -> Contexts:
@@ -256,7 +256,7 @@ class ImageCrossAttention(fl.Chain):
                     fl.Linear(
                         in_features=1280,
                         out_features=text_cross_attention.inner_dim,
-                        use_bias=text_cross_attention.use_bias,
+                        bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
@@ -269,7 +269,7 @@ class ImageCrossAttention(fl.Chain):
                     fl.Linear(
                         in_features=1280,
                         out_features=text_cross_attention.inner_dim,
-                        use_bias=text_cross_attention.use_bias,
+                        bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
@@ -285,7 +285,7 @@ class ImageCrossAttention(fl.Chain):
                         fl.Linear(
                             in_features=text_cross_attention.key_embedding_dim,
                             out_features=text_cross_attention.inner_dim,
-                            use_bias=text_cross_attention.use_bias,
+                            bias=text_cross_attention.use_bias,
                             device=text_cross_attention.device,
                             dtype=text_cross_attention.dtype,
                         ),
@@ -298,7 +298,7 @@ class ImageCrossAttention(fl.Chain):
                         fl.Linear(
                             in_features=text_cross_attention.value_embedding_dim,
                             out_features=text_cross_attention.inner_dim,
-                            use_bias=text_cross_attention.use_bias,
+                            bias=text_cross_attention.use_bias,
                             device=text_cross_attention.device,
                             dtype=text_cross_attention.dtype,
                         ),
@@ -386,7 +386,7 @@ class PooledTextEmbeddingTimestepEncoder(fl.Passthrough):
     ) -> None:
         super().__init__(
             fl.UseContext("ip_adapter", "pooled_text_embedding"),
-            fl.Linear(768, 1280, use_bias=use_bias, device=device, dtype=dtype),
+            fl.Linear(768, 1280, bias=use_bias, device=device, dtype=dtype),
             fl.SetContext("ip_adapter", "pooled_text_timestep_embedding"),
         )
 

@@ -282,21 +282,21 @@ class Attention(Chain):
                 Linear(  # Query projection
                     in_features=self.embedding_dim,
                     out_features=self.inner_dim,
-                    use_bias=self.use_bias,
+                    bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
                 Linear(  # Key projection
                     in_features=self.key_embedding_dim,
                     out_features=self.inner_dim,
-                    use_bias=self.use_bias,
+                    bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
                 Linear(  # Value projection
                     in_features=self.value_embedding_dim,
                     out_features=self.inner_dim,
-                    use_bias=self.use_bias,
+                    bias=self.use_bias,
                     device=device,
                     dtype=dtype,
                 ),
@@ -309,7 +309,7 @@ class Attention(Chain):
             Linear(  # Output projection
                 in_features=self.inner_dim,
                 out_features=self.embedding_dim,
-                use_bias=True,
+                bias=True,
                 device=device,
                 dtype=dtype,
             ),

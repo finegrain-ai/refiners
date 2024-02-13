@@ -167,7 +167,7 @@ class CLIPImageEncoder(fl.Chain):
             ),
             fl.Lambda(func=cls_token_pooling),
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
-            fl.Linear(in_features=embedding_dim, out_features=output_dim, use_bias=False, device=device, dtype=dtype),
+            fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
 
 

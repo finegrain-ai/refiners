@@ -236,14 +236,14 @@ class LinearLora(Lora[fl.Linear]):
             fl.Linear(
                 in_features=self.in_features,
                 out_features=self.rank,
-                use_bias=False,
+                bias=False,
                 device=device,
                 dtype=dtype,
             ),
             fl.Linear(
                 in_features=self.rank,
                 out_features=self.out_features,
-                use_bias=False,
+                bias=False,
                 device=device,
                 dtype=dtype,
             ),

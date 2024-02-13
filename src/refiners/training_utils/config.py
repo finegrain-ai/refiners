@@ -150,19 +150,6 @@ class OptimizerConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-<<<<<<< HEAD
-    checkpoint: Path | None = None
-    train: bool = True
-    compile: bool = False
-    learning_rate: float | None = None  # TODO: Implement this
-
-
-class GyroDropoutConfig(BaseModel):
-    total_subnetworks: int = 512
-    concurent_subnetworks: int = 64
-    iters_per_epoch: int = 512
-    num_features_threshold: float = 5e5
-=======
     # If None, then requires_grad will NOT be changed when loading the model
     # this can be useful if you want to train only a part of the model
     requires_grad: bool | None = None
@@ -171,7 +158,7 @@ class GyroDropoutConfig(BaseModel):
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
->>>>>>> 3488273f503283bfe0273fa4008aafd643789df3
+
 
     model_config = ConfigDict(extra="forbid")
 

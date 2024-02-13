@@ -36,14 +36,15 @@ class LayerNorm(_LayerNorm, WeightedModule):
         self,
         normalized_shape: int | list[int],
         eps: float = 0.00001,
-        use_bias: bool = True,
+        bias: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
         super().__init__(  # type: ignore
             normalized_shape=normalized_shape,
             eps=eps,
-            bias=use_bias,
+            elementwise_affine=True,
+            bias=bias,
             device=device,
             dtype=dtype,
         )
