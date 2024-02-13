@@ -43,7 +43,7 @@ class LayerNorm(_LayerNorm, WeightedModule):
         super().__init__(  # type: ignore
             normalized_shape=normalized_shape,
             eps=eps,
-            elementwise_affine=True,
+            elementwise_affine=True,  # otherwise not a WeightedModule
             bias=bias,
             device=device,
             dtype=dtype,
