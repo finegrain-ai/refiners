@@ -1,0 +1,28 @@
+[mock_model1]
+requires_grad = true
+learning_rate = 1e-5
+
+[mock_model2]
+requires_grad = true
+
+[clock]
+verbose = false
+
+[gradient_clipping]
+clip_grad_norm = 1.0
+
+[training]
+duration = "100:epoch"
+seed = 0
+batch_size = 4
+gradient_accumulation = "4:step"
+evaluation_interval = "5:epoch"
+evaluation_seed = 1
+
+[optimizer]
+optimizer = "SGD"
+learning_rate = 1
+
+[scheduler]
+scheduler_type = "ConstantLR"
+update_interval = "1:step"

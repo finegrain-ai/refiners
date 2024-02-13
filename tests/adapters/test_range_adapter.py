@@ -15,8 +15,9 @@ def test_range_encoder_dtype_after_adaptation(test_device: torch.device):  # FG-
     dtype = torch.float64
     chain = Chain(RangeEncoder(320, 1280, device=test_device, dtype=dtype))
 
-    adaptee = chain.RangeEncoder.Linear_1
-    adapter = DummyLinearAdapter(adaptee).inject(chain.RangeEncoder)
+    range_encoder = chain.layer("RangeEncoder", RangeEncoder)
+    adaptee = range_encoder.layer("Linear_1", Linear)
+    adapter = DummyLinearAdapter(adaptee).inject(range_encoder)
 
     assert adapter.parent == chain.RangeEncoder
 

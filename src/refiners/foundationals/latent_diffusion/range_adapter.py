@@ -63,6 +63,6 @@ class RangeAdapter2d(fl.Sum, Adapter[fl.Conv2d]):
                     fl.UseContext("range_adapter", context_key),
                     fl.SiLU(),
                     fl.Linear(in_features=embedding_dim, out_features=channels, device=device, dtype=dtype),
-                    fl.View(-1, channels, 1, 1),
+                    fl.Reshape(channels, 1, 1),
                 ),
             )

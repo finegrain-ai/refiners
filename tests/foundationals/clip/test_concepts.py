@@ -7,7 +7,7 @@ import transformers  # type: ignore
 from diffusers import StableDiffusionPipeline  # type: ignore
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import load_from_safetensors, no_grad
+from refiners.fluxion.utils import load_from_safetensors, load_tensors, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender, TokenExtender
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
@@ -76,22 +76,23 @@ def prompt(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="module")
 def gta5_artwork_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
-    return torch.load(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]  # type: ignore
+    return load_tensors(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]
 
 
 @pytest.fixture(scope="module")
 def cat_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch.Tensor:
-    return torch.load(test_textual_inversion_path / "cat-toy" / "learned_embeds.bin")["<cat-toy>"]  # type: ignore
+    return load_tensors(test_textual_inversion_path / "cat-toy" / "learned_embeds.bin")["<cat-toy>"]
 
 
 def test_tokenizer_with_special_character():
-    clip_tokenizer = fl.Chain(CLIPTokenizer())
-    token_extender = TokenExtender(clip_tokenizer.CLIPTokenizer)
-    new_token_id = max(clip_tokenizer.CLIPTokenizer.token_to_id_mapping.values()) + 42
+    clip_tokenizer_chain = fl.Chain(CLIPTokenizer())
+    original_clip_tokenizer = clip_tokenizer_chain.layer("CLIPTokenizer", CLIPTokenizer)
+    token_extender = TokenExtender(original_clip_tokenizer)
+    new_token_id = max(original_clip_tokenizer.token_to_id_mapping.values()) + 42
     token_extender.add_token("*", new_token_id)
-    token_extender.inject(clip_tokenizer)
+    token_extender.inject(clip_tokenizer_chain)
 
-    adapted_clip_tokenizer = clip_tokenizer.ensure_find(CLIPTokenizer)
+    adapted_clip_tokenizer = clip_tokenizer_chain.ensure_find(CLIPTokenizer)
 
     assert torch.allclose(
         adapted_clip_tokenizer.encode("*"),

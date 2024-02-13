@@ -21,10 +21,18 @@ def test_chain_find() -> None:
     assert chain.find(fl.Conv2d) is None
 
 
+def test_chain_getitem_accessor() -> None:
+    chain = fl.Chain(fl.Linear(1, 1), fl.Linear(1, 1))
+    assert chain["Linear_2"] == chain.Linear_2
+    with pytest.raises(KeyError):
+        chain["Linear_3"]
+
+
 def test_chain_find_parent():
     chain = fl.Chain(fl.Chain(fl.Linear(1, 1)))
+    subchain = chain.layer("Chain", fl.Chain)
 
-    assert chain.find_parent(chain.Chain.Linear) == chain.Chain
+    assert chain.find_parent(subchain.layer("Linear", fl.Linear)) == subchain
     assert chain.find_parent(fl.Linear(1, 1)) is None
 
 
@@ -48,6 +56,33 @@ def test_chain_slice() -> None:
     assert chain[:-1](x).shape == (1, 1)
 
 
+def test_chain_walk() -> None:
+    chain = fl.Chain(
+        fl.Sum(
+            fl.Chain(fl.Linear(1, 1)),
+            fl.Linear(1, 1),
+        ),
+        fl.Chain(),
+    )
+
+    sum_ = chain.layer("Sum", fl.Sum)
+    sum_chain = sum_.layer("Chain", fl.Chain)
+
+    assert list(chain.walk()) == [(sum_, chain), (chain.Chain, chain)]
+    assert list(chain.walk(fl.Linear)) == [
+        (sum_chain.Linear, sum_chain),
+        (sum_.Linear, sum_),
+    ]
+
+    assert list(chain.walk(recurse=True)) == [
+        (sum_, chain),
+        (sum_chain, sum_),
+        (sum_chain.Linear, sum_chain),
+        (sum_.Linear, sum_),
+        (chain.Chain, chain),
+    ]
+
+
 def test_chain_walk_stop_iteration() -> None:
     chain = fl.Chain(
         fl.Sum(
@@ -65,6 +100,29 @@ def test_chain_walk_stop_iteration() -> None:
 
     assert len(list(chain.walk(fl.Linear))) == 3
     assert len(list(chain.walk(predicate))) == 1
+
+
+def test_chain_layer() -> None:
+    chain = fl.Chain(
+        fl.Sum(fl.Chain(), fl.Chain()),
+    )
+
+    sum_ = chain.layer(0, fl.Sum)
+    assert chain.layer("Sum", fl.Sum) == sum_
+    assert chain.layer("Sum", fl.Chain) == sum_
+
+    chain_2 = chain.layer((0, 1), fl.Chain)
+    assert chain.layer((0, 1)) == chain_2
+    assert chain.layer((0, "Chain_2"), fl.Chain) == chain_2
+    assert chain.layer(("Sum", "Chain_2"), fl.Chain) == chain_2
+
+    assert chain.layer((), fl.Chain) == chain
+
+    with pytest.raises(AssertionError):
+        chain.layer((0, 1), fl.Sum)
+
+    with pytest.raises(AssertionError):
+        chain.layer((), fl.Sum)
 
 
 def test_chain_layers() -> None:
@@ -183,11 +241,12 @@ def test_chain_replace() -> None:
         fl.Linear(1, 1),
         fl.Chain(fl.Linear(1, 1), fl.Linear(1, 1)),
     )
+    subchain = chain.layer("Chain", fl.Chain)
 
-    assert isinstance(chain.Chain[1], fl.Linear)
-    chain.Chain.replace(chain.Chain[1], fl.Conv2d(1, 1, 1))
+    assert isinstance(subchain[1], fl.Linear)
+    subchain.replace(subchain[1], fl.Conv2d(1, 1, 1))
     assert len(chain) == 3
-    assert isinstance(chain.Chain[1], fl.Conv2d)
+    assert isinstance(subchain[1], fl.Conv2d)
 
 
 def test_chain_structural_copy() -> None:
@@ -205,15 +264,18 @@ def test_chain_structural_copy() -> None:
 
     m2 = m.structural_copy()
 
-    assert m.Linear == m2.Linear
-    assert m.Sum.Linear_1 == m2.Sum.Linear_1
-    assert m.Sum.Linear_2 == m2.Sum.Linear_2
+    m_sum = m.layer("Sum", fl.Sum)
+    m2_sum = m2.layer("Sum", fl.Sum)
 
-    assert m.Sum != m2.Sum
+    assert m.Linear == m2.Linear
+    assert m_sum.Linear_1 == m2_sum.Linear_1
+    assert m_sum.Linear_2 == m2_sum.Linear_2
+
+    assert m_sum != m2_sum
     assert m != m2
 
-    assert m.Sum.parent == m
-    assert m2.Sum.parent == m2
+    assert m_sum.parent == m
+    assert m2_sum.parent == m2
 
     y2 = m2(x)
     assert y2.shape == (7, 12)
@@ -229,10 +291,13 @@ def test_setattr_dont_register() -> None:
     assert module_keys(chain=chain) == ["Linear_1", "Linear_2"]
 
 
-EXPECTED_TREE = (
-    "(CHAIN)\n    ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) (x2)\n    └── (CHAIN)\n        ├── Linear(in_features=1,"
-    " out_features=1, device=cpu, dtype=float32) #1\n        └── Linear(in_features=2, out_features=1, device=cpu, dtype=float32) #2"
-)
+EXPECTED_TREE = """
+(CHAIN)
+    ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) (x2)
+    └── (CHAIN)
+        ├── Linear(in_features=1, out_features=1, device=cpu, dtype=float32) #1
+        └── Linear(in_features=2, out_features=1, device=cpu, dtype=float32) #2
+    """.strip()
 
 
 def test_debug_print() -> None:

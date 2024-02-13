@@ -22,8 +22,8 @@ def chain() -> Chain:
 
 
 def test_weighted_module_adapter_insertion(chain: Chain):
-    parent = chain.Chain
-    adaptee = parent.Linear
+    parent = chain.layer("Chain", Chain)
+    adaptee = parent.layer("Linear", Linear)
 
     adapter = DummyLinearAdapter(adaptee).inject(parent)
 
@@ -39,7 +39,7 @@ def test_weighted_module_adapter_insertion(chain: Chain):
 
 def test_chain_adapter_insertion(chain: Chain):
     parent = chain
-    adaptee = parent.Chain
+    adaptee = parent.layer("Chain", Chain)
 
     adapter = DummyChainAdapter(adaptee)
     assert adaptee.parent == parent
@@ -58,20 +58,20 @@ def test_chain_adapter_insertion(chain: Chain):
 
 
 def test_weighted_module_adapter_structural_copy(chain: Chain):
-    parent = chain.Chain
-    adaptee = parent.Linear
+    parent = chain.layer("Chain", Chain)
+    adaptee = parent.layer("Linear", Linear)
 
     DummyLinearAdapter(adaptee).inject(parent)
 
     clone = chain.structural_copy()
-    cloned_adapter = clone.Chain.DummyLinearAdapter
+    cloned_adapter = clone.layer(("Chain", "DummyLinearAdapter"), DummyLinearAdapter)
     assert cloned_adapter.parent == clone.Chain
     assert cloned_adapter.target == adaptee
 
 
 def test_chain_adapter_structural_copy(chain: Chain):
     # Chain adapters cannot be copied by default.
-    adapter = DummyChainAdapter(chain.Chain).inject()
+    adapter = DummyChainAdapter(chain.layer("Chain", Chain)).inject()
 
     with pytest.raises(RuntimeError):
         chain.structural_copy()

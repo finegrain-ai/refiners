@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from refiners.fluxion import manual_seed
+from refiners.fluxion.layers import Chain
 from refiners.fluxion.utils import no_grad
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 from refiners.foundationals.latent_diffusion.freeu import FreeUResidualConcatenator, SDFreeUAdapter
@@ -33,7 +34,7 @@ def test_freeu_adapter(unet: SD1UNet | SDXLUNet) -> None:
 
 
 def test_freeu_adapter_too_many_scales(unet: SD1UNet | SDXLUNet) -> None:
-    num_blocks = len(unet.UpBlocks)
+    num_blocks = len(unet.layer("UpBlocks", Chain))
 
     with pytest.raises(AssertionError):
         SDFreeUAdapter(unet, backbone_scales=[1.2] * (num_blocks + 1), skip_scales=[0.9] * (num_blocks + 1))

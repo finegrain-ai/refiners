@@ -1,45 +1,22 @@
-from typing import TYPE_CHECKING, Any, Generic, Iterable, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from loguru import logger
-from torch import tensor
-from torch.nn import Parameter
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
     from refiners.training_utils.trainer import Trainer
 
-__all__ = [
-    "Callback",
-    "GradientNormClipping",
-    "GradientValueClipping",
-    "ClockCallback",
-    "GradientNormLogging",
-    "MonitorLoss",
-]
+T = TypeVar("T", bound="Trainer[BaseConfig, Any]")
 
 
-def clip_gradient_norm(parameters: Iterable[Parameter], total_norm: float, clip_norm: float = 1.0) -> None:
+class CallbackConfig(BaseModel):
     """
-    Clips the gradient norm of the parameters of a given model similar to `clip_grad_norm_`.
+    Base configuration for a callback.
+
+    For your callback to be properly configured, you should inherit from this class and add your own configuration.
     """
-    gradients = [p.grad.detach() for p in parameters if p.grad is not None]
-    assert gradients, "The model has no gradients to clip."
-    clip_coefficient = tensor(data=clip_norm / (total_norm + 1e-6)).clamp(max=1)
-    for gradient in gradients:
-        gradient.mul_(other=clip_coefficient)  # type: ignore
 
-
-def clip_gradient_value(parameters: Iterable[Parameter], clip_value: float) -> None:
-    """
-    Clips the gradients of the parameters of a given model at an individual level similar to `clip_grad_value_`.
-    """
-    gradients = [p.grad.detach() for p in parameters if p.grad is not None]
-    assert gradients, "The model has no gradients to clip."
-    for gradient in gradients:
-        gradient.clamp_(min=-clip_value, max=clip_value)
-
-
-T = TypeVar("T")
+    model_config = ConfigDict(extra="forbid")
 
 
 class Callback(Generic[T]):

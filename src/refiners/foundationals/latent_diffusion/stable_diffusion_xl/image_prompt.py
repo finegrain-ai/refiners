@@ -8,6 +8,8 @@ from refiners.foundationals.dinov2 import ViT
 
 
 class SDXLIPAdapter(IPAdapter[SDXLUNet]):
+    """Image Prompt adapter for the Stable Diffusion XL U-Net model."""
+
     def __init__(
         self,
         target: SDXLUNet,
@@ -21,6 +23,16 @@ class SDXLIPAdapter(IPAdapter[SDXLUNet]):
         use_pooled_text_embedding: bool = False,
         use_bias: bool = True,
     ) -> None:
+        """Initialize the adapter.
+
+        Args:
+            target: The SDXLUNet model to adapt.
+            image_encoder: The image encoder to use.
+            image_proj: The image projection to use.
+            scale: The scale to use for the image prompt.
+            fine_grained: Whether to use fine-grained image prompt.
+            weights: The weights of the IPAdapter.
+        """
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
         if image_proj is None:

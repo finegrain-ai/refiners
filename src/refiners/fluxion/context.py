@@ -7,16 +7,38 @@ Contexts = dict[str, Context]
 
 
 class ContextProvider:
+    """A class that provides a context store."""
+
     def __init__(self) -> None:
+        """Initializes the ContextProvider."""
         self.contexts: Contexts = {}
 
     def set_context(self, key: str, value: Context) -> None:
+        """Store a value in the context.
+
+        Args:
+            key: The key of the context.
+            value: The context.
+        """
         self.contexts[key] = value
 
     def get_context(self, key: str) -> Any:
+        """Retrieve a value from the context.
+
+        Args:
+            key: The key of the context.
+
+        Returns:
+            The context value.
+        """
         return self.contexts.get(key)
 
     def update_contexts(self, new_contexts: Contexts) -> None:
+        """Update or set the contexts with new contexts.
+
+        Args:
+            new_contexts: The new contexts.
+        """
         for key, value in new_contexts.items():
             if key not in self.contexts:
                 self.contexts[key] = value
@@ -25,20 +47,17 @@ class ContextProvider:
 
     @staticmethod
     def create(contexts: Contexts) -> "ContextProvider":
+        """Create a ContextProvider from a dict of contexts.
+
+        Args:
+            contexts: The contexts.
+
+        Returns:
+            A ContextProvider with the contexts.
+        """
         provider = ContextProvider()
         provider.update_contexts(contexts)
         return provider
-
-    def __add__(self, other: "ContextProvider") -> "ContextProvider":
-        self.contexts.update(other.contexts)
-        return self
-
-    def __lshift__(self, other: "ContextProvider") -> "ContextProvider":
-        other.contexts.update(self.contexts)
-        return other
-
-    def __bool__(self) -> bool:
-        return bool(self.contexts)
 
     def _get_repr_for_value(self, value: Any) -> str:
         if isinstance(value, Tensor):

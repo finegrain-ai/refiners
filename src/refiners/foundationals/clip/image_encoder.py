@@ -108,6 +108,12 @@ class ViTEmbeddings(fl.Chain):
 
 
 class CLIPImageEncoder(fl.Chain):
+    """Contrastive Language-Image Pretraining (CLIP) image encoder.
+
+    See [[arXiv:2103.00020] Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)
+    for more details.
+    """
+
     def __init__(
         self,
         image_size: int = 224,
@@ -121,6 +127,20 @@ class CLIPImageEncoder(fl.Chain):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
+        """Initialize a CLIP image encoder.
+
+        Args:
+            image_size: The size of the input image.
+            embedding_dim: The dimension of the embedding.
+            output_dim: The dimension of the output.
+            patch_size: The size of the patches.
+            num_layers: The number of layers.
+            num_attention_heads: The number of attention heads.
+            feedforward_dim: The dimension of the feedforward layer.
+            layer_norm_eps: The epsilon value for normalization.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         self.image_size = image_size
         self.embedding_dim = embedding_dim
         self.output_dim = output_dim
@@ -152,7 +172,27 @@ class CLIPImageEncoder(fl.Chain):
 
 
 class CLIPImageEncoderH(CLIPImageEncoder):
+    """CLIP huge image encoder.
+
+    See [[arXiv:2103.00020] Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)
+    for more details.
+
+    Attributes:
+        embedding_dim (int): 1280
+        output_dim (int): 1024
+        patch_size (int): 14
+        num_layers (int): 32
+        num_attention_heads (int): 16
+        feedforward_dim (int): 5120
+    """
+
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
+        """Initialize CLIP huge image encoder.
+
+        Args:
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         super().__init__(
             embedding_dim=1280,
             output_dim=1024,
@@ -166,7 +206,27 @@ class CLIPImageEncoderH(CLIPImageEncoder):
 
 
 class CLIPImageEncoderG(CLIPImageEncoder):
+    """CLIP giant image encoder.
+
+    See [[arXiv:2103.00020] Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)
+    for more details.
+
+    Attributes:
+        embedding_dim (int): 1664
+        output_dim (int): 1280
+        patch_size (int): 14
+        num_layers (int): 48
+        num_attention_heads (int): 16
+        feedforward_dim (int): 8192
+    """
+
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
+        """Initialize CLIP giant image encoder.
+
+        Args:
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         super().__init__(
             embedding_dim=1664,
             output_dim=1280,

@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import Tensor
 
@@ -60,17 +62,17 @@ class LayerScale(fl.WeightedModule):
         super().__init__()
         self.embedding_dim = embedding_dim
 
-        self.register_parameter(
-            name="weight",
-            param=torch.nn.Parameter(
-                torch.full(
-                    size=(embedding_dim,),
-                    fill_value=init_value,
-                    dtype=dtype,
-                    device=device,
-                ),
+        p = torch.nn.Parameter(
+            torch.full(
+                size=(embedding_dim,),
+                fill_value=init_value,
+                dtype=dtype,
+                device=device,
             ),
         )
+
+        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
+        self.register_parameter(name="weight", param=cast(torch.nn.Parameter, p))
 
     def forward(self, x: Tensor) -> Tensor:
         return x * self.weight
@@ -225,9 +227,10 @@ class Registers(fl.Concatenate):
 
 
 class ViT(fl.Chain):
-    """Vision Transformer (ViT).
+    """Vision Transformer (ViT) model.
 
-    see https://arxiv.org/abs/2010.11929v2
+    See [[arXiv:2010.11929] An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](https://arxiv.org/abs/2010.11929)
+    for more details.
     """
 
     def __init__(
@@ -243,6 +246,20 @@ class ViT(fl.Chain):
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
+        """Initialize a Vision Transformer (ViT) model.
+
+        Args:
+            embedding_dim: The dimension of the embedding.
+            patch_size: The size of the patches.
+            image_size: The size of the input image.
+            num_layers: The number of layers.
+            num_heads: The number of heads.
+            norm_eps: The epsilon value for normalization.
+            mlp_ratio: The ratio for the multi-layer perceptron (MLP).
+            num_registers: The number of registers.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         num_patches = image_size // patch_size
         self.embedding_dim = embedding_dim
         self.output_dim = embedding_dim
@@ -304,71 +321,3 @@ class ViT(fl.Chain):
                 dtype=dtype,
             )
             self.insert_before_type(Transformer, registers)
-
-
-class ViT_tiny(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=192,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=3,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_small(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=384,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=6,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_base(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=768,
-            patch_size=16,
-            image_size=224,
-            num_layers=12,
-            num_heads=12,
-            device=device,
-            dtype=dtype,
-        )
-
-
-class ViT_large(ViT):
-    def __init__(
-        self,
-        device: torch.device | str | None = None,
-        dtype: torch.dtype | None = None,
-    ) -> None:
-        super().__init__(
-            embedding_dim=1024,
-            patch_size=16,
-            image_size=224,
-            num_layers=24,
-            num_heads=16,
-            device=device,
-            dtype=dtype,
-        )

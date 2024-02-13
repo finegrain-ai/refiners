@@ -73,7 +73,7 @@ class FreeUResidualConcatenator(fl.Concatenate):
 class SDFreeUAdapter(Generic[T], fl.Chain, Adapter[T]):
     def __init__(self, target: T, backbone_scales: list[float], skip_scales: list[float]) -> None:
         assert len(backbone_scales) == len(skip_scales)
-        assert len(backbone_scales) <= len(target.UpBlocks)
+        assert len(backbone_scales) <= len(target.layer("UpBlocks", fl.Chain))
         self.backbone_scales = backbone_scales
         self.skip_scales = skip_scales
         with self.setup_adapter(target):
@@ -88,7 +88,7 @@ class SDFreeUAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     def eject(self) -> None:
         for n in range(len(self.backbone_scales)):
-            block = self.target.UpBlocks[n]
+            block = self.target.layer(("UpBlocks", n), fl.Chain)
             concat = block.ensure_find(FreeUResidualConcatenator)
             block.replace(concat, ResidualConcatenator(-n - 2))
         super().eject()

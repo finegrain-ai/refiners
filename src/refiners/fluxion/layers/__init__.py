@@ -1,8 +1,19 @@
-from refiners.fluxion.layers.activations import GLU, ApproximateGeLU, GeLU, ReLU, Sigmoid, SiLU
-from refiners.fluxion.layers.attentions import Attention, SelfAttention, SelfAttention2d
+from refiners.fluxion.layers.activations import (
+    GLU,
+    Activation,
+    GeLU,
+    GeLUApproximation,
+    ReLU,
+    Sigmoid,
+    SiLU,
+)
+from refiners.fluxion.layers.attentions import (
+    Attention,
+    ScaledDotProductAttention,
+    SelfAttention,
+    SelfAttention2d,
+)
 from refiners.fluxion.layers.basics import (
-    Buffer,
-    Chunk,
     Cos,
     Flatten,
     GetArg,
@@ -15,10 +26,8 @@ from refiners.fluxion.layers.basics import (
     Slicing,
     Squeeze,
     Transpose,
-    Unbind,
     Unflatten,
     Unsqueeze,
-    View,
 )
 from refiners.fluxion.layers.chain import (
     Breakpoint,
@@ -52,18 +61,19 @@ __all__ = [
     "GroupNorm",
     "LayerNorm2d",
     "InstanceNorm2d",
+    "Activation",
     "GeLU",
+    "GeLUApproximation",
     "GLU",
     "SiLU",
     "ReLU",
-    "ApproximateGeLU",
     "Sigmoid",
     "Attention",
+    "ScaledDotProductAttention",
     "SelfAttention",
     "SelfAttention2d",
     "Identity",
     "GetArg",
-    "View",
     "Flatten",
     "Unflatten",
     "Transpose",
@@ -75,11 +85,8 @@ __all__ = [
     "Parameter",
     "Sin",
     "Cos",
-    "Chunk",
     "Multiply",
-    "Unbind",
     "Matmul",
-    "Buffer",
     "Lambda",
     "Return",
     "Sum",

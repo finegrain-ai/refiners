@@ -1,11 +1,9 @@
-import random
-import time
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
+from dataclasses import dataclass
 from functools import cached_property, wraps
-from pathlib import Path
-from typing import Any, Callable, Generic, Iterable, TypeVar, cast
+from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
-import numpy as np
+import torch
 from loguru import logger
 from torch import (
     Tensor,
@@ -19,9 +17,9 @@ from torch import (
     bfloat16,
     float16,
     compile,
+    nn
 )
 from torch.autograd import backward
-from torch.nn import Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -40,7 +38,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.cuda.amp import GradScaler
 
 from refiners.fluxion import layers as fl
-from refiners.fluxion.utils import manual_seed, no_grad
+from refiners.fluxion.utils import no_grad
 from refiners.training_utils.callback import (
     Callback,
     ClockCallback,
@@ -49,15 +47,17 @@ from refiners.training_utils.callback import (
     GradientValueClipping,
     MonitorLoss,
     MonitorTime,
+    CallbackConfig,
 )
-from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
-from refiners.training_utils.dropout import DropoutCallback
-from refiners.training_utils.wandb import WandbLoggable, WandbLogger
-
-__all__ = ["seed_everything", "scoped_seed", "Trainer"]
-
-
-# Ported from open-muse
+from refiners.training_utils.clock import ClockConfig, TrainingClock
+from refiners.training_utils.common import (
+    compute_grad_norm,
+    count_learnable_parameters,
+    human_readable_number,
+    scoped_seed,
+)
+from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType
+from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -77,230 +77,113 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def count_learnable_parameters(parameters: Iterable[Parameter]) -> int:
-    return sum(p.numel() for p in parameters if p.requires_grad)
-
-
-def human_readable_number(number: int) -> str:
-    float_number = float(number)
-    for unit in ["", "K", "M", "G", "T", "P"]:
-        if abs(float_number) < 1000:
-            return f"{float_number:.1f}{unit}"
-        float_number /= 1000
-    return f"{float_number:.1f}E"
-
-
-def seed_everything(seed: int | None = None) -> None:
-    if seed is None:
-        seed = random.randint(0, 2**32 - 1)
-        logger.info(f"Using random seed: {seed}")
-    random.seed(a=seed)
-    np.random.seed(seed=seed)
-    manual_seed(seed=seed)
-    cuda.manual_seed_all(seed=seed)
-
-
-def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., Callable[..., Any]]:
-    """
-    Decorator for setting a random seed within the scope of a function.
-
-    This decorator sets the random seed for Python's built-in `random` module,
-    `numpy`, and `torch` and `torch.cuda` at the beginning of the decorated function. After the
-    function is executed, it restores the state of the random number generators
-    to what it was before the function was called. This is useful for ensuring
-    reproducibility for specific parts of the code without affecting randomness
-    elsewhere.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @wraps(func)
-        def inner_wrapper(*args: Any, **kwargs: Any) -> Any:
-            random_state = random.getstate()
-            numpy_state = np.random.get_state()
-            torch_state = get_rng_state()
-            cuda_torch_state = cuda.get_rng_state()
-            actual_seed = seed(*args) if callable(seed) else seed
-            seed_everything(seed=actual_seed)
-            result = func(*args, **kwargs)
-            random.setstate(random_state)
-            np.random.set_state(numpy_state)
-            set_rng_state(torch_state)
-            cuda.set_rng_state(cuda_torch_state)
-            return result
-
-        return inner_wrapper
-
-    return decorator
-
-
 class WarmupScheduler(LRScheduler):
     _step_count: int  # defined by LRScheduler
 
-    def __init__(self, optimizer: Optimizer, scheduler: LRScheduler, warmup_steps: int = 0) -> None:
-        self.warmup_steps = warmup_steps
+    def __init__(self, optimizer: Optimizer, scheduler: LRScheduler, warmup_scheduler_steps: int = 0) -> None:
+        self.warmup_scheduler_steps = warmup_scheduler_steps
         self.scheduler = scheduler
         super().__init__(optimizer=optimizer)
 
     def get_lr(self) -> list[float] | float:  # type: ignore
-        if self._step_count < self.warmup_steps:
-            return [base_lr * self._step_count / self.warmup_steps for base_lr in self.base_lrs]
+        if self._step_count <= self.warmup_scheduler_steps:
+            return [base_lr * self._step_count / self.warmup_scheduler_steps for base_lr in self.base_lrs]
         return self.scheduler.get_lr()
 
     def step(self, epoch: int | None = None) -> None:
-        if self._step_count < self.warmup_steps:
+        if self._step_count < self.warmup_scheduler_steps:
             super().step()
         else:
             self.scheduler.step(epoch=epoch)
             self._step_count += 1
 
 
-class TrainingClock:
-    def __init__(
-        self,
-        dataset_length: int,
-        batch_size: int,
-        training_duration: TimeValue,
-        gradient_accumulation: TimeValue,
-        evaluation_interval: TimeValue,
-        lr_scheduler_interval: TimeValue,
-        checkpointing_save_interval: TimeValue,
-    ) -> None:
-        self.dataset_length = dataset_length
-        self.batch_size = batch_size
-        self.training_duration = training_duration
-        self.gradient_accumulation = gradient_accumulation
-        self.evaluation_interval = evaluation_interval
-        self.lr_scheduler_interval = lr_scheduler_interval
-        self.checkpointing_save_interval = checkpointing_save_interval
-        self.num_batches_per_epoch = dataset_length // batch_size
-        self.start_time = None
-        self.end_time = None
-        self.step = 0
-        self.epoch = 0
-        self.iteration = 0
-        self.num_batches_processed = 0
-        self.num_minibatches_processed = 0
-        self.loss: Tensor | None = None
-
-    @cached_property
-    def unit_to_steps(self) -> dict[TimeUnit, int]:
-        iteration_factor = self.num_batches_per_epoch if self.gradient_accumulation["unit"] == TimeUnit.EPOCH else 1
-        return {
-            TimeUnit.STEP: 1,
-            TimeUnit.EPOCH: self.num_batches_per_epoch,
-            TimeUnit.ITERATION: self.gradient_accumulation["number"] * iteration_factor,
-        }
-
-    def convert_time_unit_to_steps(self, number: int, unit: TimeUnit) -> int:
-        return number * self.unit_to_steps[unit]
-
-    def convert_steps_to_time_unit(self, steps: int, unit: TimeUnit) -> int:
-        return steps // self.unit_to_steps[unit]
-
-    def convert_time_value(self, time_value: TimeValue, target_unit: TimeUnit) -> int:
-        number, unit = time_value["number"], time_value["unit"]
-        steps = self.convert_time_unit_to_steps(number=number, unit=unit)
-        return self.convert_steps_to_time_unit(steps=steps, unit=target_unit)
-
-    @cached_property
-    def num_epochs(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.EPOCH)
-
-    @cached_property
-    def num_iterations(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.ITERATION)
-
-    @cached_property
-    def num_steps(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.STEP)
-
-    @cached_property
-    def num_step_per_iteration(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.gradient_accumulation["number"], unit=self.gradient_accumulation["unit"]
-        )
-
-    @cached_property
-    def num_step_per_evaluation(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.evaluation_interval["number"], unit=self.evaluation_interval["unit"]
-        )
-
-    def reset(self) -> None:
-        self.start_time = None
-        self.end_time = None
-        self.step = 0
-        self.epoch = 0
-        self.iteration = 0
-        self.num_batches_processed = 0
-        self.num_minibatches_processed = 0
-
-    def start_timer(self) -> None:
-        self.start_time = time.time()
-
-    def stop_timer(self) -> None:
-        self.end_time = time.time()
-
-    @property
-    def time_elapsed(self) -> float:
-        assert self.start_time is not None, "Timer has not been started yet."
-        return time.time() - self.start_time
-
-    @cached_property
-    def evalution_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.evaluation_interval["number"], unit=self.evaluation_interval["unit"]
-        )
-
-    @cached_property
-    def lr_scheduler_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.lr_scheduler_interval["number"], unit=self.lr_scheduler_interval["unit"]
-        )
-
-    @cached_property
-    def checkpointing_save_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.checkpointing_save_interval["number"], unit=self.checkpointing_save_interval["unit"]
-        )
-
-    @property
-    def is_optimizer_step(self) -> bool:
-        return self.num_minibatches_processed == self.num_step_per_iteration
-
-    @property
-    def is_lr_scheduler_step(self) -> bool:
-        return self.step % self.lr_scheduler_interval_steps == 0
-
-    @property
-    def done(self) -> bool:
-        return self.step >= self.num_steps
-
-    @property
-    def is_evaluation_step(self) -> bool:
-        return self.step % self.evalution_interval_steps == 0
-
-    @property
-    def is_checkpointing_step(self) -> bool:
-        return self.step % self.checkpointing_save_interval_steps == 0
-
-
-def compute_grad_norm(parameters: Iterable[Parameter]) -> float:
-    """
-    Computes the gradient norm of the parameters of a given model similar to `clip_grad_norm_` returned value.
-    """
-    gradients: list[Tensor] = [p.grad.detach() for p in parameters if p.grad is not None]
-    assert gradients, "The model has no gradients to compute the norm."
-    total_norm = stack(tensors=[gradient.norm() for gradient in gradients]).norm().item()  # type: ignore
-    return total_norm  # type: ignore
-
-
 Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
+class _Dataset(Dataset[Batch]):
+    """
+    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
+    """
+
+    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
+        assert length > 0, "Dataset length must be greater than 0."
+        self.length = length
+        self.get_item = get_item
+
+    def __getitem__(self, index: int) -> Batch:
+        return self.get_item(index)
+
+    def __len__(self) -> int:
+        return self.length
+
+
+@dataclass
+class ModelItem:
+    name: str
+    config: ModelConfig
+    model: fl.Module
+    learnable_parameters: list[nn.Parameter]
+
+<<<<<<< HEAD
+    @property
+    def time_elapsed(self) -> float:
+        assert self.start_time is not None, "Timer has not been started yet."
+        return time.time() - self.start_time
+=======
+>>>>>>> 3488273f503283bfe0273fa4008aafd643789df3
+
+ModelRegistry = dict[str, ModelItem]
+ModuleT = TypeVar("ModuleT", bound=fl.Module)
+ModelConfigT = TypeVar("ModelConfigT", bound=ModelConfig)
+
+
+def register_model():
+    def decorator(func: Callable[[Any, ModelConfigT], ModuleT]) -> ModuleT:
+        @wraps(func)
+        def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
+            name = func.__name__
+            model = func(self, config)
+            model = model.to(self.device, dtype=self.dtype)
+            if config.requires_grad is not None:
+                model.requires_grad_(requires_grad=config.requires_grad)
+            learnable_parameters = [param for param in model.parameters() if param.requires_grad]
+            self.models[name] = ModelItem(
+                name=name, config=config, model=model, learnable_parameters=learnable_parameters
+            )
+            setattr(self, name, self.models[name].model)
+            return func(self, config)
+
+        return wrapper  # type: ignore
+
+    return decorator
+
+
+CallbackRegistry = dict[str, Callback[Any]]
+CallbackT = TypeVar("CallbackT", bound=Callback[Any])
+CallbackConfigT = TypeVar("CallbackConfigT", bound=CallbackConfig)
+
+
+def register_callback():
+    def decorator(func: Callable[[Any, CallbackConfigT], CallbackT]) -> CallbackT:
+        @wraps(func)
+        def wrapper(self: "Trainer[BaseConfig, Any]", config: CallbackConfigT) -> CallbackT:
+            name = func.__name__
+            callback = func(self, config)
+            self.callbacks[name] = callback
+            setattr(self, name, callback)
+            return func(self, config)
+
+        return wrapper  # type: ignore
+
+    return decorator
+
+
 class Trainer(Generic[ConfigType, Batch], ABC):
-    def __init__(self, config: ConfigType, callbacks: list[Callback[Any]] | None = None) -> None:
+    def __init__(self, config: ConfigType) -> None:
+        self._models: ModelRegistry = {}
+        self._callbacks: CallbackRegistry = {}
         self.config = config
         self.clock = TrainingClock(
             dataset_length=self.dataset_length,
@@ -315,44 +198,47 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.forward_time_m = AverageMeter()
         self.backprop_time_m = AverageMeter()
         self.data_time_m = AverageMeter()
-        self.callbacks = callbacks or []
-        self.callbacks += self.default_callbacks()
+        self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
-        self.load_wandb()
-        self.load_models()
-        self.prepare_models()
-        self.prepare_checkpointing()
+        self._load_models()
         self._call_callbacks(event_name="on_init_end")
 
-    @staticmethod
-    def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
-        return instance.config.training.seed
+    @register_callback()
+    def clock(self, config: ClockConfig) -> TrainingClock:
+        return TrainingClock(
+            dataset_length=self.dataset_length,
+            batch_size=self.config.training.batch_size,
+            training_duration=self.config.training.duration,
+            evaluation_interval=self.config.training.evaluation_interval,
+            gradient_accumulation=self.config.training.gradient_accumulation,
+            lr_scheduler_interval=self.config.scheduler.update_interval,
+            verbose=config.verbose,
+        )
 
-    def default_callbacks(self) -> list[Callback[Any]]:
-        return [
-            ClockCallback(),
-            MonitorLoss(),
-            MonitorTime(),
-            GradientNormLogging(),
-            GradientValueClipping(),
-            GradientNormClipping(),
-            DropoutCallback(),
-        ]
+    @register_callback()
+    def gradient_clipping(self, config: GradientClippingConfig) -> GradientClipping:
+        return GradientClipping(config)
+
+    @property
+    def models(self) -> ModelRegistry:
+        return self._models
+
+    @property
+    def callbacks(self) -> CallbackRegistry:
+        return self._callbacks
 
     @cached_property
     def device(self) -> Device:
-        selected_device = Device(device=f"cuda:{self.config.training.gpu_index}")
+        selected_device = Device(self.config.training.device)
         logger.info(f"Using device: {selected_device}")
         return selected_device
 
     @cached_property
     def dtype(self) -> DType:
-        weight_dtype = float32
-        if self.config.training.mixed_precision == "fp16":
-            weight_dtype = float16
-        elif self.config.training.mixed_precision == "bf16":
-            weight_dtype = bfloat16
-        return weight_dtype
+        dtype = getattr(torch, self.config.training.dtype, None)
+        assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
+        logger.info(f"Using dtype: {dtype}")
+        return dtype
 
     @property
     def parameters(self) -> list[Parameter]:
@@ -360,16 +246,33 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return [param for model in self.models.values() for param in model.parameters()]
 
     @property
-    def learnable_parameters(self) -> list[Parameter]:
+    def learnable_parameters(self) -> list[nn.Parameter]:
         """Returns a list of learnable parameters in all models"""
-        out: list[Parameter] = []
-        for model_name in self.models:
-            model = self.models[model_name]
-            if self.config.models[model_name].train:
-                for param in model.parameters():
-                    if param.requires_grad:
-                        out.append(param)
-        return out
+        return [param for item in self.models.values() for param in item.learnable_parameters]
+
+    @cached_property
+    def optimizer_parameters(self) -> list[dict[str, Any]]:
+        """
+        Returns a list of `dict`-s containing the params and optimizer options for each model.
+        See https://pytorch.org/docs/stable/optim.html#per-parameter-options for more details
+        """
+        params: list[dict[str, Any]] = []
+        for item in self.models.values():
+            config = item.config
+            model_optim_conf: dict[str, Any] = {}
+
+            if config.learning_rate is not None:
+                model_optim_conf["lr"] = config.learning_rate
+            if config.weight_decay is not None:
+                model_optim_conf["weight_decay"] = config.learning_rate
+            if config.betas is not None:
+                model_optim_conf["betas"] = config.learning_rate
+            if config.eps is not None:
+                model_optim_conf["eps"] = config.learning_rate
+
+            params.append({"params": item.learnable_parameters, **model_optim_conf})
+
+        return params
 
     @property
     def learnable_parameter_count(self) -> int:
@@ -379,14 +282,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @property
     def gradients(self) -> list[Tensor]:
         """Returns a list of detached gradients for all learnable parameters in all models"""
-        out: list[Tensor] = []
-        for model_name in self.models:
-            model = self.models[model_name]
-            if self.config.models[model_name].train:
-                for param in model.parameters():
-                    if param.grad is not None:
-                        out.append(param.grad)
-        return out
+        return [param.grad.detach() for param in self.learnable_parameters if param.grad is not None]
 
     @property
     def total_gradient_norm(self) -> float:
@@ -398,7 +294,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         print("Optimizer found ", len(self.learnable_parameters), "number of params")
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
-        optimizer = self.config.optimizer.get(model_parameters=self.learnable_parameters)
+
+        optimizer = self.config.optimizer.get(params=self.optimizer_parameters)
         return optimizer
 
     @cached_property
@@ -410,19 +307,18 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
         config = self.config.scheduler
-        step_size = self.clock.convert_time_unit_to_steps(
-            number=config.update_interval["number"], unit=config.update_interval["unit"]
-        )
+        scheduler_step_size = config.update_interval["number"]
+
         match config.scheduler_type:
             case SchedulerType.CONSTANT_LR:
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lambda _: 1.0)
             case SchedulerType.STEP_LR:
-                lr_scheduler = StepLR(optimizer=self.optimizer, step_size=step_size, gamma=config.gamma)
+                lr_scheduler = StepLR(optimizer=self.optimizer, step_size=scheduler_step_size, gamma=config.gamma)
             case SchedulerType.EXPONENTIAL_LR:
                 lr_scheduler = ExponentialLR(optimizer=self.optimizer, gamma=config.gamma)
             case SchedulerType.COSINE_ANNEALING_LR:
                 lr_scheduler = CosineAnnealingLR(
-                    optimizer=self.optimizer, T_max=config.max_steps, eta_min=config.eta_min
+                    optimizer=self.optimizer, T_max=scheduler_step_size, eta_min=config.eta_min
                 )
             case SchedulerType.REDUCE_LR_ON_PLATEAU:
                 lr_scheduler = cast(
@@ -441,14 +337,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use LambdaLR"
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
             case SchedulerType.ONE_CYCLE_LR:
-                lr_scheduler = OneCycleLR(optimizer=self.optimizer, max_lr=config.max_lr, total_steps=step_size)
+                lr_scheduler = OneCycleLR(
+                    optimizer=self.optimizer, max_lr=config.max_lr, total_steps=scheduler_step_size
+                )
             case SchedulerType.MULTIPLICATIVE_LR:
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use MultiplicativeLR"
                 lr_scheduler = MultiplicativeLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
             case SchedulerType.COSINE_ANNEALING_WARM_RESTARTS:
-                lr_scheduler = CosineAnnealingWarmRestarts(
-                    optimizer=self.optimizer, T_0=config.max_steps, eta_min=config.eta_min
-                )
+                lr_scheduler = CosineAnnealingWarmRestarts(optimizer=self.optimizer, T_0=scheduler_step_size)
             case SchedulerType.CYCLIC_LR:
                 lr_scheduler = CyclicLR(optimizer=self.optimizer, base_lr=config.base_lr, max_lr=config.max_lr)
             case SchedulerType.MULTI_STEP_LR:
@@ -456,101 +352,56 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case _:
                 raise ValueError(f"Unknown scheduler type: {config.scheduler_type}")
 
-        warmup_steps = self.clock.convert_time_unit_to_steps(number=config.warmup["number"], unit=config.warmup["unit"])
-        print("Set warmup steps to ", warmup_steps)
-        if warmup_steps > 0:
+        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval["unit"])
+        if warmup_scheduler_steps > 0:
             lr_scheduler = WarmupScheduler(
                 optimizer=self.optimizer,
                 scheduler=lr_scheduler,
-                warmup_steps=warmup_steps,
+                warmup_scheduler_steps=warmup_scheduler_steps,
             )
 
         return lr_scheduler
 
-    @cached_property
-    def models(self) -> dict[str, fl.Module]:
-        return self.load_models()
-
-    def set_models_to_train_mode(self) -> None:
-        for model in self.models.values():
-            model.train()
-
-    def set_models_to_eval_mode(self) -> None:
-        for model in self.models.values():
-            model.eval()
-
-    def log(self, data: dict[str, WandbLoggable]) -> None:
-        self.wandb.log(data=data, step=self.clock.step)
-
-    def load_wandb(self) -> None:
-        init_config = {**self.config.wandb.model_dump(), "config": self.config.model_dump()}
-        self.wandb = WandbLogger(init_config=init_config)
-
-    def prepare_model(self, model_name: str) -> None:
-        model = self.models[model_name]
-        if (checkpoint := self.config.models[model_name].checkpoint) is not None:
-            model.load_from_safetensors(tensors_path=checkpoint)
-        else:
-            logger.info(f"No checkpoint found. Initializing model `{model_name}` from scratch.")
-        model.requires_grad_(requires_grad=self.config.models[model_name].train)
-        model.to(self.device, dtype=self.dtype)
-        model.zero_grad()
-        if self.config.models[model_name].compile:
-            self.models[model_name] = compile(model)
-
-    def prepare_models(self) -> None:
-        assert self.models, "No models found."
-        for model_name in self.models:
-            self.prepare_model(model_name=model_name)
-
-    def prepare_checkpointing(self) -> None:
-        if self.config.checkpointing.save_folder is not None:
-            assert self.config.checkpointing.save_folder.is_dir()
-            self.checkpoints_save_folder = (
-                self.config.checkpointing.save_folder / self.wandb.project_name / self.wandb.run_name
-            )
-            self.checkpoints_save_folder.mkdir(parents=True, exist_ok=False)
-            logger.info(f"Checkpointing enabled: {self.checkpoints_save_folder}")
-        else:
-            self.checkpoints_save_folder = None
-            logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")
-
     @abstractmethod
-    def load_models(self) -> dict[str, fl.Module]:
+    def get_item(self, index: int) -> Batch:
+        """
+        Returns a batch of data.
+
+        This function is used by the dataloader to fetch a batch of data.
+        """
+        ...
+
+    @abstractproperty
+    def dataset_length(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        This is used to compute the number of batches per epoch.
+        """
         ...
 
     @abstractmethod
-    def load_dataset(self) -> Dataset[Batch]:
+    def collate_fn(self, batch: list[Batch]) -> Batch:
+        """
+        Collate function for the dataloader.
+
+        This function is used to tell the dataloader how to combine a list of
+        batches into a single batch.
+        """
         ...
 
     @cached_property
     def dataset(self) -> Dataset[Batch]:
-        return self.load_dataset()
+        """
+        Returns the dataset constructed with the `get_item` method.
+        """
+        return _Dataset(get_item=self.get_item, length=self.dataset_length)
 
     @cached_property
-    def dataset_length(self) -> int:
-        assert hasattr(self.dataset, "__len__"), "The dataset must implement the `__len__` method."
-        return len(self.dataset)  # type: ignore
-
-    @cached_property
-    def dataloader(self) -> DataLoader[Batch]:
-        collate_fn = getattr(self.dataset, "collate_fn", None)
+    def dataloader(self) -> DataLoader[Any]:
         return DataLoader(
-            dataset=self.dataset,
-            batch_size=self.config.training.batch_size,
-            num_workers=self.config.training.dataset_workers,
-            shuffle=True,
-            collate_fn=collate_fn,
+            dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
         )
-
-    @property
-    def checkpointing_enabled(self) -> bool:
-        return self.checkpoints_save_folder is not None
-
-    @property
-    def ensure_checkpoints_save_folder(self) -> Path:
-        assert self.checkpoints_save_folder is not None
-        return self.checkpoints_save_folder
 
     @abstractmethod
     def compute_loss(self, batch: Batch) -> Tensor:
@@ -589,8 +440,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
         if self.clock.is_evaluation_step:
             self.evaluate()
-        if self.checkpointing_enabled and self.clock.is_checkpointing_step:
-            self._call_callbacks(event_name="on_checkpoint_save")
 
     def step(self, batch: Batch) -> tuple[int, int]:
         """Perform a single training step."""
@@ -610,6 +459,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single epoch."""
         self.clock.start_timer()
         for batch in self.dataloader:
+            if self.clock.done:
+                break
             data_time = self.clock.time_elapsed
             self.data_time_m.update(data_time)
             self.clock.start_timer()
@@ -623,7 +474,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
         """Train the model."""
-        self.set_models_to_train_mode()
+        self.set_models_to_mode("train")
         self._call_callbacks(event_name="on_train_begin")
         assert self.learnable_parameters, "There are no learnable parameters in the models."
         self.evaluate()
@@ -641,13 +492,46 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @scoped_seed(seed=get_evaluation_seed)
     def evaluate(self) -> None:
         """Evaluate the model."""
-        self.set_models_to_eval_mode()
+        self.set_models_to_mode(mode="eval")
         self._call_callbacks(event_name="on_evaluate_begin")
         self.compute_evaluation()
         self._call_callbacks(event_name="on_evaluate_end")
-        self.set_models_to_train_mode()
+        self.set_models_to_mode(mode="train")
+
+    def set_models_to_mode(self, mode: Literal["train", "eval"]) -> None:
+        for item in self.models.values():
+            if mode == "train":
+                item.model.train()
+            elif mode == "eval":
+                item.model.eval()
 
     @scoped_seed(seed=get_training_seed)
     def _call_callbacks(self, event_name: str) -> None:
-        for callback in self.callbacks:
+        for callback in self.callbacks.values():
             getattr(callback, event_name)(self)
+
+    def _load_callbacks(self) -> None:
+        for name, config in self.config:
+            if not isinstance(config, CallbackConfig):
+                continue
+            try:
+                registered_callback = getattr(self, name)
+            except AttributeError:
+                raise ValueError(
+                    f"Callback {name} is in the config but not registered in the Trainer. Create a method with the @register_callback decorator."
+                )
+            assert callable(registered_callback)
+            registered_callback(config)
+
+    def _load_models(self) -> None:
+        for name, config in self.config:
+            if not isinstance(config, ModelConfig):
+                continue
+            try:
+                registered_model = getattr(self, name)
+            except AttributeError:
+                raise ValueError(
+                    f"Model {name} is in the config but not registered in the Trainer. Create a method with the @register_model decorator."
+                )
+            assert callable(registered_model)
+            registered_model(config)

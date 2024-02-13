@@ -51,7 +51,7 @@ class MultiDiffusion(Generic[T, D], ABC):
             match step:
                 case step if step == target.start_step and target.init_latents is not None:
                     noise_view = target.crop(noise)
-                    view = self.ldm.scheduler.add_noise(
+                    view = self.ldm.solver.add_noise(
                         x=target.init_latents,
                         noise=noise_view,
                         step=step,
@@ -83,8 +83,15 @@ class MultiDiffusion(Generic[T, D], ABC):
     def dtype(self) -> DType:
         return self.ldm.dtype
 
+    # backward-compatibility alias
     def decode_latents(self, x: Tensor) -> Image.Image:
-        return self.ldm.lda.decode_latents(x=x)
+        return self.latents_to_image(x=x)
+
+    def latents_to_image(self, x: Tensor) -> Image.Image:
+        return self.ldm.lda.latents_to_image(x=x)
+
+    def latents_to_images(self, x: Tensor) -> list[Image.Image]:
+        return self.ldm.lda.latents_to_images(x=x)
 
     @staticmethod
     def generate_offset_grid(size: tuple[int, int], stride: int = 8) -> list[tuple[int, int]]:

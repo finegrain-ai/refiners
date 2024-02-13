@@ -32,3 +32,8 @@ wandb/
 
 # lock files
 requirements-dev.lock
+
+# coverage.py
+htmlcov/
+.coverage
+.coverage.*
