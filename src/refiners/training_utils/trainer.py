@@ -109,7 +109,7 @@ def register_model():
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
             setattr(self, name, self.models[name].model)
-            return func(self, config)
+            return model
 
         return wrapper  # type: ignore
 
@@ -129,7 +129,7 @@ def register_callback():
             callback = func(self, config)
             self.callbacks[name] = callback
             setattr(self, name, callback)
-            return func(self, config)
+            return callback
 
         return wrapper  # type: ignore
 

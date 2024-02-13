@@ -50,6 +50,7 @@ class MockModel(fl.Chain):
 
 class MockTrainer(Trainer[MockConfig, MockBatch]):
     step_counter: int = 0
+    model_registration_counter: int = 0
 
     @property
     def dataset_length(self) -> int:
@@ -69,6 +70,8 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
         model = MockModel()
         if config.use_activation:
             model.add_activation()
+
+        self.model_registration_counter += 1
         return model
 
     def compute_loss(self, batch: MockBatch) -> Tensor:
@@ -172,6 +175,7 @@ def test_mock_trainer_initialization(mock_config: MockConfig, mock_trainer: Mock
     assert isinstance(mock_trainer, MockTrainer)
     assert mock_trainer.optimizer is not None
     assert mock_trainer.lr_scheduler is not None
+    assert mock_trainer.model_registration_counter == 1
 
 
 def test_training_cycle(mock_trainer: MockTrainer) -> None:
