@@ -34,6 +34,7 @@ from refiners.training_utils.callback import (
     GradientNormLogging,
     GradientValueClipping,
     MonitorLoss,
+    MonitorTime
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
@@ -294,6 +295,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             GradientValueClipping(),
             GradientNormClipping(),
             DropoutCallback(),
+            MonitorTime()
         ]
 
     @cached_property
@@ -610,13 +612,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def epoch(self) -> None:
         """Perform a single epoch."""
         for batch in self.dataloader:
-            if not self.clock.done:
-                self._call_callbacks(event_name="on_batch_begin")
-                self.step(batch=batch)
-                self._call_callbacks(event_name="on_batch_end")
-            else:
+            if self.clock.done:
                 break
-
+            self._call_callbacks(event_name="on_batch_begin")
+            self.step(batch=batch)
+            self._call_callbacks(event_name="on_batch_end")
+            
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
         return instance.config.training.seed
