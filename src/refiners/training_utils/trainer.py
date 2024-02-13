@@ -234,7 +234,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return dtype
 
     @property
-    def parameters(self) -> list[Parameter]:
+    def parameters(self) -> list[nn.Parameter]:
         """Returns a list of all parameters in all models"""
         return [param for model in self.models.values() for param in model.parameters()]
 
