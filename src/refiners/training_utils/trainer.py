@@ -463,7 +463,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
             self._call_callbacks(event_name="on_batch_end")
-
+    @staticmethod
+    def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
+        return instance.config.training.seed
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
         """Train the model."""
