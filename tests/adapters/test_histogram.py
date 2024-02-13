@@ -2,7 +2,8 @@ import torch
 
 from refiners.fluxion.adapters.histogram import HistogramDistance, HistogramEncoder, HistogramExtractor, ColorLoss, histogram_to_histo_channels, sorted_channels_to_histo_channels, tensor_to_sorted_channels
 from refiners.fluxion.utils import image_to_tensor, tensor_to_image
-
+from PIL import Image
+import numpy as np
 
 def test_histogram_extractor() -> None:
     color_bits = 3
@@ -25,7 +26,12 @@ def test_histogram_extractor() -> None:
     histogram_white = extractor(img_white)
     assert abs(histogram_white[0, -1, -1, -1] - 1.0) < 1e-4, "histogram_white should be 1.0 at -1,-1,-1,-1"
     assert abs(histogram_white.sum() - 1.0) < 1e-4, "histogram sum should equal 1.0"
-    
+
+    imarray = np.random.rand(256,256,3) * 255
+    image = Image.fromarray(imarray.astype('uint8')).convert('RGB')
+    histogram_img = extractor.images_to_histograms([image, image])
+    assert abs(histogram_img.sum() - 2.0) < 1e-5, "histogram sum should equal 1.0"
+
 def test_images_histogram_extractor() -> None:
     color_bits = 3
 
@@ -47,7 +53,7 @@ def test_histogram_distance() -> None:
     distance = HistogramDistance()
     color_bits = 2
     color_size = 2**color_bits
-    batch_size = 2
+    batch_size = 10
 
     histo1 = torch.rand((batch_size, color_size, color_size, color_size))
     sum1 = histo1.sum()
@@ -58,7 +64,22 @@ def test_histogram_distance() -> None:
     histo2 = histo2 / sum2
 
     dist_same = distance(histo1, histo1)
-    assert dist_same == 0.0, "distance between himself should be 0.0"
+    assert abs(dist_same) < 1e-4, "distance between himself should be 0.0"
+    
+    dist_diff = distance(histo1, histo2)
+    assert dist_diff >= 0.0, "distance should more than 0.0"
+    
+    dist_bhattacharyya = distance.bhattacharyya(histo1, histo2)
+    assert dist_bhattacharyya >= 0.0, "distance bhattacharyya should be more than 0"
+
+    dist_kl_div = distance.kl_div(histo1, histo2)
+    assert dist_kl_div >= 0.0, "distance kl div himself should more than 0.0"
+
+    dist_intersection_same = distance.intersection(histo1, histo1)
+    assert abs(dist_intersection_same - 1.0) < 1e-6, "distance intersection should be 1"
+    
+    dist_correlation_same = distance.correlation(histo1, histo1)
+    assert dist_correlation_same > 0.0, "distance correlation should be more than 0"
 
 
 def test_histogram_encoder() -> None:

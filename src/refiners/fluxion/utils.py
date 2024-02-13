@@ -142,6 +142,9 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
     """
     if image.mode == "P":
         image = image.convert("RGB")
+    
+    if image.mode != "RGB":
+        raise Exception("not an RGB image")
 
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 

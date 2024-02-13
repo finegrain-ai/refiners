@@ -86,12 +86,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
             device=self.device,
         )
         return encoder
-    @cached_property
-    def color_palette_extractor(self) -> ColorPaletteExtractor:
-        return ColorPaletteExtractor(
-            size=self.config.color_palette.max_colors,
-            weighted_palette=self.config.color_palette.weighted_palette
-        )
+
     @cached_property
     def color_palette_adapter(self) -> SD1ColorPaletteAdapter[Any]:
         
@@ -219,19 +214,6 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchColorPaletteP
                 batch.source_palettes
             )
         )
-    
-    def draw_palette(self, palette: ColorPalette, width: int, palette_img_size: int) -> Image.Image:
-        palette_img = Image.new(mode="RGB", size=(width, palette_img_size))
-        
-        # sort the palette by weight
-        current_x = 0
-        for (color, weight) in palette:
-            box_width = int(weight*width)            
-            color_box = Image.fromarray(np.full((palette_img_size, box_width, 3), color, dtype=np.uint8)) # type: ignore
-            palette_img.paste(color_box, box=(current_x, 0))
-            current_x+=box_width
-            
-        return palette_img
     
     def draw_cover_image(self, batch: BatchColorPaletteResults) -> Image.Image:
         (batch_size, _, height, width) = batch.result_images.shape

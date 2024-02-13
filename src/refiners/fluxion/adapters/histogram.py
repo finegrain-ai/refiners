@@ -1,9 +1,9 @@
 from typing import Any, List, TypeVar
 from refiners.foundationals.dinov2.vit import FeedForward
 
-from torch import Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like, float32
+from torch import ge, isnan, min, max, log, Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like, float32
 from torch.nn import init, L1Loss
-from torch.nn.functional import mse_loss as _mse_loss
+from torch.nn.functional import mse_loss as _mse_loss, kl_div as _kl_div
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -113,9 +113,46 @@ class HistogramDistance(fl.Chain):
         self.color_bits = color_bits
         super().__init__(fl.Lambda(func=self.kl_div))
 
-    def kl_div(self, x: Tensor, y: Tensor) -> Tensor:
+    def mse(self, x: Tensor, y: Tensor) -> Tensor:
         return _mse_loss(x, y)
+    
+    def correlation(self, x: Tensor, y: Tensor) -> Tensor:
+        n = (2 ** self.color_bits) ** 3
+        
+        centered_x = x - 1/n
+        centered_y = y - 1/n
+                
+        denom = ((centered_x*centered_x).sum() * (centered_y*centered_y).sum()).sqrt()
+        return (centered_x*centered_y).sum()/denom
+    
+    def chi_square(self, x: Tensor, y: Tensor) -> Tensor:
+        return (2*((x - y)**2)/(x + y)).sum()/x.shape[0]
 
+    def intersection(self, x: Tensor, y: Tensor) -> Tensor:
+        return min(stack([x,y]), dim=0)[0].sum()/x.shape[0]
+    
+    def hellinger(self, x: Tensor, y: Tensor) -> Tensor:
+        x = x.reshape(x.shape[0], -1)
+        y = y.reshape(x.shape[0], -1)
+        
+        base = x.sqrt() - y.sqrt()
+        dist = (base * base).sum(dim = 1).sqrt()
+        return dist.mean()
+    
+    def kl_div(self, actual: Tensor, expected: Tensor) -> Tensor:
+        # TODO: connect it to the pre-softmax logits 
+        # to reduce log calculation needs
+        return _kl_div(actual.log(), expected)
+    
+    def metrics(self, x: Tensor, y: Tensor) -> dict[str, Tensor]:
+        return {
+            "mse": self.mse(x, y),
+            "correlation": self.correlation(x, y),
+            "chi_square": self.chi_square(x, y),
+            "intersection": self.intersection(x, y),
+            "hellinger": self.hellinger(x, y),
+            "kl_div": self.kl_div(x, y)
+        }
 
 class HistogramExtractor(fl.Chain):
     def __init__(

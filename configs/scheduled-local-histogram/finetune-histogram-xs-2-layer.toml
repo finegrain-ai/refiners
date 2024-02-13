@@ -1,9 +1,9 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "disabled" # "online", "offline", "disabled"
+mode = "offline" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histogram"
-name="xs"
+name="local-histo-palette-eval"
 tags = ["l4", "local"]
 
 [models]
@@ -61,7 +61,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[4:]"
+split = "train[200:]"
 #random_crop = false
 
 [eval_dataset]
@@ -69,7 +69,7 @@ hf_repo = "1aurent/unsplash-lite-palette"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
-split = "train[0:4]"
+split = "train[0:200]"
 
 [checkpointing]
 #save_folder = "ckpts"
@@ -78,15 +78,11 @@ use_wandb = true
 
 [evaluation]
 num_inference_steps = 30
-db_indexes = [0]#, 1, 2, 3]
-batch_size = 1
+db_indexes = [15]
+batch_size = 4
 prompts = [
-     "A Bustling City Street"
-#,
-#     "A cute cat",
-#     "An oil painting",
-#     "A photography of a beautiful woman",
-#     "A pair of shoes",
-#     "A group of working people"
+#     "A Bustling City Street",
+     "A cute cat",
+#     "A photography of a beautiful woman"
 ]
 condition_scale = 7.5 

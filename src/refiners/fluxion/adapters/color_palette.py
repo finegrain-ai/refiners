@@ -218,6 +218,9 @@ class ColorPaletteExtractor:
         
         image_np = np.array(image)
         pixels = image_np.reshape(-1, 3)
+        return self.from_pixels(pixels, size)
+    def from_pixels(self, pixels: np.ndarray, size: int | None = None) -> ColorPalette:
+        print("pixels.shape", pixels.shape)
         kmeans = KMeans(n_clusters=size).fit(pixels) # type: ignore 
         counts = np.unique(kmeans.labels_, return_counts=True)[1] # type: ignore
         palette : ColorPalette = []
@@ -233,6 +236,22 @@ class ColorPaletteExtractor:
             palette.append(color_cluster)
         sorted_palette = sorted(palette, key=lambda x: x[1], reverse=True)
         return sorted_palette
+
+    def from_histogram(self, histogram: Tensor, color_bits: int, size: int | None = None, num: int = 1) -> ColorPalette:
+        if histogram.dim() != 4:
+            raise Exception('histogram must be 4 dimensions')
+        cube_size = 2 ** color_bits
+        color_factor = 256 / cube_size
+        pixels : list[np.ndarray] = []
+        for histo in histogram.split(1):
+            for r in range(cube_size):
+                for g in range(cube_size):
+                    for b in range(cube_size):
+                        for i in range(int(histo[0, r, g, b]* num)):
+                            pixels.append(np.array([r*color_factor, g*color_factor, b*color_factor]))                
+            
+        return self.from_pixels(np.array(pixels), size)
+    
     def distance(self, a: ColorPalette, b: ColorPalette) -> float:
         #TO DO
         raise NotImplementedError

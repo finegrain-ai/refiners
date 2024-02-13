@@ -123,9 +123,9 @@ class HistogramLatentDiffusionTrainer(
     
     def batch_metrics(self, results: BatchHistogramResults, prefix: str = "histogram-img") -> None:
         
-        self.log({f"{prefix}/mse": self.histogram_distance(
-            results.source_histograms.to(device=self.device), 
-            results.result_histograms.to(device=self.device)
+        self.log({f"{prefix}/loss": self.histogram_distance(
+            results.result_histograms.to(device=self.device),
+            results.source_histograms.to(device=self.device)
         )})
         
         
@@ -358,15 +358,30 @@ class HistogramLatentDiffusionTrainer(
         for i in range(batch_size):
             join_canvas_image.paste(source_images[i].resize((width//2, height//2)), box=(0, height *i))
             
+            source_image_palette = self.draw_palette(
+                self.color_palette_extractor.from_histogram(source_histograms[i], color_bits= self.config.histogram_auto_encoder.color_bits, size=len(batch.source_palettes[i])),
+                width//2,
+                height//16
+            )
+            join_canvas_image.paste(source_image_palette, box=(0, height *i + height//2))
+            
+            res_image_palette = self.draw_palette(
+                self.color_palette_extractor.from_histogram(results_histograms[i], color_bits= self.config.histogram_auto_encoder.color_bits, size=len(batch.source_palettes[i])),
+                width//2,
+                height//16
+            )
+            
+            join_canvas_image.paste(res_image_palette, box=(0, height *i + (15*height)//16))
+
             for (color_id, color_name) in enumerate(colors):
                 image_curve = self.draw_curves(
                     res_histo_channels[color_id][i].cpu().tolist(), # type: ignore
                     src_histo_channels[color_id][i].cpu().tolist(), # type: ignore
                     color_name,
                     width//2,
-                    height//6
+                    height//8
                 )
-                join_canvas_image.paste(image_curve, box=(0, height *i + height//2 + color_id*height//6))
+                join_canvas_image.paste(image_curve, box=(0, height *i + height//2 + ((1+2*color_id)*height)//16))
                 
         return join_canvas_image
     

@@ -1,7 +1,9 @@
 from PIL import Image
 from refiners.fluxion.layers.converter import Converter
+from refiners.fluxion.utils import summarize_tensor
 from torch import Tensor, device as Device, dtype as DType, zeros_like, cat
-from refiners.fluxion.layers.basics import Unsqueeze, Squeeze
+from torch.nn import Softmax
+from refiners.fluxion.layers.basics import Reshape, Unsqueeze, Squeeze
 from refiners.foundationals.latent_diffusion.auto_encoder import Encoder, Decoder
 from refiners.fluxion.layers import Chain
 
@@ -26,6 +28,7 @@ class HistogramAutoEncoder(Chain):
         self.n_down_samples = n_down_samples
         self.latent_dim = latent_dim
         self.color_bits = color_bits
+        cube_size = 2 ** color_bits
         
         super().__init__(
             Chain(
@@ -49,13 +52,16 @@ class HistogramAutoEncoder(Chain):
                     num_groups = num_groups, 
                     resnet_sizes = resnet_sizes,
                     output_channels = histogram_dim,
-                     n_up_samples=n_down_samples,
+                    n_up_samples=n_down_samples,
                     latent_dim = latent_dim,
                     device=device, 
                     dtype=dtype
                 ),
                 Squeeze(dim=1)    
-            )
+            ),
+            Reshape(cube_size*cube_size*cube_size),
+            Softmax(dim=1),
+            Reshape(cube_size,cube_size,cube_size)
         )
     
     def encode(self, x: Tensor) -> Tensor:
@@ -88,7 +94,6 @@ class HistogramAutoEncoder(Chain):
         
         embedding_dim = color_size**3 / self.compression_rate
         return int(embedding_dim)
-    
     
     def unconditionnal_embedding_like(self, x: Tensor) -> Tensor:
         numel: int = x.numel()

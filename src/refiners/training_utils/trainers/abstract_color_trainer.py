@@ -6,13 +6,14 @@ from refiners.training_utils.wandb import WandbLoggable
 from refiners.training_utils.metrics.color_palette import AbstractColorPrompt, AbstractColorResults
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from torch import Tensor, randn, tensor
-
+from refiners.fluxion.adapters.color_palette import ColorPaletteExtractor, ColorPalette
+import numpy as np
 from torch.utils.data import DataLoader
 
 from refiners.fluxion.adapters.histogram import (
     HistogramExtractor
 )
-
+from PIL import Image
 from refiners.foundationals.latent_diffusion import (
     DPMSolver,
     StableDiffusion_1,
@@ -35,6 +36,8 @@ from refiners.training_utils.trainers.trainer import scoped_seed
 #     return str(hash(str2))
 
 from torch.utils.data import Dataset
+
+
 
 class ColorTrainerEvaluationConfig(TestDiffusionBaseConfig):
     db_indexes: list[int]
@@ -119,7 +122,27 @@ class AbstractColorTrainer(
     @cached_property
     def unconditionnal_text_embedding(self) -> Tensor:
         return self.text_encoder([""])
-   
+    
+    @cached_property
+    def color_palette_extractor(self) -> ColorPaletteExtractor:
+        return ColorPaletteExtractor(
+            size=self.config.color_palette.max_colors,
+            weighted_palette=self.config.color_palette.weighted_palette
+        )
+    
+    def draw_palette(self, palette: ColorPalette, width: int, height: int) -> Image.Image:
+        palette_img = Image.new(mode="RGB", size=(width, height))
+        
+        # sort the palette by weight
+        current_x = 0
+        for (color, weight) in palette:
+            box_width = int(weight*width)            
+            color_box = Image.fromarray(np.full((height, box_width, 3), color, dtype=np.uint8)) # type: ignore
+            palette_img.paste(color_box, box=(current_x, 0))
+            current_x+=box_width
+            
+        return palette_img
+
     @scoped_seed(5)
     def compute_batch_evaluation(self, batch: PromptType, same_seed: bool = True) -> ResultType:
         batch_size = len(batch.source_prompts)

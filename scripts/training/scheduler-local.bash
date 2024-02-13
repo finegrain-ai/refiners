@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Path to the directory containing the config files
-config_dir="./configs/scheduled-local"
+config_dir="./configs/histogram-auto-encoder"
 prefix=""
-script="./scripts/training/finetune-ldm-color-palette.py"
+script="./scripts/training/train-histogram-autoencoder.py"
 # Log file path
 log_file="./tmp/schedule-log.txt"
 
