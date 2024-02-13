@@ -126,13 +126,6 @@ class ModelItem:
     model: fl.Module
     learnable_parameters: list[nn.Parameter]
 
-<<<<<<< HEAD
-    @property
-    def time_elapsed(self) -> float:
-        assert self.start_time is not None, "Timer has not been started yet."
-        return time.time() - self.start_time
-=======
->>>>>>> 3488273f503283bfe0273fa4008aafd643789df3
 
 ModelRegistry = dict[str, ModelItem]
 ModuleT = TypeVar("ModuleT", bound=fl.Module)
