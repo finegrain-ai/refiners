@@ -46,7 +46,7 @@ batch_size = 16
 gradient_accumulation = {"number" = 4, "unit" = "step"}
 evaluation_interval = {"number" = 1000, "unit" = "step"}
 evaluation_seed = 9752
-mixed_precision = "bfloat16"
+mixed_precision = "bf16"
 dataset_workers=4
 checkpoint_interval = {"number" = 1000, "unit" = "step"}
 device="cuda"
