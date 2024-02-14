@@ -588,8 +588,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
-        ).float()
+        )
         ip_adapter.inject()
+        ip_adapter.to(self.device, float32)
         i=0
         for module in ip_adapter.modules():
             i+=1
