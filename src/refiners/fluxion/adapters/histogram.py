@@ -128,8 +128,8 @@ class HistogramDistance(fl.Chain):
         denom = ((centered_x*centered_x).sum() * (centered_y*centered_y).sum()).sqrt()
         return (centered_x*centered_y).sum()/denom
     
-    def chi_square(self, x: Tensor, y: Tensor) -> Tensor:
-        return (2*((x - y)**2)/(x + y)).sum()/x.shape[0]
+    def chi_square(self, x: Tensor, y: Tensor, eps: float = 1e-7) -> Tensor:
+        return (2*((x - y)**2)/(x + y + eps)).sum()/x.shape[0]
 
     def intersection(self, x: Tensor, y: Tensor) -> Tensor:
         return min(stack([x,y]), dim=0)[0].sum()/x.shape[0]
@@ -143,18 +143,17 @@ class HistogramDistance(fl.Chain):
         return dist.mean()
     
     def kl_div(self, actual: Tensor, expected: Tensor) -> Tensor:
-        # TODO: connect it to the pre-softmax logits 
-        # to reduce log calculation needs
-        return _kl_div(actual.log(), expected)
+        return _kl_div(actual, expected)
     
-    def metrics(self, x: Tensor, y: Tensor) -> dict[str, Tensor]:
+    def metrics_log(self, log: Tensor, y: Tensor) -> dict[str, Tensor]:
+        x = log.exp()
         return {
             "mse": self.mse(x, y),
             "correlation": self.correlation(x, y),
             "chi_square": self.chi_square(x, y),
             "intersection": self.intersection(x, y),
             "hellinger": self.hellinger(x, y),
-            "kl_div": self.kl_div(x, y)
+            "kl_div": self.kl_div(log, y)
         }
 
 class HistogramExtractor(fl.Chain):

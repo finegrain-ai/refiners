@@ -99,7 +99,7 @@ class HistogramAutoEncoderTrainer(
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((GradientNormLayerLogging(),SaveHistogramAutoEncoder()))
+        self.callbacks.extend((SaveHistogramAutoEncoder(),GradientNormLayerLogging()))
 
     def load_models(self) -> dict[str, fl.Module]:
         return {
@@ -110,18 +110,20 @@ class HistogramAutoEncoderTrainer(
         
         expected = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
 
-        actual_logits = self.histogram_auto_encoder(expected)
+        actual_log = self.histogram_auto_encoder(expected)
         
-        if isnan(actual).any():
+        if isnan(actual_log).any():
             raise ValueError("The autoencoder produced NaNs.")
         
         if self.config.histogram_auto_encoder.loss == "mse":
-            actual = actual_logits.reshape(expected.shape[0], -1).softmax(dim=1).reshape(expected.shape)
-            loss = self.histogram_distance.mse(actual, expected)
+            loss = self.histogram_distance.mse(actual_log.exp(), expected)
         elif self.config.histogram_auto_encoder.loss == "kl_div":
-            loss = self.histogram_distance.kl_div(actual_logits, expected)
+            loss = self.histogram_distance.kl_div(actual_log, expected)
         else:
             raise ValueError(f"Unknown loss {self.config.histogram_auto_encoder.loss}")
+        
+        if isnan(loss).any():
+            raise ValueError("The loss produced NaNs.")
         
         return loss
 
@@ -172,11 +174,10 @@ class HistogramAutoEncoderTrainer(
                 
         expected = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
 
-        actual_logits = self.histogram_auto_encoder(expected)
+        actual_log = self.histogram_auto_encoder(expected)
         
-        actual = actual_logits.reshape(expected.shape[0], -1).softmax(dim=1).reshape(expected.shape)
-        
-        metrics = self.histogram_distance.metrics(actual, expected)
+                
+        metrics = self.histogram_distance.metrics_log(actual_log, expected)
         log_dict : dict[str, WandbLoggable] = {}
         for (key, value) in metrics.items():
             log_dict[f"eval/{key}"] = value
@@ -184,7 +185,8 @@ class HistogramAutoEncoderTrainer(
         
         
         images : dict[str, WandbLoggable] = {}
-        
+        actual = actual_log.reshape(expected.shape[0], -1).softmax(dim=1).reshape(expected.shape)
+
         res_histo_channels = histogram_to_histo_channels(actual)
         src_histo_channels = histogram_to_histo_channels(expected)
         
