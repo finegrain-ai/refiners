@@ -273,6 +273,20 @@ def download_controlnet():
     download_files(urls, mfidabel_folder)
 
 
+def download_control_lora_fooocus():
+    base_folder = os.path.join(test_weights_dir, "lllyasviel", "misc")
+    control_loras = [
+        "control-lora-canny-rank128.safetensors",
+        "fooocus_xl_cpds_128.safetensors",
+    ]
+
+    for control_lora in control_loras:
+        download_file(
+            url=f"https://huggingface.co/lllyasviel/misc/resolve/main/{control_lora}",
+            dest_folder=base_folder,
+        )
+
+
 def download_unclip():
     base_folder = os.path.join(test_weights_dir, "stabilityai", "stable-diffusion-2-1-unclip")
     download_file(
@@ -624,6 +638,21 @@ def convert_dinov2():
     )
 
 
+def convert_control_lora_fooocus():
+    run_conversion_script(
+        "convert_fooocus_control_lora.py",
+        "tests/weights/lllyasviel/misc/control-lora-canny-rank128.safetensors",
+        "tests/weights/control_lora/refiners_control-lora-canny-rank128.safetensors",
+        expected_hash="4d505134",
+    )
+    run_conversion_script(
+        "convert_fooocus_control_lora.py",
+        "tests/weights/lllyasviel/misc/fooocus_xl_cpds_128.safetensors",
+        "tests/weights/control_lora/refiners_fooocus_xl_cpds_128.safetensors",
+        expected_hash="d81aa461",
+    )
+
+
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
     download_sd15("runwayml/stable-diffusion-v1-5")
@@ -639,6 +668,7 @@ def download_all():
     download_t2i_adapter()
     download_sam()
     download_dinov2()
+    download_control_lora_fooocus()
 
 
 def convert_all():
@@ -654,6 +684,7 @@ def convert_all():
     convert_t2i_adapter()
     convert_sam()
     convert_dinov2()
+    convert_control_lora_fooocus()
 
 
 def main():
