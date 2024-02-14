@@ -110,6 +110,7 @@ class Chain(ContextModule):
                     or (not module._can_refresh_parent)
                     or (module.parent is None)
                     or (module.parent == self))
+                    print(id(self), id(module.parent))
 
                 raise Exception()
 
