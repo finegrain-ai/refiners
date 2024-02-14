@@ -148,12 +148,13 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
     test_ldm: TestIPDiffusionConfig
+    wandb: WandbConfig
     unet: ModelConfig
     lda: ModelConfig
     text_encoder: ModelConfig
-    image_proj: ModelConfig
     image_encoder: ModelConfig
-    wandb: WandbConfig
+    # image proj has to be after image encoder or it fails
+    image_proj: ModelConfig
     # adapter needs to be initialized later for this to work
     adapter: AdapterConfig
 
