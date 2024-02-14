@@ -593,6 +593,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_bias=self.config.adapter.use_bias,
         )
         ip_adapter.requires_grad_(True)
+        self.unet.requires_grad_(False)
+        self.image_encoder.requires_grad_(False)
+        self.image_proj.requires_grad_(False)
 
         ip_adapter.inject()
         ip_adapter.to(self.device, float32)
@@ -603,6 +606,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} modules in ip adapter")
+        self.image_proj.requires_grad_(True)
         return ip_adapter
 
     @cached_property
