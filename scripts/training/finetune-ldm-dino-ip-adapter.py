@@ -569,7 +569,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def adapter(self, adapter_config: ModelConfig) -> SD1IPAdapter:
-        assert self.config.models["adapter"] is not None, "The config must contain an adapter entry."
         # At the point this gets called the unet, image_encoder, and image_proj will get called thanks to @register_model
         ip_adapter = SD1IPAdapter(
             target=self.unet,
