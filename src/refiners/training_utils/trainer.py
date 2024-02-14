@@ -113,7 +113,6 @@ def register_model():
     def decorator(func: Callable[[Any, ModelConfigT], ModuleT]) -> ModuleT:
         @wraps(func)
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
-            print("config", config, type(config))
             name = func.__name__
             model = func(self, config)
             if config.checkpoint is not None:
@@ -170,7 +169,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
         self._call_callbacks(event_name="on_init_end")
-        print("loaded models")
         self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
