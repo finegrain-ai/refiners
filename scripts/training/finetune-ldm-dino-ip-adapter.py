@@ -19,6 +19,7 @@ from torch import (
     stack,
     randn_like,
     no_grad,
+    float32
 )
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
@@ -561,11 +562,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
-        print("image proj")
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
-            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
-        ).to("cpu").float()
+            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=Device("cpu"), dtype=float32
+        )
         for module in image_proj.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         return image_proj

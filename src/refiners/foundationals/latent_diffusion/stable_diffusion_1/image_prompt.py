@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.cross_attention import CrossAttenti
 from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, IPAdapter, PerceiverResampler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.dinov2 import ViT
-
+from torch import device as Device, dtype as DType,
 
 def get_sd1_image_proj(
     image_encoder: CLIPImageEncoderH | ViT,
@@ -13,13 +13,17 @@ def get_sd1_image_proj(
     cross_attn_2d: CrossAttentionBlock2d,
     fine_grained: bool,
     use_bias: bool,
+    device: Device | None = None,
+    dtype: DType | None = None
 ) -> ImageProjection | PerceiverResampler:
+    proj_device = target.device if device is None else device
+    proj_dtype = target.dtype if device is None else dtype
     return (
         ImageProjection(
             image_embedding_dim=image_encoder.output_dim,
             clip_text_embedding_dim=cross_attn_2d.context_embedding_dim,
-            device=target.device,
-            dtype=target.dtype,
+            device=proj_device,
+            dtype=proj_dtype,
             use_bias=use_bias,
         )
         if not fine_grained
@@ -31,8 +35,8 @@ def get_sd1_image_proj(
             num_tokens=16,
             input_dim=image_encoder.embedding_dim,  # = dim before final projection
             output_dim=cross_attn_2d.context_embedding_dim,
-            device=target.device,
-            dtype=target.dtype,
+            device=proj_device,
+            dtype=proj_dtype,
             use_bias=use_bias,
         )
     )

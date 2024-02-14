@@ -279,7 +279,6 @@ class ImageCrossAttention(fl.Chain):
             fl.Distribute(
                 fl.Identity(),
                 fl.Sum(
-                    *contexts,
                     fl.Chain(
                         fl.UseContext(context="ip_adapter", key="image_embedding"),
                         fl.Linear(
@@ -290,9 +289,9 @@ class ImageCrossAttention(fl.Chain):
                             dtype=text_cross_attention.dtype,
                         ),
                     ),
+                    *contexts,
                 ),
                 fl.Sum(
-                    *contexts,
                     fl.Chain(
                         fl.UseContext(context="ip_adapter", key="image_embedding"),
                         fl.Linear(
@@ -303,6 +302,7 @@ class ImageCrossAttention(fl.Chain):
                             dtype=text_cross_attention.dtype,
                         ),
                     ),
+                    *contexts,
                 ),
             ),
             ScaledDotProductAttention(
