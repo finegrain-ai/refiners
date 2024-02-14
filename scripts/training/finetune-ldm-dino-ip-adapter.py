@@ -569,7 +569,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for module in image_proj.modules():
             i+=1
             _init_learnable_weights(module, self.config.adapter.initializer_range)
-        logger.info(f"Initialized ", i, "modules in image_proj")
+        logger.info(f"Initialized {i} modules in image_proj")
         return image_proj
 
     @register_model()
@@ -595,7 +595,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for module in ip_adapter.modules():
             i+=1
             _init_learnable_weights(module, self.config.adapter.initializer_range)
-        logger.info(f"Initialized ", i, "modules in ip adapter")
+        logger.info(f"Initialized {i} modules in ip adapter")
         return ip_adapter
 
     @cached_property
