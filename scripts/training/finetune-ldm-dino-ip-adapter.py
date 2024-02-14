@@ -567,8 +567,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
         i=0
         for module in image_proj.modules():
-            i+=1
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+            if module.requires_grad is not None:
+                i+=1
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
         logger.info(f"Initialized {i} modules in image_proj")
         return image_proj
 
@@ -597,8 +598,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ip_adapter.to(self.device, float32)
         i=0
         for module in ip_adapter.modules():
-            i+=1
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+            if module.requires_grad is not None:
+                i+=1
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
         logger.info(f"Initialized {i} modules in ip adapter")
         return ip_adapter
 
