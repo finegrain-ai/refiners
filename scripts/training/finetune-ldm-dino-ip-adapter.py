@@ -118,6 +118,7 @@ def _init_learnable_weights(module: Module, initializer_range: float):
             if initializer_range == 0:
                 module.weight.data.zero_()
             else:
+                print(module.weight.device, module.weight.dtype)
                 trunc_normal_(module.weight, std=initializer_range)
         if module.bias is not None and module.bias.requires_grad:
             module.bias.data.zero_()
