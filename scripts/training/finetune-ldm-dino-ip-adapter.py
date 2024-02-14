@@ -561,16 +561,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
+        print("image proj")
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
-        ).to(device=self.device, dtype=self.dtype)
+        )
         for module in image_proj.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         return image_proj
 
     @register_model()
     def adapter(self, adapter_config: ModelConfig) -> SD1IPAdapter:
+        print("adapter")
         # At the point this gets called the unet, image_encoder, and image_proj will get called thanks to @register_model
         ip_adapter = SD1IPAdapter(
             target=self.unet,
@@ -585,7 +587,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
-        ).to(device=self.device, dtype=self.dtype)
+        )
         ip_adapter.inject()
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
