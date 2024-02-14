@@ -494,7 +494,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @scoped_seed(seed=get_training_seed)
     def _load_models(self) -> None:
         for name, config in self.config:
-            print(name)
             if not isinstance(config, ModelConfig):
                 continue
             try:

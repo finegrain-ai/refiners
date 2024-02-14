@@ -148,13 +148,14 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
     test_ldm: TestIPDiffusionConfig
-    adapter: AdapterConfig
     unet: ModelConfig
     lda: ModelConfig
     text_encoder: ModelConfig
     image_proj: ModelConfig
     image_encoder: ModelConfig
     wandb: WandbConfig
+    # adapter needs to be initialized later for this to work
+    adapter: AdapterConfig
 
 
 @dataclass
