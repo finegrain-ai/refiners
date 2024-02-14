@@ -58,10 +58,7 @@ class HistogramAutoEncoder(Chain):
                     dtype=dtype
                 ),
                 Squeeze(dim=1)    
-            ),
-            Reshape(cube_size*cube_size*cube_size),
-            Softmax(dim=1),
-            Reshape(cube_size,cube_size,cube_size)
+            )
         )
     
     def encode(self, x: Tensor) -> Tensor:

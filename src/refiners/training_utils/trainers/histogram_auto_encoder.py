@@ -110,18 +110,19 @@ class HistogramAutoEncoderTrainer(
         
         expected = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
 
-        actual = self.histogram_auto_encoder(expected)
+        actual_logits = self.histogram_auto_encoder(expected)
         
         if isnan(actual).any():
             raise ValueError("The autoencoder produced NaNs.")
         
         if self.config.histogram_auto_encoder.loss == "mse":
-            loss = self.histogram_distance(actual, expected)
+            actual = actual_logits.reshape(expected.shape[0], -1).softmax(dim=1).reshape(expected.shape)
+            loss = self.histogram_distance.mse(actual, expected)
         elif self.config.histogram_auto_encoder.loss == "kl_div":
-            loss = self.histogram_distance.kl_div(actual, expected)
+            loss = self.histogram_distance.kl_div(actual_logits, expected)
         else:
             raise ValueError(f"Unknown loss {self.config.histogram_auto_encoder.loss}")
-
+        
         return loss
 
     @cached_property
@@ -171,7 +172,9 @@ class HistogramAutoEncoderTrainer(
                 
         expected = self.histogram_extractor.images_to_histograms([item.image for item in batch], device = self.device, dtype = self.dtype)
 
-        actual = self.histogram_auto_encoder(expected)
+        actual_logits = self.histogram_auto_encoder(expected)
+        
+        actual = actual_logits.reshape(expected.shape[0], -1).softmax(dim=1).reshape(expected.shape)
         
         metrics = self.histogram_distance.metrics(actual, expected)
         log_dict : dict[str, WandbLoggable] = {}

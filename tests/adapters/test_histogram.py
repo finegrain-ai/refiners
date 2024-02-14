@@ -81,7 +81,35 @@ def test_histogram_distance() -> None:
     dist_correlation_same = distance.correlation(histo1, histo1)
     assert dist_correlation_same > 0.0, "distance correlation should be more than 0"
 
+def test_histogram_emd() -> None:
+    distance = HistogramDistance()
+    color_bits = 3
+    color_size = 2**color_bits
+    batch_size = 1
+    
+    img_black_normalized = torch.zeros((2, 3, 224, 224)) 
+    img_white_normalized = torch.ones((2, 3, 224, 224)) 
+    img_gray_normalized = torch.ones((2, 3, 224, 224))*0.5
+    
+    extractor = HistogramExtractor(color_bits=color_bits)
+    
+    histo_black = extractor(img_black_normalized)
+    histo_white = extractor(img_white_normalized)
+    histo_gray = extractor(img_gray_normalized)
+    
+    dist_hellinger_bw = distance.hellinger(histo_black, histo_white)
+    dist_hellinger_wg = distance.hellinger(histo_white, histo_gray)
+    
+    assert abs(dist_hellinger_bw - dist_hellinger_wg) < 1e-6, "hellinger distance between black <-> white and black <-> grey should be the same"
+    
+    dist_emd_bw = distance.emd(histo_black, histo_white)
+    dist_emd_wg = distance.emd(histo_white, histo_gray)
+    dist_emd_bg = distance.emd(histo_black, histo_gray)
 
+    assert abs(dist_emd_bw - dist_emd_bg) > 1e-1, "distance between himself should be 0.0"
+    assert abs(dist_emd_bw - dist_emd_wg) < 1e-6, "distance between himself should be 0.0"
+    
+    
 def test_histogram_encoder() -> None:
     batch_size = 2
     patch_size = 16

@@ -116,6 +116,9 @@ class HistogramDistance(fl.Chain):
     def mse(self, x: Tensor, y: Tensor) -> Tensor:
         return _mse_loss(x, y)
     
+    def emd(self, x: Tensor, y: Tensor) -> Tensor:
+        return _mse_loss(x, y) 
+    
     def correlation(self, x: Tensor, y: Tensor) -> Tensor:
         n = (2 ** self.color_bits) ** 3
         
