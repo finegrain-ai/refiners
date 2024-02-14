@@ -113,6 +113,7 @@ def register_model():
     def decorator(func: Callable[[Any, ModelConfigT], ModuleT]) -> ModuleT:
         @wraps(func)
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
+            print("config", config)
             name = func.__name__
             model = func(self, config)
             if config.checkpoint is not None:
@@ -157,27 +158,20 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._models: ModelRegistry = {}
         self._callbacks: CallbackRegistry = {}
         self.config = config
-        self.clock = TrainingClock(
-            dataset_length=self.dataset_length,
-            batch_size=config.training.batch_size,
-            training_duration=config.training.duration,
-            evaluation_interval=config.training.evaluation_interval,
-            gradient_accumulation=config.training.gradient_accumulation,
-            lr_scheduler_interval=config.scheduler.update_interval,
-            checkpoint_interval=config.training.checkpoint_interval,
-        )
         self.batch_time_m = AverageMeter()
         self.forward_time_m = AverageMeter()
         self.backprop_time_m = AverageMeter()
         self.data_time_m = AverageMeter()
         self.global_step: int = 0
+        self._load_models()
+        # load models before loading callbacks so that
+        # dataset doesn't get loaded yet so we can do pre-encoding
+        # the problem here is the on_init_begin and on_init_end becomes useless
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
-        self._load_models()
         self._call_callbacks(event_name="on_init_end")
         print("loaded models")
         self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
-
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
