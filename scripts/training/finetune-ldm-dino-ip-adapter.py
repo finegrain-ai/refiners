@@ -561,6 +561,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
+        print("image proj")
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=Device("cpu"), dtype=float32
