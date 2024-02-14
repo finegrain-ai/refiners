@@ -248,33 +248,6 @@ class ImageCrossAttention(fl.Chain):
         use_pooled_text_embedding: bool = False,
     ) -> None:
         self._scale = scale
-        contexts: List[fl.Chain] = []
-        if use_timestep_embedding:
-            contexts.append(
-                fl.Chain(
-                    fl.UseContext(context="range_adapter", key="timestep_embedding"),
-                    fl.Linear(
-                        in_features=1280,
-                        out_features=text_cross_attention.inner_dim,
-                        bias=text_cross_attention.use_bias,
-                        device=text_cross_attention.device,
-                        dtype=text_cross_attention.dtype,
-                    ),
-                )
-            )
-        if use_pooled_text_embedding:
-            contexts.append(
-                fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
-                    fl.Linear(
-                        in_features=1280,
-                        out_features=text_cross_attention.inner_dim,
-                        bias=text_cross_attention.use_bias,
-                        device=text_cross_attention.device,
-                        dtype=text_cross_attention.dtype,
-                    ),
-                )
-            )
         key_contexts: List[fl.Chain] = [
             fl.Chain(
                 fl.UseContext(context="ip_adapter", key="image_embedding"),
@@ -286,7 +259,6 @@ class ImageCrossAttention(fl.Chain):
                     dtype=text_cross_attention.dtype,
                 ),
             ),
-            *contexts,
         ]
         query_contexts: List[fl.Chain] = [
             fl.Chain(
@@ -299,8 +271,58 @@ class ImageCrossAttention(fl.Chain):
                     dtype=text_cross_attention.dtype,
                 ),
             ),
-            *contexts,
         ]
+        if use_timestep_embedding:
+            key_contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="range_adapter", key="timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
+            query_contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="range_adapter", key="timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
+        if use_pooled_text_embedding:
+            key_contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
+            query_contexts.append(
+                fl.Chain(
+                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
+                    fl.Linear(
+                        in_features=1280,
+                        out_features=text_cross_attention.inner_dim,
+                        bias=text_cross_attention.use_bias,
+                        device=text_cross_attention.device,
+                        dtype=text_cross_attention.dtype,
+                    ),
+                )
+            )
+
         super().__init__(
             fl.Distribute(
                 fl.Identity(),

@@ -93,24 +93,12 @@ class Chain(ContextModule):
         for module in modules:
             # Violating this would mean a ContextModule ends up in two chains,
             # with a single one correctly set as its parent.
-            try:
-                assert (
-                    (not isinstance(module, ContextModule))
-                    or (not module._can_refresh_parent)
-                    or (module.parent is None)
-                    or (module.parent == self)
-                ), f"{module.__class__.__name__} already has parent {module.parent.__class__.__name__}"
-            except Exception as e:
-                for module in modules:
-                    print("assertion", (not isinstance(module, ContextModule))
-                    or (not module._can_refresh_parent)
-                    or (module.parent is None)
-                    or (module.parent == self))
-                    print(module.parent, self, self == module.parent)
-                    print(id(self), id(module.parent))
-
-                raise Exception()
-
+            assert (
+                (not isinstance(module, ContextModule))
+                or (not module._can_refresh_parent)
+                or (module.parent is None)
+                or (module.parent == self)
+            ), f"{module.__class__.__name__} already has parent {module.parent.__class__.__name__}"
         self._regenerate_keys(modules)
         self._reset_context()
 
