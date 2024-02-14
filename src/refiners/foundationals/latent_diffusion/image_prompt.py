@@ -275,7 +275,7 @@ class ImageCrossAttention(fl.Chain):
                     ),
                 )
             )
-        print([
+        key_contexts: List[fl.Chain] = [
             *contexts,
             fl.Chain(
                 fl.UseContext(context="ip_adapter", key="image_embedding"),
@@ -287,35 +287,28 @@ class ImageCrossAttention(fl.Chain):
                     dtype=text_cross_attention.dtype,
                 ),
             ),
-        ])
+        ]
+        query_contexts: List[fl.Chain] = [
+            *contexts,
+            fl.Chain(
+                fl.UseContext(context="ip_adapter", key="image_embedding"),
+                fl.Linear(
+                    in_features=text_cross_attention.value_embedding_dim,
+                    out_features=text_cross_attention.inner_dim,
+                    bias=text_cross_attention.use_bias,
+                    device=text_cross_attention.device,
+                    dtype=text_cross_attention.dtype,
+                ),
+            ),
+        ]
         super().__init__(
             fl.Distribute(
                 fl.Identity(),
                 fl.Sum(
-                    *contexts,
-                    fl.Chain(
-                        fl.UseContext(context="ip_adapter", key="image_embedding"),
-                        fl.Linear(
-                            in_features=text_cross_attention.key_embedding_dim,
-                            out_features=text_cross_attention.inner_dim,
-                            bias=text_cross_attention.use_bias,
-                            device=text_cross_attention.device,
-                            dtype=text_cross_attention.dtype,
-                        ),
-                    ),
+                    *key_contexts
                 ),
                 fl.Sum(
-                    *contexts,
-                    fl.Chain(
-                        fl.UseContext(context="ip_adapter", key="image_embedding"),
-                        fl.Linear(
-                            in_features=text_cross_attention.value_embedding_dim,
-                            out_features=text_cross_attention.inner_dim,
-                            bias=text_cross_attention.use_bias,
-                            device=text_cross_attention.device,
-                            dtype=text_cross_attention.dtype,
-                        ),
-                    ),
+                    *query_contexts
                 ),
             ),
             ScaledDotProductAttention(
