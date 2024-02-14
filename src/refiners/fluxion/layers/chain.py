@@ -103,6 +103,7 @@ class Chain(ContextModule):
             except Exception as e:
                 for module in modules:
                     print(module.parent)
+                    print(self)
                     print((not isinstance(module, ContextModule))
                     or (not module._can_refresh_parent)
                     or (module.parent is None)
