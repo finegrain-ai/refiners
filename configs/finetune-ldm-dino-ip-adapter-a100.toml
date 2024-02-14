@@ -49,6 +49,7 @@ evaluation_seed = 9752
 mixed_precision = "bfloat16"
 dataset_workers=4
 checkpoint_interval = {"number" = 1000, "unit" = "step"}
+device="cuda"
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
