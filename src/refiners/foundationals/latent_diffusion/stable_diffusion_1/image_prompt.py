@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.cross_attention import CrossAttenti
 from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, IPAdapter, PerceiverResampler
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
 from refiners.foundationals.dinov2 import ViT
-from torch import device as Device, dtype as DType,
+from torch import device as Device, dtype as DType
 
 def get_sd1_image_proj(
     image_encoder: CLIPImageEncoderH | ViT,
