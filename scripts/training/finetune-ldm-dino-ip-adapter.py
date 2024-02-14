@@ -565,7 +565,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
-        )
+        ).to("cpu").float()
         for module in image_proj.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         return image_proj
