@@ -515,6 +515,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             text_embedding=text_embeddings,
             image_embedding=image_embeddings,
         )
+    @cached_property
     def dataset_length(self) -> int:
         """
         Returns the length of the dataset.
