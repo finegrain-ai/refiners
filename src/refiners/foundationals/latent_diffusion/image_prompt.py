@@ -248,20 +248,22 @@ class ImageCrossAttention(fl.Chain):
         use_pooled_text_embedding: bool = False,
     ) -> None:
         self._scale = scale
-        contexts: List[fl.Chain] = []
+        contexts: List[fl.Module] = []
         if use_timestep_embedding:
-            contexts.append(
-                fl.Chain(
-                    fl.UseContext(context="range_adapter", key="timestep_embedding"),
-                    fl.Linear(
-                        in_features=1280,
-                        out_features=text_cross_attention.inner_dim,
-                        bias=text_cross_attention.use_bias,
-                        device=text_cross_attention.device,
-                        dtype=text_cross_attention.dtype,
-                    ),
-                )
-            )
+            # contexts.append(
+            #     fl.Chain(
+            #         fl.UseContext(context="range_adapter", key="timestep_embedding"),
+            #         fl.Linear(
+            #             in_features=1280,
+            #             out_features=text_cross_attention.inner_dim,
+            #             bias=text_cross_attention.use_bias,
+            #             device=text_cross_attention.device,
+            #             dtype=text_cross_attention.dtype,
+            #         ),
+            #     )
+            # )
+            contexts.append(fl.UseContext(context="range_adapter", key="timestep_embedding"),)
+            
         if use_pooled_text_embedding:
             contexts.append(
                 fl.Chain(
