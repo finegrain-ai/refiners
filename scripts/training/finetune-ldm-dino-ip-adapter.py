@@ -566,8 +566,11 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=Device("cpu"), dtype=float32
         )
+        i=0
         for module in image_proj.modules():
+            i+=1
             _init_learnable_weights(module, self.config.adapter.initializer_range)
+        print("Initialized ", i)
         return image_proj
 
     @register_model()
