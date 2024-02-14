@@ -211,7 +211,7 @@ def convert_lora_layers(
             f"{path}.down": lora_layer.down.weight,
             f"{path}.up": lora_layer.up.weight,
         }
-        state_dict = {simplify_key(key, "ControlLora"): param for key, param in state_dict.items()}
+        state_dict = {simplify_key(key, "ControlLora."): param for key, param in state_dict.items()}
         refiners_state_dict.update(state_dict)
 
 
