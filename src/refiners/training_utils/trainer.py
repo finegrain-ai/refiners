@@ -125,7 +125,7 @@ def register_model():
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
             setattr(self, name, self.models[name].model)
-            return func(self, config)
+            return model
 
         return wrapper  # type: ignore
 
@@ -500,10 +500,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             if not isinstance(config, ModelConfig):
                 continue
             try:
+                print("getting attr")
                 registered_model = getattr(self, name)
             except AttributeError:
                 raise ValueError(
                     f"Model {name} is in the config but not registered in the Trainer. Create a method with the @register_model decorator."
                 )
             assert callable(registered_model)
+            print("calling model")
             registered_model(config)
