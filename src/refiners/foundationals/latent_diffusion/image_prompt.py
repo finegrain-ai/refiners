@@ -276,7 +276,6 @@ class ImageCrossAttention(fl.Chain):
                 )
             )
         key_contexts: List[fl.Chain] = [
-            *contexts,
             fl.Chain(
                 fl.UseContext(context="ip_adapter", key="image_embedding"),
                 fl.Linear(
@@ -287,9 +286,9 @@ class ImageCrossAttention(fl.Chain):
                     dtype=text_cross_attention.dtype,
                 ),
             ),
+            *contexts,
         ]
         query_contexts: List[fl.Chain] = [
-            *contexts,
             fl.Chain(
                 fl.UseContext(context="ip_adapter", key="image_embedding"),
                 fl.Linear(
@@ -300,6 +299,7 @@ class ImageCrossAttention(fl.Chain):
                     dtype=text_cross_attention.dtype,
                 ),
             ),
+            *contexts,
         ]
         super().__init__(
             fl.Distribute(
