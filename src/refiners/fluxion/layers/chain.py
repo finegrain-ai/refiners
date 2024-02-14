@@ -93,6 +93,7 @@ class Chain(ContextModule):
         for module in modules:
             # Violating this would mean a ContextModule ends up in two chains,
             # with a single one correctly set as its parent.
+            print(module)
             assert (
                 (not isinstance(module, ContextModule))
                 or (not module._can_refresh_parent)

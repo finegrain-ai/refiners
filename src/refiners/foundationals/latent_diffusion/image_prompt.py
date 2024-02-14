@@ -279,33 +279,29 @@ class ImageCrossAttention(fl.Chain):
             fl.Distribute(
                 fl.Identity(),
                 fl.Sum(
-                    fl.Parallel(
-                        fl.Chain(
-                            fl.UseContext(context="ip_adapter", key="image_embedding"),
-                            fl.Linear(
-                                in_features=text_cross_attention.key_embedding_dim,
-                                out_features=text_cross_attention.inner_dim,
-                                bias=text_cross_attention.use_bias,
-                                device=text_cross_attention.device,
-                                dtype=text_cross_attention.dtype,
-                            ),
+                    *contexts,
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="image_embedding"),
+                        fl.Linear(
+                            in_features=text_cross_attention.key_embedding_dim,
+                            out_features=text_cross_attention.inner_dim,
+                            bias=text_cross_attention.use_bias,
+                            device=text_cross_attention.device,
+                            dtype=text_cross_attention.dtype,
                         ),
-                        *contexts,
                     ),
                 ),
                 fl.Sum(
-                    fl.Parallel(
-                        fl.Chain(
-                            fl.UseContext(context="ip_adapter", key="image_embedding"),
-                            fl.Linear(
-                                in_features=text_cross_attention.value_embedding_dim,
-                                out_features=text_cross_attention.inner_dim,
-                                bias=text_cross_attention.use_bias,
-                                device=text_cross_attention.device,
-                                dtype=text_cross_attention.dtype,
-                            ),
+                    *contexts,
+                    fl.Chain(
+                        fl.UseContext(context="ip_adapter", key="image_embedding"),
+                        fl.Linear(
+                            in_features=text_cross_attention.value_embedding_dim,
+                            out_features=text_cross_attention.inner_dim,
+                            bias=text_cross_attention.use_bias,
+                            device=text_cross_attention.device,
+                            dtype=text_cross_attention.dtype,
                         ),
-                        *contexts,
                     ),
                 ),
             ),
