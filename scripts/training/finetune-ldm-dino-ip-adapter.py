@@ -604,6 +604,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
+        ip_adapter.to(self.device, dtype=self.dtype)
+        self.unet.to(self.device, dtype=self.dtype)
         return ip_adapter
 
     @cached_property
