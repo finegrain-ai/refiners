@@ -516,7 +516,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             text_embedding=text_embeddings,
             image_embedding=image_embeddings,
         )
-    def __len__(self) -> int:
+    def dataset_length(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        This is used to compute the number of batches per epoch.
+        """
         return len(self.dataset)
     @register_model()
     def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
