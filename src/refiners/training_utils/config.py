@@ -28,6 +28,7 @@ class TrainingConfig(BaseModel):
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    save_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
     mixed_precision: str = "no"
     dataset_workers: int = 1

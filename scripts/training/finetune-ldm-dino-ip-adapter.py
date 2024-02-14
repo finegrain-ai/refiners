@@ -139,7 +139,6 @@ class TestIPDiffusionConfig(TestDiffusionConfig):
 
     validation_image_paths: List[str]
 
-
 class AdapterLatentDiffusionConfig(BaseConfig):
     """Finetunning configuration.
 
@@ -728,7 +727,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         super().__init__(config=config)
         self._callbacks["compute_grad_norm"] = ComputeGradNormCallback()
         self._callbacks["compute_param_norm"] = ComputeParamNormCallback()
-        self._callbacks["save_adapter"] = SaveAdapterCallback()
+        # self._callbacks["save_adapter"] = SaveAdapterCallback()
 
 
 class ComputeGradNormCallback(Callback[AdapterLatentDiffusionTrainer]):
