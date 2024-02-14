@@ -592,8 +592,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
         )
-        self.unet.requires_grad_(False)
         ip_adapter.requires_grad_(True)
+        self.unet.requires_grad_(False)
 
         ip_adapter.inject()
         ip_adapter.to(self.device, float32)
