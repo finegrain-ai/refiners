@@ -5,6 +5,7 @@ project = "finetune-ldm-ip-adapter"
 
 [ldm]
 offset_noise = 0.0
+snr_gamma = 5
 
 [unet]
 checkpoint = "tests/weights/unet.safetensors"
@@ -32,22 +33,22 @@ resolution = 518
 scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false
-use_timestep_embedding = false
+use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
 
 [training]
-duration = "1000000:step"
+duration = {"number": 1000000, "unit": "step"}
 seed = 9752
-batch_size = 20
-gradient_accumulation = "1:step"
-evaluation_interval = "1000:step"
+batch_size = 16
+gradient_accumulation = {"number": 4, "unit": "step"}
+evaluation_interval = {"number": 1000, "unit": "step"}
 evaluation_seed = 9752
 mixed_precision = "bfloat16"
 dataset_workers=4
-save_interval = "1000:step"
+save_interval = {"number": 1000, "unit": "step"}
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
