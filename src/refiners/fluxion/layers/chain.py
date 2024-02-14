@@ -102,14 +102,11 @@ class Chain(ContextModule):
                 ), f"{module.__class__.__name__} already has parent {module.parent.__class__.__name__}"
             except Exception as e:
                 for module in modules:
-                    print(module.parent)
-                    print(self)
-                    print(self == module.parent)
-
-                    print((not isinstance(module, ContextModule))
+                    print("assertion", (not isinstance(module, ContextModule))
                     or (not module._can_refresh_parent)
                     or (module.parent is None)
                     or (module.parent == self))
+                    print(module.parent, self, self == module.parent)
                     print(id(self), id(module.parent))
 
                 raise Exception()
