@@ -565,11 +565,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=float32
         )
-        i=0
+        image_proj.requires_grad_(True)
         for module in image_proj.modules():
-            if module.requires_grad is not None:
-                i+=1
-                _init_learnable_weights(module, self.config.adapter.initializer_range)
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        i=0
+        for param in image_proj.parameters():
+            if param.requires_grad is not None:
+                i += 1
         logger.info(f"Initialized {i} modules in image_proj")
         return image_proj
 
@@ -591,16 +593,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_bias=self.config.adapter.use_bias,
         )
         ip_adapter.requires_grad_(True)
-        print(ip_adapter.target.requires_grad_)
-        print(ip_adapter.image_encoder.requires_grad_)
 
         ip_adapter.inject()
         ip_adapter.to(self.device, float32)
-        i=0
         for module in ip_adapter.modules():
-            if module.requires_grad is not None:
-                i+=1
-                _init_learnable_weights(module, self.config.adapter.initializer_range)
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        i=0
+        for param in image_proj.parameters():
+            if param.requires_grad is not None:
+                i += 1
         logger.info(f"Initialized {i} modules in ip adapter")
         return ip_adapter
 
