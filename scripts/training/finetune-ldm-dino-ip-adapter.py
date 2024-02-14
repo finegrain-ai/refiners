@@ -119,7 +119,6 @@ def _init_learnable_weights(module: Module, initializer_range: float):
             if initializer_range == 0:
                 module.weight.data.zero_()
             else:
-                print(module.weight.device, module.weight.dtype)
                 trunc_normal_(module.weight, std=initializer_range)
         if module.bias is not None and module.bias.requires_grad:
             module.bias.data.zero_()
@@ -570,7 +569,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for module in image_proj.modules():
             i+=1
             _init_learnable_weights(module, self.config.adapter.initializer_range)
-        print("Initialized ", i)
+        logger.info(f"Initialized ", i, "modules in image_proj")
         return image_proj
 
     @register_model()
@@ -592,8 +591,11 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_bias=self.config.adapter.use_bias,
         )
         ip_adapter.inject()
+        i=0
         for module in ip_adapter.modules():
+            i+=1
             _init_learnable_weights(module, self.config.adapter.initializer_range)
+        logger.info(f"Initialized ", i, "modules in ip adapter")
         return ip_adapter
 
     @cached_property
