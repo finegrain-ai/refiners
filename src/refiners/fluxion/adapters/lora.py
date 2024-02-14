@@ -250,9 +250,11 @@ class LinearLora(Lora[fl.Linear]):
         )
 
     def is_compatible(self, layer: fl.WeightedModule, /) -> bool:
-        if isinstance(layer, fl.Linear):
-            return layer.in_features == self.in_features and layer.out_features == self.out_features
-        return False
+        return (
+            isinstance(layer, fl.Linear)
+            and layer.in_features == self.in_features
+            and layer.out_features == self.out_features
+        )
 
 
 class Conv2dLora(Lora[fl.Conv2d]):
