@@ -104,6 +104,8 @@ class Chain(ContextModule):
                 for module in modules:
                     print(module.parent)
                     print(self)
+                    print(self == module.parent)
+
                     print((not isinstance(module, ContextModule))
                     or (not module._can_refresh_parent)
                     or (module.parent is None)
