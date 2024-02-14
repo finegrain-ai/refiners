@@ -546,6 +546,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
+        print("image encoder")
         image_encoder_cls = DINOv2_base
         if self.config.adapter.image_encoder_type == "dinov2_vitl14_reg4":
             image_encoder_cls = DINOv2_large_reg
