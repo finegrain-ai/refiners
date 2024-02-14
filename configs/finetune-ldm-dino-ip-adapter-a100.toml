@@ -83,10 +83,9 @@ download_images = true
 save_path = "/home/isamu/unsplash_pre_encode_15k"
 dataset_length = 15000
 
-
-# [checkpointing]
-# save_folder = "/home/isamu/checkpoints"
-# save_interval = "1000:step"
+[checkpointing]
+save_folder = "/home/isamu/checkpoints"
+save_interval = "1000:step"
 
 [test_ldm]
 num_inference_steps = 30
