@@ -57,7 +57,7 @@ from refiners.training_utils.latent_diffusion import (
     filter_image,
 )
 from refiners.training_utils.trainer import register_model, Trainer, register_callback
-from refiners.training_utils.wandb import WandbLoggable, WandbMixin
+from refiners.training_utils.wandb import WandbLoggable, WandbMixin, WandbConfig
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 
@@ -65,7 +65,7 @@ from refiners.fluxion.utils import load_from_safetensors
 Image.MAX_IMAGE_PIXELS = 200_000_000
 
 
-class AdapterConfig(BaseModel):
+class AdapterConfig(ModelConfig):
     """Configuration for the IP adapter."""
 
     image_encoder_type: str
@@ -148,8 +148,14 @@ class AdapterLatentDiffusionConfig(BaseConfig):
 
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
-    adapter: AdapterConfig
     test_ldm: TestIPDiffusionConfig
+    adapter: AdapterConfig
+    unet: ModelConfig
+    lda: ModelConfig
+    text_encoder: ModelConfig
+    image_proj: ModelConfig
+    image_encoder: ModelConfig
+    wandb: WandbConfig
 
 
 @dataclass
