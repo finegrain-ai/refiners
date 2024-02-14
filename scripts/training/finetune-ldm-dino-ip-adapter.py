@@ -502,6 +502,11 @@ class IPDataset(Dataset[IPBatch]):
         data = self.transform(data)  # type: ignore
         return data
 
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+
+class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch], WandbMixin):
     def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
         latents = cat(tensors=[item.latent for item in batch])
         text_embeddings = cat(tensors=[item.text_embedding for item in batch])
@@ -511,12 +516,8 @@ class IPDataset(Dataset[IPBatch]):
             text_embedding=text_embeddings,
             image_embedding=image_embeddings,
         )
-
     def __len__(self) -> int:
         return len(self.dataset)
-
-
-class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatch], WandbMixin):
     @register_model()
     def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
         return SD1Autoencoder(
@@ -585,7 +586,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return ip_adapter
 
     @cached_property
-    def ddpm_scheduler(self) -> DDPM:
+    def ddpm_solver(self) -> DDPM:
         return DDPM(
             num_inference_steps=1000,  # FIXME: harcoded value
             device=self.device,
@@ -593,7 +594,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
-        return exp(self.ddpm_scheduler.signal_to_noise_ratios) ** 2
+        return exp(self.ddpm_solver.signal_to_noise_ratios) ** 2
 
 
     def load_dataset(self) -> IPDataset:
@@ -605,7 +606,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             b=self.config.ldm.max_step,
         )
         self.current_step = random_step
-        return self.ddpm_scheduler.timesteps[random_step].unsqueeze(dim=0)
+        return self.ddpm_solver.timesteps[random_step].unsqueeze(dim=0)
 
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
@@ -637,9 +638,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         if input_perturbation > 0:
             new_noise = noise + input_perturbation * randn_like(noise)
         if input_perturbation > 0:
-            noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=new_noise, step=self.current_step)
+            noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=new_noise, step=self.current_step)
         else:
-            noisy_latents = self.ddpm_scheduler.add_noise(x=latents, noise=noise, step=self.current_step)
+            noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
 
         # get prediction from unet
         prediction = self.unet(noisy_latents)
@@ -671,7 +672,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             unet=self.unet,
             lda=self.lda,
             clip_text_encoder=self.text_encoder,
-            scheduler=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
+            solver=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
         )
         self.adapter.scale = self.config.adapter.inference_scale

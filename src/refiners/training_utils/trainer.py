@@ -96,23 +96,6 @@ Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
-class _Dataset(Dataset[Batch]):
-    """
-    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
-    """
-
-    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
-        assert length > 0, "Dataset length must be greater than 0."
-        self.length = length
-        self.get_item = get_item
-
-    def __getitem__(self, index: int) -> Batch:
-        return self.get_item(index)
-
-    def __len__(self) -> int:
-        return self.length
-
-
 @dataclass
 class ModelItem:
     name: str
@@ -353,15 +336,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
         return lr_scheduler
 
-    @abstractmethod
-    def get_item(self, index: int) -> Batch:
-        """
-        Returns a batch of data.
-
-        This function is used by the dataloader to fetch a batch of data.
-        """
-        ...
-
     @abstractproperty
     def dataset_length(self) -> int:
         """
@@ -381,12 +355,13 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """
         ...
 
+    @abstractmethod
+    def load_dataset(self) -> Dataset[Batch]:
+        ...
+
     @cached_property
     def dataset(self) -> Dataset[Batch]:
-        """
-        Returns the dataset constructed with the `get_item` method.
-        """
-        return _Dataset(get_item=self.get_item, length=self.dataset_length)
+        return self.load_dataset()
 
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
