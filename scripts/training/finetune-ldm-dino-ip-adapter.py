@@ -594,9 +594,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
         ip_adapter.requires_grad_(True)
         self.unet.requires_grad_(False)
-
         ip_adapter.inject()
-        ip_adapter.to(self.device, float32)
+        for sub_adapter in ip_adapter.sub_adapters:
+            sub_adapter.to(self.device, float32)
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
@@ -604,8 +604,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
-        ip_adapter.to(self.device, dtype=self.dtype)
-        self.unet = self.unet.to(self.device, dtype=self.dtype)
         return ip_adapter
 
     @cached_property
