@@ -721,7 +721,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
-                x = randn(1, 4, 64, 64, device=self.device)
+                x = randn(1, 4, 64, 64, device=self.device, dtype=self.dtype)
                 self.adapter.set_image_embedding(image_embedding)
                 for step in sd.steps:
                     x = sd(
