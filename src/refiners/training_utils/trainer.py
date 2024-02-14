@@ -113,7 +113,7 @@ def register_model():
     def decorator(func: Callable[[Any, ModelConfigT], ModuleT]) -> ModuleT:
         @wraps(func)
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
-            print("config", config)
+            print("config", config, type(config))
             name = func.__name__
             model = func(self, config)
             if config.checkpoint is not None:
