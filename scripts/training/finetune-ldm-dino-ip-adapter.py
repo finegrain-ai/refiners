@@ -599,7 +599,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
-        for param in image_proj.parameters():
+        for param in ip_adapter.parameters():
             if param.requires_grad is not None:
                 i += 1
         logger.info(f"Initialized {i} modules in ip adapter")
