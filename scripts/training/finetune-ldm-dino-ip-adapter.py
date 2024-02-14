@@ -572,7 +572,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for param in image_proj.parameters():
             if param.requires_grad:
                 i += 1
-        logger.info(f"Initialized {i} modules in image_proj")
+        logger.info(f"Initialized {i} parameters in image_proj")
         return image_proj
 
     @register_model()
@@ -603,7 +603,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for param in ip_adapter.parameters():
             if param.requires_grad:
                 i += 1
-        logger.info(f"Initialized {i} modules in ip adapter")
+        logger.info(f"Initialized {i} parameters in ip adapter")
         return ip_adapter
 
     @cached_property

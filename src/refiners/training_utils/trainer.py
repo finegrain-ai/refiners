@@ -180,6 +180,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             evaluation_interval=self.config.training.evaluation_interval,
             gradient_accumulation=self.config.training.gradient_accumulation,
             lr_scheduler_interval=self.config.scheduler.update_interval,
+            checkpoint_interval=self.config.training.checkpoint_interval,
             verbose=config.verbose,
         )
 
