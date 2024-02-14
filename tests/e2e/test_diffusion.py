@@ -257,7 +257,7 @@ def controllora_sdxl_config(
         config_name: ControlLoraResolvedConfig(
             scale=config.scale,
             condition_image=Image.open(ref_path / config.condition_path).convert("RGB"),
-            weights_path=test_weights_path / "control_lora" / config.weights_path,
+            weights_path=test_weights_path / "control-loras" / config.weights_path,
         )
         for config_name, config in configs.items()
     }
@@ -1155,7 +1155,7 @@ def test_diffusion_controlnet_stack(
 
 
 @no_grad()
-def test_diffusion_sdxl_controllora(
+def test_diffusion_sdxl_control_lora(
     controllora_sdxl_config: tuple[Image.Image, dict[str, ControlLoraResolvedConfig]],
     sdxl_ddim_lda_fp16_fix: StableDiffusion_XL,
 ) -> None:
