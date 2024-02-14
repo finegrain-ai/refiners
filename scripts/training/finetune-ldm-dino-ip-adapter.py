@@ -564,7 +564,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias
-        )
+        ).to(device=self.device, dtype=self.dtype)
         for module in image_proj.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         return image_proj
@@ -585,7 +585,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
-        )
+        ).to(device=self.device, dtype=self.dtype)
         ip_adapter.inject()
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
