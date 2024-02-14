@@ -164,7 +164,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             evaluation_interval=config.training.evaluation_interval,
             gradient_accumulation=config.training.gradient_accumulation,
             lr_scheduler_interval=config.scheduler.update_interval,
-            checkpointing_save_interval=config.training.save_interval,
+            checkpoint_interval=config.training.checkpoint_interval,
         )
         self.batch_time_m = AverageMeter()
         self.forward_time_m = AverageMeter()
