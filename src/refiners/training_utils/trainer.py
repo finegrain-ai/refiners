@@ -162,12 +162,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.backprop_time_m = AverageMeter()
         self.data_time_m = AverageMeter()
         self.global_step: int = 0
-        print("Loading models")
         self._load_models()
         # load models before loading callbacks so that
         # dataset doesn't get loaded yet so we can do pre-encoding
         # the problem here is the on_init_begin and on_init_end becomes useless
-        print("Loading callbacks")
 
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
@@ -500,12 +498,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             if not isinstance(config, ModelConfig):
                 continue
             try:
-                print("getting attr")
                 registered_model = getattr(self, name)
             except AttributeError:
                 raise ValueError(
                     f"Model {name} is in the config but not registered in the Trainer. Create a method with the @register_model decorator."
                 )
             assert callable(registered_model)
-            print("calling model")
             registered_model(config)

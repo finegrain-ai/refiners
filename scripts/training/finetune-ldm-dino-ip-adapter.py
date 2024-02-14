@@ -546,7 +546,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
-        print("image encoder")
         image_encoder_cls = DINOv2_base
         if self.config.adapter.image_encoder_type == "dinov2_vitl14_reg4":
             image_encoder_cls = DINOv2_large_reg
@@ -562,7 +561,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
-        print("image proj")
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=Device("cpu"), dtype=float32
