@@ -175,6 +175,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_init_begin")
         self._load_models()
         self._call_callbacks(event_name="on_init_end")
+        print("loaded models")
         self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
 
     @register_callback()
