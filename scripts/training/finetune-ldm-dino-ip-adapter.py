@@ -704,23 +704,17 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         # log images to wandb
-        self.log(data=images)
+        self.wandb_log(data=images)
         self.adapter.scale = self.config.adapter.scale
-    @register_callback()
-    def compute_grad_norms(self, config: CallbackConfig) -> ComputeGradNormCallback:
-        return ComputeGradNormCallback()
-    @register_callback()
-    def compute_parm_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
-        return ComputeParamNormCallback()
-    @register_callback()
-    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
-        return SaveAdapterCallback()
     def __init__(
         self,
         config: AdapterLatentDiffusionConfig,
-        callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         # if initializing after, the on_init_end methods do not get called for the extended callbacks
+        # hacky method for now
+        self.callbacks["compute_grad_norm"] = ComputeGradNormCallback()
+        self.callbacks["compute_param_norm"] = ComputeParamNormCallback()
+        self.callbacks["save_adapter"] = SaveAdapterCallback()
         super().__init__(config=config)
 
 
@@ -733,12 +727,12 @@ class ComputeGradNormCallback(Callback[AdapterLatentDiffusionTrainer]):
                 if param.grad is not None:
                     grads = param.grad.detach().data
                     grad_norm = (grads.norm(p=2) / grads.numel()).item()
-                    trainer.log(data={"grad_norm/" + name: grad_norm})
+                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
             for name, param in trainer.image_proj.named_parameters():
                 if param.grad is not None:
                     grads = param.grad.detach().data
                     grad_norm = (grads.norm(p=2) / grads.numel()).item()
-                    trainer.log(data={"grad_norm/" + name: grad_norm})
+                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
         return super().on_backward_end(trainer)
 
 

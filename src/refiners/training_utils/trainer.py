@@ -433,6 +433,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 self._call_callbacks(event_name="on_lr_scheduler_step_end")
             if self.clock.is_evaluation_step:
                 self.evaluate()
+            if sself.clock.is_checkpointing_step:
+                self._call_callbacks(event_name="on_checkpoint_save")
             self.current_loss[:] = 0
 
     def step(self, batch: Batch) -> tuple[int, int]:
