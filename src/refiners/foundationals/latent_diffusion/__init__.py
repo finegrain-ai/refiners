@@ -21,6 +21,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     SDXLUNet,
     StableDiffusion_XL,
 )
+from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 
 __all__ = [
     "StableDiffusion_1",
@@ -39,4 +40,5 @@ __all__ = [
     "LatentDiffusionAutoencoder",
     "SDFreeUAdapter",
     "StableDiffusion_XL",
+    "StyleAlignedAdapter",
 ]
