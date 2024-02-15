@@ -1,3 +1,4 @@
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.control_lora import ControlLora, ControlLoraAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt import SDXLIPAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import SDXLAutoencoder, StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.t2i_adapter import SDXLT2IAdapter
@@ -11,4 +12,6 @@ __all__ = [
     "SDXLAutoencoder",
     "SDXLIPAdapter",
     "SDXLT2IAdapter",
+    "ControlLora",
+    "ControlLoraAdapter",
 ]
