@@ -11,6 +11,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 from refiners.fluxion.adapters.histogram import (
+    HistogramDistance,
     HistogramExtractor
 )
 from PIL import Image
@@ -42,6 +43,7 @@ from torch.utils.data import Dataset
 class ColorTrainerEvaluationConfig(TestDiffusionBaseConfig):
     db_indexes: list[int]
     batch_size: int = 1
+    color_bits: int = 8
 
 class ColorTrainerConfig(FinetuneLatentDiffusionBaseConfig):
     evaluation: ColorTrainerEvaluationConfig
@@ -61,12 +63,15 @@ class GridEvalDataset(Generic[PromptType], Dataset[PromptType]):
         self.hf_dataset = hf_dataset
         self.source_prompts = source_prompts
         self.text_encoder = text_encoder
-        self.text_embeddings : list[Tensor] = [self.text_encoder(prompt) for prompt in source_prompts]
+        
+        txt_emb = [self.text_encoder(prompt).cpu() for prompt in source_prompts]
+        self.text_embeddings : list[Tensor] = txt_emb
 
     def __len__(self):
         return len(self.db_indexes) * len(self.source_prompts)
 
     def __getitem__(self, index: int) -> PromptType:
+        
         db_index = self.db_indexes[index // len(self.source_prompts)]
         source_prompt = self.source_prompts[index % len(self.source_prompts)]
         batch = self.hf_dataset[db_index]
@@ -143,6 +148,10 @@ class AbstractColorTrainer(
             
         return palette_img
 
+    @cached_property
+    def histogram_distance(self) -> HistogramDistance:
+        return HistogramDistance(color_bits=self.config.evaluation.color_bits)
+    
     @scoped_seed(5)
     def compute_batch_evaluation(self, batch: PromptType, same_seed: bool = True) -> ResultType:
         batch_size = len(batch.source_prompts)
@@ -240,7 +249,7 @@ class AbstractColorTrainer(
     
     @cached_property
     def histogram_extractor(self) -> HistogramExtractor:
-        return HistogramExtractor(color_bits=self.config.histogram_auto_encoder.color_bits)
+        return HistogramExtractor(color_bits=self.config.evaluation.color_bits)
 
 
     @cached_property

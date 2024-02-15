@@ -175,10 +175,20 @@ class HistogramDistance(fl.Chain):
             "chi_square": self.chi_square(x, y),
             "intersection": self.intersection(x, y),
             "hellinger": self.hellinger(x, y),
-            "kl_div": self.kl_div(log, y)
-            # "emd": self.emd(x, y)
+            "kl_div": self.kl_div(log, y),
+            "emd": self.emd(x, y)
         }
-
+    def metrics(self, x: Tensor, y: Tensor, eps: float = 1e-7) -> dict[str, Tensor]:
+        
+        return {
+            "mse": self.mse(x, y),
+            "correlation": self.correlation(x, y),
+            "chi_square": self.chi_square(x, y),
+            "intersection": self.intersection(x, y),
+            "hellinger": self.hellinger(x, y),
+            "kl_div": self.kl_div((x+eps).log(), y),
+            "emd": self.emd(x, y)
+        }
 class HistogramExtractor(fl.Chain):
     def __init__(
         self,

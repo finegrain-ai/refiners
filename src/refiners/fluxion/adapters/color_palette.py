@@ -220,7 +220,6 @@ class ColorPaletteExtractor:
         pixels = image_np.reshape(-1, 3)
         return self.from_pixels(pixels, size)
     def from_pixels(self, pixels: np.ndarray, size: int | None = None) -> ColorPalette:
-        print("pixels.shape", pixels.shape)
         kmeans = KMeans(n_clusters=size).fit(pixels) # type: ignore 
         counts = np.unique(kmeans.labels_, return_counts=True)[1] # type: ignore
         palette : ColorPalette = []
