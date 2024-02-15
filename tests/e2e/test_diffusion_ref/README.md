@@ -56,6 +56,7 @@ Special cases:
     - `expected_controllora_PyraCanny.png`
     - `expected_controllora_PyraCanny+CPDS.png`
     - `expected_controllora_disabled.png`
+    - `expected_style_aligned.png`
 
 ## Other images
 
