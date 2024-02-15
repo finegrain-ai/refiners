@@ -52,9 +52,9 @@ doc = [
     "mkdocs-literate-nav>=0.6.1",
 ]
 palette = [
-    "pykeops>=0.6.1",
-    "matplotlib>=0.6.1",
-    "geomloss"
+    "pykeops>=2.2.2",
+    "matplotlib>=3.8.2",
+    "geomloss>=0.2.6"
 ]
 
 
