@@ -24,8 +24,7 @@ training = [
     "loguru>=0.7.2",
     "wandb>=0.16.0",
     "datasets>=2.15.0",
-    "tomli>=2.0.1",
-    "scikit-learn[training]>=1.4.0"
+    "tomli>=2.0.1"
 ]
 test = [
     "diffusers>=0.26.1",

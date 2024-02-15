@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Path to the directory containing the config files
-config_dir="./configs/remote/scheduled/"
+config_dir="./configs/remote/scheduled"
 prefix="finetune-"
 script="./scripts/training/train-color-palette.py"
 # Log file path

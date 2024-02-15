@@ -1,6 +1,6 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "offline" # "online", "offline", "disabled"
+mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
 name = "weighted-palette"
