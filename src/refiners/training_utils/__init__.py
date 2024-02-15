@@ -8,11 +8,11 @@ from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.config import (
     BaseConfig,
+    LRSchedulerConfig,
+    LRSchedulerType,
     ModelConfig,
     OptimizerConfig,
     Optimizers,
-    SchedulerConfig,
-    SchedulerType,
     TrainingConfig,
 )
 from refiners.training_utils.gradient_clipping import GradientClippingConfig
@@ -48,11 +48,11 @@ __all__ = [
     "CallbackConfig",
     "WandbMixin",
     "WandbConfig",
-    "SchedulerConfig",
+    "LRSchedulerConfig",
     "OptimizerConfig",
     "TrainingConfig",
     "ClockConfig",
     "GradientClippingConfig",
     "Optimizers",
-    "SchedulerType",
+    "LRSchedulerType",
 ]
