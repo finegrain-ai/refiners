@@ -13,7 +13,7 @@ lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train 
 color_palette_encoder = {train = true}
 
 [adapters]
-color_palette_adapter = {checkpoint = "./tmp/converted-mlp-step4998.safetensors"}
+color_palette_adapter = {checkpoint = "./tmp/mlp-step4998.safetensors"}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
