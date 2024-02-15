@@ -18,7 +18,7 @@ loss = "kl_div"
 histogram_auto_encoder = {train = true, checkpoint = "tmp/step1900.safetensors"}
 
 [training]
-duration = "2:epoch"
+duration = "10:epoch"
 seed = 0
 gpu_index = 1
 batch_size = 8

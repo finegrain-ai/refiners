@@ -3,14 +3,14 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histo-autoencoder"
-name = "4b-4_8-cube2-b8-lr5e-3-logits"
-tags = ["autoencoder", "4bits"]
+name = "5b-4_8-cube2-b8-lr5e-3-logits"
+tags = ["autoencoder", "6bits", "64x4-emb"]
 
 [histogram_auto_encoder]
 latent_dim = 4
-resnet_sizes = [2, 2, 2, 4]
-n_down_samples = 3
-color_bits = 4
+resnet_sizes = [4, 4, 8, 8, 16]
+n_down_samples = 4
+color_bits = 6
 num_groups = 1
 loss = "kl_div"
 

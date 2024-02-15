@@ -530,7 +530,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         else:
             self.checkpoints_save_folder = None
             logger.info("Checkpointing disabled: configure `save_folder` to turn it on.")
-
+        
     @abstractmethod
     def load_models(self) -> dict[str, fl.Module]:
         ...

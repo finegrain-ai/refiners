@@ -1,7 +1,7 @@
 from typing import Any, List, TypeVar
 from refiners.foundationals.dinov2.vit import FeedForward
 
-from torch import ge, isnan, min, max, log, Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like, float32
+from torch import rand, ge, isnan, min, max, log, Tensor, sort, flatten, cat, device as Device, dtype as DType, histogramdd, histogram, nn, stack, zeros_like, float32
 from torch.nn import init, L1Loss
 from torch.nn.functional import mse_loss as _mse_loss, kl_div as _kl_div
 
@@ -15,6 +15,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet import SDX
 from PIL import Image
 from refiners.fluxion.utils import images_to_tensor
 from refiners.foundationals.clip.common import PositionalEncoder, FeedForward
+from geomloss import SamplesLoss
 
 def images_to_histo_channels(images: List[Image.Image], color_bits: int = 8) -> List[Tensor]:
     img_tensor = images_to_tensor(images)
@@ -105,6 +106,19 @@ class ColorLoss(fl.Module):
             self.l1_loss(histo_chan, image_histo_channels[i]) for i, histo_chan in enumerate(histo_channels)
         ]
 
+def sample_points(histogram: Tensor, num_samples: int = 1000, color_bits : int= 4) -> Tensor:
+    histo = histogram.reshape(histogram.shape[0], -1)
+    num_bins = histo.shape[1]
+    cube_size = histogram.shape[1]
+    cdf = histo.cumsum(dim=1)
+    cdf = cdf / cdf[:, -1].unsqueeze(1)
+    uniform_samples = rand(num_samples, num_bins, device=histogram.device, dtype=histogram.dtype)
+    onedim = (uniform_samples.unsqueeze(0) < cdf.unsqueeze(1)).int().argmax(dim=2)
+    cubed_dim = stack([onedim // cube_size // cube_size, (onedim // cube_size) % cube_size, onedim % cube_size], -1)
+    return cubed_dim.float()
+
+from math import sqrt
+
 class HistogramDistance(fl.Chain):
     def __init__(
         self,
@@ -117,7 +131,14 @@ class HistogramDistance(fl.Chain):
         return _mse_loss(x, y)
     
     def emd(self, x: Tensor, y: Tensor) -> Tensor:
-        return _mse_loss(x, y) 
+        color_size = x.shape[1]
+        emd_loss = SamplesLoss("sinkhorn", p=2, blur=1.0, diameter=sqrt(3*color_size*color_size))
+
+        s_y = sample_points(x)
+        s_x = sample_points(y)
+        emd = emd_loss(s_x, s_y)
+        print(f"EMD: {emd.mean()}, shape: {emd.shape}")
+        return emd.mean()
     
     def correlation(self, x: Tensor, y: Tensor) -> Tensor:
         n = (2 ** self.color_bits) ** 3
@@ -147,6 +168,7 @@ class HistogramDistance(fl.Chain):
     
     def metrics_log(self, log: Tensor, y: Tensor) -> dict[str, Tensor]:
         x = log.exp()
+        
         return {
             "mse": self.mse(x, y),
             "correlation": self.correlation(x, y),
@@ -154,6 +176,7 @@ class HistogramDistance(fl.Chain):
             "intersection": self.intersection(x, y),
             "hellinger": self.hellinger(x, y),
             "kl_div": self.kl_div(log, y)
+            # "emd": self.emd(x, y)
         }
 
 class HistogramExtractor(fl.Chain):

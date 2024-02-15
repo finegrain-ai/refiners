@@ -83,10 +83,8 @@ def test_histogram_distance() -> None:
 
 def test_histogram_emd() -> None:
     distance = HistogramDistance()
-    color_bits = 3
-    color_size = 2**color_bits
-    batch_size = 1
-    
+    color_bits = 1
+
     img_black_normalized = torch.zeros((2, 3, 224, 224)) 
     img_white_normalized = torch.ones((2, 3, 224, 224)) 
     img_gray_normalized = torch.ones((2, 3, 224, 224))*0.5
@@ -106,8 +104,8 @@ def test_histogram_emd() -> None:
     dist_emd_wg = distance.emd(histo_white, histo_gray)
     dist_emd_bg = distance.emd(histo_black, histo_gray)
 
-    assert abs(dist_emd_bw - dist_emd_bg) > 1e-1, "distance between himself should be 0.0"
-    assert abs(dist_emd_bw - dist_emd_wg) < 1e-6, "distance between himself should be 0.0"
+    assert abs(dist_emd_bw - dist_emd_bg).ge(1e-1).all(), "distance between black and white should be greater than distance between black and gray"
+    assert abs(dist_emd_bw - dist_emd_wg).le(1e-6).all(), "distance between black and gray should be same than distance between white and gray"
     
     
 def test_histogram_encoder() -> None:
