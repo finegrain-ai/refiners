@@ -8,7 +8,7 @@ tags = ["autoencoder", "4bits"]
 
 [histogram_auto_encoder]
 latent_dim = 4
-resnet_sizes = [2, 2, 2, 4]
+resnet_sizes = [32, 32, 32, 32]
 n_down_samples = 3
 color_bits = 4
 num_groups = 1
