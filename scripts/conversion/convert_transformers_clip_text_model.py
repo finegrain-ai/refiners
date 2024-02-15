@@ -46,7 +46,7 @@ def setup_converter(args: Args, with_projection: bool = False) -> ModelConverter
         use_quick_gelu=use_quick_gelu,
     )
     if architecture == "CLIPTextModelWithProjection":
-        target.append(module=fl.Linear(in_features=embedding_dim, out_features=projection_dim, bias=False))
+        target.append(module=fl.Linear(in_features=embedding_dim, out_features=projection_dim, use_bias=False))
     text = "What a nice cat you have there!"
     tokenizer = target.ensure_find(CLIPTokenizer)
     tokens = tokenizer(text)

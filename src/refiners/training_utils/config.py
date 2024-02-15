@@ -28,7 +28,10 @@ class TrainingConfig(BaseModel):
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    checkpoint_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
+    mixed_precision: str = "no"
+    dataset_workers: int = 1
 
     model_config = ConfigDict(extra="forbid")
 
@@ -77,6 +80,7 @@ class SchedulerConfig(BaseModel):
     min_lr: float | list[float] = 0
     max_lr: float | list[float] = 0
     eta_min: float = 0
+    max_steps: int = 2000
 
     model_config = ConfigDict(extra="forbid")
 
@@ -155,6 +159,8 @@ class ModelConfig(BaseModel):
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
+    checkpoint: str | None = None
+
 
     model_config = ConfigDict(extra="forbid")
 

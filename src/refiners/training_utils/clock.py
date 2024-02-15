@@ -27,6 +27,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         gradient_accumulation: TimeValue,
         evaluation_interval: TimeValue,
         lr_scheduler_interval: TimeValue,
+        checkpoint_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
         self.dataset_length = dataset_length
@@ -34,6 +35,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.training_duration = training_duration
         self.gradient_accumulation = gradient_accumulation
         self.evaluation_interval = evaluation_interval
+        self.checkpoint_interval = checkpoint_interval
         self.lr_scheduler_interval = lr_scheduler_interval
         self.verbose = verbose
         self.num_batches_per_epoch = dataset_length // batch_size
@@ -115,6 +117,11 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         return self.convert_time_unit_to_steps(
             number=self.evaluation_interval["number"], unit=self.evaluation_interval["unit"]
         )
+    @cached_property
+    def checkpoint_interval_steps(self) -> int:
+        return self.convert_time_unit_to_steps(
+            number=self.checkpoint_interval["number"], unit=self.checkpoint_interval["unit"]
+        )
 
     @cached_property
     def lr_scheduler_interval_steps(self) -> int:
@@ -137,6 +144,10 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     @property
     def is_evaluation_step(self) -> bool:
         return self.step % self.evaluation_interval_steps == 0
+
+    @property
+    def is_checkpointing_step(self) -> bool:
+        return self.step % self.checkpoint_interval_steps == 0
 
     def log(self, message: str, /) -> None:
         if self.verbose:

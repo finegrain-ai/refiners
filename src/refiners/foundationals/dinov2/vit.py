@@ -262,6 +262,7 @@ class ViT(fl.Chain):
         """
         num_patches = image_size // patch_size
         self.embedding_dim = embedding_dim
+        self.output_dim = embedding_dim
         self.patch_size = patch_size
         self.image_size = image_size
         self.num_layers = num_layers

@@ -73,3 +73,6 @@ class Callback(Generic[T]):
 
     def on_lr_scheduler_step_end(self, trainer: T) -> None:
         ...
+
+    def on_checkpoint_save(self, trainer: T) -> None:
+        ...

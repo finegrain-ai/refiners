@@ -99,7 +99,6 @@ class Chain(ContextModule):
                 or (module.parent is None)
                 or (module.parent == self)
             ), f"{module.__class__.__name__} already has parent {module.parent.__class__.__name__}"
-
         self._regenerate_keys(modules)
         self._reset_context()
 

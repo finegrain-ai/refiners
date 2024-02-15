@@ -5,7 +5,20 @@ from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
 from loguru import logger
-from torch import Tensor, device as Device, dtype as DType, nn
+from torch import (
+    Tensor,
+    cuda,
+    device as Device,
+    get_rng_state,
+    set_rng_state,
+    stack,
+    dtype as DType,
+    float32,
+    bfloat16,
+    float16,
+    compile,
+    nn
+)
 from torch.autograd import backward
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
@@ -22,6 +35,7 @@ from torch.optim.lr_scheduler import (
     StepLR,
 )
 from torch.utils.data import DataLoader, Dataset
+from torch.cuda.amp import GradScaler
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
@@ -38,6 +52,23 @@ from refiners.training_utils.common import (
 )
 from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val: float = 0
+        self.avg: float = 0
+        self.sum: float = 0
+        self.count: int = 0
+
+    def update(self, val: float, n: int = 1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
 
 class WarmupScheduler(LRScheduler):
@@ -65,23 +96,6 @@ Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
-class _Dataset(Dataset[Batch]):
-    """
-    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
-    """
-
-    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
-        assert length > 0, "Dataset length must be greater than 0."
-        self.length = length
-        self.get_item = get_item
-
-    def __getitem__(self, index: int) -> Batch:
-        return self.get_item(index)
-
-    def __len__(self) -> int:
-        return self.length
-
-
 @dataclass
 class ModelItem:
     name: str
@@ -101,6 +115,8 @@ def register_model():
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
+            if config.checkpoint is not None:
+                model.load_from_safetensors(config.checkpoint)
             model = model.to(self.device, dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
@@ -141,11 +157,20 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._models: ModelRegistry = {}
         self._callbacks: CallbackRegistry = {}
         self.config = config
+        self.batch_time_m = AverageMeter()
+        self.forward_time_m = AverageMeter()
+        self.backprop_time_m = AverageMeter()
+        self.data_time_m = AverageMeter()
+        self.global_step: int = 0
+        self._load_models()
+        # load models before loading callbacks so that
+        # dataset doesn't get loaded yet so we can do pre-encoding
+        # the problem here is the on_init_begin and on_init_end becomes useless
+
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
-        self._load_models()
         self._call_callbacks(event_name="on_init_end")
-
+        self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
@@ -155,6 +180,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             evaluation_interval=self.config.training.evaluation_interval,
             gradient_accumulation=self.config.training.gradient_accumulation,
             lr_scheduler_interval=self.config.scheduler.update_interval,
+            checkpoint_interval=self.config.training.checkpoint_interval,
             verbose=config.verbose,
         )
 
@@ -182,6 +208,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
         logger.info(f"Using dtype: {dtype}")
         return dtype
+
+    @property
+    def parameters(self) -> list[nn.Parameter]:
+        """Returns a list of all parameters in all models"""
+        return [param for model in self.models.values() for param in model.parameters()]
 
     @property
     def learnable_parameters(self) -> list[nn.Parameter]:
@@ -229,11 +260,18 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def optimizer(self) -> Optimizer:
+        print("Optimizer found ", len(self.learnable_parameters), "number of params")
         formatted_param_count = human_readable_number(number=self.learnable_parameter_count)
         logger.info(f"Total number of learnable parameters in the model(s): {formatted_param_count}")
 
         optimizer = self.config.optimizer.get(params=self.optimizer_parameters)
         return optimizer
+
+    @cached_property
+    def scaler(self) -> GradScaler | None:
+        if self.config.training.mixed_precision == "no":
+            return None
+        return GradScaler()
 
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
@@ -293,15 +331,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
         return lr_scheduler
 
-    @abstractmethod
-    def get_item(self, index: int) -> Batch:
-        """
-        Returns a batch of data.
-
-        This function is used by the dataloader to fetch a batch of data.
-        """
-        ...
-
     @abstractproperty
     def dataset_length(self) -> int:
         """
@@ -321,17 +350,18 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """
         ...
 
+    @abstractmethod
+    def load_dataset(self) -> Dataset[Batch]:
+        ...
+
     @cached_property
     def dataset(self) -> Dataset[Batch]:
-        """
-        Returns the dataset constructed with the `get_item` method.
-        """
-        return _Dataset(get_item=self.get_item, length=self.dataset_length)
+        return self.load_dataset()
 
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
         return DataLoader(
-            dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=self.collate_fn
+            dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
         )
 
     @abstractmethod
@@ -345,41 +375,73 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        backward(tensors=scaled_loss)
-        self._call_callbacks(event_name="on_backward_end")
-        if self.clock.is_optimizer_step:
-            self._call_callbacks(event_name="on_optimizer_step_begin")
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-            self._call_callbacks(event_name="on_optimizer_step_end")
-        if self.clock.is_lr_scheduler_step:
-            self._call_callbacks(event_name="on_lr_scheduler_step_begin")
-            self.lr_scheduler.step()
-            self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        if self.clock.is_evaluation_step:
-            self.evaluate()
+        self.current_loss += scaled_loss
+        if self.global_step % self.clock.num_step_per_iteration == 0:
+            if self.scaler is not None:
+                self.scaler.scale(scaled_loss).backward()  # type: ignore
+            else:
+                backward(tensors=scaled_loss)
+            self._call_callbacks(event_name="on_backward_end")
+            if self.clock.is_optimizer_step:
+                self._call_callbacks(event_name="on_optimizer_step_begin")
+                if self.scaler is not None:
+                    # logic from accelerator
+                    scale_before = self.scaler.get_scale()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                    scale_after = self.scaler.get_scale()
+                    # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+                    if scale_after < scale_before:
+                        logger.info("Overflow in optimizer caused optimizer to skip")
+                else:
+                    self.optimizer.step()
+                self.optimizer.zero_grad()
+                self._call_callbacks(event_name="on_optimizer_step_end")
+            if self.clock.is_lr_scheduler_step:
+                self._call_callbacks(event_name="on_lr_scheduler_step_begin")
+                self.lr_scheduler.step()
+                self._call_callbacks(event_name="on_lr_scheduler_step_end")
+            if self.clock.is_evaluation_step:
+                self.evaluate()
+            if self.clock.is_checkpointing_step:
+                self._call_callbacks(event_name="on_checkpoint_save")
+            self.current_loss[:] = 0
 
-    def step(self, batch: Batch) -> None:
+    def step(self, batch: Batch) -> tuple[int, int]:
         """Perform a single training step."""
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
+        forward_time = self.clock.time_elapsed
+        self.forward_time_m.update(forward_time)
+        self.clock.start_timer()
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
+        backward_time = self.clock.time_elapsed
+        self.backprop_time_m.update(backward_time)
+        return forward_time, backward_time
 
     def epoch(self) -> None:
         """Perform a single epoch."""
+        self.clock.start_timer()
+        self.global_step = 1
         for batch in self.dataloader:
             if self.clock.done:
                 break
+            data_time = self.clock.time_elapsed
+            self.data_time_m.update(data_time)
+            self.clock.start_timer()
             self._call_callbacks(event_name="on_batch_begin")
-            self.step(batch=batch)
+            forward_time, backward_time = self.step(batch=batch)
+            self.clock.start_timer()
+            batch_time = data_time + forward_time + backward_time
+            self.batch_time_m.update(batch_time)
             self._call_callbacks(event_name="on_batch_end")
+            self.global_step += 1
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
         return instance.config.training.seed
-
     @scoped_seed(seed=get_training_seed)
     def train(self) -> None:
         """Train the model."""
@@ -414,6 +476,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             elif mode == "eval":
                 item.model.eval()
 
+    @scoped_seed(seed=get_training_seed)
     def _call_callbacks(self, event_name: str) -> None:
         for callback in self.callbacks.values():
             getattr(callback, event_name)(self)
@@ -430,7 +493,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 )
             assert callable(registered_callback)
             registered_callback(config)
-
+    @scoped_seed(seed=get_training_seed)
     def _load_models(self) -> None:
         for name, config in self.config:
             if not isinstance(config, ModelConfig):
