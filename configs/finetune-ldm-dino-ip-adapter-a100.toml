@@ -31,7 +31,7 @@ resolution = 518
 scale = 1.0
 inference_scale = 1.0
 use_pooled_text_embedding = false
-use_timestep_embedding = false
+use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
 initializer_range = 0.02
@@ -40,8 +40,8 @@ use_bias = true
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
 seed = 9752
-batch_size = 8
-gradient_accumulation = {"number" = 8, "unit" = "step"}
+batch_size = 20
+gradient_accumulation = {"number" = 1, "unit" = "step"}
 evaluation_interval = {"number" = 1000, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
