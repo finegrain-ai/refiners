@@ -59,6 +59,6 @@ caption_key = "ai_description"
 split = "train[:10]"
 
 [checkpointing]
-save_interval = "1000:step"
+save_interval = "100000:step"
 use_wandb = true
 
