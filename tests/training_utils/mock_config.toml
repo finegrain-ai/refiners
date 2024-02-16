@@ -1,6 +1,12 @@
-[models.mock_model]
+[mock_model]
 requires_grad = true
+use_activation = true
 
+[clock]
+verbose = false
+
+[gradient_clipping]
+clip_grad_norm = 1.0
 
 [training]
 duration = "100:epoch"
@@ -9,7 +15,6 @@ device = "cpu"
 dtype = "float32"
 batch_size = 4
 gradient_accumulation = "4:step"
-clip_grad_norm = 1.0
 evaluation_interval = "5:epoch"
 evaluation_seed = 1
 
@@ -17,10 +22,7 @@ evaluation_seed = 1
 optimizer = "SGD"
 learning_rate = 1
 
-[scheduler]
-scheduler_type = "ConstantLR"
+[lr_scheduler]
+type = "ConstantLR"
 update_interval = "1:step"
 warmup = "20:step"
-
-[dropout]
-dropout_probability = 0.0

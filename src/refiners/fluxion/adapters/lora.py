@@ -250,9 +250,11 @@ class LinearLora(Lora[fl.Linear]):
         )
 
     def is_compatible(self, layer: fl.WeightedModule, /) -> bool:
-        if isinstance(layer, fl.Linear):
-            return layer.in_features == self.in_features and layer.out_features == self.out_features
-        return False
+        return (
+            isinstance(layer, fl.Linear)
+            and layer.in_features == self.in_features
+            and layer.out_features == self.out_features
+        )
 
 
 class Conv2dLora(Lora[fl.Conv2d]):
@@ -435,3 +437,32 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
             lora = self.loras[name]
             self.remove(lora)
             return lora
+
+
+def auto_attach_loras(
+    loras: dict[str, Lora[Any]],
+    target: fl.Chain,
+    /,
+    exclude: list[str] | None = None,
+) -> list[str]:
+    """Auto-attach several LoRA layers to a Chain.
+
+    Args:
+        loras: A dictionary of LoRA layers associated to their respective key.
+        target: The target Chain.
+
+    Returns:
+        A list of keys of LoRA layers which failed to attach.
+    """
+    failed_keys: list[str] = []
+    for key, lora in loras.items():
+        if attached := lora.auto_attach(target, exclude=exclude):
+            adapter, parent = attached
+            if parent is None:
+                # `adapter` is already attached and `lora` has been added to it
+                continue
+            adapter.inject(parent)
+        else:
+            failed_keys.append(key)
+
+    return failed_keys
