@@ -383,12 +383,12 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         return self.ensure_find(ImageCrossAttention)
 
     @property
-    def image_key_projection(self) -> fl.Linear:
-        return self.image_cross_attention.layer(("Distribute", 1, "Linear"), fl.Linear)
+    def image_key_projection(self) -> fl.Sum:
+        return self.image_cross_attention.layer(("Distribute", 1, "Linear"), fl.Sum)
 
     @property
-    def image_value_projection(self) -> fl.Linear:
-        return self.image_cross_attention.layer(("Distribute", 2, "Linear"), fl.Linear)
+    def image_value_projection(self) -> fl.Sum:
+        return self.image_cross_attention.layer(("Distribute", 2, "Linear"), fl.Sum)
 
     @property
     def scale(self) -> float:
