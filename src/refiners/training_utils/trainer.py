@@ -33,7 +33,6 @@ from refiners.training_utils.callback import (
     ClockCallback,
     GradientNormClipping,
     GradientValueClipping,
-    MonitorTime,
 )
 from refiners.training_utils.config import BaseConfig, SchedulerType, TimeUnit, TimeValue
 from refiners.training_utils.dropout import DropoutCallback
@@ -314,7 +313,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             GradientValueClipping(),
             GradientNormClipping(),
             DropoutCallback(),
-            MonitorTime(),
         ]
 
         # look for any Callback that might be a property of the Trainer
