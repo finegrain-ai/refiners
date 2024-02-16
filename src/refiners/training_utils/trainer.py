@@ -145,6 +145,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_init_begin")
         self._load_models()
         self._call_callbacks(event_name="on_init_end")
+        self.global_step: int = 1
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
@@ -345,7 +346,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
         backward(tensors=scaled_loss)
-        if self.clock.step % self.clock.num_step_per_iteration == 0:
+        if self.global_step % self.clock.num_step_per_iteration == 0:
             self._call_callbacks(event_name="on_backward_end")
             if self.clock.is_optimizer_step:
                 self._call_callbacks(event_name="on_optimizer_step_begin")
@@ -369,12 +370,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def epoch(self) -> None:
         """Perform a single epoch."""
+        self.global_step = 1
         for batch in self.dataloader:
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_batch_begin")
             self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
+            self.global_step += 1
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
