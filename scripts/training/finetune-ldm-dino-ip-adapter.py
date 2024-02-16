@@ -596,10 +596,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             use_bias=self.config.adapter.use_bias,
         ).inject()
         for adapter in ip_adapter.sub_adapters:
-            adapter.image_key_projection.requires_grad_(True)
-            adapter.image_value_projection.requires_grad_(True)
-            adapter.image_key_projection.to(self.device, float32)
-            adapter.image_value_projection.to(self.device, float32)
+            adapter.image_cross_attention.requires_grad_(True)
+            adapter.image_cross_attention.to(self.device, float32)
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
@@ -608,8 +606,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
         for adapter in ip_adapter.sub_adapters:
-            adapter.image_key_projection.to(self.device, self.dtype)
-            adapter.image_value_projection.to(self.device, self.dtype)
+            adapter.image_cross_attention.to(self.device, self.dtype)
         return ip_adapter
 
     @cached_property
