@@ -63,6 +63,10 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             image_proj = get_sd1_image_proj(image_encoder, target, cross_attn_2d, fine_grained, use_bias)
         elif fine_grained:
             assert isinstance(image_proj, PerceiverResampler)
+        if fine_grained:
+            sequence_length = 16
+        else:
+            sequence_length = -1
 
         super().__init__(
             target=target,
@@ -75,4 +79,5 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             use_timestep_embedding=use_timestep_embedding,
             use_pooled_text_embedding=use_pooled_text_embedding,
             use_bias=use_bias,
+            sequence_length=sequence_length
         )

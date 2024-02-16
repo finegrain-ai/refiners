@@ -238,6 +238,11 @@ class PerceiverResampler(fl.Chain):
     def init_context(self) -> Contexts:
         return {"perceiver_resampler": {"x": None}}
 
+def expand_dim(x: Float[Tensor, "batch embed_dim"], sequence_length: int = -1) -> Float[Tensor, "batch seq_len embed_dim"]:
+    if sequence_length == -1:
+        return x
+    return x[:, None].repeat([1, sequence_length, 1])
+
 
 class ImageCrossAttention(fl.Chain):
     def __init__(
@@ -246,8 +251,10 @@ class ImageCrossAttention(fl.Chain):
         scale: float = 1.0,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
+        sequence_length: int = -1,
     ) -> None:
         self._scale = scale
+        self.sequence_length = sequence_length
         key_contexts: List[fl.Chain] = [
             fl.Chain(
                 fl.UseContext(context="ip_adapter", key="image_embedding"),
@@ -283,6 +290,7 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
                 )
             )
             query_contexts.append(
@@ -295,6 +303,7 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
                 )
             )
         if use_pooled_text_embedding:
@@ -308,6 +317,7 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
                 )
             )
             query_contexts.append(
@@ -320,6 +330,7 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
                 )
             )
 
@@ -338,7 +349,6 @@ class ImageCrossAttention(fl.Chain):
             ),
             fl.Multiply(self.scale),
         )
-
     @property
     def scale(self) -> float:
         return self._scale
@@ -356,6 +366,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         scale: float = 1.0,
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
+        sequence_length: int = -1,
     ) -> None:
         self._scale = scale
         with self.setup_adapter(target):
@@ -366,6 +377,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
                 scale=self.scale,
                 use_timestep_embedding=use_timestep_embedding,
                 use_pooled_text_embedding=use_pooled_text_embedding,
+                sequence_length=sequence_length
             )
             clone.replace(
                 old_module=scaled_dot_product,
@@ -443,6 +455,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
         use_bias: bool = True,
+        sequence_length: int = -1
     ) -> None:
         """Initialize the adapter.
 
@@ -475,6 +488,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 scale=scale,
                 use_timestep_embedding=use_timestep_embedding,
                 use_pooled_text_embedding=use_pooled_text_embedding,
+                sequence_length=sequence_length
             )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]

@@ -666,7 +666,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
-        print("setting image_embeddings", image_embedding.shape)
         self.adapter.set_image_embedding(image_embedding)
 
         # set text embeddings context
