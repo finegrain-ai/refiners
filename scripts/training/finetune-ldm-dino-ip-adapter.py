@@ -663,12 +663,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
-        print(latents.shape)
-        print(text_embeddings.shape)
-        print(image_embedding.shape)
 
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
+        print("setting image_embeddings", image_embedding.shape)
         self.adapter.set_image_embedding(image_embedding)
 
         # set text embeddings context
@@ -689,7 +687,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
 
         # get prediction from unet
-        print(noisy_latents.shape)
         prediction = self.unet(noisy_latents)
 
         # compute mse loss
