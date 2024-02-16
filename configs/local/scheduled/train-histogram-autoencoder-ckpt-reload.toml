@@ -15,10 +15,10 @@ num_groups = 4
 loss = "kl_div"
 
 [models]
-histogram_auto_encoder = {train = true, checkpoint = "tmp/ckpt-reload-step6000.safetensors"}
+histogram_auto_encoder = {train=true, checkpoint = "tmp/ckpt-reload-step6000.safetensors"}
 
 [training]
-duration = "10:epoch"
+duration = "20:epoch"
 seed = 0
 gpu_index = 1
 batch_size = 8

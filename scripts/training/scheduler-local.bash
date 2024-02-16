@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Path to the directory containing the config files
-config_dir="./configs/histogram-auto-encoder"
+config_dir="./configs/remote/scheduled"
 prefix=""
-script="./scripts/training/train-histogram-autoencoder.py"
+script="./scripts/training/train-color-palette.py"
 # Log file path
 log_file="./tmp/schedule-log.txt"
 

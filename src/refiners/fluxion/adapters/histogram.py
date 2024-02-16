@@ -137,7 +137,6 @@ class HistogramDistance(fl.Chain):
         s_y = sample_points(x)
         s_x = sample_points(y)
         emd = emd_loss(s_x, s_y)
-        print(f"EMD: {emd.mean()}, shape: {emd.shape}")
         return emd.mean()
     
     def correlation(self, x: Tensor, y: Tensor) -> Tensor:
