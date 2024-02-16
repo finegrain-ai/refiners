@@ -439,6 +439,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             forward_time, backward_time = self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
             batch_time = data_time + forward_time + backward_time
+            print(data_time, forward_time, backward_time, batch_time)
             self.batch_time_m.update(batch_time)
             self.global_step += 1
 
