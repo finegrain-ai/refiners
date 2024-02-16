@@ -4,6 +4,7 @@ from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
+import time
 from loguru import logger
 from torch import Tensor, device as Device, dtype as DType, nn
 from torch.autograd import backward
