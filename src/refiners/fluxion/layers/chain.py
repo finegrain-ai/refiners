@@ -897,6 +897,8 @@ class Sum(Chain):
                 output = layer_output if output is None else output + layer_output
             except:
                 print(layer_output.shape)
+                if output is not None:
+                    print(output.shape)
                 raise Exception()
         return output
 
