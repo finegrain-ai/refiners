@@ -685,6 +685,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
 
         # get prediction from unet
+        print(noisy_latents.shape)
         prediction = self.unet(noisy_latents)
 
         # compute mse loss
