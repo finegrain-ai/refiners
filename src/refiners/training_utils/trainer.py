@@ -4,6 +4,7 @@ from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
 from tqdm.auto import tqdm
 import torch
+import time
 from loguru import logger
 from torch import (
     Tensor,
@@ -406,36 +407,35 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             if self.clock.is_checkpointing_step:
                 self._call_callbacks(event_name="on_checkpoint_save")
 
-    def step(self, batch: Batch) -> tuple[int, int]:
+    def step(self, batch: Batch) -> tuple[float, float]:
         """Perform a single training step."""
+        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
-        forward_time = self.clock.time_elapsed
+        forward_time = time.time() - start
         self.forward_time_m.update(forward_time)
-        self.clock.start_timer()
+        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
-        backward_time = self.clock.time_elapsed
+        backward_time = time.time() - start
         self.backprop_time_m.update(backward_time)
         return forward_time, backward_time
 
     def epoch(self) -> None:
         """Perform a single epoch."""
-        self.clock.start_timer()
         self.global_step = 1
-        for batch in tqdm(self.dataloader):
+        start = time.time()
+        for batch in self.dataloader:
             if self.clock.done:
                 break
-            data_time = self.clock.time_elapsed
-            self.data_time_m.update(data_time)
-            self.clock.start_timer()
             self._call_callbacks(event_name="on_batch_begin")
+            data_time = time.time() - start
+            self.data_time_m.update(data_time)
             forward_time, backward_time = self.step(batch=batch)
-            self.clock.start_timer()
+            self._call_callbacks(event_name="on_batch_end")
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
-            self._call_callbacks(event_name="on_batch_end")
             self.global_step += 1
 
     @staticmethod
