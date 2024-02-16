@@ -145,7 +145,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_init_begin")
         self._load_models()
         self._call_callbacks(event_name="on_init_end")
-
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
@@ -346,18 +345,19 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
         backward(tensors=scaled_loss)
-        self._call_callbacks(event_name="on_backward_end")
-        if self.clock.is_optimizer_step:
-            self._call_callbacks(event_name="on_optimizer_step_begin")
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-            self._call_callbacks(event_name="on_optimizer_step_end")
-        if self.clock.is_lr_scheduler_step:
-            self._call_callbacks(event_name="on_lr_scheduler_step_begin")
-            self.lr_scheduler.step()
-            self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        if self.clock.is_evaluation_step:
-            self.evaluate()
+        if self.clock.step % self.clock.num_step_per_iteration == 0:
+            self._call_callbacks(event_name="on_backward_end")
+            if self.clock.is_optimizer_step:
+                self._call_callbacks(event_name="on_optimizer_step_begin")
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                self._call_callbacks(event_name="on_optimizer_step_end")
+            if self.clock.is_lr_scheduler_step:
+                self._call_callbacks(event_name="on_lr_scheduler_step_begin")
+                self.lr_scheduler.step()
+                self._call_callbacks(event_name="on_lr_scheduler_step_end")
+            if self.clock.is_evaluation_step:
+                self.evaluate()
 
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""
