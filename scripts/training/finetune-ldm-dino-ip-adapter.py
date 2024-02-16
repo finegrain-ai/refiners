@@ -19,7 +19,8 @@ from torch import (
     stack,
     randn_like,
     no_grad,
-    float32
+    autocast,
+    randint
 )
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
@@ -563,11 +564,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
-            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=float32
+            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=self.dtype
         )
         image_proj.requires_grad_(True)
-        for module in image_proj.modules():
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        device_str = str(self.device.type) + ":" + str(self.device.index)
+        with autocast(device_str, self.dtype):
+            for module in image_proj.modules():
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
         for param in image_proj.parameters():
             if param.requires_grad:
@@ -591,14 +594,16 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
-        )
-        ip_adapter.requires_grad_(True)
-        self.unet.requires_grad_(False)
-        ip_adapter.inject()
-        for sub_adapter in ip_adapter.sub_adapters:
-            sub_adapter.to(self.device, float32)
-        for module in ip_adapter.modules():
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        ).inject()
+        for adapter in ip_adapter.sub_adapters:
+            adapter.image_key_projection.requires_grad_(True)
+            adapter.image_key_projection.to(self.device, self.dtype)
+            adapter.image_value_projection.requires_grad_(True)
+            adapter.image_value_projection.to(self.device, self.dtype)
+        device_str = str(self.device.type) + ":" + str(self.device.index)
+        with autocast(device_str, self.dtype):
+            for module in ip_adapter.modules():
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
         for param in ip_adapter.parameters():
             if param.requires_grad:
@@ -621,14 +626,27 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def load_dataset(self) -> IPDataset:
         return IPDataset(trainer=self)
 
-    def sample_timestep(self) -> Tensor:
-        random_step = random.randint(
-            a=self.config.ldm.min_step,
-            b=self.config.ldm.max_step,
-        )
-        self.current_step = random_step
-        return self.ddpm_solver.timesteps[random_step].unsqueeze(dim=0)
+    def sample_timestep(self, batch_size: int, /) -> Tensor:
+        """Sample a timestep from a uniform distribution."""
+        assert isinstance(self, Trainer), "This mixin can only be used with a Trainer"
+        random_steps = randint(0, 1000, (batch_size,))
+        self.random_steps = random_steps
+        return self.ddpm_solver.timesteps[random_steps]
+    
 
+    def add_noise_to_latents(
+        self, latents: Tensor, noise: Tensor
+    ) -> Tensor:
+        """Add noise to latents."""
+        return cat(
+            [
+                self.ddpm_solver.add_noise(
+                    latents[i : i + 1], noise[i : i + 1], int(self.random_steps[i].item())
+                )
+                for i in range(latents.shape[0])
+            ],
+            dim=0,
+        )
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
             size=size,
@@ -650,7 +668,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
         # sample timestep and set unet timestep context
-        timestep = self.sample_timestep()
+        timestep = self.sample_timestep(latents.shape[0])
         self.unet.set_timestep(timestep=timestep)
 
         # sample noise and noisify the latents
@@ -658,10 +676,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         input_perturbation = self.config.ldm.input_perturbation
         if input_perturbation > 0:
             new_noise = noise + input_perturbation * randn_like(noise)
-        if input_perturbation > 0:
-            noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=new_noise, step=self.current_step)
+            noisy_latents = self.add_noise_to_latents(latents, new_noise)
         else:
-            noisy_latents = self.ddpm_solver.add_noise(x=latents, noise=noise, step=self.current_step)
+            noisy_latents = self.add_noise_to_latents(latents, noise)
+
 
         # get prediction from unet
         prediction = self.unet(noisy_latents)
