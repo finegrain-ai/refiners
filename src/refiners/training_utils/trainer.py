@@ -368,6 +368,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                     logger.info("Overflow in optimizer caused optimizer to skip")
             else:
                 self.optimizer.step()
+            self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
