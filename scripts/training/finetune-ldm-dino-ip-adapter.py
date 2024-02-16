@@ -172,7 +172,63 @@ class IPBatch:
     text_embedding: Tensor
     image_embedding: Tensor
 
+class ComputeGradNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
+    """Callback to compute gradient norm"""
 
+    def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        if trainer.clock.is_evaluation_step:
+            for name, param in trainer.adapter.named_parameters():
+                if param.grad is not None:
+                    grads = param.grad.detach().data
+                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
+                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
+            for name, param in trainer.image_proj.named_parameters():
+                if param.grad is not None:
+                    grads = param.grad.detach().data
+                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
+                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
+        return super().on_backward_end(trainer)
+
+
+class ComputeParamNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
+    """Callback to compute gradient norm"""
+
+    def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        if trainer.clock.is_evaluation_step:
+            for name, param in trainer.adapter.named_parameters():
+                if param.grad is not None:
+                    data = param.data.detach()
+                    data_norm = (data.norm(p=2) / data.numel()).item()
+                    trainer.log(data={"param_norm/" + name: data_norm})
+            for name, param in trainer.image_proj.named_parameters():
+                if param.grad is not None:
+                    data = param.data.detach()
+                    data_norm = (data.norm(p=2) / data.numel()).item()
+                    trainer.log(data={"param_norm/" + name: data_norm})
+        return super().on_backward_end(trainer)
+
+
+class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
+    """Callback to save the adapter when a checkpoint is saved."""
+
+    def on_checkpoint_save(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        adapter = trainer.adapter
+        cross_attention_adapters = trainer.adapter.sub_adapters
+        image_proj = trainer.adapter.image_proj
+
+        tensors: dict[str, Tensor] = {}
+        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
+        for i, cross_attention_adapter in enumerate(cross_attention_adapters):
+            tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
+        if trainer.config.adapter.use_pooled_text_embedding:
+            tensors |= {
+                f"pooled_text_embedding_proj.{key}": value
+                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
+            }
+        save_to_safetensors(
+            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
+            tensors=tensors,
+        )
 class IPDataset(Dataset[IPBatch]):
     """Dataset for the IP adapter.
 
@@ -757,6 +813,16 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # log images to wandb
         self.wandb_log(data=images)
         self.adapter.scale = self.config.adapter.scale
+    @register_callback()
+    def compute_grad_norms(self, config: CallbackConfig) -> ComputeGradNormCallback:
+        return ComputeGradNormCallback()
+    @register_callback()
+    def compute_param_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
+        return ComputeParamNormCallback()
+    @register_callback()
+    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
+        return SaveAdapterCallback()
+
     def __init__(
         self,
         config: AdapterLatentDiffusionConfig,
@@ -769,63 +835,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # self._callbacks["save_adapter"] = SaveAdapterCallback()
 
 
-class ComputeGradNormCallback(Callback[AdapterLatentDiffusionTrainer]):
-    """Callback to compute gradient norm"""
 
-    def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        if trainer.clock.is_evaluation_step:
-            for name, param in trainer.adapter.named_parameters():
-                if param.grad is not None:
-                    grads = param.grad.detach().data
-                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
-                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
-            for name, param in trainer.image_proj.named_parameters():
-                if param.grad is not None:
-                    grads = param.grad.detach().data
-                    grad_norm = (grads.norm(p=2) / grads.numel()).item()
-                    trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
-        return super().on_backward_end(trainer)
-
-
-class ComputeParamNormCallback(Callback[AdapterLatentDiffusionTrainer]):
-    """Callback to compute gradient norm"""
-
-    def on_backward_end(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        if trainer.clock.is_evaluation_step:
-            for name, param in trainer.adapter.named_parameters():
-                if param.grad is not None:
-                    data = param.data.detach()
-                    data_norm = (data.norm(p=2) / data.numel()).item()
-                    trainer.log(data={"param_norm/" + name: data_norm})
-            for name, param in trainer.image_proj.named_parameters():
-                if param.grad is not None:
-                    data = param.data.detach()
-                    data_norm = (data.norm(p=2) / data.numel()).item()
-                    trainer.log(data={"param_norm/" + name: data_norm})
-        return super().on_backward_end(trainer)
-
-
-class SaveAdapterCallback(Callback[AdapterLatentDiffusionTrainer]):
-    """Callback to save the adapter when a checkpoint is saved."""
-
-    def on_checkpoint_save(self, trainer: AdapterLatentDiffusionTrainer) -> None:
-        adapter = trainer.adapter
-        cross_attention_adapters = trainer.adapter.sub_adapters
-        image_proj = trainer.adapter.image_proj
-
-        tensors: dict[str, Tensor] = {}
-        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
-        for i, cross_attention_adapter in enumerate(cross_attention_adapters):
-            tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
-        if trainer.config.adapter.use_pooled_text_embedding:
-            tensors |= {
-                f"pooled_text_embedding_proj.{key}": value
-                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
-            }
-        save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors,
-        )
 
 
 if __name__ == "__main__":
