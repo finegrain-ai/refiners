@@ -101,10 +101,10 @@ class WandbCallback(Callback["TrainerWithWandb"]):
         self.iteration_losses = []
 
     def on_compute_loss_end(self, trainer: "TrainerWithWandb") -> None:
+        loss_value = trainer.loss.detach().cpu().item()
+        self.epoch_losses.append(loss_value)
+        self.iteration_losses.append(loss_value)
         if trainer.clock.is_evaluation_step:
-            loss_value = trainer.loss.detach().cpu().item()
-            self.epoch_losses.append(loss_value)
-            self.iteration_losses.append(loss_value)
             trainer.wandb_log(data={"step_loss": loss_value})
 
     def on_optimizer_step_end(self, trainer: "TrainerWithWandb") -> None:
