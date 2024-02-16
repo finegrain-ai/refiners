@@ -21,8 +21,9 @@ from torch import (
     no_grad,
     autocast,
     randint,
-    float32
+    float32,
 )
+from torch.cuda import empty_cache
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
 from torch.nn.init import trunc_normal_
@@ -63,6 +64,7 @@ from refiners.training_utils.trainer import register_model, Trainer, register_ca
 from refiners.training_utils.wandb import WandbLoggable, WandbMixin, WandbConfig
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
+import gc
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
@@ -531,20 +533,20 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
         return SD1Autoencoder(
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
     @register_model()
     def unet(self, unet_config: ModelConfig) -> SD1UNet:
         return SD1UNet(
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
     @register_model()
     def text_encoder(self, text_encoder_config: ModelConfig) -> CLIPTextEncoderL:
         return CLIPTextEncoderL(
             device=self.device,
-        ).to(self.device, dtype=self.dtype)
+        )
 
     @register_model()
     def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
@@ -559,7 +561,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder_cls = DINOv2_small_reg
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
-        return image_encoder_cls().to(self.device, dtype=self.dtype)
+        return image_encoder_cls()
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
@@ -575,7 +577,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in image_proj")
-        return image_proj.to(self.device, dtype=self.dtype)
+        empty_cache()
+        gc.collect()
+        return image_proj
 
     @register_model()
     def adapter(self, adapter_config: ModelConfig) -> SD1IPAdapter:
@@ -606,7 +610,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         logger.info(f"Initialized {i} parameters in ip adapter")
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.to(self.device, self.dtype)
-        return ip_adapter.to(self.device, dtype=self.dtype)
+        empty_cache()
+        gc.collect()
+        return ip_adapter
 
     @cached_property
     def ddpm_solver(self) -> DDPM:
