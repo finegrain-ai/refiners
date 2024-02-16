@@ -103,6 +103,7 @@ class WandbCallback(Callback["TrainerWithWandb"]):
     def on_train_begin(self, trainer: "TrainerWithWandb") -> None:
         self.epoch_losses = []
         self.iteration_losses = []
+
     def on_batch_end(self, trainer: "TrainerWithWandb") -> None:
         batch_time, forward_time, backprop_time, data_time = (
             trainer.batch_time_m.avg,
@@ -120,6 +121,7 @@ class WandbCallback(Callback["TrainerWithWandb"]):
                     "data_time": data_time / effective_batch_size,
                 }
             )
+
     def on_compute_loss_end(self, trainer: "TrainerWithWandb") -> None:
         loss_value = trainer.loss.detach().cpu().item()
         self.epoch_losses.append(loss_value)

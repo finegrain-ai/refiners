@@ -150,6 +150,7 @@ class ClockCallback(Callback["Trainer[BaseConfig, Any]"]):
     def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         logger.info("Evaluation ended.")
 
+
 class GradientNormClipping(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         clip_norm = trainer.config.training.clip_grad_norm
