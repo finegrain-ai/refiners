@@ -45,7 +45,7 @@ gradient_accumulation = {"number" = 4, "unit" = "step"}
 evaluation_interval = {"number" = 1000, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
-dataset_workers=16
+dataset_workers=4
 checkpoint_interval = {"number" = 1000, "unit" = "step"}
 device="cuda"
 
