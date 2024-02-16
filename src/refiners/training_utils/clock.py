@@ -185,7 +185,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         trainer.clock.num_batches_processed = 0
 
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Step {trainer.clock.step} started.")
+        return
 
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.step += 1
@@ -193,7 +193,6 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         trainer.clock.num_minibatches_processed += 1
 
     def on_optimizer_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Iteration {trainer.clock.iteration} ended.")
         trainer.clock.iteration += 1
         trainer.clock.num_minibatches_processed = 0
 

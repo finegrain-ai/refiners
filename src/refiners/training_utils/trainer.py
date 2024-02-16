@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
-
+from tqdm.auto import tqdm
 import torch
 from loguru import logger
 from torch import (
@@ -425,7 +425,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single epoch."""
         self.clock.start_timer()
         self.global_step = 1
-        for batch in self.dataloader:
+        for batch in tqdm(self.dataloader):
             if self.clock.done:
                 break
             data_time = self.clock.time_elapsed
