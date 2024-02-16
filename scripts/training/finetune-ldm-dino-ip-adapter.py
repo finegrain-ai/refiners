@@ -567,7 +567,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=self.dtype
         )
         image_proj.requires_grad_(True)
-        device_str = str(self.device.type) + ":" + str(self.device.index)
+        device_str = str(self.device.type)
         with autocast(device_str, self.dtype):
             for module in image_proj.modules():
                 _init_learnable_weights(module, self.config.adapter.initializer_range)
@@ -600,7 +600,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             adapter.image_key_projection.to(self.device, self.dtype)
             adapter.image_value_projection.requires_grad_(True)
             adapter.image_value_projection.to(self.device, self.dtype)
-        device_str = str(self.device.type) + ":" + str(self.device.index)
+        device_str = str(self.device.type)
         with autocast(device_str, self.dtype):
             for module in ip_adapter.modules():
                 _init_learnable_weights(module, self.config.adapter.initializer_range)
