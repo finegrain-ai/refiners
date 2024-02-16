@@ -118,7 +118,6 @@ def register_model():
             if config.checkpoint is not None:
                 model.load_from_safetensors(config.checkpoint)
             model = model.to(self.device, dtype=self.dtype)
-            print("Initializing model with ", self.device, self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
