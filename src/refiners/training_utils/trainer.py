@@ -427,7 +427,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single epoch."""
         self.global_step = 1
         start = time.time()
-        for batch in self.dataloader:
+        for batch in tqdm(self.dataloader):
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_batch_begin")
