@@ -819,9 +819,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @register_callback()
     def compute_param_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
         return ComputeParamNormCallback()
-    @register_callback()
-    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
-        return SaveAdapterCallback()
+    # @register_callback()
+    # def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
+    #     return SaveAdapterCallback()
 
     def __init__(
         self,
