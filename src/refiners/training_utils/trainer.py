@@ -170,7 +170,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
         self._call_callbacks(event_name="on_init_end")
-        self.current_loss: Tensor = torch.zeros([1]).to(self.device, dtype=self.dtype)
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
@@ -375,13 +374,13 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        self.current_loss += scaled_loss
+        if self.scaler is not None:
+            self.scaler.scale(scaled_loss).backward()  # type: ignore
+        else:
+            backward(tensors=scaled_loss)
+        self._call_callbacks(event_name="on_backward_end")
         if self.global_step % self.clock.num_step_per_iteration == 0:
-            if self.scaler is not None:
-                self.scaler.scale(scaled_loss).backward()  # type: ignore
-            else:
-                backward(tensors=scaled_loss)
-            self._call_callbacks(event_name="on_backward_end")
+
             if self.clock.is_optimizer_step:
                 self._call_callbacks(event_name="on_optimizer_step_begin")
                 if self.scaler is not None:
@@ -405,7 +404,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 self.evaluate()
             if self.clock.is_checkpointing_step:
                 self._call_callbacks(event_name="on_checkpoint_save")
-            self.current_loss[:] = 0
 
     def step(self, batch: Batch) -> tuple[int, int]:
         """Perform a single training step."""
