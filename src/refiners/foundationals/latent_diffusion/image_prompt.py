@@ -384,11 +384,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
     @property
     def image_key_projection(self) -> fl.Sum:
-        return self.image_cross_attention.layer(("Distribute", 1, "Linear"), fl.Sum)
+        return self.image_cross_attention.layer(("Distribute", 1, "Sum"), fl.Sum)
 
     @property
     def image_value_projection(self) -> fl.Sum:
-        return self.image_cross_attention.layer(("Distribute", 2, "Linear"), fl.Sum)
+        return self.image_cross_attention.layer(("Distribute", 2, "Sum"), fl.Sum)
 
     @property
     def scale(self) -> float:
