@@ -40,7 +40,7 @@ use_bias = true
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
 seed = 9752
-batch_size = 8
+batch_size = 4
 gradient_accumulation = {"number" = 4, "unit" = "step"}
 evaluation_interval = {"number" = 1000, "unit" = "step"}
 evaluation_seed = 9752
