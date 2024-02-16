@@ -893,13 +893,7 @@ class Sum(Chain):
             layer_output: Any = layer(*inputs)
             if isinstance(layer_output, tuple):
                 layer_output = sum(layer_output)  # type: ignore
-            try:
-                output = layer_output if output is None else output + layer_output
-            except:
-                print(layer_output.shape)
-                if output is not None:
-                    print(output.shape)
-                raise Exception()
+            output = layer_output if output is None else output + layer_output
         return output
 
     def _show_only_tag(self) -> bool:
