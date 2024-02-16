@@ -22,7 +22,7 @@ from torch.optim.lr_scheduler import (
     StepLR,
 )
 from torch.utils.data import DataLoader, Dataset
-
+from torch.cuda.amp import GradScaler
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
 from refiners.training_utils.callback import (
@@ -182,7 +182,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
         logger.info(f"Using dtype: {dtype}")
         return dtype
-
+    @cached_property
+    def scaler(self) -> GradScaler | None:
+        if self.config.training.dtype == "float32":
+            return None
+        return GradScaler()
     @property
     def learnable_parameters(self) -> list[nn.Parameter]:
         """Returns a list of learnable parameters in all models"""
@@ -345,12 +349,25 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
+        if self.scaler is not None:
+            self.scaler.scale(scaled_loss).backward()  # type: ignore
+        else:
+            backward(tensors=scaled_loss)
         backward(tensors=scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+            if self.scaler is not None:
+                # logic from accelerator
+                scale_before = self.scaler.get_scale()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                scale_after = self.scaler.get_scale()
+                # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+                if scale_after < scale_before:
+                    logger.info("Overflow in optimizer caused optimizer to skip")
+            else:
+                self.optimizer.step()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
