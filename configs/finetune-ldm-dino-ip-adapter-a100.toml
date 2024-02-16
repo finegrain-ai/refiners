@@ -99,3 +99,6 @@ validation_image_paths = [
     "tests/weights/frida.jpg",
     "tests/weights/cute_cats.jpg"
 ]
+[compute_grad_norms]
+
+[compute_param_norms]

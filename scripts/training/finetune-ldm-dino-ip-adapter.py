@@ -153,6 +153,8 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     dataset: DatasetConfig
     ldm: LatentDiffusionConfig
     test_ldm: TestIPDiffusionConfig
+    compute_grad_norms: CallbackConfig
+    compute_param_norms: CallbackConfig
     wandb: WandbConfig
     unet: ModelConfig
     lda: ModelConfig
