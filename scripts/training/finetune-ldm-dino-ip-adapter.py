@@ -531,20 +531,20 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
         return SD1Autoencoder(
             device=self.device,
-        )
+        ).to(self.device, dtype=self.dtype)
 
     @register_model()
     def unet(self, unet_config: ModelConfig) -> SD1UNet:
         return SD1UNet(
             in_channels=4,  # FIXME: harcoded value
             device=self.device,
-        )
+        ).to(self.device, dtype=self.dtype)
 
     @register_model()
     def text_encoder(self, text_encoder_config: ModelConfig) -> CLIPTextEncoderL:
         return CLIPTextEncoderL(
             device=self.device,
-        )
+        ).to(self.device, dtype=self.dtype)
 
     @register_model()
     def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
@@ -559,7 +559,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder_cls = DINOv2_small_reg
         elif self.config.adapter.image_encoder_type == "dinov2_vits14":
             image_encoder_cls = DINOv2_small
-        return image_encoder_cls()
+        return image_encoder_cls().to(self.device, dtype=self.dtype)
 
     @register_model()
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
@@ -575,8 +575,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in image_proj")
-        image_proj.to(self.device, dtype=self.dtype)
-        return image_proj
+        return image_proj.to(self.device, dtype=self.dtype)
 
     @register_model()
     def adapter(self, adapter_config: ModelConfig) -> SD1IPAdapter:
@@ -607,7 +606,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         logger.info(f"Initialized {i} parameters in ip adapter")
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.to(self.device, self.dtype)
-        return ip_adapter
+        return ip_adapter.to(self.device, dtype=self.dtype)
 
     @cached_property
     def ddpm_solver(self) -> DDPM:
