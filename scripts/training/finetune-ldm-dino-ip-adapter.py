@@ -654,8 +654,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
         # retreive data from batch
-        for param in self.unet.parameters():
-            print(param.device, param.dtype)
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
@@ -706,6 +704,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_evaluation(self) -> None:
         # initialize an SD1.5 pipeline using the trainer's models
+        for param in self.unet.parameters():
+            print(param.device, param.dtype)
         sd = StableDiffusion_1(
             unet=self.unet,
             lda=self.lda,
