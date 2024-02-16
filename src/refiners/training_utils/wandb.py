@@ -120,6 +120,12 @@ class WandbCallback(Callback["TrainerWithWandb"]):
                 trainer.backprop_time_m.avg,
                 trainer.data_time_m.avg,
             )
+            batch_time_curr, forward_time_curr, backprop_time_curr, data_time_curr = (
+                trainer.batch_time_m.val,
+                trainer.forward_time_m.val,
+                trainer.backprop_time_m.val,
+                trainer.data_time_m.val,
+            )
             effective_batch_size = trainer.clock.batch_size*trainer.clock.num_step_per_iteration
             trainer.wandb_log(
                 data={
@@ -127,6 +133,10 @@ class WandbCallback(Callback["TrainerWithWandb"]):
                     "forward_time": forward_time / effective_batch_size,
                     "backprop_time": backprop_time / effective_batch_size,
                     "data_time": data_time / effective_batch_size,
+                    "batch_time_current": batch_time_curr / effective_batch_size,
+                    "forward_time_current": forward_time_curr / effective_batch_size,
+                    "backprop_time_current": backprop_time_curr / effective_batch_size,
+                    "data_time_current": data_time_curr / effective_batch_size,
                 }
             )
     def on_epoch_end(self, trainer: "TrainerWithWandb") -> None:
