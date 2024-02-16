@@ -378,8 +378,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.scaler.scale(scaled_loss).backward()  # type: ignore
         else:
             backward(tensors=scaled_loss)
-        self._call_callbacks(event_name="on_backward_end")
         if self.global_step % self.clock.num_step_per_iteration == 0:
+            self._call_callbacks(event_name="on_backward_end")
+
 
             if self.clock.is_optimizer_step:
                 self._call_callbacks(event_name="on_optimizer_step_begin")

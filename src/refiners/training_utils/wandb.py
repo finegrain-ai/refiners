@@ -101,24 +101,26 @@ class WandbCallback(Callback["TrainerWithWandb"]):
         self.iteration_losses = []
 
     def on_compute_loss_end(self, trainer: "TrainerWithWandb") -> None:
-        loss_value = trainer.loss.detach().cpu().item()
-        self.epoch_losses.append(loss_value)
-        self.iteration_losses.append(loss_value)
-        trainer.wandb_log(data={"step_loss": loss_value})
+        if trainer.clock.is_evaluation_step:
+            loss_value = trainer.loss.detach().cpu().item()
+            self.epoch_losses.append(loss_value)
+            self.iteration_losses.append(loss_value)
+            trainer.wandb_log(data={"step_loss": loss_value})
 
     def on_optimizer_step_end(self, trainer: "TrainerWithWandb") -> None:
-        avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
-        trainer.wandb_log(data={"average_iteration_loss": avg_iteration_loss})
+        if trainer.clock.is_evaluation_step:
+            avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
+            trainer.wandb_log(data={"average_iteration_loss": avg_iteration_loss})
         self.iteration_losses = []
     def on_batch_end(self, trainer: "TrainerWithWandb") -> None:
-        batch_time, forward_time, backprop_time, data_time = (
-            trainer.batch_time_m.avg,
-            trainer.forward_time_m.avg,
-            trainer.backprop_time_m.avg,
-            trainer.data_time_m.avg,
-        )
-        effective_batch_size = trainer.clock.batch_size*trainer.clock.num_step_per_iteration
         if trainer.clock.is_evaluation_step:
+            batch_time, forward_time, backprop_time, data_time = (
+                trainer.batch_time_m.avg,
+                trainer.forward_time_m.avg,
+                trainer.backprop_time_m.avg,
+                trainer.data_time_m.avg,
+            )
+            effective_batch_size = trainer.clock.batch_size*trainer.clock.num_step_per_iteration
             trainer.wandb_log(
                 data={
                     "batch_time": batch_time / effective_batch_size,
@@ -128,15 +130,18 @@ class WandbCallback(Callback["TrainerWithWandb"]):
                 }
             )
     def on_epoch_end(self, trainer: "TrainerWithWandb") -> None:
-        avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
-        trainer.wandb_log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
-        self.epoch_losses = []
+        if trainer.clock.is_evaluation_step:
+            avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
+            trainer.wandb_log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
+            self.epoch_losses = []
 
     def on_lr_scheduler_step_end(self, trainer: "TrainerWithWandb") -> None:
-        trainer.wandb_log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
+        if trainer.clock.is_evaluation_step:
+            trainer.wandb_log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
 
     def on_backward_end(self, trainer: "TrainerWithWandb") -> None:
-        trainer.wandb_log(data={"total_grad_norm": trainer.total_gradient_norm})
+        if trainer.clock.is_evaluation_step:
+            trainer.wandb_log(data={"total_grad_norm": trainer.total_gradient_norm})
 
 
 class WandbMixin(ABC):
