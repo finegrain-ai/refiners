@@ -364,7 +364,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def compute_evaluation(self) -> None:
         pass
 
-    def backward(self) -> None:
+    def backward(self, start: float) -> float:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
@@ -379,8 +379,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
             self.lr_scheduler.step()
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
+        backward_time = time.time()-start
         if self.clock.is_evaluation_step:
             self.evaluate()
+        return backward_time
 
     def step(self, batch: Batch) -> tuple[float, float]:
         """Perform a single training step."""
@@ -392,8 +394,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.forward_time_m.update(forward_time)
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_end")
-        self.backward()
-        backward_time = time.time() - start
+        backward_time = self.backward(start)
         self.backprop_time_m.update(backward_time)
         return forward_time, backward_time
 
@@ -410,6 +411,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_batch_end")
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
+            start = time.time()
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
