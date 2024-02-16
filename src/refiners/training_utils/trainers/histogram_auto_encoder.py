@@ -99,7 +99,10 @@ class HistogramAutoEncoderTrainer(
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((SaveHistogramAutoEncoder(),GradientNormLayerLogging()))
+        self.callbacks.extend((
+            SaveHistogramAutoEncoder(),
+            #GradientNormLayerLogging()
+        ))
 
     def load_models(self) -> dict[str, fl.Module]:
         return {

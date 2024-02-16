@@ -194,7 +194,12 @@ class HistogramLatentDiffusionTrainer(
         callbacks: "list[Callback[Any]] | None" = None,
     ) -> None:
         super().__init__(config=config, callbacks=callbacks)
-        self.callbacks.extend((LoadHistogram(), SaveHistogram(), GradientNormLayerLogging()))
+        self.callbacks.extend((
+            LoadHistogram(), 
+            SaveHistogram()
+            #, 
+            #GradientNormLayerLogging()
+        ))
 
     def load_models(self) -> dict[str, fl.Module]:
         return {
