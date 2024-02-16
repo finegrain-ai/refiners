@@ -3,25 +3,25 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "histo-autoencoder"
-name = "ckpt-reload"
-tags = ["autoencoder", "reload"]
+name = "32x1-embedding"
+tags = ["autoencoder", "6bits"]
 
 [histogram_auto_encoder]
-latent_dim = 8
-resnet_sizes = [4, 4, 4, 4, 4, 4]
-n_down_samples = 5
+latent_dim = 32
+resnet_sizes = [4, 4, 8, 8, 16, 16, 16]
+n_down_samples = 6
 color_bits = 6
 num_groups = 4
 loss = "kl_div"
 
 [models]
-histogram_auto_encoder = {train=true, checkpoint = "tmp/ckpt-reload-step6000.safetensors"}
+histogram_auto_encoder = {train = true}
 
 [training]
-duration = "20:epoch"
+duration = "40:epoch"
 seed = 0
 gpu_index = 1
-batch_size = 8
+batch_size = 2
 gradient_accumulation = "1:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
@@ -61,3 +61,4 @@ split = "train[:10]"
 [checkpointing]
 save_interval = "1000:step"
 use_wandb = true
+

@@ -7,7 +7,7 @@ from refiners.training_utils.trainers.latent_diffusion import FinetuneLatentDiff
 
 def adapt_config(config_path: str, config: FinetuneLatentDiffusionBaseConfig) -> FinetuneLatentDiffusionBaseConfig:
     if 'local' in config_path:
-        config.training.batch_size = 1
+        #config.training.batch_size = 1
         config.training.num_workers = min(4,config.training.num_workers)
         config.wandb.tags = config.wandb.tags + ['local']
 
