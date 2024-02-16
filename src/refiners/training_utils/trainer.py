@@ -442,6 +442,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             print(data_time, forward_time, backward_time, batch_time)
             self.batch_time_m.update(batch_time)
             self.global_step += 1
+            start = time.time()
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
