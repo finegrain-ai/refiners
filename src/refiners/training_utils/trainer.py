@@ -360,7 +360,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
-        print("Dataset workers ", self.config.training.dataset_workers)
         return DataLoader(
             dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
         )
@@ -440,7 +439,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_batch_end")
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
-            print(data_time, forward_time, backward_time, batch_time)
             self.global_step += 1
             start = time.time()
 
