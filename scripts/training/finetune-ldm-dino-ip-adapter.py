@@ -20,7 +20,8 @@ from torch import (
     randn_like,
     no_grad,
     autocast,
-    randint
+    randint,
+    float32
 )
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
@@ -568,7 +569,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
         image_proj.requires_grad_(True)
         device_str = str(self.device.type)
-        with autocast(device_str, self.dtype):
+        with autocast(device_str, float32):
             for module in image_proj.modules():
                 _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
@@ -601,7 +602,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             adapter.image_value_projection.requires_grad_(True)
             adapter.image_value_projection.to(self.device, self.dtype)
         device_str = str(self.device.type)
-        with autocast(device_str, self.dtype):
+        with autocast(device_str, float32):
             for module in ip_adapter.modules():
                 _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
