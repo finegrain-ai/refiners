@@ -360,6 +360,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
+        print("Dataset workers ", self.config.training.dataset_workers)
         return DataLoader(
             dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
         )
