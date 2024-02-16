@@ -565,18 +565,17 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def image_proj(self, image_proj_config: ModelConfig) -> ImageProjection | PerceiverResampler:
         cross_attn_2d = self.unet.ensure_find(CrossAttentionBlock2d)
         image_proj = get_sd1_image_proj(
-            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=self.dtype
+            self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=float32
         )
         image_proj.requires_grad_(True)
-        device_str = str(self.device.type)
-        with autocast(device_str, float32):
-            for module in image_proj.modules():
-                _init_learnable_weights(module, self.config.adapter.initializer_range)
+        for module in image_proj.modules():
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
         for param in image_proj.parameters():
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in image_proj")
+        image_proj.to(self.device, dtype=self.dtype)
         return image_proj
 
     @register_model()
@@ -598,18 +597,19 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ).inject()
         for adapter in ip_adapter.sub_adapters:
             adapter.image_key_projection.requires_grad_(True)
-            adapter.image_key_projection.to(self.device, self.dtype)
+            adapter.image_key_projection.to(self.device, float32)
             adapter.image_value_projection.requires_grad_(True)
-            adapter.image_value_projection.to(self.device, self.dtype)
-        device_str = str(self.device.type)
-        with autocast(device_str, float32):
-            for module in ip_adapter.modules():
-                _init_learnable_weights(module, self.config.adapter.initializer_range)
+            adapter.image_value_projection.to(self.device, float32)
+        for module in ip_adapter.modules():
+            _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
         for param in ip_adapter.parameters():
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
+        for adapter in ip_adapter.sub_adapters:
+            adapter.image_key_projection.to(self.device, self.dtype)
+            adapter.image_value_projection.to(self.device, self.dtype)
         return ip_adapter
 
     @cached_property
