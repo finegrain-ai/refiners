@@ -704,9 +704,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_evaluation(self) -> None:
         # initialize an SD1.5 pipeline using the trainer's models
-        for param in self.unet.parameters():
-            if param.dtype == float32:
-                print(param.device, param.dtype)
         sd = StableDiffusion_1(
             unet=self.unet,
             lda=self.lda,
