@@ -893,7 +893,6 @@ class Sum(Chain):
             layer_output: Any = layer(*inputs)
             if isinstance(layer_output, tuple):
                 layer_output = sum(layer_output)  # type: ignore
-            print(layer_output.shape)
             output = layer_output if output is None else output + layer_output
         return output
 
