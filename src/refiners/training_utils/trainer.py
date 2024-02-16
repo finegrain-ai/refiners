@@ -409,6 +409,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             if self.clock.is_checkpointing_step:
                 self._call_callbacks(event_name="on_checkpoint_save")
             return backward_time
+        else:
+            return time.time()-start_time
 
     def step(self, batch: Batch) -> tuple[float, float]:
         """Perform a single training step."""
