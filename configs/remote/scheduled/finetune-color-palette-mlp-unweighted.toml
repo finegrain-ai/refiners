@@ -28,13 +28,13 @@ embedding_dim = 10
 weighted_palette = false
 
 [training]
-duration = "5:epoch"
+duration = "20:epoch"
 seed = 0
 batch_size = 10
-gradient_accumulation = "1:step"
+gradient_accumulation = "10:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
-evaluation_interval = "1000:step"
+evaluation_interval = "200:step"
 evaluation_seed = 1
 num_workers = 8
 use_color_loss = false
