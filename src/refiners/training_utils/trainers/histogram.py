@@ -78,7 +78,7 @@ class GridEvalHistogramDataset(GridEvalDataset[BatchHistogramPrompt]):
             raise ValueError("The items must have length 1.")
         
         histograms = self.histogram_extractor.images_to_histograms([item.image for item in items])
-        source_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
+        source_palettes = [self.color_palette_extractor(item.image, size=item.palette_size) for item in items]
 
         return {
             "source_palettes": source_palettes,
