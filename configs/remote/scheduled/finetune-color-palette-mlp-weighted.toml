@@ -60,7 +60,6 @@ use_gyro_dropout = false
 hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-caption_key = "ai_description"
 split = "train[200:]"
 
 [checkpointing]
@@ -71,7 +70,6 @@ use_wandb = true
 hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-caption_key = "ai_description"
 split = "train[:20]"
 
 [evaluation]

@@ -29,7 +29,7 @@ def load_hf_dataset(
     
     dataset = dataset.map(
         function=download_image,
-        input_columns=["url"],
+        input_columns=["photo_image_url"],
         fn_kwargs={
             "dl_manager": DownloadManager(),
         },
