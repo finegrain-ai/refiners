@@ -4,7 +4,7 @@ entity = "isamu"
 project = "finetune-ldm-ip-adapter"
 
 [ldm]
-offset_noise = 0.05
+offset_noise = 0.01
 snr_gamma = 5
 
 [unet]
