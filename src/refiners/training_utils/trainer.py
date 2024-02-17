@@ -162,7 +162,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.forward_time_m = AverageMeter()
         self.backprop_time_m = AverageMeter()
         self.data_time_m = AverageMeter()
-        self.global_step: int = 0
         self._load_models()
         # load models before loading callbacks so that
         # dataset doesn't get loaded yet so we can do pre-encoding
@@ -379,25 +378,24 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.scaler.scale(scaled_loss).backward()  # type: ignore
         else:
             backward(tensors=scaled_loss)
-        if self.global_step % self.clock.num_step_per_iteration == 0:
-            self._call_callbacks(event_name="on_backward_end")
+        self._call_callbacks(event_name="on_backward_end")
 
 
-            if self.clock.is_optimizer_step:
-                self._call_callbacks(event_name="on_optimizer_step_begin")
-                if self.scaler is not None:
-                    # logic from accelerator
-                    scale_before = self.scaler.get_scale()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    scale_after = self.scaler.get_scale()
-                    # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
-                    if scale_after < scale_before:
-                        logger.info("Overflow in optimizer caused optimizer to skip")
-                else:
-                    self.optimizer.step()
-                self.optimizer.zero_grad()
-                self._call_callbacks(event_name="on_optimizer_step_end")
+        if self.clock.is_optimizer_step:
+            self._call_callbacks(event_name="on_optimizer_step_begin")
+            if self.scaler is not None:
+                # logic from accelerator
+                scale_before = self.scaler.get_scale()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                scale_after = self.scaler.get_scale()
+                # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+                if scale_after < scale_before:
+                    logger.info("Overflow in optimizer caused optimizer to skip")
+            else:
+                self.optimizer.step()
+            self.optimizer.zero_grad()
+            self._call_callbacks(event_name="on_optimizer_step_end")
             if self.clock.is_lr_scheduler_step:
                 self._call_callbacks(event_name="on_lr_scheduler_step_begin")
                 self.lr_scheduler.step()
@@ -427,7 +425,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def epoch(self) -> None:
         """Perform a single epoch."""
-        self.global_step = 1
         start = time.time()
         for batch in tqdm(self.dataloader):
             if self.clock.done:
@@ -439,7 +436,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_batch_end")
             batch_time = data_time + forward_time + backward_time
             self.batch_time_m.update(batch_time)
-            self.global_step += 1
             start = time.time()
 
     @staticmethod
