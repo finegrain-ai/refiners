@@ -64,7 +64,7 @@ class GridEvalPaletteDataset(GridEvalDataset[BatchHistogramPrompt]):
         if len(items) != 1:
             raise ValueError("The items must have length 1.")
 
-        source_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in items]
+        source_palettes = [self.color_palette_extractor(item.image, size=len(item.palette_size)) for item in items]
         return {
             "source_palettes": source_palettes
         }
@@ -197,7 +197,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchHistogramProm
         text_embeddings = self.text_encoder(texts)
         
         latents = self.lda.images_to_latents([item.image for item in batch])
-        color_palettes = [self.color_palette_extractor(item.image, size=len(item.color_palette)) for item in batch]
+        color_palettes = [self.color_palette_extractor(item.image, size=len(item.palette_size)) for item in batch]
         
         color_palette_embeddings = self.color_palette_encoder(
             color_palettes

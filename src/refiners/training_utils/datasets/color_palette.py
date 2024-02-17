@@ -22,7 +22,7 @@ class ColorDatasetConfig(HuggingfaceDatasetConfig):
 
 @dataclass
 class ColorPaletteDatasetItem:
-    color_palette: ColorPalette
+    palette_size: int
     text: str
     image: Image.Image
     conditional_flag: bool
@@ -94,7 +94,7 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         
         return [
             ColorPaletteDatasetItem(
-                color_palette=self.process_color_palette(item),
+                palette_size=self.random_palette_size(),
                 text=caption_processed,
                 image=image,
                 conditional_flag=conditional_flag
@@ -115,10 +115,6 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         palette_index = int(random.choices(choices, probabilities, k=1)[0])
         return palette_index
     
-    def process_color_palette(self, item: DatasetItem) -> ColorPalette:
-        palette_color: list[Color] = item['palettes'][str(self.random_palette_size())]
-        palette: ColorPalette = [(color, 1.0/len(palette_color)) for color in palette_color]
-        return palette
 
     def build_image_processor(self) -> Callable[[Image.Image], Image.Image]:
         # TODO: make this configurable and add other transforms
@@ -139,10 +135,6 @@ class ColorPaletteDataset(TextEmbeddingLatentsBaseDataset[TextEmbeddingColorPale
         
         palette: ColorPalette = item.palettes[str(self.random_palette_size())]
         return palette 
-       
-    def get_color_palette(self, index: int) -> ColorPalette:
-        item = self.hf_dataset[index]
-        return self.process_color_palette(item)
 
     def collate_fn(self, batch: list[TextEmbeddingColorPaletteLatentsBatch]) -> TextEmbeddingColorPaletteLatentsBatch:
         return [item for sublist in batch for item in sublist]

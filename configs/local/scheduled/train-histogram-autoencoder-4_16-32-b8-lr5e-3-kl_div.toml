@@ -45,17 +45,15 @@ dropout_probability = 0.2
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "1aurent/unsplash-lite-palette"
+hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-caption_key = "ai_description"
 split = "train[10:]"
 
 [eval_dataset]
-hf_repo = "1aurent/unsplash-lite-palette"
+hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-caption_key = "ai_description"
 split = "train[:10]"
 
 [checkpointing]
