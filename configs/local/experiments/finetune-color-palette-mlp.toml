@@ -1,6 +1,6 @@
 script = "finetune-ldm-color-palette.py" # not used for now
 [wandb]
-mode = "online" # "online", "offline", "disabled"
+mode = "offline" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
 name = "weighted-palette"
@@ -56,7 +56,7 @@ dropout_probability = 0.0
 use_gyro_dropout = false
 
 [dataset]
-hf_repo = "1aurent/unsplash-lite-palette"
+hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
 caption_key = "ai_description"
