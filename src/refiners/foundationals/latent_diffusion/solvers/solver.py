@@ -139,8 +139,6 @@ class Solver(fl.Module, ABC):
         denoised_x = (x - noise_stds * noise) / cumulative_scale_factors
         return denoised_x
 
-    def predict_initial(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
-        return x
     @property
     def all_steps(self) -> list[int]:
         """Return a list of all inference steps."""
