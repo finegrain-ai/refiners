@@ -84,6 +84,9 @@ class AdapterConfig(ModelConfig):
     initialize_model: bool = True
     initializer_range: float = 0.02
     use_bias: bool = False
+    do_palp: bool = False
+    palp_alpha: float = 7.5
+    palp_beta: float = 5
 
 
 class DatasetConfig(BaseModel):
@@ -717,10 +720,35 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
+        """
+        For adapting this to PALP, the changes needed are
+        1. We need to guarantee that we have both the correct text and image embeddings
+        2. We need both the negative and the positive embeddings
+        3. We do CFG where the base pretrained model has a higher cfg than us
+
+        Then, the steps are
+        1. Predict the original latent given noisy latent+scheduler with injected model(I think)
+        2. Given the predicted x_0 we add noise to it again at timestep t to get x'_t(for now I'm thinking of using same timestep)
+        3. Eject adapter from unet and compute the empty embeds and the text conditioned embeds and do a cfg with some alpha condition scale
+        4. Inject, and do cfg with unconditioned image text, and get conditioned and do cfg with some condition scale beta
+        5. To the loss, add the difference between 3 and 4
+        """
+        if self.config.adapter.do_palp:
+            assert self.config.dataset.image_drop_rate == 0
+            assert self.config.dataset.text_drop_rate == 0
+            assert self.config.dataset.text_and_image_drop_rate == 0
+
         # retreive data from batch
         latents = batch.latent.to(self.device, dtype=self.dtype)
+        batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
+        if self.config.adapter.do_palp:
+            assert batch.uncond_text_embedding is not None
+            assert batch.uncond_image_embedding is not None
+            uncond_text_embedding = self.dataset.empty_text_embedding[None, :].repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
+            uncond_image_embedding = zeros_like(image_embedding)
+
 
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
