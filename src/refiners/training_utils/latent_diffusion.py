@@ -48,6 +48,7 @@ class TestDiffusionConfig(BaseModel):
     use_short_prompts: bool = False
     prompts: list[str] = []
     num_images_per_prompt: int = 1
+    condition_scale: float = 7.5
 
 
 class FinetuneLatentDiffusionConfig(BaseConfig):

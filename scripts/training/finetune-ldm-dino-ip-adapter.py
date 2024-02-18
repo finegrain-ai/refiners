@@ -809,6 +809,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                         x=x,
                         step=step,
                         clip_text_embedding=clip_text_embedding,
+                        condition_scale=self.config.test_ldm.condition_scale
                     )
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
