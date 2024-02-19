@@ -814,7 +814,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         # log images to wandb
-        images["training image"] = self.dataset.dataset[0]["image"]
         self.wandb_log(data=images)
         self.adapter.scale = self.config.adapter.scale
     @register_callback()

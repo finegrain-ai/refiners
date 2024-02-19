@@ -42,16 +42,16 @@ duration = {"number" = 1000000, "unit" = "step"}
 seed = 9752
 batch_size = 16
 gradient_accumulation = {"number" = 16, "unit" = "step"}
-evaluation_interval = {"number" = 4000, "unit" = "step"}
+evaluation_interval = {"number" = 20000, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
 dataset_workers=8
-checkpoint_interval = {"number" = 4000, "unit" = "step"}
+checkpoint_interval = {"number" = 20000, "unit" = "step"}
 device="cuda"
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1e-4
+learning_rate = 5e-5
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
@@ -93,11 +93,15 @@ num_inference_steps = 30
 num_images_per_prompt = 4
 prompts = [
     "A dog flying over a castle",
-    "Cute cats watching a tv"
+    "Cute cats watching a tv",
+    "A ferret on top of a sky scraper",
+    "Pink flamingo playing soccer"
 ]
 validation_image_paths = [
     "tests/weights/frida.jpg",
-    "tests/weights/cute_cats.jpg"
+    "tests/weights/cute_cats.jpg",
+    "tests/weights/ferret.jpg",
+    "tests/weights/pink_flamingo.jpg"
 ]
 [compute_grad_norms]
 
