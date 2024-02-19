@@ -3,8 +3,8 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
-name = "unweighted-palette"
-tags = ["reload-ckpt", "unweighted-palette"]
+name = "weighted-palette"
+tags = ["reload-ckpt", "weighted-palette"]
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
@@ -13,11 +13,11 @@ lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train 
 color_palette_encoder = {train = true}
 
 [adapters]
-color_palette_adapter = {checkpoint = "./tmp/mlp-step4998.safetensors"}
+color_palette_adapter = {}
 
 [latent_diffusion]
 unconditional_sampling_probability = 0.1
-offset_noise = 0.2
+offset_noise = 0.1
 
 [color_palette]
 max_colors = 8
@@ -25,13 +25,13 @@ feedforward_dim = 20
 num_layers = 2
 mode = 'mlp'
 embedding_dim = 10
-weighted_palette = false
+weighted_palette = true
 
 [training]
-duration = "20:epoch"
+duration = "1000:epoch"
 seed = 0
 batch_size = 10
-gradient_accumulation = "10:step"
+gradient_accumulation = "20:step"
 clip_grad_norm = 1.0
 # clip_grad_value = 1.0
 evaluation_interval = "200:step"
@@ -60,7 +60,7 @@ use_gyro_dropout = false
 hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-split = "train[200:]"
+split = "train[:100]"
 
 [checkpointing]
 save_interval = "5000:step"
