@@ -12,6 +12,7 @@ from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
+    ControlLoraAdapter,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
@@ -28,7 +29,6 @@ from refiners.foundationals.latent_diffusion.reference_only_control import Refer
 from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.control_lora import ControlLoraAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 from tests.utils import ensure_similar_images
