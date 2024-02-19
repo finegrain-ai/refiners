@@ -119,8 +119,10 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchHistogramProm
         super().__init__(config=config, callbacks=callbacks)
         self.callbacks.extend((
             LoadColorPalette(), 
-            SaveColorPalette()
-            #,GradientNormLayerLogging()
+            SaveColorPalette(),
+            GradientNormLayerLogging([
+                "unet.*"
+            ])
         ))
     
     def load_models(self) -> dict[str, fl.Module]:

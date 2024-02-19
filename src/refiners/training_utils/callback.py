@@ -267,9 +267,15 @@ class GradientNormLogging(Callback["Trainer[BaseConfig, Any]"]):
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.log(data={"total_grad_norm": trainer.total_gradient_norm})
 
-
+from fnmatch import fnmatch
+        
 class GradientNormLayerLogging(Callback["Trainer[BaseConfig, Any]"]):
+    def __init__(self, names: list[str]) -> None:
+        self.names = names
+        super().__init__()
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         named_gradient_norm = trainer.named_gradient_norm
         for layer_name, norm in named_gradient_norm:
-            trainer.log(data={f"layer_grad_norm/{layer_name}": norm})
+            for pattern in self.names:
+                if fnmatch(layer_name, pattern):
+                    trainer.log(data={f"layer_grad_norm/{layer_name}": norm})

@@ -10,7 +10,7 @@ tags = ["init-ckpt", "weighted-palette"]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
 text_encoder = {checkpoint = "tests/weights/stable-diffusion-1-5/CLIPTextEncoderL.safetensors", train = false}
 lda = {checkpoint = "tests/weights/stable-diffusion-1-5/lda.safetensors", train = false}
-color_palette_encoder = {train = true}
+color_palette_encoder = {learning_rate=1e-2, train = true}
 
 [adapters]
 color_palette_adapter = {}
@@ -60,7 +60,7 @@ use_gyro_dropout = false
 hf_repo = "refiners/unsplash-25k-cogvlm-captions"
 revision = "main"
 resize_image_max_size = 512
-split = "train[:100]"
+split = "train[:200]"
 
 [checkpointing]
 save_interval = "5000:step"
