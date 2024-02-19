@@ -15,6 +15,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     StableDiffusion_1_Inpainting,
 )
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
+    ControlLoraAdapter,
     DoubleTextEncoder,
     SDXLIPAdapter,
     SDXLT2IAdapter,
@@ -41,4 +42,5 @@ __all__ = [
     "SDFreeUAdapter",
     "StableDiffusion_XL",
     "StyleAlignedAdapter",
+    "ControlLoraAdapter",
 ]
