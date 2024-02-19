@@ -3,8 +3,8 @@ script = "finetune-ldm-color-palette.py" # not used for now
 mode = "online" # "online", "offline", "disabled"
 entity = "piercus"
 project = "color-palette"
-name = "weighted-palette"
-tags = ["reload-ckpt", "weighted-palette"]
+name = "weighted-overfit"
+tags = ["init-ckpt", "weighted-palette"]
 
 [models]
 unet = {checkpoint = "tests/weights/stable-diffusion-1-5/unet.safetensors", train = false}
