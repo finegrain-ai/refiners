@@ -199,7 +199,7 @@ class ColorPaletteLatentDiffusionTrainer(AbstractColorTrainer[BatchHistogramProm
         text_embeddings = self.text_encoder(texts)
         
         latents = self.lda.images_to_latents([item.image for item in batch])
-        color_palettes = [self.color_palette_extractor(item.image, size=len(item.palette_size)) for item in batch]
+        color_palettes = [self.color_palette_extractor(item.image, size=item.palette_size) for item in batch]
         
         color_palette_embeddings = self.color_palette_encoder(
             color_palettes
