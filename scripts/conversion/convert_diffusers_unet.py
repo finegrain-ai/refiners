@@ -8,7 +8,7 @@ from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import LcmAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import SDXLLcmAdapter
 
 
 class Args(argparse.Namespace):
@@ -39,7 +39,7 @@ def setup_converter(args: Args) -> ModelConverter:
 
     if source_is_lcm:
         assert isinstance(target, SDXLUNet)
-        LcmAdapter(target=target).inject()
+        SDXLLcmAdapter(target=target).inject()
 
     x = torch.randn(1, source_in_channels, 32, 32)
     timestep = torch.tensor(data=[0])

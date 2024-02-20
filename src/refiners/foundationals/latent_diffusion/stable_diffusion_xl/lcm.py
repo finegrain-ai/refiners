@@ -44,13 +44,25 @@ class ResidualBlock(fl.Residual):
         )
 
 
-class LcmAdapter(fl.Chain, Adapter[SDXLUNet]):
+class SDXLLcmAdapter(fl.Chain, Adapter[SDXLUNet]):
     def __init__(
         self,
         target: SDXLUNet,
         condition_scale_embedding_dim: int = 256,
         condition_scale: float = 7.5,
     ) -> None:
+        """Adapt [the SDXl UNet][refiners.foundationals.latent_diffusion.stable_diffusion_xl.unet.SDXLUNet]
+        for use with [LCMSolver][refiners.foundationals.latent_diffusion.solvers.lcm.LCMSolver].
+
+        Note that LCM must be used *without* CFG. You can disable CFG on SD by setting the
+        `classifier_free_guidance` attribute to `False`.
+
+        Args:
+            target: A SDXL UNet.
+            condition_scale_embedding_dim: LCM uses a condition scale embedding, this is its dimension.
+            condition_scale: Because of the embedding, the condition scale must be passed to this adapter
+                instead of SD. The condition scale passed to SD will be ignored.
+        """
         assert condition_scale_embedding_dim % 2 == 0
         self.condition_scale_embedding_dim = condition_scale_embedding_dim
         self.condition_scale = condition_scale
@@ -71,7 +83,7 @@ class LcmAdapter(fl.Chain, Adapter[SDXLUNet]):
         self.condition_scale = scale
         self.set_context("lcm", {"condition_scale_embedding": self.sinusoidal_embedding})
 
-    def inject(self: "LcmAdapter", parent: fl.Chain | None = None) -> "LcmAdapter":
+    def inject(self: "SDXLLcmAdapter", parent: fl.Chain | None = None) -> "SDXLLcmAdapter":
         ra = self.target.ensure_find(RangeEncoder)
         block = ResidualBlock(
             in_channels=self.condition_scale_embedding_dim,

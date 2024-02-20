@@ -6,6 +6,16 @@ from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule
 
 
 class LCMSolver(Solver):
+    """Latent Consistency Model solver.
+
+    This solver is designed for use either with
+    [a specific base model][refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm.SDXLLcmAdapter]
+    or [a specific LoRA][refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm_lora.add_lcm_lora].
+
+    See [[arXiv:2310.04378] Latent Consistency Models: Synthesizing High-Resolution Images with Few-Step Inference](https://arxiv.org/abs/2310.04378)
+    for details.
+    """
+
     def __init__(
         self,
         num_inference_steps: int,
