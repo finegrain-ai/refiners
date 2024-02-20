@@ -150,7 +150,7 @@ class RelativePositionAttention(fl.WeightedModule):
         vertical_coords = self.compute_relative_coords(size=height)
         horizontal_positional_embedding = self.horizontal_embedding[horizontal_coords]
         vertical_positional_embedding = self.vertical_embedding[vertical_coords]
-        x = x.reshape(x.shape[0], width, -1, height)
+        x = x.reshape(x.shape[0], width, height, -1)
         horizontal_relative_embedding = torch.einsum("bhwc,wkc->bhwk", x, horizontal_positional_embedding).unsqueeze(
             dim=-2
         )
