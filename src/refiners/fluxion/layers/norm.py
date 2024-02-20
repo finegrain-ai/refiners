@@ -4,6 +4,7 @@ from torch.nn import (
     GroupNorm as _GroupNorm,
     InstanceNorm2d as _InstanceNorm2d,
     LayerNorm as _LayerNorm,
+    BatchNorm2d as _BatchNorm2d,
     Parameter as TorchParameter,
 )
 
@@ -151,3 +152,28 @@ class InstanceNorm2d(_InstanceNorm2d, Module):
             device=device,
             dtype=dtype,
         )
+
+
+class BatchNorm2d(_BatchNorm2d, Module):
+    def __init__(
+        self,
+        num_features: int,
+        eps: float = 1e-05,
+        momentum: float = 0.1,
+        affine: bool = True,
+        track_running_stats: bool = True,
+        eval_mode: bool = True,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        super().__init__(  # type: ignore
+            num_features=num_features,
+            eps=eps,
+            momentum=momentum,
+            affine=affine,
+            track_running_stats=track_running_stats,
+            device=device,
+            dtype=dtype,
+        )
+        if eval_mode:
+            self.eval()

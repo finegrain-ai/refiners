@@ -50,7 +50,7 @@ from refiners.fluxion.layers.embedding import Embedding
 from refiners.fluxion.layers.linear import Linear, MultiLinear
 from refiners.fluxion.layers.maxpool import MaxPool1d, MaxPool2d
 from refiners.fluxion.layers.module import ContextModule, Module, WeightedModule
-from refiners.fluxion.layers.norm import GroupNorm, InstanceNorm2d, LayerNorm, LayerNorm2d
+from refiners.fluxion.layers.norm import GroupNorm, InstanceNorm2d, LayerNorm, LayerNorm2d, BatchNorm2d
 from refiners.fluxion.layers.padding import ReflectionPad2d
 from refiners.fluxion.layers.pixelshuffle import PixelUnshuffle
 from refiners.fluxion.layers.sampling import Downsample, Interpolate, Upsample
@@ -60,6 +60,7 @@ __all__ = [
     "LayerNorm",
     "GroupNorm",
     "LayerNorm2d",
+    "BatchNorm2d",
     "InstanceNorm2d",
     "Activation",
     "GeLU",
