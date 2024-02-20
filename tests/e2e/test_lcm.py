@@ -7,10 +7,10 @@ import torch
 from PIL import Image
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
-from refiners.foundationals.latent_diffusion.lcm_lora import add_lcm_lora
 from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.solvers import LCMSolver
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import LcmAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import SDXLLcmAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm_lora import add_lcm_lora
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from tests.utils import ensure_similar_images
 
@@ -105,7 +105,7 @@ def test_lcm_base(
 
     # With standard LCM the condition scale is passed to the adapter,
     # not in the diffusion loop.
-    LcmAdapter(sdxl.unet, condition_scale=8.0).inject()
+    SDXLLcmAdapter(sdxl.unet, condition_scale=8.0).inject()
 
     sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
     sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
@@ -158,7 +158,7 @@ def test_lcm_lora_with_guidance(
     sdxl.unet.load_from_safetensors(sdxl_unet_weights)
 
     manager = SDLoraManager(sdxl)
-    add_lcm_lora(manager, "lcm", load_from_safetensors(sdxl_lcm_lora_weights))
+    add_lcm_lora(manager, load_from_safetensors(sdxl_lcm_lora_weights))
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0 if condition_scale == 1.0 else expected_lcm_lora_1_2
@@ -208,7 +208,7 @@ def test_lcm_lora_without_guidance(
     sdxl.unet.load_from_safetensors(sdxl_unet_weights)
 
     manager = SDLoraManager(sdxl)
-    add_lcm_lora(manager, "lcm", load_from_safetensors(sdxl_lcm_lora_weights))
+    add_lcm_lora(manager, load_from_safetensors(sdxl_lcm_lora_weights))
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0

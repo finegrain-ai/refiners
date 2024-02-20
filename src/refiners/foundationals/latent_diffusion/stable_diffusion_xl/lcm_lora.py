@@ -1,9 +1,8 @@
 import torch
 
 from refiners.fluxion.adapters.lora import Lora, auto_attach_loras
-
-from .lora import SDLoraManager
-from .stable_diffusion_xl import StableDiffusion_XL
+from refiners.foundationals.latent_diffusion.lora import SDLoraManager
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 
 
 def _check_validity(debug_map: list[tuple[str, str]]):
@@ -25,14 +24,27 @@ def _check_validity(debug_map: list[tuple[str, str]]):
 
 def add_lcm_lora(
     manager: SDLoraManager,
-    name: str,
     tensors: dict[str, torch.Tensor],
+    name: str = "lcm",
     scale: float = 1.0 / 8.0,
     check_validity: bool = True,
 ) -> None:
-    # This is a complex LoRA so SDLoraManager.add_lora() is not enough.
-    # Instead, we add the LoRAs to the UNet in several iterations, using
-    # the filtering mechanism of `auto_attach_loras`.
+    """Add a LCM LoRA to SDXLUNet.
+
+    This is a complex LoRA so [SDLoraManager.add_loras()][refiners.foundationals.latent_diffusion.lora.SDLoraManager.add_loras]
+    is not enough. Instead, we add the LoRAs to the UNet in several iterations, using the filtering mechanism of
+    [auto_attach_loras][refiners.fluxion.adapters.lora.auto_attach_loras].
+
+    This LoRA can be used with or without CFG in SD.
+    If you use CFG, typical values range from 1.0 (same as no CFG) to 2.0.
+
+    Args:
+        manager: A SDLoraManager for SDXL
+        tensors: The `state_dict` of the LCM LoRA
+        name: The name of the LoRA.
+        scale: The scale to use for the LoRA (should generally not be changed).
+        check_validity: Perform additional checks, raise an exception if they fail.
+    """
 
     assert isinstance(manager.target, StableDiffusion_XL)
     unet = manager.target.unet

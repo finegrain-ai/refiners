@@ -462,7 +462,7 @@ def auto_attach_loras(
         target: The target Chain.
         include: A list of layer names, only layers with such a layer in its parents will be considered.
         exclude: A list of layer names, layers with such a layer in its parents will not be considered.
-        debug_map: Pass a list to get a debug mapping of key - path pairs.
+        debug_map: Pass a list to get a debug mapping of key - path pairs of attached points.
 
     Returns:
         A list of keys of LoRA layers which failed to attach.
