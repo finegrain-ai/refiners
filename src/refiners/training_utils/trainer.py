@@ -37,6 +37,7 @@ from torch.optim.lr_scheduler import (
 )
 from torch.utils.data import DataLoader, Dataset
 from torch.cuda.amp import GradScaler, autocast
+from torch import autocast as bf16_autocast
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
@@ -120,8 +121,12 @@ def register_model():
                 model.load_from_safetensors(config.checkpoint)
             if not config.train or self.dtype == float32:
                 model = model.to(self.device, dtype=self.dtype)
-            else:
+            elif self.dtype == float16:
                 model.forward = autocast(dtype=self.dtype)(model.forward)
+            elif self.dtype == bfloat16:
+                model.forward = bf16_autocast(device_type=self.device.type, dtype=torch.bfloat16)(model.forward)
+            else:
+                model.forward = autocast()(model.forward)
 
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
