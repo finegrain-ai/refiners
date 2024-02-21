@@ -8,6 +8,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import (
+    tensor,
     Tensor,
     cat,
     device as Device,
@@ -19,7 +20,6 @@ from torch import (
     stack,
     randn_like,
     no_grad,
-    autocast,
     randint,
     float32,
 )
@@ -65,6 +65,7 @@ from refiners.training_utils.wandb import WandbLoggable, WandbMixin, WandbConfig
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 import gc
+import math
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
@@ -74,7 +75,7 @@ class AdapterConfig(ModelConfig):
     """Configuration for the IP adapter."""
 
     image_encoder_type: str
-    checkpoint: str | None = None
+    save_folder: str | None = None
     resolution: int = 518
     scale: float = 1.0
     inference_scale: float = 0.75
@@ -87,6 +88,8 @@ class AdapterConfig(ModelConfig):
     do_palp: bool = False
     palp_alpha: float = 7.5
     palp_beta: float = 5
+    use_rescaler: bool = False
+    image_embedding_div_factor: float = 1
 
 
 class DatasetConfig(BaseModel):
@@ -158,6 +161,7 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     test_ldm: TestIPDiffusionConfig
     compute_grad_norms: CallbackConfig
     compute_param_norms: CallbackConfig
+    save_adapter: CallbackConfig
     wandb: WandbConfig
     unet: ModelConfig
     lda: ModelConfig
@@ -216,24 +220,25 @@ class ComputeParamNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
 class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
     """Callback to save the adapter when a checkpoint is saved."""
 
-    def on_checkpoint_save(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
-        adapter = trainer.adapter
-        cross_attention_adapters = trainer.adapter.sub_adapters
-        image_proj = trainer.adapter.image_proj
+    def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        if trainer.clock.is_evaluation_step:
+            adapter = trainer.adapter
+            cross_attention_adapters = trainer.adapter.sub_adapters
+            image_proj = trainer.adapter.image_proj
 
-        tensors: dict[str, Tensor] = {}
-        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
-        for i, cross_attention_adapter in enumerate(cross_attention_adapters):
-            tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
-        if trainer.config.adapter.use_pooled_text_embedding:
-            tensors |= {
-                f"pooled_text_embedding_proj.{key}": value
-                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
-            }
-        save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors,
-        )
+            tensors: dict[str, Tensor] = {}
+            tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
+            for i, cross_attention_adapter in enumerate(cross_attention_adapters):
+                tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
+            if trainer.config.adapter.use_pooled_text_embedding:
+                tensors |= {
+                    f"pooled_text_embedding_proj.{key}": value
+                    for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
+                }
+            save_to_safetensors(
+                path= f"{trainer.config.adapter.save_folder}/step{trainer.clock.step}.safetensors",
+                tensors=tensors,
+            )
 class IPDataset(Dataset[IPBatch]):
     """Dataset for the IP adapter.
 
@@ -582,6 +587,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             text_embedding=text_embeddings,
             image_embedding=image_embeddings,
         )
+    @staticmethod
+    def approximate_loss(timestep: int, /) -> float:
+        a = 3.1198626909458634e-08
+        exponent = 2.3683577564059
+        b = -0.3560275587290773
+        c = -13.269541143845919
+        C = 0.36245161978354973
+        return a * timestep**exponent + b * math.exp(-c / (timestep - 1001)) + C
     @cached_property
     def dataset_length(self) -> int:
         """
@@ -662,6 +675,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)
             adapter.image_cross_attention.to(self.device, float32)
+        if ip_adapter.use_pooled_text_embedding:
+            ip_adapter.pooled_text_embedding_proj.requires_grad_(True)
+            ip_adapter.pooled_text_embedding_proj.to(self.device, float32)
+
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
@@ -669,8 +686,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
-        for adapter in ip_adapter.sub_adapters:
-            adapter.image_cross_attention.to(self.device, self.dtype)
         empty_cache()
         gc.collect()
         return ip_adapter
@@ -759,14 +774,16 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
-        image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
+        image_embedding = batch.image_embedding.to(self.device, dtype=float32)
         if do_palp:
             assert batch.uncond_text_embedding is not None
             assert batch.uncond_image_embedding is not None
             uncond_text_embedding: Tensor = self.dataset.empty_text_embedding[None, :].repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
             uncond_image_embedding = zeros_like(image_embedding)
 
-        image_embedding = self.image_proj(image_embedding)
+        div_factor = self.config.adapter.image_embedding_div_factor
+        image_embedding = self.image_proj(image_embedding/div_factor)
+
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
 
@@ -791,7 +808,16 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         prediction = self.unet(noisy_latents)
         # compute mse loss
         snr_gamma = self.config.ldm.snr_gamma
-        if snr_gamma is None:
+        rescaler = self.config.adapter.use_rescaler
+        if rescaler:
+            loss = mse_loss(input=prediction.float(), target=noise.float(), reduction="none")
+            scales = tensor(
+                [self.approximate_loss(999 - int(t.item())) for t in timestep],
+                device=self.device,
+                dtype=float32,
+            ).reshape(-1, 1, 1, 1)
+            loss = (loss / scales).mean()
+        elif snr_gamma is None:
             loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
         else:
             # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
@@ -842,7 +868,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_encoder=self.text_encoder,
             solver=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
-            dtype=self.dtype
+            dtype=None
         )
         self.adapter.scale = self.config.adapter.inference_scale
         # retreive data from config
@@ -864,7 +890,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(
-                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype)
+                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype),
+                div_factor=self.config.adapter.image_embedding_div_factor
             )
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
@@ -881,7 +908,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 canvas_image.paste(sd.lda.decode_latents(x=x), box=(0, 512 * i))
             images[prompt] = canvas_image
         # log images to wandb
-        images["training image"] = self.dataset.dataset[0]["image"]
         self.wandb_log(data=images)
         self.adapter.scale = self.config.adapter.scale
     @register_callback()
@@ -890,9 +916,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @register_callback()
     def compute_param_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
         return ComputeParamNormCallback()
-    # @register_callback()
-    # def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
-    #     return SaveAdapterCallback()
+    @register_callback()
+    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
+        return SaveAdapterCallback()
 
     def __init__(
         self,
@@ -901,9 +927,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # if initializing after, the on_init_end methods do not get called for the extended callbacks. So all these callbacks
         # can't have on_init
         super().__init__(config=config)
-        self._callbacks["compute_grad_norm"] = ComputeGradNormCallback()
-        self._callbacks["compute_param_norm"] = ComputeParamNormCallback()
-        # self._callbacks["save_adapter"] = SaveAdapterCallback()
 
 
 

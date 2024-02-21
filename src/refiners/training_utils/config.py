@@ -160,7 +160,7 @@ class ModelConfig(BaseModel):
     eps: float | None = None
     weight_decay: float | None = None
     checkpoint: str | None = None
-
+    train: bool = False
 
     model_config = ConfigDict(extra="forbid")
 

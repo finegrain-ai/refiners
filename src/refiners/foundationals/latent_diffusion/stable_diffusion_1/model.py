@@ -42,7 +42,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         clip_text_encoder: CLIPTextEncoderL | None = None,
         solver: Solver | None = None,
         device: Device | str = "cpu",
-        dtype: DType = torch.float32,
+        dtype: DType | None = torch.float32,
     ) -> None:
         """Initializes the model.
 
