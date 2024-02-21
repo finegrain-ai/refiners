@@ -160,7 +160,7 @@ class ModelConfig(BaseModel):
     eps: float | None = None
     weight_decay: float | None = None
     checkpoint: str | None = None
-    set_to_device: bool = True
+    train: bool = False
 
     model_config = ConfigDict(extra="forbid")
 

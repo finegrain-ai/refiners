@@ -36,7 +36,7 @@ from torch.optim.lr_scheduler import (
     StepLR,
 )
 from torch.utils.data import DataLoader, Dataset
-from torch.cuda.amp import GradScaler
+from torch.cuda.amp import GradScaler, autocast
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
@@ -118,8 +118,11 @@ def register_model():
             model = func(self, config)
             if config.checkpoint is not None:
                 model.load_from_safetensors(config.checkpoint)
-            if config.set_to_device:
+            if not config.train or self.dtype == float32:
                 model = model.to(self.device, dtype=self.dtype)
+            else:
+                model.forward = autocast(dtype=self.dtype)(model.forward)
+
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
