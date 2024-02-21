@@ -339,23 +339,23 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         pass
 
     def backward_step(self, scaled_loss: Tensor) -> None:
-        if self.scaler is not None:
-            self.scaler.scale(scaled_loss).backward()  # type: ignore
-        else:
+        if self.scaler is None:
             backward(tensors=scaled_loss)
+            return
+        self.scaler.scale(scaled_loss).backward()  # type: ignore
 
+    # logic from accelerator
     def optimizer_step(self) -> None:
-        if self.scaler is not None:
-            # logic from accelerator
-            scale_before = self.scaler.get_scale()  # type: ignore
-            self.scaler.step(self.optimizer)  # type: ignore
-            self.scaler.update()  # type: ignore
-            scale_after = self.scaler.get_scale()  # type: ignore
-            # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
-            if scale_after < scale_before:
-                logger.info("Overflow in optimizer caused optimizer to skip")
-        else:
+        if self.scaler is None:
             self.optimizer.step()
+            return
+        scale_before = self.scaler.get_scale()  # type: ignore
+        self.scaler.step(self.optimizer)  # type: ignore
+        self.scaler.update()  # type: ignore
+        scale_after = self.scaler.get_scale()  # type: ignore
+        # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+        if scale_after < scale_before:
+            logger.info("Overflow in optimizer caused optimizer to skip")
 
     def backward(self) -> None:
         """Backward pass on the loss."""
