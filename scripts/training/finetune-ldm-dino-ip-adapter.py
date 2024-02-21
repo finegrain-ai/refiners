@@ -155,6 +155,7 @@ class AdapterLatentDiffusionConfig(BaseConfig):
     test_ldm: TestIPDiffusionConfig
     compute_grad_norms: CallbackConfig
     compute_param_norms: CallbackConfig
+    save_adapter: CallbackConfig
     wandb: WandbConfig
     unet: ModelConfig
     lda: ModelConfig
@@ -843,9 +844,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # if initializing after, the on_init_end methods do not get called for the extended callbacks. So all these callbacks
         # can't have on_init
         super().__init__(config=config)
-        self._callbacks["compute_grad_norm"] = ComputeGradNormCallback()
-        self._callbacks["compute_param_norm"] = ComputeParamNormCallback()
-        # self._callbacks["save_adapter"] = SaveAdapterCallback()
 
 
 
