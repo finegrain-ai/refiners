@@ -668,8 +668,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         logger.info(f"Initialized {i} parameters in ip adapter")
         empty_cache()
         gc.collect()
-        for adapter in ip_adapter.sub_adapters:
-            print("IP Adapter dtype", adapter.image_cross_attention.dtype)
         return ip_adapter
 
     @cached_property
@@ -723,9 +721,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         image_embedding = batch.image_embedding.to(self.device, dtype=float32)
 
         image_embedding = self.image_proj(image_embedding)
-        print("image emb", image_embedding.dtype)
-        for adapter in self.adapter.sub_adapters:
-            print("Adapter dtype", adapter.image_cross_attention.dtype)
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
 
@@ -767,12 +762,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             loss = mse_loss(prediction.float(), noise.float(), reduction="none")
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
-        print("loss", loss.dtype)
         return loss
 
     def compute_evaluation(self) -> None:
-        for adapter in self.adapter.sub_adapters:
-            print("Adapter dtype", adapter.image_cross_attention.dtype)
         # initialize an SD1.5 pipeline using the trainer's models
         sd = StableDiffusion_1(
             unet=self.unet,

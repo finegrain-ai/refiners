@@ -125,11 +125,8 @@ def register_model():
                 model = model.to(dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
-                
+
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
-            if name == "adapter":
-                for learnable_parameter in learnable_parameters:
-                    print("register ", learnable_parameter.dtype)
             self.models[name] = ModelItem(
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
@@ -421,7 +418,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single training step."""
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
-        loss = self.compute_loss(batch=batch)
+        with autocast(dtype=self.dtype):
+            loss = self.compute_loss(batch=batch)
         self.loss = loss
         forward_time = time.time() - start
         self.forward_time_m.update(forward_time)
