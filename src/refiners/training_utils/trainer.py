@@ -31,6 +31,7 @@ from refiners.training_utils.callback import (
     CallbackConfig,
 )
 from refiners.training_utils.clock import ClockConfig, TrainingClock
+from refiners.training_utils.timer import TrainingTimer
 from refiners.training_utils.common import (
     compute_grad_norm,
     count_learnable_parameters,
@@ -39,24 +40,6 @@ from refiners.training_utils.common import (
 )
 from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
-
-
-# Ported from open-muse
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.avg: float = 0
-        self.sum: float = 0
-        self.count: int = 0
-
-    def update(self, val: float):
-        self.sum += val
-        self.count += 1
-        self.avg = self.sum / self.count
 
 
 class WarmupScheduler(LRScheduler):
@@ -160,10 +143,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._models: ModelRegistry = {}
         self._callbacks: CallbackRegistry = {}
         self.config = config
-        self.batch_time_m = AverageMeter()
-        self.forward_time_m = AverageMeter()
-        self.backprop_time_m = AverageMeter()
-        self.data_time_m = AverageMeter()
         self._load_callbacks()
         self._call_callbacks(event_name="on_init_begin")
         self._load_models()
@@ -180,6 +159,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
+
+    @register_callback()
+    def timer(self, config: CallbackConfig) -> TrainingTimer:
+        return TrainingTimer()
 
     @register_callback()
     def gradient_clipping(self, config: GradientClippingConfig) -> GradientClipping:
@@ -358,13 +341,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
-        ...
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
     def compute_evaluation(self) -> None:
         pass
 
-    def backward(self, start: float) -> float:
+    def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
@@ -379,39 +361,25 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
             self.lr_scheduler.step()
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        backward_time = time.time()-start
         if self.clock.is_evaluation_step:
             self.evaluate()
-        return backward_time
 
-    def step(self, batch: Batch) -> tuple[float, float]:
+    def step(self, batch: Batch) -> None:
         """Perform a single training step."""
-        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)
         self.loss = loss
-        forward_time = time.time() - start
-        self.forward_time_m.update(forward_time)
-        start = time.time()
         self._call_callbacks(event_name="on_compute_loss_end")
-        backward_time = self.backward(start)
-        self.backprop_time_m.update(backward_time)
-        return forward_time, backward_time
+        self.backward()
 
     def epoch(self) -> None:
         """Perform a single epoch."""
-        start = time.time()
         for batch in self.dataloader:
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_batch_begin")
-            data_time = time.time() - start
-            self.data_time_m.update(data_time)
-            forward_time, backward_time = self.step(batch=batch)
+            self.step(batch=batch)
             self._call_callbacks(event_name="on_batch_end")
-            batch_time = data_time + forward_time + backward_time
-            self.batch_time_m.update(batch_time)
-            start = time.time()
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
