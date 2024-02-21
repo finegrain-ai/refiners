@@ -771,6 +771,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return loss
 
     def compute_evaluation(self) -> None:
+        for adapter in self.adapter.sub_adapters:
+            print("Adapter dtype", adapter.image_cross_attention.dtype)
         # initialize an SD1.5 pipeline using the trainer's models
         sd = StableDiffusion_1(
             unet=self.unet,
