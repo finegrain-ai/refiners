@@ -8,6 +8,7 @@ from loguru import logger
 from PIL import Image
 from pydantic import BaseModel
 from torch import (
+    tensor,
     Tensor,
     cat,
     device as Device,
@@ -73,7 +74,7 @@ class AdapterConfig(ModelConfig):
     """Configuration for the IP adapter."""
 
     image_encoder_type: str
-    checkpoint: str | None = None
+    save_folder: str | None = None
     resolution: int = 518
     scale: float = 1.0
     inference_scale: float = 0.75
@@ -230,7 +231,7 @@ class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
                     for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
                 }
             save_to_safetensors(
-                path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
+                path=trainer.config.adapter.save_folder / f"step{trainer.clock.step}.safetensors",
                 tensors=tensors,
             )
 class IPDataset(Dataset[IPBatch]):
@@ -760,7 +761,17 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
         # compute mse loss
         snr_gamma = self.config.ldm.snr_gamma
-        if snr_gamma is None:
+        rescaler = self.config.adapter.use_rescaler
+        if rescaler:
+            prediction = self.unet(noisy_latents)
+            loss = mse_loss(input=prediction.float(), target=noise.float(), reduction="none")
+            scales = tensor(
+                [self.approximate_loss(999 - int(t.item())) for t in timestep],
+                device=self.device,
+                dtype=float32,
+            ).reshape(-1, 1, 1, 1)
+            loss = (loss / scales).mean()
+        elif snr_gamma is None:
             loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
         else:
             # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.

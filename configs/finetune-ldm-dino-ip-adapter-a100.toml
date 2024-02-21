@@ -39,6 +39,7 @@ initializer_range = 0.02
 use_bias = true
 train = true
 use_rescaler = true
+save_folder = "/home/isamu/checkpoints"
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
@@ -109,3 +110,5 @@ validation_image_paths = [
 [compute_grad_norms]
 
 [compute_param_norms]
+
+[save_adapter]
