@@ -783,15 +783,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
-        image_embedding = batch.image_embedding.to(self.device, dtype=float32)
+        div_factor = self.config.adapter.image_embedding_div_factor
+        image_embedding = batch.image_embedding.to(self.device, dtype=float32)/div_factor
         if do_palp:
             assert batch.uncond_text_embedding is not None
             assert batch.uncond_image_embedding is not None
-            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding[None, :].repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
-            uncond_image_embedding = zeros_like(image_embedding)
+            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
+            if self.config.dataset.zero_uncond:
+                uncond_image_embedding = zeros_like(image_embedding)
+            else:
+                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)/div_factor
 
-        div_factor = self.config.adapter.image_embedding_div_factor
-        image_embedding = self.image_proj(image_embedding/div_factor)
+        image_embedding = self.image_proj(image_embedding)
 
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
