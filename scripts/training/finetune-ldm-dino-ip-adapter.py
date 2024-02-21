@@ -718,10 +718,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # retreive data from batch
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
-        image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
+        image_embedding = batch.image_embedding.to(self.device, dtype=float32)
 
         image_embedding = self.image_proj(image_embedding)
-        image_embedding = image_embedding.to(dtype=self.dtype)
+        print("image emb", image_embedding.dtype)
+        for adapter in self.adapter.sub_adapters:
+            print("Adapter dtype", adapter.image_cross_attention.dtype)
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
 
@@ -763,7 +765,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             loss = mse_loss(prediction.float(), noise.float(), reduction="none")
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
-
+        print("loss", loss.dtype)
         return loss
 
     def compute_evaluation(self) -> None:
