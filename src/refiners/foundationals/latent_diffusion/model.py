@@ -20,7 +20,7 @@ class LatentDiffusionModel(fl.Module, ABC):
         clip_text_encoder: fl.Chain,
         solver: Solver,
         device: Device | str = "cpu",
-        dtype: DType = torch.float32,
+        dtype: DType | None = torch.float32,
     ) -> None:
         super().__init__()
         self.device: Device = device if isinstance(device, Device) else Device(device=device)
