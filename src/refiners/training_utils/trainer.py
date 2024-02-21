@@ -120,8 +120,9 @@ def register_model():
             model = func(self, config)
             if config.checkpoint is not None:
                 model.load_from_safetensors(config.checkpoint)
+            model = model.to(self.device)
             if not config.train or self.dtype == float32:
-                model = model.to(self.device, dtype=self.dtype)
+                model = model.to(dtype=self.dtype)
 
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)

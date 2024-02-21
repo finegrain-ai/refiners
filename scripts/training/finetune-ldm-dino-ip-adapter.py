@@ -668,6 +668,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         logger.info(f"Initialized {i} parameters in ip adapter")
         empty_cache()
         gc.collect()
+        for adapter in ip_adapter.sub_adapters:
+            print("IP Adapter dtype", adapter.image_cross_attention.dtype)
         return ip_adapter
 
     @cached_property
