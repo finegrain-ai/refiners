@@ -780,7 +780,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_encoder=self.text_encoder,
             solver=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
-            dtype=self.dtype
+            dtype=None
         )
         self.adapter.scale = self.config.adapter.inference_scale
         # retreive data from config
