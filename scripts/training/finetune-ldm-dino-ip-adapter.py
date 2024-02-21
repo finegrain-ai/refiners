@@ -666,8 +666,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if param.requires_grad:
                 i += 1
         logger.info(f"Initialized {i} parameters in ip adapter")
-        for adapter in ip_adapter.sub_adapters:
-            adapter.image_cross_attention.to(self.device, self.dtype)
         empty_cache()
         gc.collect()
         return ip_adapter
