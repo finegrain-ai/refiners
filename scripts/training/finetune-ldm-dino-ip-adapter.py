@@ -83,6 +83,7 @@ class AdapterConfig(ModelConfig):
     initialize_model: bool = True
     initializer_range: float = 0.02
     use_bias: bool = False
+    use_rescaler: bool = False
 
 
 class DatasetConfig(BaseModel):
@@ -212,24 +213,25 @@ class ComputeParamNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
 class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
     """Callback to save the adapter when a checkpoint is saved."""
 
-    def on_checkpoint_save(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
-        adapter = trainer.adapter
-        cross_attention_adapters = trainer.adapter.sub_adapters
-        image_proj = trainer.adapter.image_proj
+    def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
+        if trainer.clock.is_evaluation_step:
+            adapter = trainer.adapter
+            cross_attention_adapters = trainer.adapter.sub_adapters
+            image_proj = trainer.adapter.image_proj
 
-        tensors: dict[str, Tensor] = {}
-        tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
-        for i, cross_attention_adapter in enumerate(cross_attention_adapters):
-            tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
-        if trainer.config.adapter.use_pooled_text_embedding:
-            tensors |= {
-                f"pooled_text_embedding_proj.{key}": value
-                for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
-            }
-        save_to_safetensors(
-            path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
-            tensors=tensors,
-        )
+            tensors: dict[str, Tensor] = {}
+            tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
+            for i, cross_attention_adapter in enumerate(cross_attention_adapters):
+                tensors |= {f"ip_adapter.{i+1}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
+            if trainer.config.adapter.use_pooled_text_embedding:
+                tensors |= {
+                    f"pooled_text_embedding_proj.{key}": value
+                    for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
+                }
+            save_to_safetensors(
+                path=trainer.ensure_checkpoints_save_folder / f"step{trainer.clock.step}.safetensors",
+                tensors=tensors,
+            )
 class IPDataset(Dataset[IPBatch]):
     """Dataset for the IP adapter.
 
@@ -578,6 +580,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             text_embedding=text_embeddings,
             image_embedding=image_embeddings,
         )
+    @staticmethod
+    def approximate_loss(timestep: int, /) -> float:
+        a = 3.1198626909458634e-08
+        exponent = 2.3683577564059
+        b = -0.3560275587290773
+        c = -13.269541143845919
+        C = 0.36245161978354973
+        return a * timestep**exponent + b * math.exp(-c / (timestep - 1001)) + C
     @cached_property
     def dataset_length(self) -> int:
         """
@@ -658,6 +668,10 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)
             adapter.image_cross_attention.to(self.device, float32)
+        if ip_adapter.use_pooled_text_embedding:
+            ip_adapter.pooled_text_embedding_proj.requires_grad_(True)
+            ip_adapter.pooled_text_embedding_proj.to(self.device, float32)
+
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
@@ -818,9 +832,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @register_callback()
     def compute_param_norms(self, config: CallbackConfig) -> ComputeParamNormCallback:
         return ComputeParamNormCallback()
-    # @register_callback()
-    # def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
-    #     return SaveAdapterCallback()
+    @register_callback()
+    def save_adapter(self, config: CallbackConfig) -> SaveAdapterCallback:
+        return SaveAdapterCallback()
 
     def __init__(
         self,

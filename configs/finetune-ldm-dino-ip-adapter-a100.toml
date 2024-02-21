@@ -38,6 +38,7 @@ initialize_model = true
 initializer_range = 0.02
 use_bias = true
 train = true
+use_rescaler = true
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}

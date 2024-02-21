@@ -408,8 +408,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             backward_time = time.time()-start_time
             if self.clock.is_evaluation_step:
                 self.evaluate()
-            if self.clock.is_checkpointing_step:
-                self._call_callbacks(event_name="on_checkpoint_save")
             return backward_time
         else:
             return time.time()-start_time
