@@ -678,7 +678,7 @@ def convert_lcm_base():
         "tests/weights/latent-consistency/lcm-sdxl",
         "tests/weights/sdxl-lcm-unet.safetensors",
         half=True,
-        expected_hash="242cf440",
+        expected_hash="e161b20c",
     )
 
 
