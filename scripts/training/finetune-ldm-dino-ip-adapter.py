@@ -86,6 +86,9 @@ class AdapterConfig(ModelConfig):
     initialize_model: bool = True
     initializer_range: float = 0.02
     use_bias: bool = False
+    do_palp: bool = False
+    palp_alpha: float = 7.5
+    palp_beta: float = 5
     use_rescaler: bool = False
     image_embedding_div_factor: float = 1
 
@@ -732,6 +735,19 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             ],
             dim=0,
         )
+    def remove_noise_from_latents(
+        self, latents: Tensor, noise: Tensor
+    ) -> Tensor:
+        """Add noise to latents."""
+        return cat(
+            [
+                self.ddpm_solver.remove_noise(
+                    latents[i : i + 1], noise[i : i + 1], int(self.random_steps[i].item())
+                )
+                for i in range(latents.shape[0])
+            ],
+            dim=0,
+        )
     def sample_noise(self, size: tuple[int, ...], dtype: DType | None = None) -> Tensor:
         return sample_noise(
             size=size,
@@ -741,12 +757,45 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
+        """
+        For adapting this to PALP, the changes needed are
+        1. We need to guarantee that we have both the correct text and image embeddings
+        2. We need both the negative and the positive embeddings
+        3. We do CFG where the base pretrained model has a higher cfg than us
+
+        Then, the steps are
+        1. Predict the original latent given noisy latent+scheduler with injected model(I think)
+        2. Given the predicted x_0 we add noise to it again at timestep t to get x'_t(for now I'm thinking of using same timestep)
+        3. Eject adapter from unet and compute the empty embeds and the text conditioned embeds and do a cfg with some alpha condition scale
+        4. Inject, and do cfg with unconditioned image text, and get conditioned and do cfg with some condition scale beta
+        5. To the loss, add the difference between 3 and 4
+        """
+        do_palp = self.config.adapter.do_palp
+        if do_palp:
+            assert self.config.dataset.image_drop_rate == 0
+            assert self.config.dataset.text_drop_rate == 0
+            assert self.config.dataset.text_and_image_drop_rate == 0
+            alpha = self.config.adapter.palp_alpha
+            beta = self.config.adapter.palp_beta
+
+
         # retreive data from batch
         latents = batch.latent.to(self.device, dtype=self.dtype)
+        batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
-        image_embedding = batch.image_embedding.to(self.device, dtype=float32)
         div_factor = self.config.adapter.image_embedding_div_factor
-        image_embedding = self.image_proj(image_embedding/div_factor)
+        image_embedding = batch.image_embedding.to(self.device, dtype=float32)/div_factor
+        if do_palp:
+            assert batch.uncond_text_embedding is not None
+            assert batch.uncond_image_embedding is not None
+            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
+            if self.config.dataset.zero_uncond:
+                uncond_image_embedding = zeros_like(image_embedding)
+            else:
+                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)/div_factor
+
+        image_embedding = self.image_proj(image_embedding)
+
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
 
@@ -754,7 +803,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
         # sample timestep and set unet timestep context
-        timestep = self.sample_timestep(latents.shape[0])
+        timestep = self.sample_timestep(batch_size)
         self.unet.set_timestep(timestep=timestep)
 
         # sample noise and noisify the latents
@@ -769,7 +818,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
         # get prediction from unet
         prediction = self.unet(noisy_latents)
-
         # compute mse loss
         snr_gamma = self.config.ldm.snr_gamma
         rescaler = self.config.adapter.use_rescaler
@@ -797,6 +845,31 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             loss = mse_loss(prediction.float(), noise.float(), reduction="none")
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
+        if do_palp:
+            timestep = self.sample_timestep(batch_size)
+            predicted_latent = self.remove_noise_from_latents(noisy_latents, prediction)
+            text_alignment_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
+            noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, text_alignment_noise)
+            self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
+            self.unet.set_timestep(timestep=timestep)
+            self.adapter.set_image_embedding(uncond_image_embedding)
+            uncond_adapted_noise = self.unet(noisy_predicted_latent)
+            self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
+            self.unet.set_timestep(timestep=timestep)
+            self.adapter.set_image_embedding(image_embedding)
+            cond_adapted_noise = self.unet(noisy_predicted_latent)
+            self.adapter.eject()
+            self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
+            self.unet.set_timestep(timestep=timestep)
+            uncond_default_noise = self.unet(noisy_predicted_latent)
+            self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
+            self.unet.set_timestep(timestep=timestep)
+            cond_default_noise = self.unet(noisy_predicted_latent)
+            self.adapter.inject()
+            cfg_default_noise = uncond_default_noise+alpha*(cond_default_noise-uncond_default_noise)
+            cfg_adapted_noise = uncond_adapted_noise+beta*(cond_adapted_noise-uncond_adapted_noise)
+            loss += mse_loss(cfg_default_noise.float(), cfg_adapted_noise.float(), reduction="mean")
+
         return loss
 
     def compute_evaluation(self) -> None:
