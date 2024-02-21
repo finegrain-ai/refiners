@@ -763,7 +763,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         snr_gamma = self.config.ldm.snr_gamma
         rescaler = self.config.adapter.use_rescaler
         if rescaler:
-            prediction = self.unet(noisy_latents)
             loss = mse_loss(input=prediction.float(), target=noise.float(), reduction="none")
             scales = tensor(
                 [self.approximate_loss(999 - int(t.item())) for t in timestep],
