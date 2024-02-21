@@ -720,51 +720,51 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         image_embedding = batch.image_embedding.to(self.device, dtype=self.dtype)
+        with autocast(self.device.type, self.dtype):
+            image_embedding = self.image_proj(image_embedding)
+            # set IP embeddings context
+            self.adapter.set_image_embedding(image_embedding)
 
-        image_embedding = self.image_proj(image_embedding)
-        # set IP embeddings context
-        self.adapter.set_image_embedding(image_embedding)
+            # set text embeddings context
+            self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
-        # set text embeddings context
-        self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
+            # sample timestep and set unet timestep context
+            timestep = self.sample_timestep(latents.shape[0])
+            self.unet.set_timestep(timestep=timestep)
 
-        # sample timestep and set unet timestep context
-        timestep = self.sample_timestep(latents.shape[0])
-        self.unet.set_timestep(timestep=timestep)
-
-        # sample noise and noisify the latents
-        noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-        input_perturbation = self.config.ldm.input_perturbation
-        if input_perturbation > 0:
-            new_noise = noise + input_perturbation * randn_like(noise)
-            noisy_latents = self.add_noise_to_latents(latents, new_noise)
-        else:
-            noisy_latents = self.add_noise_to_latents(latents, noise)
+            # sample noise and noisify the latents
+            noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
+            input_perturbation = self.config.ldm.input_perturbation
+            if input_perturbation > 0:
+                new_noise = noise + input_perturbation * randn_like(noise)
+                noisy_latents = self.add_noise_to_latents(latents, new_noise)
+            else:
+                noisy_latents = self.add_noise_to_latents(latents, noise)
 
 
-        # get prediction from unet
-        prediction = self.unet(noisy_latents)
+            # get prediction from unet
+            prediction = self.unet(noisy_latents)
 
-        # compute mse loss
-        snr_gamma = self.config.ldm.snr_gamma
-        if snr_gamma is None:
-            loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
-        else:
-            # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
-            # Since we predict the noise instead of x_0, the original formulation is slightly changed.
-            # This is discussed in Section 4.2 of the same paper.
-            signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
+            # compute mse loss
+            snr_gamma = self.config.ldm.snr_gamma
+            if snr_gamma is None:
+                loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
+            else:
+                # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                # This is discussed in Section 4.2 of the same paper.
+                signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
 
-            mse_loss_weights = (
-                stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
-                / signal_to_noise_ratios
-            )
+                mse_loss_weights = (
+                    stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
+                    / signal_to_noise_ratios
+                )
 
-            loss = mse_loss(prediction.float(), noise.float(), reduction="none")
-            loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-            loss = loss.mean()
+                loss = mse_loss(prediction.float(), noise.float(), reduction="none")
+                loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+                loss = loss.mean()
 
-        return loss
+            return loss
 
     def compute_evaluation(self) -> None:
         # initialize an SD1.5 pipeline using the trainer's models
