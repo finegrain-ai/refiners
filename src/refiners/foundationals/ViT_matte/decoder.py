@@ -60,7 +60,7 @@ class VitMatteConvStream(fl.Passthrough):
         )
 
 
-class Fusion_Block(fl.Chain):
+class FusionBlock(fl.Chain):
     def __init__(
         self,
         in_channels: int,
@@ -83,7 +83,7 @@ class Fusion_Block(fl.Chain):
         )
 
 
-class Matting_Head(fl.Chain):
+class MattingHead(fl.Chain):
     def __init__(
         self,
         in_channels: int = 32,
@@ -114,7 +114,7 @@ class FusionBlocks(fl.Chain):
     pass
 
 
-class Detail_Capture(fl.Chain):
+class DetailCapture(fl.Chain):
     def __init__(
         self,
         in_channels: int = 384,
@@ -132,14 +132,14 @@ class Detail_Capture(fl.Chain):
         super().__init__(
             VitMatteConvStream(in_channels=img_channels),
             FusionBlocks(
-                Fusion_Block(
+                FusionBlock(
                     in_channels=self.fusion_channels[i] + self.conv_channels[-(i + 1)],
                     out_channels=self.fusion_channels[i + 1],
                     conv_key=f"{len(self.conv_channels)-i-1}",
                 )
                 for i in range(len(self.fusion_channels) - 1)
             ),
-            Matting_Head(in_channels=fusion_out[-1]),
+            MattingHead(in_channels=fusion_out[-1]),
             fl.Sigmoid(),
         )
 

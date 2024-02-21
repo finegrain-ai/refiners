@@ -364,10 +364,7 @@ class Transformer(fl.Chain):
     pass
 
 
-# -----------------------------------------------------------------------
-
-
-class MViT(fl.Chain):
+class ViT(fl.Chain):
     def __init__(
         self,
         embedding_dim: int,
@@ -391,6 +388,7 @@ class MViT(fl.Chain):
         self.num_patches = (pretrain_img_size // self.patch_size) * (pretrain_img_size // self.patch_size)
         self.num_positions = self.num_patches + 1
         super().__init__(
+            fl.SetContext(context="detail_capture", key="images"),
             PatchEncoder(
                 in_channels=4, out_channels=embedding_dim, patch_size=self.patch_size, device=device, dtype=dtype
             ),
@@ -415,9 +413,12 @@ class MViT(fl.Chain):
             ),
             fl.Permute(0, 3, 1, 2),
         )
+        for layer in self.layers(TransformerLayer):
+            if layer.window_size is None:
+                layer.append(ResBlock(layer.embedding_dim))
 
 
-class MViTH(MViT):
+class ViTH(ViT):
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
         super().__init__(
             embedding_dim=384,

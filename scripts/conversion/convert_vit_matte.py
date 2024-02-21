@@ -10,9 +10,7 @@ from transformers.models.vitdet.modeling_vitdet import VitDetLayerNorm  # type: 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import manual_seed, save_to_safetensors
-from refiners.foundationals.ViT_matte.decoder import Detail_Capture
-from refiners.foundationals.ViT_matte.vit_backbone import MViTH
-from refiners.foundationals.ViT_matte.vit_matte import ViTMatte
+from refiners.foundationals.vit_matte import DetailCapture, ViT, ViTMatteH
 
 
 class VitMatte(nn.Module):
@@ -36,7 +34,7 @@ class Args(argparse.Namespace):
 
 def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
-    refiners_vit_matte_h = MViTH()
+    refiners_vit_matte_h = ViTMatteH().ensure_find(ViT)
 
     converter = ModelConverter(
         source_model=vit,
@@ -96,7 +94,7 @@ def convert_decoder(decoder: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
     features = torch.randn((1, 384, 32, 32))
     images = torch.randn((1, 4, 512, 512))
-    d_capture = Detail_Capture()
+    d_capture = ViTMatteH().ensure_find(DetailCapture)
     d_capture.set_context("detail_capture", {"images": images})
 
     converter = ModelConverter(
@@ -143,11 +141,11 @@ def main() -> None:
     decoder_state_dict = convert_decoder(decoder=vitm_h.decoder)  # type: ignore
 
     output_state_dict = {
-        **{".".join(("MViTH", key)): value for key, value in vit_state_dict.items()},
-        **{".".join(("Detail_Capture", key)): value for key, value in decoder_state_dict.items()},
+        **{".".join(("ViT", key)): value for key, value in vit_state_dict.items()},
+        **{".".join(("DetailCapture", key)): value for key, value in decoder_state_dict.items()},
     }
 
-    myViTMatte = ViTMatte()
+    myViTMatte = ViTMatteH()
     myViTMatte.load_state_dict(output_state_dict)
 
     images = torch.randn((1, 4, 512, 512))
