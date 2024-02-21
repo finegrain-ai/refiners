@@ -5,7 +5,7 @@ from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
 from loguru import logger
-from torch import Tensor, device as Device, dtype as DType, nn
+from torch import Tensor, device as Device, dtype as DType, nn, float16
 from torch.autograd import backward
 from torch.cuda.amp import GradScaler
 from torch.optim import Optimizer
@@ -186,7 +186,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def scaler(self) -> GradScaler | None:
-        if self.config.training.dtype == "float32":
+        if self.dtype != float16:
             return None
         return GradScaler()
 
