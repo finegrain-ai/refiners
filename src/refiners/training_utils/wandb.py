@@ -140,10 +140,9 @@ class WandbCallback(Callback["TrainerWithWandb"]):
                 }
             )
     def on_epoch_end(self, trainer: "TrainerWithWandb") -> None:
-        if trainer.clock.is_evaluation_step:
-            avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
-            trainer.wandb_log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
-            self.epoch_losses = []
+        avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
+        trainer.wandb_log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
+        self.epoch_losses = []
 
     def on_lr_scheduler_step_end(self, trainer: "TrainerWithWandb") -> None:
         if trainer.clock.is_evaluation_step:
