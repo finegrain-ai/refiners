@@ -1,9 +1,7 @@
 import time
-from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from refiners.training_utils.callback import Callback
-from refiners.training_utils.common import TimeUnit, TimeValue
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.trainer import Trainer
 
