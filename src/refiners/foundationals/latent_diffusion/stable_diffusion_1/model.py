@@ -42,7 +42,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         clip_text_encoder: CLIPTextEncoderL | None = None,
         solver: Solver | None = None,
         device: Device | str = "cpu",
-        dtype: DType = torch.float32,
+        dtype: DType | None = torch.float32,
     ) -> None:
         """Initializes the model.
 
@@ -180,7 +180,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
         clip_text_encoder: CLIPTextEncoderL | None = None,
         solver: Solver | None = None,
         device: Device | str = "cpu",
-        dtype: DType = torch.float32,
+        dtype: DType | None = torch.float32,
     ) -> None:
         self.mask_latents: Tensor | None = None
         self.target_image_latents: Tensor | None = None
