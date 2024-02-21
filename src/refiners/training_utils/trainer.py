@@ -5,9 +5,9 @@ from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
 from loguru import logger
-from torch import Tensor, device as Device, dtype as DType, nn, float16
+from torch import Tensor, device as Device, dtype as DType, nn, float16, float32
 from torch.autograd import backward
-from torch.cuda.amp import GradScaler
+from torch.cuda.amp import GradScaler, autocast
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -102,7 +102,9 @@ def register_model():
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
-            model = model.to(self.device, dtype=self.dtype)
+            model = model.to(self.device)
+            if not config.train or self.dtype == float32:
+                model = model.to(dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
@@ -388,7 +390,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""
         self._call_callbacks(event_name="on_compute_loss_begin")
-        loss = self.compute_loss(batch=batch)
+        with autocast(dtype=self.dtype):
+            loss = self.compute_loss(batch=batch)
         self.loss = loss
         self._call_callbacks(event_name="on_compute_loss_end")
         self.backward()
@@ -429,7 +432,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Evaluate the model."""
         self.set_models_to_mode(mode="eval")
         self._call_callbacks(event_name="on_evaluate_begin")
-        self.compute_evaluation()
+        with autocast(dtype=self.dtype):
+            self.compute_evaluation()
         self._call_callbacks(event_name="on_evaluate_end")
         self.set_models_to_mode(mode="train")
 
