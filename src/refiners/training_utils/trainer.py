@@ -36,8 +36,7 @@ from torch.optim.lr_scheduler import (
     StepLR,
 )
 from torch.utils.data import DataLoader, Dataset
-from torch.cuda.amp import GradScaler, autocast
-from torch import autocast as torch_autocast
+from torch.cuda.amp import GradScaler
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
@@ -54,6 +53,8 @@ from refiners.training_utils.common import (
 )
 from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
+from torch.cuda.amp import autocast
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -122,10 +123,6 @@ def register_model():
             model = model.to(self.device)
             if not config.train or self.dtype == float32:
                 model = model.to(dtype=self.dtype)
-            elif self.dtype == bfloat16:
-                model.forward = torch_autocast(self.device.type, dtype=bfloat16)(model.forward)
-            else:
-                model.forward = autocast(dtype=float16)(model.forward)
 
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
@@ -421,7 +418,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single training step."""
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
-        loss = self.compute_loss(batch=batch)
+        with autocast(dtype=self.dtype):
+            loss = self.compute_loss(batch=batch)
         self.loss = loss
         forward_time = time.time() - start
         self.forward_time_m.update(forward_time)
