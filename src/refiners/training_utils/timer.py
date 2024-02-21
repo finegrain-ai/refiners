@@ -43,10 +43,6 @@ class TrainingTimer(Callback["Trainer[BaseConfig, Any]"]):
     def on_epoch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.start_time = time.time()
 
-    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.epoch += 1
-        trainer.clock.num_batches_processed = 0
-
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.data_time_meter.update(time.time() - self.start_time)
 
