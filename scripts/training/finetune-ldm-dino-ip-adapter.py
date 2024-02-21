@@ -65,6 +65,7 @@ from refiners.training_utils.wandb import WandbLoggable, WandbMixin, WandbConfig
 import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 import gc
+import math
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
