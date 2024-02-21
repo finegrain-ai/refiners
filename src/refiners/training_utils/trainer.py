@@ -182,11 +182,13 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
         logger.info(f"Using dtype: {dtype}")
         return dtype
+
     @cached_property
     def scaler(self) -> GradScaler | None:
         if self.config.training.dtype == "float32":
             return None
         return GradScaler()
+
     @property
     def learnable_parameters(self) -> list[nn.Parameter]:
         """Returns a list of learnable parameters in all models"""
@@ -339,34 +341,39 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
-        ...
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
     def compute_evaluation(self) -> None:
         pass
+
+    def backward_step(self, scaled_loss: Tensor) -> None:
+        if self.scaler is not None:
+            self.scaler.scale(scaled_loss).backward()  # type: ignore
+        else:
+            backward(tensors=scaled_loss)
+
+    def optimizer_step(self) -> None:
+        if self.scaler is not None:
+            # logic from accelerator
+            scale_before = self.scaler.get_scale()  # type: ignore
+            self.scaler.step(self.optimizer)  # type: ignore
+            self.scaler.update()  # type: ignore
+            scale_after = self.scaler.get_scale()  # type: ignore
+            # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
+            if scale_after < scale_before:
+                logger.info("Overflow in optimizer caused optimizer to skip")
+        else:
+            self.optimizer.step()
 
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
         scaled_loss = self.loss / self.clock.num_step_per_iteration
-        if self.scaler is not None:
-            self.scaler.scale(scaled_loss).backward()  # type: ignore
-        else:
-            backward(tensors=scaled_loss)
+        self.backward_step(scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
-            if self.scaler is not None:
-                # logic from accelerator
-                scale_before = self.scaler.get_scale()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                scale_after = self.scaler.get_scale()
-                # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
-                if scale_after < scale_before:
-                    logger.info("Overflow in optimizer caused optimizer to skip")
-            else:
-                self.optimizer.step()
+            self.optimizer_step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:
