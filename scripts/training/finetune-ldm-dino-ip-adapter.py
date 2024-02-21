@@ -182,6 +182,7 @@ class ComputeGradNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
             for name, param in trainer.adapter.named_parameters():
                 if param.grad is not None:
                     grads = param.grad.detach().data
+                    print(grads.dtype)
                     grad_norm = (grads.norm(p=2) / grads.numel()).item()
                     trainer.wandb_log(data={"grad_norm/" + name: grad_norm})
             for name, param in trainer.image_proj.named_parameters():
