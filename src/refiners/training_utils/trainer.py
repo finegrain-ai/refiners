@@ -119,14 +119,14 @@ def register_model():
             model = func(self, config)
             if config.checkpoint is not None:
                 model.load_from_safetensors(config.checkpoint)
-            if not config.train or self.dtype == float32:
-                model = model.to(self.device, dtype=self.dtype)
-            elif self.dtype == float16:
-                model.forward = autocast(dtype=self.dtype)(model.forward)
-            elif self.dtype == bfloat16:
-                model.forward = bf16_autocast(device_type=self.device.type, dtype=torch.bfloat16)(model.forward)
-            else:
-                model.forward = autocast()(model.forward)
+            # if not config.train or self.dtype == float32:
+            model = model.to(self.device, dtype=self.dtype)
+            # elif self.dtype == float16:
+            #     model.forward = autocast(dtype=float16)(model.forward)
+            # elif self.dtype == bfloat16:
+            #     model.forward = bf16_autocast(device_type=self.device.type, dtype=bfloat16)(model.forward)
+            # else:
+            #     model.forward = autocast()(model.forward)
 
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
@@ -277,7 +277,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def scaler(self) -> GradScaler | None:
-        if self.config.training.mixed_precision == "no":
+        if self.dtype == float32:
             return None
         return GradScaler()
 
