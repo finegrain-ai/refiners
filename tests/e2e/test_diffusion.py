@@ -1,4 +1,5 @@
 import gc
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 from warnings import warn
@@ -11,6 +12,7 @@ from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
+    ControlLoraAdapter,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
@@ -28,6 +30,7 @@ from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
+from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 from tests.utils import ensure_similar_images
 
 
@@ -148,6 +151,11 @@ def expected_sdxl_euler_random_init(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "expected_cutecat_sdxl_euler_random_init.png").convert("RGB")
 
 
+@pytest.fixture
+def expected_style_aligned(ref_path: Path) -> Image.Image:
+    return Image.open(fp=ref_path / "expected_style_aligned.png").convert(mode="RGB")
+
+
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
 def controlnet_data(
     ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
@@ -183,6 +191,84 @@ def controlnet_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str,
     expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
     weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1p_sd15_depth.safetensors"
     return cn_name, condition_image, expected_image, weights_path
+
+
+@dataclass
+class ControlLoraConfig:
+    scale: float
+    condition_path: str
+    weights_path: str
+
+
+@dataclass
+class ControlLoraResolvedConfig:
+    scale: float
+    condition_image: Image.Image
+    weights_path: Path
+
+
+CONTROL_LORA_CONFIGS: dict[str, dict[str, ControlLoraConfig]] = {
+    "expected_controllora_PyraCanny.png": {
+        "PyraCanny": ControlLoraConfig(
+            scale=1.0,
+            condition_path="cutecat_guide_PyraCanny.png",
+            weights_path="refiners_control-lora-canny-rank128.safetensors",
+        ),
+    },
+    "expected_controllora_CPDS.png": {
+        "CPDS": ControlLoraConfig(
+            scale=1.0,
+            condition_path="cutecat_guide_CPDS.png",
+            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+        ),
+    },
+    "expected_controllora_PyraCanny+CPDS.png": {
+        "PyraCanny": ControlLoraConfig(
+            scale=0.55,
+            condition_path="cutecat_guide_PyraCanny.png",
+            weights_path="refiners_control-lora-canny-rank128.safetensors",
+        ),
+        "CPDS": ControlLoraConfig(
+            scale=0.55,
+            condition_path="cutecat_guide_CPDS.png",
+            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+        ),
+    },
+    "expected_controllora_disabled.png": {
+        "PyraCanny": ControlLoraConfig(
+            scale=0.0,
+            condition_path="cutecat_guide_PyraCanny.png",
+            weights_path="refiners_control-lora-canny-rank128.safetensors",
+        ),
+        "CPDS": ControlLoraConfig(
+            scale=0.0,
+            condition_path="cutecat_guide_CPDS.png",
+            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+        ),
+    },
+}
+
+
+@pytest.fixture(params=CONTROL_LORA_CONFIGS.items())
+def controllora_sdxl_config(
+    request: pytest.FixtureRequest,
+    ref_path: Path,
+    test_weights_path: Path,
+) -> tuple[Image.Image, dict[str, ControlLoraResolvedConfig]]:
+    name: str = request.param[0]
+    configs: dict[str, ControlLoraConfig] = request.param[1]
+    expected_image = Image.open(ref_path / name).convert("RGB")
+
+    loaded_configs = {
+        config_name: ControlLoraResolvedConfig(
+            scale=config.scale,
+            condition_image=Image.open(ref_path / config.condition_path).convert("RGB"),
+            weights_path=test_weights_path / "control-loras" / config.weights_path,
+        )
+        for config_name, config in configs.items()
+    }
+
+    return expected_image, loaded_configs
 
 
 @pytest.fixture(scope="module")
@@ -672,6 +758,60 @@ def test_diffusion_std_random_init(
 
 
 @no_grad()
+def test_diffusion_batch2(sd15_std: StableDiffusion_1):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2 = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    step = sd15.steps[0]
+
+    manual_seed(2)
+    rand_b2 = torch.randn(2, 4, 64, 64, device=sd15.device)
+
+    x_b2 = sd15(
+        rand_b2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_b2,
+        condition_scale=7.5,
+    )
+
+    assert x_b2.shape == (2, 4, 64, 64)
+
+    rand_1 = rand_b2[0:1]
+    clip_text_embedding_1 = sd15.compute_clip_text_embedding(text=[prompt1], negative_text=[negative_prompt1])
+    x_1 = sd15(
+        rand_1,
+        step=step,
+        clip_text_embedding=clip_text_embedding_1,
+        condition_scale=7.5,
+    )
+
+    rand_2 = rand_b2[1:2]
+    clip_text_embedding_2 = sd15.compute_clip_text_embedding(text=[prompt2], negative_text=[negative_prompt2])
+    x_2 = sd15(
+        rand_2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_2,
+        condition_scale=7.5,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
+
+
+@no_grad()
 def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
@@ -750,7 +890,6 @@ def test_diffusion_std_random_init_float16(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
@@ -1075,6 +1214,79 @@ def test_diffusion_controlnet_stack(
 
 
 @no_grad()
+def test_diffusion_sdxl_control_lora(
+    controllora_sdxl_config: tuple[Image.Image, dict[str, ControlLoraResolvedConfig]],
+    sdxl_ddim_lda_fp16_fix: StableDiffusion_XL,
+) -> None:
+    sdxl = sdxl_ddim_lda_fp16_fix.to(dtype=torch.float16)
+    sdxl.dtype = torch.float16  # FIXME: should not be necessary
+
+    expected_image = controllora_sdxl_config[0]
+    configs = controllora_sdxl_config[1]
+
+    adapters: dict[str, ControlLoraAdapter] = {}
+    for config_name, config in configs.items():
+        adapter = ControlLoraAdapter(
+            name=config_name,
+            scale=config.scale,
+            target=sdxl.unet,
+            weights=load_from_safetensors(
+                path=config.weights_path,
+                device=sdxl.device,
+            ),
+        )
+        adapter.set_condition(
+            image_to_tensor(
+                image=config.condition_image,
+                device=sdxl.device,
+                dtype=sdxl.dtype,
+            )
+        )
+        adapters[config_name] = adapter
+
+    # inject all the control lora adapters
+    for adapter in adapters.values():
+        adapter.inject()
+
+    # compute the text embeddings
+    prompt = "a cute cat, flying in the air, detailed high-quality professional image, blank background"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality, watermarks"
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=prompt,
+        negative_text=negative_prompt,
+    )
+
+    # initialize the latents
+    manual_seed(2)
+    x = torch.randn(
+        (1, 4, 128, 128),
+        device=sdxl.device,
+        dtype=sdxl.dtype,
+    )
+
+    # denoise
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=sdxl.default_time_ids,
+        )
+
+    # decode latent to image
+    predicted_image = sdxl.lda.decode_latents(x)
+
+    # ensure the predicted image is similar to the expected image
+    ensure_similar_images(
+        img_1=predicted_image,
+        img_2=expected_image,
+        min_psnr=35,
+        min_ssim=0.99,
+    )
+
+
+@no_grad()
 def test_diffusion_lora(
     sd15_std: StableDiffusion_1,
     lora_data_pokemon: tuple[Image.Image, dict[str, torch.Tensor]],
@@ -1104,6 +1316,68 @@ def test_diffusion_lora(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_batch2(sdxl_ddim: StableDiffusion_XL) -> None:
+    sdxl = sdxl_ddim
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2, pooled_text_embedding_b2 = sdxl.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    time_ids = sdxl.default_time_ids
+    time_ids_b2 = sdxl.default_time_ids.repeat(2, 1)
+
+    manual_seed(seed=2)
+    x_b2 = torch.randn(2, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    x_1 = x_b2[0:1]
+    x_2 = x_b2[1:2]
+
+    x_b2 = sdxl(
+        x_b2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_b2,
+        pooled_text_embedding=pooled_text_embedding_b2,
+        time_ids=time_ids_b2,
+    )
+
+    clip_text_embedding_1, pooled_text_embedding_1 = sdxl.compute_clip_text_embedding(
+        text=prompt1, negative_text=negative_prompt1
+    )
+
+    x_1 = sdxl(
+        x_1,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_1,
+        pooled_text_embedding=pooled_text_embedding_1,
+        time_ids=time_ids,
+    )
+
+    clip_text_embedding_2, pooled_text_embedding_2 = sdxl.compute_clip_text_embedding(
+        text=prompt2, negative_text=negative_prompt2
+    )
+
+    x_2 = sdxl(
+        x_2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_2,
+        pooled_text_embedding=pooled_text_embedding_2,
+        time_ids=time_ids,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
 
 
 @no_grad()
@@ -1987,3 +2261,59 @@ def test_hello_world(
     predicted_image = sdxl.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image)
+
+
+@no_grad()
+def test_style_aligned(
+    sdxl_ddim_lda_fp16_fix: StableDiffusion_XL,
+    expected_style_aligned: Image.Image,
+):
+    sdxl = sdxl_ddim_lda_fp16_fix.to(dtype=torch.float16)
+    sdxl.dtype = torch.float16  # FIXME: should not be necessary
+
+    style_aligned_adapter = StyleAlignedAdapter(sdxl.unet)
+    style_aligned_adapter.inject()
+
+    set_of_prompts = [
+        "a toy train. macro photo. 3d game asset",
+        "a toy airplane. macro photo. 3d game asset",
+        "a toy bicycle. macro photo. 3d game asset",
+        "a toy car. macro photo. 3d game asset",
+        "a toy boat. macro photo. 3d game asset",
+    ]
+
+    # create (context) embeddings from prompts
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=set_of_prompts, negative_text=[""] * len(set_of_prompts)
+    )
+
+    time_ids = sdxl.default_time_ids.repeat(len(set_of_prompts), 1)
+
+    # initialize latents
+    manual_seed(seed=2)
+    x = torch.randn(
+        (len(set_of_prompts), 4, 128, 128),
+        device=sdxl.device,
+        dtype=sdxl.dtype,
+    )
+
+    # denoise
+    for step in sdxl.steps:
+        x = sdxl(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+        )
+
+    # decode latents
+    predicted_images = [sdxl.lda.decode_latents(latent.unsqueeze(0)) for latent in x]
+
+    # tile all images horizontally
+    merged_image = Image.new("RGB", (1024 * len(predicted_images), 1024))
+    for i in range(len(predicted_images)):
+        merged_image.paste(predicted_images[i], (i * 1024, 0))
+
+    # compare against reference image
+    ensure_similar_images(merged_image, expected_style_aligned, min_psnr=35, min_ssim=0.99)

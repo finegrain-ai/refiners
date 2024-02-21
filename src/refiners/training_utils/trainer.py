@@ -36,7 +36,7 @@ from refiners.training_utils.common import (
     human_readable_number,
     scoped_seed,
 )
-from refiners.training_utils.config import BaseConfig, ModelConfig, SchedulerType
+from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
 
 
@@ -154,7 +154,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             training_duration=self.config.training.duration,
             evaluation_interval=self.config.training.evaluation_interval,
             gradient_accumulation=self.config.training.gradient_accumulation,
-            lr_scheduler_interval=self.config.scheduler.update_interval,
+            lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
 
@@ -237,21 +237,21 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
-        config = self.config.scheduler
+        config = self.config.lr_scheduler
         scheduler_step_size = config.update_interval["number"]
 
-        match config.scheduler_type:
-            case SchedulerType.CONSTANT_LR:
+        match config.type:
+            case LRSchedulerType.CONSTANT_LR:
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=lambda _: 1.0)
-            case SchedulerType.STEP_LR:
+            case LRSchedulerType.STEP_LR:
                 lr_scheduler = StepLR(optimizer=self.optimizer, step_size=scheduler_step_size, gamma=config.gamma)
-            case SchedulerType.EXPONENTIAL_LR:
+            case LRSchedulerType.EXPONENTIAL_LR:
                 lr_scheduler = ExponentialLR(optimizer=self.optimizer, gamma=config.gamma)
-            case SchedulerType.COSINE_ANNEALING_LR:
+            case LRSchedulerType.COSINE_ANNEALING_LR:
                 lr_scheduler = CosineAnnealingLR(
                     optimizer=self.optimizer, T_max=scheduler_step_size, eta_min=config.eta_min
                 )
-            case SchedulerType.REDUCE_LR_ON_PLATEAU:
+            case LRSchedulerType.REDUCE_LR_ON_PLATEAU:
                 lr_scheduler = cast(
                     LRScheduler,
                     ReduceLROnPlateau(
@@ -264,24 +264,24 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                         min_lr=config.min_lr,
                     ),
                 )
-            case SchedulerType.LAMBDA_LR:
+            case LRSchedulerType.LAMBDA_LR:
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use LambdaLR"
                 lr_scheduler = LambdaLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
-            case SchedulerType.ONE_CYCLE_LR:
+            case LRSchedulerType.ONE_CYCLE_LR:
                 lr_scheduler = OneCycleLR(
                     optimizer=self.optimizer, max_lr=config.max_lr, total_steps=scheduler_step_size
                 )
-            case SchedulerType.MULTIPLICATIVE_LR:
+            case LRSchedulerType.MULTIPLICATIVE_LR:
                 assert config.lr_lambda is not None, "lr_lambda must be specified to use MultiplicativeLR"
                 lr_scheduler = MultiplicativeLR(optimizer=self.optimizer, lr_lambda=config.lr_lambda)
-            case SchedulerType.COSINE_ANNEALING_WARM_RESTARTS:
+            case LRSchedulerType.COSINE_ANNEALING_WARM_RESTARTS:
                 lr_scheduler = CosineAnnealingWarmRestarts(optimizer=self.optimizer, T_0=scheduler_step_size)
-            case SchedulerType.CYCLIC_LR:
+            case LRSchedulerType.CYCLIC_LR:
                 lr_scheduler = CyclicLR(optimizer=self.optimizer, base_lr=config.base_lr, max_lr=config.max_lr)
-            case SchedulerType.MULTI_STEP_LR:
+            case LRSchedulerType.MULTI_STEP_LR:
                 lr_scheduler = MultiStepLR(optimizer=self.optimizer, milestones=config.milestones, gamma=config.gamma)
             case _:
-                raise ValueError(f"Unknown scheduler type: {config.scheduler_type}")
+                raise ValueError(f"Unknown scheduler type: {config.type}")
 
         warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval["unit"])
         if warmup_scheduler_steps > 0:
