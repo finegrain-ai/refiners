@@ -421,8 +421,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single training step."""
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
-        with autocast(dtype=self.dtype):
-            loss = self.compute_loss(batch=batch)
+        loss = self.compute_loss(batch=batch)
         self.loss = loss
         forward_time = time.time() - start
         self.forward_time_m.update(forward_time)
