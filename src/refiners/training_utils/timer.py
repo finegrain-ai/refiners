@@ -10,9 +10,6 @@ if TYPE_CHECKING:
     from refiners.training_utils.trainer import Trainer
 
 
-from loguru import logger
-
-
 # Ported from open-muse
 class AverageMeter(object):
     """Computes and stores the average and current value"""
