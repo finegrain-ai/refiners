@@ -2,10 +2,10 @@ from typing import cast
 from warnings import warn
 
 import pytest
-from torch import Tensor, allclose, device as Device, equal, isclose, randn
+from torch import Generator, Tensor, allclose, device as Device, equal, isclose, randn
 
 from refiners.fluxion import manual_seed
-from refiners.foundationals.latent_diffusion.solvers import DDIM, DDPM, DPMSolver, Euler, NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, DDPM, DPMSolver, Euler, LCMSolver, NoiseSchedule
 
 
 def test_ddpm_diffusers():
@@ -98,6 +98,49 @@ def test_euler_diffusers():
         refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.02), f"outputs differ at step {step}"
+
+
+def test_lcm_diffusers():
+    from diffusers import LCMScheduler  # type: ignore
+
+    manual_seed(0)
+
+    # LCMScheduler is stochastic, make sure we use identical generators
+    diffusers_generator = Generator().manual_seed(42)
+    refiners_generator = Generator().manual_seed(42)
+
+    diffusers_scheduler = LCMScheduler()
+    diffusers_scheduler.set_timesteps(4)
+    refiners_scheduler = LCMSolver(num_inference_steps=4, diffusers_mode=True)
+
+    # diffusers_mode means the timesteps are the same
+    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+
+    sample = randn(1, 4, 32, 32)
+    predicted_noise = randn(1, 4, 32, 32)
+
+    for step, timestep in enumerate(diffusers_scheduler.timesteps):
+        alpha_prod_t = diffusers_scheduler.alphas_cumprod[timestep]
+        diffusers_noise_ratio = (1 - alpha_prod_t).sqrt()
+        diffusers_scale_factor = alpha_prod_t.sqrt()
+
+        refiners_scale_factor = refiners_scheduler.cumulative_scale_factors[timestep]
+        refiners_noise_ratio = refiners_scheduler.noise_std[timestep]
+
+        assert refiners_scale_factor == diffusers_scale_factor
+        assert refiners_noise_ratio == diffusers_noise_ratio
+
+        d_out = diffusers_scheduler.step(predicted_noise, timestep, sample, generator=diffusers_generator)  # type: ignore
+        diffusers_output = cast(Tensor, d_out.prev_sample)  # type: ignore
+
+        refiners_output = refiners_scheduler(
+            x=sample,
+            predicted_noise=predicted_noise,
+            step=step,
+            generator=refiners_generator,
+        )
+
+        assert allclose(refiners_output, diffusers_output, rtol=0.01), f"outputs differ at step {step}"
 
 
 def test_scheduler_remove_noise():

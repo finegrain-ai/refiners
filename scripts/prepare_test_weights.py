@@ -52,6 +52,7 @@ def download_file(
     dry_run: bool | None = None,
     skip_existing: bool = True,
     expected_hash: str | None = None,
+    filename: str | None = None,
 ):
     """
     Downloads a file
@@ -65,7 +66,7 @@ def download_file(
 
     """
     global download_count, bytes_count
-    filename = os.path.basename(urlparse(url).path)
+    filename = os.path.basename(urlparse(url).path) if filename is None else filename
     dest_filename = os.path.join(dest_folder, filename)
     temp_filename = dest_filename + ".part"
     dry_run = bool(os.environ.get("DRY_RUN") == "1") if dry_run is None else dry_run
@@ -273,6 +274,20 @@ def download_controlnet():
     download_files(urls, mfidabel_folder)
 
 
+def download_control_lora_fooocus():
+    base_folder = os.path.join(test_weights_dir, "lllyasviel", "misc")
+    control_loras = [
+        "control-lora-canny-rank128.safetensors",
+        "fooocus_xl_cpds_128.safetensors",
+    ]
+
+    for control_lora in control_loras:
+        download_file(
+            url=f"https://huggingface.co/lllyasviel/misc/resolve/main/{control_lora}",
+            dest_folder=base_folder,
+        )
+
+
 def download_unclip():
     base_folder = os.path.join(test_weights_dir, "stabilityai", "stable-diffusion-2-1-unclip")
     download_file(
@@ -348,6 +363,24 @@ def download_dinov2():
             f"https://huggingface.co/facebook/{repo}/resolve/main/pytorch_model.bin",
         ]
         download_files(urls, base_folder)
+
+
+def download_lcm_base():
+    base_folder = os.path.join(test_weights_dir, "latent-consistency/lcm-sdxl")
+    download_file(f"https://huggingface.co/latent-consistency/lcm-sdxl/raw/main/config.json", base_folder)
+    download_file(
+        f"https://huggingface.co/latent-consistency/lcm-sdxl/resolve/main/diffusion_pytorch_model.safetensors",
+        base_folder,
+    )
+
+
+def download_lcm_lora():
+    download_file(
+        "https://huggingface.co/latent-consistency/lcm-lora-sdxl/resolve/main/pytorch_lora_weights.safetensors",
+        dest_folder=test_weights_dir,
+        filename="sdxl-lcm-lora.safetensors",
+        expected_hash="6312a30a",
+    )
 
 
 def printg(msg: str):
@@ -624,6 +657,31 @@ def convert_dinov2():
     )
 
 
+def convert_control_lora_fooocus():
+    run_conversion_script(
+        "convert_fooocus_control_lora.py",
+        "tests/weights/lllyasviel/misc/control-lora-canny-rank128.safetensors",
+        "tests/weights/control_lora/refiners_control-lora-canny-rank128.safetensors",
+        expected_hash="4d505134",
+    )
+    run_conversion_script(
+        "convert_fooocus_control_lora.py",
+        "tests/weights/lllyasviel/misc/fooocus_xl_cpds_128.safetensors",
+        "tests/weights/control_lora/refiners_fooocus_xl_cpds_128.safetensors",
+        expected_hash="d81aa461",
+    )
+
+
+def convert_lcm_base():
+    run_conversion_script(
+        "convert_diffusers_unet.py",
+        "tests/weights/latent-consistency/lcm-sdxl",
+        "tests/weights/sdxl-lcm-unet.safetensors",
+        half=True,
+        expected_hash="e161b20c",
+    )
+
+
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
     download_sd15("runwayml/stable-diffusion-v1-5")
@@ -639,6 +697,9 @@ def download_all():
     download_t2i_adapter()
     download_sam()
     download_dinov2()
+    download_control_lora_fooocus()
+    download_lcm_base()
+    download_lcm_lora()
 
 
 def convert_all():
@@ -654,6 +715,8 @@ def convert_all():
     convert_t2i_adapter()
     convert_sam()
     convert_dinov2()
+    convert_control_lora_fooocus()
+    convert_lcm_base()
 
 
 def main():

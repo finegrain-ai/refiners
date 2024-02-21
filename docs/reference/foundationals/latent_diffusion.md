@@ -9,3 +9,5 @@
 ::: refiners.foundationals.latent_diffusion.lora
 
 ::: refiners.foundationals.latent_diffusion.image_prompt
+
+::: refiners.foundationals.latent_diffusion.style_aligned

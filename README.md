@@ -21,6 +21,9 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added [Latent Consistency Models](https://arxiv.org/abs/2310.04378) and [LCM-LoRA](https://arxiv.org/abs/2311.05556) for Stable Diffusion XL
+- Added [Style Aligned adapter](https://arxiv.org/abs/2312.02133) to Stable Diffusion models
+- Added [ControlLoRA (v2) adapter](https://github.com/HighCWu/control-lora-v2) to Stable Diffusion XL
 - Added [Euler's method](https://arxiv.org/abs/2206.00364) to solvers (contributed by [@israfelsr](https://github.com/israfelsr))
 - Added [DINOv2](https://github.com/facebookresearch/dinov2) for high-performance visual features (contributed by [@Laurent2916](https://github.com/Laurent2916))
 - Added [FreeU](https://github.com/ChenyangSi/FreeU) for improved quality at no cost (contributed by [@isamu-isozaki](https://github.com/isamu-isozaki))

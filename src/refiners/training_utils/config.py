@@ -46,7 +46,7 @@ class Optimizers(str, Enum):
     Prodigy = "Prodigy"
 
 
-class SchedulerType(str, Enum):
+class LRSchedulerType(str, Enum):
     STEP_LR = "StepLR"
     EXPONENTIAL_LR = "ExponentialLR"
     REDUCE_LR_ON_PLATEAU = "ReduceLROnPlateau"
@@ -61,8 +61,8 @@ class SchedulerType(str, Enum):
     DEFAULT = "ConstantLR"
 
 
-class SchedulerConfig(BaseModel):
-    scheduler_type: SchedulerType = SchedulerType.DEFAULT
+class LRSchedulerConfig(BaseModel):
+    type: LRSchedulerType = LRSchedulerType.DEFAULT
     update_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     warmup: TimeValue = {"number": 0, "unit": TimeUnit.ITERATION}
     gamma: float = 0.1
@@ -165,7 +165,7 @@ T = TypeVar("T", bound="BaseConfig")
 class BaseConfig(BaseModel):
     training: TrainingConfig
     optimizer: OptimizerConfig
-    scheduler: SchedulerConfig
+    lr_scheduler: LRSchedulerConfig
     clock: ClockConfig = ClockConfig()
     gradient_clipping: GradientClippingConfig = GradientClippingConfig()
 

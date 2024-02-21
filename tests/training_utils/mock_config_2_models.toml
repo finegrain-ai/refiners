@@ -23,6 +23,6 @@ evaluation_seed = 1
 optimizer = "SGD"
 learning_rate = 1
 
-[scheduler]
-scheduler_type = "ConstantLR"
+[lr_scheduler]
+type = "ConstantLR"
 update_interval = "1:step"
