@@ -4,7 +4,6 @@ from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
-import time
 from loguru import logger
 from torch import Tensor, device as Device, dtype as DType, nn
 from torch.autograd import backward
@@ -341,7 +340,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor: ...
+    def compute_loss(self, batch: Batch) -> Tensor:
+        ...
 
     def compute_evaluation(self) -> None:
         pass
