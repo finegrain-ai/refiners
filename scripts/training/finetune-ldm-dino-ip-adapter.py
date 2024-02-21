@@ -86,6 +86,7 @@ class AdapterConfig(ModelConfig):
     initializer_range: float = 0.02
     use_bias: bool = False
     use_rescaler: bool = False
+    image_embedding_div_factor: float = 1
 
 
 class DatasetConfig(BaseModel):
@@ -735,8 +736,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         image_embedding = batch.image_embedding.to(self.device, dtype=float32)
-
-        image_embedding = self.image_proj(image_embedding)
+        div_factor = self.config.adapter.image_embedding_div_factor
+        image_embedding = self.image_proj(image_embedding/div_factor)
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
 
@@ -819,7 +820,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(
-                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype)
+                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype),
+                self.config.adapter.image_embedding_div_factor
             )
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):

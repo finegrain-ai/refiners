@@ -593,6 +593,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         weights: list[float] | None = None,
         concat_batches: bool = True,
         size: tuple[int, int] = (224, 224),
+        div_factor: float = 1
     ) -> Tensor:
         """Compute the image embedding.
 
@@ -610,7 +611,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             assert all(isinstance(image, Image.Image) for image in image_prompt)
             image_prompt = cat([self.preprocess_image(image, size=size) for image in image_prompt])
 
-        negative_embedding, conditional_embedding = self._compute_image_embedding(image_prompt)
+        negative_embedding, conditional_embedding = self._compute_image_embedding(image_prompt, div_factor)
 
         batch_size = image_prompt.shape[0]
         if weights is not None:
@@ -631,15 +632,17 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         return cat((negative_embedding, conditional_embedding))
 
 
-    def _compute_image_embedding(self, image_prompt: Tensor) -> tuple[Tensor, Tensor]:
+    def _compute_image_embedding(self, image_prompt: Tensor, div_factor: float = 1) -> tuple[Tensor, Tensor]:
         image_encoder = self.image_encoder
         image_embedding = image_encoder(image_prompt)
+        image_embedding /= div_factor
         conditional_embedding = self.image_proj(image_embedding)
         if not self.fine_grained:
             negative_embedding = self.image_proj(zeros_like(image_embedding))
         else:
             # See https://github.com/tencent-ailab/IP-Adapter/blob/d580c50/tutorial_train_plus.py#L351-L352
             image_embedding = image_encoder(zeros_like(image_prompt))
+            image_embedding /= div_factor
             negative_embedding = self.image_proj(image_embedding)
         return negative_embedding, conditional_embedding
 
