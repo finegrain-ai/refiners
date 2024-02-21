@@ -576,24 +576,24 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def set_pooled_text_embedding(self, pooled_text_embedding: Tensor) -> None:
         self.set_context("ip_adapter", {"pooled_text_embedding": pooled_text_embedding})
     @overload
-    def compute_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor:
+    def compute_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None, div_factor: float = 1) -> Tensor:
         ...
 
     @overload
-    def compute_image_embedding(self, image_prompt: Image.Image) -> Tensor:
+    def compute_image_embedding(self, image_prompt: Image.Image, div_factor: float = 1) -> Tensor:
         ...
 
     @overload
     def compute_image_embedding(
-        self, image_prompt: list[Image.Image], weights: list[float] | None = None
+        self, image_prompt: list[Image.Image], weights: list[float] | None = None, div_factor: float = 1
     ) -> Tensor:
         ...
     # These should be concatenated to the CLIP text embedding before setting the UNet context
     def compute_image_embedding(self, image_prompt: Tensor | Image.Image | list[Image.Image],
         weights: list[float] | None = None,
+        div_factor: float = 1,
         concat_batches: bool = True,
         size: tuple[int, int] = (224, 224),
-        div_factor: float = 1
     ) -> Tensor:
         """Compute the image embedding.
 

@@ -820,7 +820,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(
-                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype)            )
+                self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype),
+                div_factor=self.config.adapter.image_embedding_div_factor
+            )
             # TODO: pool text according to end of text id for pooled text embeds if given option
             for i in range(num_images_per_prompt):
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
