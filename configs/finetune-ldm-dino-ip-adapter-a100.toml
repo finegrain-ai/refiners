@@ -24,7 +24,7 @@ checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors"
 requires_grad = false
 
 [image_proj]
-set_to_device = false
+train = true
 
 [adapter]
 image_encoder_type = "dinov2_vitl14_reg4"
@@ -37,7 +37,7 @@ fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
-set_to_device = false
+train = true
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
