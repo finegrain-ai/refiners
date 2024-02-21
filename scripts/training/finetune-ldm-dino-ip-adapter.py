@@ -232,7 +232,7 @@ class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
                     for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
                 }
             save_to_safetensors(
-                path=trainer.config.adapter.save_folder / f"step{trainer.clock.step}.safetensors",
+                path= f"{trainer.config.adapter.save_folder}/step{trainer.clock.step}.safetensors",
                 tensors=tensors,
             )
 class IPDataset(Dataset[IPBatch]):
