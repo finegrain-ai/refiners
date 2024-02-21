@@ -468,11 +468,12 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @scoped_seed(seed=get_evaluation_seed)
     def evaluate(self) -> None:
         """Evaluate the model."""
-        self.set_models_to_mode(mode="eval")
-        self._call_callbacks(event_name="on_evaluate_begin")
-        self.compute_evaluation()
-        self._call_callbacks(event_name="on_evaluate_end")
-        self.set_models_to_mode(mode="train")
+        with autocast(dtype=self.dtype):
+            self.set_models_to_mode(mode="eval")
+            self._call_callbacks(event_name="on_evaluate_begin")
+            self.compute_evaluation()
+            self._call_callbacks(event_name="on_evaluate_end")
+            self.set_models_to_mode(mode="train")
 
     def set_models_to_mode(self, mode: Literal["train", "eval"]) -> None:
         for item in self.models.values():
