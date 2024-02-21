@@ -22,6 +22,7 @@ from torch import (
     no_grad,
     randint,
     float32,
+    zeros
 )
 from torch.cuda import empty_cache
 from torch.distributions import Beta
@@ -111,6 +112,7 @@ class DatasetConfig(BaseModel):
     download_images: bool = True
     save_path: str | None = None
     dataset_length: int | None = None
+    zero_uncond: bool = False
 
 
 # Adapted from https://github.com/huggingface/open-muse
@@ -254,6 +256,7 @@ class IPDataset(Dataset[IPBatch]):
         self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
         self.empty_text_embedding = self.trainer.text_encoder("").cpu().float()
+        self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).cpu().float()
 
     @staticmethod
     def download_images(
@@ -548,14 +551,20 @@ class IPDataset(Dataset[IPBatch]):
         text_embedding = data["text_embedding"]
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
-            image_embedding = zeros_like(image_embedding)
+            if dataset_config.zero_uncond:
+                image_embedding = zeros_like(image_embedding)
+            else:
+                image_embedding = self.black_image_embedding
         elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
             text_embedding = self.empty_text_embedding
         elif rand_num < (
             dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate
         ):
             text_embedding = self.empty_text_embedding
-            image_embedding = zeros_like(image_embedding)
+            if dataset_config.zero_uncond:
+                image_embedding = zeros_like(image_embedding)
+            else:
+                image_embedding = self.black_image_embedding
 
         return IPBatch(
             latent=latent,
