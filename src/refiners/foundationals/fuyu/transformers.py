@@ -1,23 +1,25 @@
+from typing import Any
+
 from torch import device as Device, dtype as DType, arange, einsum, cat
 import refiners.fluxion.layers as fl
 
 from refiners.foundationals.fuyu.common import SquaredReLU
 from refiners.foundationals.dinov2.vit import FeedForward
 
+
 class RotaryPositionalEmbedding(fl.Module):
     def __init__(
         self,
-        n_features : int = 4096,
-        base : int = 10_000,
+        n_features: int = 4096,
+        base: int = 10_000,
     ) -> None:
-
         super().__init__()
         self.n_features = n_features
         self.base = base
         # Create positional encodings
-        theta = 1 / (self.base**((arange(0, self.n_features,2).float()) / self.n_features))
-        self.register_buffer('theta', theta)
-    
+        theta = 1 / (self.base ** ((arange(0, self.n_features, 2).float()) / self.n_features))
+        self.register_buffer("theta", theta)
+
     def forward(self, q, k, v, mask):
         q_text = q[:, mask]
         k_text = k[:, mask]
@@ -25,14 +27,14 @@ class RotaryPositionalEmbedding(fl.Module):
         # Q rotation
         q_seq_len = q_text.shape[1]
         q_position_idxs = arange(q_seq_len, device=q_text.device).float()
-        q_freqs = einsum("i,j->ij", q_position_idxs, self.theta) 
+        q_freqs = einsum("i,j->ij", q_position_idxs, self.theta)
         q_emb = cat([q_freqs, q_freqs], dim=1).to(q_text.device)
         q_rot = self.apply_rotary_embedding(q_text, q_emb)
-    
+
         # K rotation
         k_seq_len = k_text.shape[1]
         k_position_idxs = arange(k_seq_len, device=k_text.device).float()
-        k_freqs = einsum("i,j->ij", k_position_idxs, self.theta) 
+        k_freqs = einsum("i,j->ij", k_position_idxs, self.theta)
         k_emb = cat([k_freqs, k_freqs], dim=1).to(k_text.device)
         k_rot = self.apply_rotary_embedding(k_text, k_emb)
 
@@ -40,19 +42,20 @@ class RotaryPositionalEmbedding(fl.Module):
         k[:, mask] = k_rot
 
         return q, k, v
-    
+
     def apply_rotary_embedding(self, x, emb, seq_len):
         # Split x into two halves for real and imaginary components for rotation
         x1, x2 = x.split(self.n_features // 2, dim=-1)
         x_halfr = cat((-x2, x1), dim=-1)
         # Apply rotation
-        x_rot = (x * emb.cos()[:seq_len] + x_halfr * emb.sin()[:seq_len])
+        x_rot = x * emb.cos()[:seq_len] + x_halfr * emb.sin()[:seq_len]
         return x_rot
 
-class FuyuAttention(fl.Chain):
-    """Multi-Head Attention layer with fuyu-8b spcificity : Rotary Embedding and Layer Norm added to QK.
 
-    ??? note "See [[arXiv:1706.03762] Attention Is All You Need (Figure 2)](https://arxiv.org/abs/1706.03762) and 
+class FuyuAttention(fl.Chain):
+    """Multi-Head Attention layer with fuyu-8b spcificities : Rotary Embedding and Layer Norm added to QK.
+
+    ??? note "See [[arXiv:1706.03762] Attention Is All You Need (Figure 2)](https://arxiv.org/abs/1706.03762) and
     https://www.adept.ai/blog/persimmon-8b for more details"
 
         ![](https://ar5iv.labs.arxiv.org/html/1706.03762/assets/Figures/ModalNet-20.png)
@@ -132,36 +135,34 @@ class FuyuAttention(fl.Chain):
         self.base = base
         self.norm_eps = norm_eps
 
-        self.
-
         super().__init__(
             fl.Distribute(
-                    fl.Linear(  # Query projection
-                        in_features=self.embedding_dim,
-                        out_features=self.inner_dim,
-                        bias=self.use_bias,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    fl.Linear(  # Key projection
-                        in_features=self.key_embedding_dim,
-                        out_features=self.inner_dim,
-                        bias=self.use_bias,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    fl.Linear(  # Value projection
-                        in_features=self.value_embedding_dim,
-                        out_features=self.inner_dim,
-                        bias=self.use_bias,
-                        device=device,
-                        dtype=dtype,
-                    ),
-                    fl.Identity(), # Mask to perform Rotary Projection Embedding only on the text component
+                fl.Linear(  # Query projection
+                    in_features=self.embedding_dim,
+                    out_features=self.inner_dim,
+                    bias=self.use_bias,
+                    device=device,
+                    dtype=dtype,
                 ),
+                fl.Linear(  # Key projection
+                    in_features=self.key_embedding_dim,
+                    out_features=self.inner_dim,
+                    bias=self.use_bias,
+                    device=device,
+                    dtype=dtype,
+                ),
+                fl.Linear(  # Value projection
+                    in_features=self.value_embedding_dim,
+                    out_features=self.inner_dim,
+                    bias=self.use_bias,
+                    device=device,
+                    dtype=dtype,
+                ),
+                fl.Identity(),  # Mask to perform Rotary Projection Embedding only on the text component
+            ),
             RotaryPositionalEmbedding(
-                n_features = inner_dim,
-                base = base,
+                n_features=inner_dim,
+                base=base,
             ),
             fl.Distribute(
                 fl.LayerNorm(  # Layer Norm on Q
@@ -171,19 +172,16 @@ class FuyuAttention(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.LayerNorm(  # Layer Norm on K
-                    normalized_shape=self.inner_dim,
-                    eps=self.norm_eps,
-                    device=device,
-                    dtype=dtype
+                    normalized_shape=self.inner_dim, eps=self.norm_eps, device=device, dtype=dtype
                 ),
                 fl.Identity(),  # No Layer Norm on V
-            )
+            ),
             fl.ScaledDotProductAttention(
                 num_heads=num_heads,
                 is_causal=is_causal,
                 is_optimized=is_optimized,
             ),
-            Linear(  # Output projection
+            fl.Linear(  # Output projection
                 in_features=self.inner_dim,
                 out_features=self.embedding_dim,
                 bias=True,
@@ -191,6 +189,7 @@ class FuyuAttention(fl.Chain):
                 dtype=dtype,
             ),
         )
+
 
 class FuyuSelfAttention(FuyuAttention):
     """Fuyu Self-Attention layer.
@@ -258,7 +257,7 @@ class FuyuSelfAttention(FuyuAttention):
         )
         self.insert(
             index=0,
-            module=Parallel(
+            module=fl.Parallel(
                 fl.GetArg(0),  # Query projection's input
                 fl.GetArg(0),  # Key projection's input
                 fl.GetArg(0),  # Value projection's input
@@ -269,6 +268,7 @@ class FuyuSelfAttention(FuyuAttention):
 
 class FuyuTransformerLayer(fl.Chain):
     """Apply a multi-head self-attention mechanism to the input tensor."""
+
     def __init__(
         self,
         embedding_dim: int = 4_096,
@@ -281,7 +281,7 @@ class FuyuTransformerLayer(fl.Chain):
         is_causal: bool = True,
         is_optimized: bool = True,
         device: Device | str | None = None,
-        dtype: Dtype | None = None,
+        dtype: DType | None = None,
     ) -> None:
         self.embedding_dim = embedding_dim
         self.num_heads = num_heads
@@ -321,11 +321,11 @@ class FuyuTransformerLayer(fl.Chain):
                     feedforward_dim=feedforward_dim,
                     activation=SquaredReLU(),
                     device=device,
-                    dtype=dtype
+                    dtype=dtype,
                 ),
-            )
+            ),
         )
-    
+
     def forward(self, *args: Any) -> Any:
         result: tuple[Any] | Any = None
         intermediate_args: tuple[Any, ...] = args
@@ -339,6 +339,7 @@ class FuyuTransformerLayer(fl.Chain):
 
         self._reset_context()
         return result
+
 
 class FuyuTransformer(fl.Chain):
     """Alias for a Chain of FuyuTransformerLayer."""
