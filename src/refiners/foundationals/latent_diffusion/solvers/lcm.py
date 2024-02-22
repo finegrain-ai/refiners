@@ -1,8 +1,7 @@
-import numpy as np
 import torch
 
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
 
 
 class LCMSolver(Solver):
@@ -20,14 +19,29 @@ class LCMSolver(Solver):
         self,
         num_inference_steps: int,
         num_train_timesteps: int = 1_000,
+        timesteps_spacing: TimestepSpacing = TimestepSpacing.TRAILING,
+        timesteps_offset: int = 0,
         num_orig_steps: int = 50,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
-        diffusers_mode: bool = False,
         device: torch.device | str = "cpu",
         dtype: torch.dtype = torch.float32,
     ):
+        """Initializes a new LCM solver.
+
+        Args:
+            num_inference_steps: The number of inference steps.
+            num_train_timesteps: The number of training timesteps.
+            timesteps_spacing: The spacing to use for the timesteps.
+            timesteps_offset: The offset to use for the timesteps.
+            num_orig_steps: The number of inference steps of the emulated DPM solver.
+            initial_diffusion_rate: The initial diffusion rate.
+            final_diffusion_rate: The final diffusion rate.
+            noise_schedule: The noise schedule.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
         assert (
             num_orig_steps >= num_inference_steps
         ), f"num_orig_steps ({num_orig_steps}) < num_inference_steps ({num_inference_steps})"
@@ -36,22 +50,17 @@ class LCMSolver(Solver):
             DPMSolver(
                 num_inference_steps=num_orig_steps,
                 num_train_timesteps=num_train_timesteps,
+                timesteps_spacing=timesteps_spacing,
                 device=device,
                 dtype=dtype,
             )
         ]
 
-        if diffusers_mode:
-            # Diffusers recomputes the timesteps in LCMScheduler,
-            # and it does it slightly differently than DPM Solver.
-            # We provide this option to reproduce Diffusers' output.
-            k = num_train_timesteps // num_orig_steps
-            ts = np.asarray(list(range(1, num_orig_steps + 1))) * k - 1
-            self.dpm.timesteps = torch.tensor(ts, device=device).flip(0)
-
         super().__init__(
             num_inference_steps=num_inference_steps,
             num_train_timesteps=num_train_timesteps,
+            timesteps_spacing=timesteps_spacing,
+            timesteps_offset=timesteps_offset,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
@@ -85,12 +94,19 @@ class LCMSolver(Solver):
         return self.dpm.timesteps[self.timestep_indices]
 
     def __call__(
-        self,
-        x: torch.Tensor,
-        predicted_noise: torch.Tensor,
-        step: int,
-        generator: torch.Generator | None = None,
+        self, x: torch.Tensor, predicted_noise: torch.Tensor, step: int, generator: torch.Generator | None = None
     ) -> torch.Tensor:
+        """Apply one step of the backward diffusion process.
+
+        Args:
+            x: The input tensor to apply the diffusion process to.
+            predicted_noise: The predicted noise tensor for the current step.
+            step: The current step of the diffusion process.
+            generator: The random number generator to use for sampling noise.
+
+        Returns:
+            The denoised version of the input data `x`.
+        """
         current_timestep = self.timesteps[step]
         scale_factor = self.cumulative_scale_factors[current_timestep]
         noise_ratio = self.noise_std[current_timestep]
