@@ -111,9 +111,7 @@ class ImageEncoder(fl.chain):
         super().__init__(
             Padding(
                 patch_size=patch_size,
-                padding_value=padding_value,
-                device=device,
-                dtype=dtype,
+                padding_value=padding_value
             ),
             LineBreakPatchEncoder(
                 in_channels=3,

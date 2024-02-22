@@ -18,8 +18,6 @@ class Padding(fl.Module):
         self,
         patch_size: int = 30,
         padding_value: int = 0,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
     ):
         super().__init__()
         self.patch_size = patch_size
