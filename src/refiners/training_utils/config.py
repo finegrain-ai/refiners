@@ -155,7 +155,6 @@ class ModelConfig(BaseModel):
     betas: tuple[float, float] | None = None
     eps: float | None = None
     weight_decay: float | None = None
-    train: bool = False
 
     model_config = ConfigDict(extra="forbid")
 
