@@ -1,6 +1,6 @@
-from torch import Generator, Tensor, arange, device as Device, dtype as Dtype, float32, sqrt, tensor
+from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, sqrt, tensor
 
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
 
 
 class DDIM(Solver):
@@ -13,6 +13,8 @@ class DDIM(Solver):
         self,
         num_inference_steps: int,
         num_train_timesteps: int = 1_000,
+        timesteps_spacing: TimestepSpacing = TimestepSpacing.LEADING,
+        timesteps_offset: int = 1,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
@@ -25,6 +27,8 @@ class DDIM(Solver):
         Args:
             num_inference_steps: The number of inference steps.
             num_train_timesteps: The number of training timesteps.
+            timesteps_spacing: The spacing to use for the timesteps.
+            timesteps_offset: The offset to use for the timesteps.
             initial_diffusion_rate: The initial diffusion rate.
             final_diffusion_rate: The final diffusion rate.
             noise_schedule: The noise schedule.
@@ -35,6 +39,8 @@ class DDIM(Solver):
         super().__init__(
             num_inference_steps=num_inference_steps,
             num_train_timesteps=num_train_timesteps,
+            timesteps_spacing=timesteps_spacing,
+            timesteps_offset=timesteps_offset,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
@@ -43,16 +49,18 @@ class DDIM(Solver):
             dtype=dtype,
         )
 
-    def _generate_timesteps(self) -> Tensor:
-        """
-        Generates decreasing timesteps with 'leading' spacing and offset of 1
-        similar to diffusers settings for the DDIM solver in Stable Diffusion 1.5
-        """
-        step_ratio = self.num_train_timesteps // self.num_inference_steps
-        timesteps = arange(start=0, end=self.num_inference_steps, step=1) * step_ratio + 1
-        return timesteps.flip(0)
-
     def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+        """Apply one step of the backward diffusion process.
+
+        Args:
+            x: The input tensor to apply the diffusion process to.
+            predicted_noise: The predicted noise tensor for the current step.
+            step: The current step of the diffusion process.
+            generator: The random number generator to use for sampling noise (ignored, this solver is deterministic).
+
+        Returns:
+            The denoised version of the input data `x`.
+        """
         assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
 
         timestep, previous_timestep = (

@@ -2,10 +2,19 @@ from typing import cast
 from warnings import warn
 
 import pytest
-from torch import Generator, Tensor, allclose, device as Device, equal, isclose, randn
+from torch import Generator, Tensor, allclose, device as Device, equal, isclose, randn, tensor
 
 from refiners.fluxion import manual_seed
-from refiners.foundationals.latent_diffusion.solvers import DDIM, DDPM, DPMSolver, Euler, LCMSolver, NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import (
+    DDIM,
+    DDPM,
+    DPMSolver,
+    Euler,
+    LCMSolver,
+    NoiseSchedule,
+    Solver,
+    TimestepSpacing,
+)
 
 
 def test_ddpm_diffusers():
@@ -14,7 +23,6 @@ def test_ddpm_diffusers():
     diffusers_scheduler = DDPMScheduler(beta_schedule="scaled_linear", beta_start=0.00085, beta_end=0.012)
     diffusers_scheduler.set_timesteps(1000)
     refiners_scheduler = DDPM(num_inference_steps=1000)
-
     assert equal(diffusers_scheduler.timesteps, refiners_scheduler.timesteps)
 
 
@@ -34,6 +42,7 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
     )
     diffusers_scheduler.set_timesteps(n_steps)
     refiners_scheduler = DPMSolver(num_inference_steps=n_steps, last_step_first_order=last_step_first_order)
+    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 3, 32, 32)
     predicted_noise = randn(1, 3, 32, 32)
@@ -59,6 +68,7 @@ def test_ddim_diffusers():
     )
     diffusers_scheduler.set_timesteps(30)
     refiners_scheduler = DDIM(num_inference_steps=30)
+    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
@@ -85,6 +95,7 @@ def test_euler_diffusers():
     )
     diffusers_scheduler.set_timesteps(30)
     refiners_scheduler = Euler(num_inference_steps=30)
+    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
@@ -111,9 +122,7 @@ def test_lcm_diffusers():
 
     diffusers_scheduler = LCMScheduler()
     diffusers_scheduler.set_timesteps(4)
-    refiners_scheduler = LCMSolver(num_inference_steps=4, diffusers_mode=True)
-
-    # diffusers_mode means the timesteps are the same
+    refiners_scheduler = LCMSolver(num_inference_steps=4)
     assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
@@ -143,7 +152,7 @@ def test_lcm_diffusers():
         assert allclose(refiners_output, diffusers_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_scheduler_remove_noise():
+def test_solver_remove_noise():
     from diffusers import DDIMScheduler  # type: ignore
 
     manual_seed(0)
@@ -169,7 +178,7 @@ def test_scheduler_remove_noise():
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_scheduler_device(test_device: Device):
+def test_solver_device(test_device: Device):
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
         pytest.skip()
@@ -182,8 +191,35 @@ def test_scheduler_device(test_device: Device):
 
 
 @pytest.mark.parametrize("noise_schedule", [NoiseSchedule.UNIFORM, NoiseSchedule.QUADRATIC, NoiseSchedule.KARRAS])
-def test_scheduler_noise_schedules(noise_schedule: NoiseSchedule, test_device: Device):
+def test_solver_noise_schedules(noise_schedule: NoiseSchedule, test_device: Device):
     scheduler = DDIM(num_inference_steps=30, device=test_device, noise_schedule=noise_schedule)
     assert len(scheduler.scale_factors) == 1000
     assert scheduler.scale_factors[0] == 1 - scheduler.initial_diffusion_rate
     assert scheduler.scale_factors[-1] == 1 - scheduler.final_diffusion_rate
+
+
+def test_solver_timestep_spacing():
+    # Tests we get the results from [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 2.
+    linspace_int = Solver.generate_timesteps(
+        spacing=TimestepSpacing.LINSPACE_INT,
+        num_inference_steps=10,
+        num_train_timesteps=1000,
+        offset=1,
+    )
+    assert equal(linspace_int, tensor([1000, 889, 778, 667, 556, 445, 334, 223, 112, 1]))
+
+    leading = Solver.generate_timesteps(
+        spacing=TimestepSpacing.LEADING,
+        num_inference_steps=10,
+        num_train_timesteps=1000,
+        offset=1,
+    )
+    assert equal(leading, tensor([901, 801, 701, 601, 501, 401, 301, 201, 101, 1]))
+
+    trailing = Solver.generate_timesteps(
+        spacing=TimestepSpacing.TRAILING,
+        num_inference_steps=10,
+        num_train_timesteps=1000,
+        offset=1,
+    )
+    assert equal(trailing, tensor([1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]))

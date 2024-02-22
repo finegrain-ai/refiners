@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
 
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver
+from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
 
 
 class Euler(Solver):
@@ -16,6 +16,8 @@ class Euler(Solver):
         self,
         num_inference_steps: int,
         num_train_timesteps: int = 1_000,
+        timesteps_spacing: TimestepSpacing = TimestepSpacing.LINSPACE_FLOAT,
+        timesteps_offset: int = 0,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
@@ -28,6 +30,8 @@ class Euler(Solver):
         Args:
             num_inference_steps: The number of inference steps.
             num_train_timesteps: The number of training timesteps.
+            timesteps_spacing: The spacing to use for the timesteps.
+            timesteps_offset: The offset to use for the timesteps.
             initial_diffusion_rate: The initial diffusion rate.
             final_diffusion_rate: The final diffusion rate.
             noise_schedule: The noise schedule.
@@ -40,6 +44,8 @@ class Euler(Solver):
         super().__init__(
             num_inference_steps=num_inference_steps,
             num_train_timesteps=num_train_timesteps,
+            timesteps_spacing=timesteps_spacing,
+            timesteps_offset=timesteps_offset,
             initial_diffusion_rate=initial_diffusion_rate,
             final_diffusion_rate=final_diffusion_rate,
             noise_schedule=noise_schedule,
@@ -53,20 +59,6 @@ class Euler(Solver):
     def init_noise_sigma(self) -> Tensor:
         """The initial noise sigma."""
         return self.sigmas.max()
-
-    def _generate_timesteps(self) -> Tensor:
-        """Generate the timesteps used by the solver.
-
-        Note:
-            We need to use numpy here because:
-
-            - numpy.linspace(0,999,31)[15] is 499.49999999999994
-            - torch.linspace(0,999,31)[15] is 499.5
-
-            and we want the same result as the original codebase.
-        """
-        timesteps = torch.tensor(np.linspace(0, self.num_train_timesteps - 1, self.num_inference_steps)).flip(0)
-        return timesteps
 
     def _generate_sigmas(self) -> Tensor:
         """Generate the sigmas used by the solver."""
@@ -88,12 +80,17 @@ class Euler(Solver):
         sigma = self.sigmas[step]
         return x / ((sigma**2 + 1) ** 0.5)
 
-    def __call__(
-        self,
-        x: Tensor,
-        predicted_noise: Tensor,
-        step: int,
-        generator: Generator | None = None,
-    ) -> Tensor:
+    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+        """Apply one step of the backward diffusion process.
+
+        Args:
+            x: The input tensor to apply the diffusion process to.
+            predicted_noise: The predicted noise tensor for the current step.
+            step: The current step of the diffusion process.
+            generator: The random number generator to use for sampling noise (ignored, this solver is deterministic).
+
+        Returns:
+            The denoised version of the input data `x`.
+        """
         assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
         return x + predicted_noise * (self.sigmas[step + 1] - self.sigmas[step])

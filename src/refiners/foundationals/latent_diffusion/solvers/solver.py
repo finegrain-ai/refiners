@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TypeVar
 
-from torch import Generator, Tensor, device as Device, dtype as DType, float32, linspace, log, sqrt
+import numpy as np
+from torch import Generator, Tensor, arange, device as Device, dtype as DType, float32, linspace, log, sqrt, tensor
 
 from refiners.fluxion import layers as fl
 
@@ -10,17 +11,37 @@ T = TypeVar("T", bound="Solver")
 
 
 class NoiseSchedule(str, Enum):
-    """An enumeration of noise schedules used to sample the noise schedule.
+    """An enumeration of schedules used to sample the noise.
 
     Attributes:
         UNIFORM: A uniform noise schedule.
-        QUADRATIC: A quadratic noise schedule.
+        QUADRATIC: A quadratic noise schedule. Corresponds to "Stable Diffusion" in [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 1.
         KARRAS: See [[arXiv:2206.00364] Elucidating the Design Space of Diffusion-Based Generative Models, Equation 5](https://arxiv.org/abs/2206.00364)
     """
 
     UNIFORM = "uniform"
     QUADRATIC = "quadratic"
     KARRAS = "karras"
+
+
+class TimestepSpacing(str, Enum):
+    """An enumeration of methods to space the timesteps.
+
+    See [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 2.
+
+    Attributes:
+        LINSPACE_FLOAT: Sample N steps with linear interpolation, return a floating-point tensor.
+        LINSPACE_INT: Same as LINSPACE_FLOAT but return an integer tensor with rounded timesteps.
+        LEADING: Sample N+1 steps, do not include the last timestep (i.e. bad - non-zero SNR). Used in DDIM.
+        TRAILING: Sample N+1 steps, do not include the first timestep.
+        TRAILING_ALT: Variant of TRAILING used in DPM.
+    """
+
+    LINSPACE_FLOAT = "linspace_float"
+    LINSPACE_INT = "linspace_int"
+    LEADING = "leading"
+    TRAILING = "trailing"
+    TRAILING_ALT = "trailing_alt"
 
 
 class Solver(fl.Module, ABC):
@@ -39,6 +60,8 @@ class Solver(fl.Module, ABC):
         self,
         num_inference_steps: int,
         num_train_timesteps: int = 1_000,
+        timesteps_spacing: TimestepSpacing = TimestepSpacing.LINSPACE_FLOAT,
+        timesteps_offset: int = 0,
         initial_diffusion_rate: float = 8.5e-4,
         final_diffusion_rate: float = 1.2e-2,
         noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
@@ -51,6 +74,8 @@ class Solver(fl.Module, ABC):
         Args:
             num_inference_steps: The number of inference steps to perform.
             num_train_timesteps: The number of timesteps used to train the diffusion process.
+            timesteps_spacing: The spacing to use for the timesteps.
+            timesteps_offset: The offset to use for the timesteps.
             initial_diffusion_rate: The initial diffusion rate used to sample the noise schedule.
             final_diffusion_rate: The final diffusion rate used to sample the noise schedule.
             noise_schedule: The noise schedule used to sample the noise schedule.
@@ -61,6 +86,8 @@ class Solver(fl.Module, ABC):
         super().__init__()
         self.num_inference_steps = num_inference_steps
         self.num_train_timesteps = num_train_timesteps
+        self.timesteps_spacing = timesteps_spacing
+        self.timesteps_offset = timesteps_offset
         self.initial_diffusion_rate = initial_diffusion_rate
         self.final_diffusion_rate = final_diffusion_rate
         self.noise_schedule = noise_schedule
@@ -87,14 +114,49 @@ class Solver(fl.Module, ABC):
         """
         ...
 
-    @abstractmethod
-    def _generate_timesteps(self) -> Tensor:
-        """Generate a tensor of timesteps.
+    @staticmethod
+    def generate_timesteps(
+        spacing: TimestepSpacing,
+        num_inference_steps: int,
+        num_train_timesteps: int = 1000,
+        offset: int = 0,
+    ) -> Tensor:
+        """Generate a tensor of timesteps according to a given spacing.
 
-        Note:
-            This method should be overridden by subclasses to provide the specific timesteps for the diffusion process.
+        Args:
+            spacing: The spacing to use for the timesteps.
+            num_inference_steps: The number of inference steps to perform.
+            num_train_timesteps: The number of timesteps used to train the diffusion process.
+            offset: The offset to use for the timesteps.
         """
-        ...
+        max_timestep = num_train_timesteps - 1 + offset
+        match spacing:
+            case TimestepSpacing.LINSPACE_FLOAT:
+                return tensor(np.linspace(offset, max_timestep, num_inference_steps), dtype=float32).flip(0)
+            case TimestepSpacing.LINSPACE_INT:
+                return tensor(np.linspace(offset, max_timestep, num_inference_steps).round().astype(int)).flip(0)
+            case TimestepSpacing.LEADING:
+                step_ratio = num_train_timesteps // num_inference_steps
+                return (arange(0, num_inference_steps, 1) * step_ratio + offset).flip(0)
+            case TimestepSpacing.TRAILING:
+                step_ratio = num_train_timesteps // num_inference_steps
+                max_timestep = num_train_timesteps - 1 + offset
+                return arange(max_timestep, offset, -step_ratio)
+            case TimestepSpacing.TRAILING_ALT:
+                # We use numpy here because:
+                #   numpy.linspace(0,999,31)[15] is 499.49999999999994
+                #   torch.linspace(0,999,31)[15] is 499.5
+                # and we want the same result as the original DPM codebase.
+                np_space = np.linspace(offset, max_timestep, num_inference_steps + 1).round().astype(int)[1:]
+                return tensor(np_space).flip(0)
+
+    def _generate_timesteps(self) -> Tensor:
+        return self.generate_timesteps(
+            spacing=self.timesteps_spacing,
+            num_inference_steps=self.num_inference_steps,
+            num_train_timesteps=self.num_train_timesteps,
+            offset=self.timesteps_offset,
+        )
 
     def add_noise(
         self,
