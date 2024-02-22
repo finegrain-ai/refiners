@@ -1,8 +1,15 @@
+import dataclasses
 from collections import deque
 
+import numpy as np
 from torch import Generator, Tensor, device as Device, dtype as Dtype, exp, float32, tensor
 
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
+from refiners.foundationals.latent_diffusion.solvers.solver import (
+    ModelPredictionType,
+    Solver,
+    SolverParams,
+    TimestepSpacing,
+)
 
 
 class DPMSolver(Solver):
@@ -18,44 +25,37 @@ class DPMSolver(Solver):
         for the last step of the diffusion.
     """
 
+    default_params = dataclasses.replace(
+        Solver.default_params,
+        timesteps_spacing=TimestepSpacing.CUSTOM,
+    )
+
     def __init__(
         self,
         num_inference_steps: int,
-        num_train_timesteps: int = 1_000,
-        timesteps_spacing: TimestepSpacing = TimestepSpacing.TRAILING_ALT,
-        timesteps_offset: int = 0,
-        initial_diffusion_rate: float = 8.5e-4,
-        final_diffusion_rate: float = 1.2e-2,
-        last_step_first_order: bool = False,
-        noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
         first_inference_step: int = 0,
+        params: SolverParams | None = None,
+        last_step_first_order: bool = False,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
         """Initializes a new DPM solver.
 
         Args:
-            num_inference_steps: The number of inference steps.
-            num_train_timesteps: The number of training timesteps.
-            timesteps_spacing: The spacing to use for the timesteps.
-            timesteps_offset: The offset to use for the timesteps.
-            initial_diffusion_rate: The initial diffusion rate.
-            final_diffusion_rate: The final diffusion rate.
+            num_inference_steps: The number of inference steps to perform.
+            first_inference_step: The first inference step to perform.
+            params: The common parameters for solvers.
             last_step_first_order: Use a first-order update for the last step.
-            noise_schedule: The noise schedule.
-            first_inference_step: The first inference step.
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
+        if params and params.model_prediction_type not in (ModelPredictionType.NOISE, None):
+            raise NotImplementedError
+
         super().__init__(
             num_inference_steps=num_inference_steps,
-            num_train_timesteps=num_train_timesteps,
-            timesteps_spacing=timesteps_spacing,
-            timesteps_offset=timesteps_offset,
-            initial_diffusion_rate=initial_diffusion_rate,
-            final_diffusion_rate=final_diffusion_rate,
-            noise_schedule=noise_schedule,
             first_inference_step=first_inference_step,
+            params=params,
             device=device,
             dtype=dtype,
         )
@@ -79,6 +79,19 @@ class DPMSolver(Solver):
         )
         r.last_step_first_order = self.last_step_first_order
         return r
+
+    def _generate_timesteps(self) -> Tensor:
+        if self.params.timesteps_spacing != TimestepSpacing.CUSTOM:
+            return super()._generate_timesteps()
+
+        # We use numpy here because:
+        #   numpy.linspace(0,999,31)[15] is 499.49999999999994
+        #   torch.linspace(0,999,31)[15] is 499.5
+        # and we want the same result as the original DPM codebase.
+        offset = self.params.timesteps_offset
+        max_timestep = self.params.num_train_timesteps - 1 + offset
+        np_space = np.linspace(offset, max_timestep, self.num_inference_steps + 1).round().astype(int)[1:]
+        return tensor(np_space).flip(0)
 
     def dpm_solver_first_order_update(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         """Applies a first-order backward Euler update to the input data `x`.

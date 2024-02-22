@@ -11,8 +11,10 @@ from refiners.foundationals.latent_diffusion.solvers import (
     DPMSolver,
     Euler,
     LCMSolver,
+    ModelPredictionType,
     NoiseSchedule,
     Solver,
+    SolverParams,
     TimestepSpacing,
 )
 
@@ -41,7 +43,10 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
     )
     diffusers_scheduler.set_timesteps(n_steps)
-    refiners_scheduler = DPMSolver(num_inference_steps=n_steps, last_step_first_order=last_step_first_order)
+    refiners_scheduler = DPMSolver(
+        num_inference_steps=n_steps,
+        last_step_first_order=last_step_first_order,
+    )
     assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 3, 32, 32)
@@ -80,10 +85,12 @@ def test_ddim_diffusers():
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
-def test_euler_diffusers():
+@pytest.mark.parametrize("model_prediction_type", [ModelPredictionType.NOISE, ModelPredictionType.SAMPLE])
+def test_euler_diffusers(model_prediction_type: ModelPredictionType):
     from diffusers import EulerDiscreteScheduler  # type: ignore
 
     manual_seed(0)
+    diffusers_prediction_type = "epsilon" if model_prediction_type == ModelPredictionType.NOISE else "sample"
     diffusers_scheduler = EulerDiscreteScheduler(
         beta_end=0.012,
         beta_schedule="scaled_linear",
@@ -92,9 +99,10 @@ def test_euler_diffusers():
         steps_offset=1,
         timestep_spacing="linspace",
         use_karras_sigmas=False,
+        prediction_type=diffusers_prediction_type,
     )
     diffusers_scheduler.set_timesteps(30)
-    refiners_scheduler = Euler(num_inference_steps=30)
+    refiners_scheduler = Euler(num_inference_steps=30, params=SolverParams(model_prediction_type=model_prediction_type))
     assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
@@ -192,16 +200,20 @@ def test_solver_device(test_device: Device):
 
 @pytest.mark.parametrize("noise_schedule", [NoiseSchedule.UNIFORM, NoiseSchedule.QUADRATIC, NoiseSchedule.KARRAS])
 def test_solver_noise_schedules(noise_schedule: NoiseSchedule, test_device: Device):
-    scheduler = DDIM(num_inference_steps=30, device=test_device, noise_schedule=noise_schedule)
+    scheduler = DDIM(
+        num_inference_steps=30,
+        params=SolverParams(noise_schedule=noise_schedule),
+        device=test_device,
+    )
     assert len(scheduler.scale_factors) == 1000
-    assert scheduler.scale_factors[0] == 1 - scheduler.initial_diffusion_rate
-    assert scheduler.scale_factors[-1] == 1 - scheduler.final_diffusion_rate
+    assert scheduler.scale_factors[0] == 1 - scheduler.params.initial_diffusion_rate
+    assert scheduler.scale_factors[-1] == 1 - scheduler.params.final_diffusion_rate
 
 
 def test_solver_timestep_spacing():
     # Tests we get the results from [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 2.
     linspace_int = Solver.generate_timesteps(
-        spacing=TimestepSpacing.LINSPACE_INT,
+        spacing=TimestepSpacing.LINSPACE_ROUNDED,
         num_inference_steps=10,
         num_train_timesteps=1000,
         offset=1,
