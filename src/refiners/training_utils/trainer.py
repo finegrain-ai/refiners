@@ -103,11 +103,11 @@ def register_model():
             name = func.__name__
             model = func(self, config)
             model = model.to(self.device)
-            if not config.train or self.dtype == float32:
-                model = model.to(dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
+            if len(learnable_parameters) > 0:
+                model = model.to(dtype=self.dtype)
             self.models[name] = ModelItem(
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
