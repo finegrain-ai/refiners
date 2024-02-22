@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from torch import Size, Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
@@ -6,24 +7,33 @@ from refiners.foundationals.fuyu.input_processor import InputEncoder
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
 
 
-embedding_dim: int = 4_096,
-inner_dim: int | None = None,
-feedforward_dim: int = 16_384,
-num_heads: int = 64,
-norm_eps: float = 1e-6,
-base: int = 10_000,
-use_bias: bool = True,
-is_causal: bool = True,
-is_optimized: bool = True,
-device: Device | str | None = None,
-dtype: Dtype | None = None,
+# @dataclass(frozen=True)
+# class FuyuConfig8b:
+#     embedding_dim: int = 4_096
+#     feedforward_dim: int = 16_384
+#     inner_dim: int | None = None
+#     max_sequence_length: int = 16_384
+#     vocabulary_size: int = 262_144
+#     tokenizer: CLIPTokenizer | None = None
+#     patch_size: int = 30
+#     padding_value: int = 0
+#     num_layers: int = 36
+#     num_heads: int = 64
+#     norm_eps: float = 1e-6
+#     base: int = 10_000
+#     use_bias: bool = True
+#     is_causal: bool = True
+#     is_optimized: bool = True
+#     device: Device | str | None = None
+#     dtype: DType | None = None
 
-class Fuyu_8b(fl.Chain):
+
+class Fuyu(fl.Chain):
     def __init__(
         self,
         embedding_dim: int = 4096,
         feedforward_dim: int = 16384,
-        inner_dim: int | None = none,
+        inner_dim: int | None = None,
         max_sequence_length: int = 16_384,
         vocabulary_size: int = 262_144,
         tokenizer: CLIPTokenizer | None = None,
@@ -37,8 +47,7 @@ class Fuyu_8b(fl.Chain):
         is_causal: bool = True,
         is_optimized: bool = True,
         device: Device | str | None = None,
-        dtype: Dtype | None = None,
-
+        dtype: DType | None = None,
     ) -> None:
         super().__init__(
             InputEncoder(
@@ -49,7 +58,7 @@ class Fuyu_8b(fl.Chain):
                 patch_size=patch_size,
                 padding_value=padding_value,
                 device=device,
-                dtype=dtype
+                dtype=dtype,
             ),
             FuyuTransformer(
                 FuyuTransformerLayer(
