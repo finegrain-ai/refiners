@@ -661,13 +661,13 @@ def convert_control_lora_fooocus():
     run_conversion_script(
         "convert_fooocus_control_lora.py",
         "tests/weights/lllyasviel/misc/control-lora-canny-rank128.safetensors",
-        "tests/weights/control_lora/refiners_control-lora-canny-rank128.safetensors",
+        "tests/weights/control-loras/refiners_control-lora-canny-rank128.safetensors",
         expected_hash="4d505134",
     )
     run_conversion_script(
         "convert_fooocus_control_lora.py",
         "tests/weights/lllyasviel/misc/fooocus_xl_cpds_128.safetensors",
-        "tests/weights/control_lora/refiners_fooocus_xl_cpds_128.safetensors",
+        "tests/weights/control-loras/refiners_fooocus_xl_cpds_128.safetensors",
         expected_hash="d81aa461",
     )
 
