@@ -21,7 +21,7 @@ def test_properties(lora: LinearLora, conv_lora: Conv2dLora) -> None:
     assert lora.scale == 1.0
     assert lora.in_features == lora.down.in_features == 320
     assert lora.out_features == lora.up.out_features == 128
-
+    assert lora.bias == False
     assert conv_lora.name == "conv_test"
     assert conv_lora.rank == conv_lora.down.out_channels == conv_lora.up.in_channels == 4
     assert conv_lora.scale == 1.0
@@ -30,6 +30,7 @@ def test_properties(lora: LinearLora, conv_lora: Conv2dLora) -> None:
     assert conv_lora.kernel_size == (conv_lora.down.kernel_size[0], conv_lora.up.kernel_size[0]) == (3, 1)
     # padding is set so the spatial dimensions are preserved
     assert conv_lora.padding == (conv_lora.down.padding[0], conv_lora.up.padding[0]) == (0, 1)
+    assert conv_lora.use_bias == False
 
 
 def test_scale_setter(lora: LinearLora) -> None:

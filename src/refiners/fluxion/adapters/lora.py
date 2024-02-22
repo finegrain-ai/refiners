@@ -191,6 +191,7 @@ class LinearLora(Lora[fl.Linear]):
         out_features: int,
         rank: int = 16,
         scale: float = 1.0,
+        bias: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -207,6 +208,7 @@ class LinearLora(Lora[fl.Linear]):
         """
         self.in_features = in_features
         self.out_features = out_features
+        self.bias = bias
 
         super().__init__(
             name,
@@ -251,7 +253,7 @@ class LinearLora(Lora[fl.Linear]):
             fl.Linear(
                 in_features=self.rank,
                 out_features=self.out_features,
-                bias=False,
+                bias=self.bias,
                 device=device,
                 dtype=dtype,
             ),
@@ -282,6 +284,7 @@ class Conv2dLora(Lora[fl.Conv2d]):
         kernel_size: tuple[int, int] = (1, 3),
         stride: tuple[int, int] = (1, 1),
         padding: tuple[int, int] = (0, 1),
+        use_bias: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -304,6 +307,7 @@ class Conv2dLora(Lora[fl.Conv2d]):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
+        self.use_bias = use_bias
 
         super().__init__(
             name,
@@ -360,7 +364,7 @@ class Conv2dLora(Lora[fl.Conv2d]):
                 kernel_size=self.kernel_size[1],
                 stride=self.stride[1],
                 padding=self.padding[1],
-                use_bias=False,
+                use_bias=self.use_bias,
                 device=device,
                 dtype=dtype,
             ),
