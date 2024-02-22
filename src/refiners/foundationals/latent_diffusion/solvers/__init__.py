@@ -3,6 +3,23 @@ from refiners.foundationals.latent_diffusion.solvers.ddpm import DDPM
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
 from refiners.foundationals.latent_diffusion.solvers.euler import Euler
 from refiners.foundationals.latent_diffusion.solvers.lcm import LCMSolver
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
+from refiners.foundationals.latent_diffusion.solvers.solver import (
+    ModelPredictionType,
+    NoiseSchedule,
+    Solver,
+    SolverParams,
+    TimestepSpacing,
+)
 
-__all__ = ["Solver", "DPMSolver", "DDPM", "DDIM", "Euler", "LCMSolver", "NoiseSchedule", "TimestepSpacing"]
+__all__ = [
+    "Solver",
+    "SolverParams",
+    "DPMSolver",
+    "DDPM",
+    "DDIM",
+    "Euler",
+    "LCMSolver",
+    "ModelPredictionType",
+    "NoiseSchedule",
+    "TimestepSpacing",
+]

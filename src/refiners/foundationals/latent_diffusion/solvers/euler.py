@@ -2,7 +2,12 @@ import numpy as np
 import torch
 from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
 
-from refiners.foundationals.latent_diffusion.solvers.solver import NoiseSchedule, Solver, TimestepSpacing
+from refiners.foundationals.latent_diffusion.solvers.solver import (
+    ModelPredictionType,
+    NoiseSchedule,
+    Solver,
+    SolverParams,
+)
 
 
 class Euler(Solver):
@@ -15,41 +20,27 @@ class Euler(Solver):
     def __init__(
         self,
         num_inference_steps: int,
-        num_train_timesteps: int = 1_000,
-        timesteps_spacing: TimestepSpacing = TimestepSpacing.LINSPACE_FLOAT,
-        timesteps_offset: int = 0,
-        initial_diffusion_rate: float = 8.5e-4,
-        final_diffusion_rate: float = 1.2e-2,
-        noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
         first_inference_step: int = 0,
+        params: SolverParams | None = None,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ):
         """Initializes a new Euler solver.
 
         Args:
-            num_inference_steps: The number of inference steps.
-            num_train_timesteps: The number of training timesteps.
-            timesteps_spacing: The spacing to use for the timesteps.
-            timesteps_offset: The offset to use for the timesteps.
-            initial_diffusion_rate: The initial diffusion rate.
-            final_diffusion_rate: The final diffusion rate.
-            noise_schedule: The noise schedule.
-            first_inference_step: The first inference step.
+            num_inference_steps: The number of inference steps to perform.
+            first_inference_step: The first inference step to perform.
+            params: The common parameters for solvers.
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
-        if noise_schedule != NoiseSchedule.QUADRATIC:
+        if params and params.noise_schedule not in (NoiseSchedule.QUADRATIC, None):
             raise NotImplementedError
+
         super().__init__(
             num_inference_steps=num_inference_steps,
-            num_train_timesteps=num_train_timesteps,
-            timesteps_spacing=timesteps_spacing,
-            timesteps_offset=timesteps_offset,
-            initial_diffusion_rate=initial_diffusion_rate,
-            final_diffusion_rate=final_diffusion_rate,
-            noise_schedule=noise_schedule,
             first_inference_step=first_inference_step,
+            params=params,
             device=device,
             dtype=dtype,
         )
@@ -85,7 +76,7 @@ class Euler(Solver):
 
         Args:
             x: The input tensor to apply the diffusion process to.
-            predicted_noise: The predicted noise tensor for the current step.
+            predicted_noise: The predicted noise tensor for the current step (or x0 if the prediction type is SAMPLE).
             step: The current step of the diffusion process.
             generator: The random number generator to use for sampling noise (ignored, this solver is deterministic).
 
@@ -93,4 +84,11 @@ class Euler(Solver):
             The denoised version of the input data `x`.
         """
         assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+
+        if self.params.model_prediction_type == ModelPredictionType.SAMPLE:
+            x0 = predicted_noise  # the model does not actually predict the noise but x0
+            ratio = self.sigmas[step + 1] / self.sigmas[step]
+            return ratio * x + (1 - ratio) * x0
+
+        assert self.params.model_prediction_type == ModelPredictionType.NOISE
         return x + predicted_noise * (self.sigmas[step + 1] - self.sigmas[step])

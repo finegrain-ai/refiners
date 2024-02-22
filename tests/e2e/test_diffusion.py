@@ -27,7 +27,7 @@ from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule, SolverParams
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
@@ -600,7 +600,7 @@ def sd15_ddim_karras(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_solver = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    ddim_solver = DDIM(num_inference_steps=20, params=SolverParams(noise_schedule=NoiseSchedule.KARRAS))
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
