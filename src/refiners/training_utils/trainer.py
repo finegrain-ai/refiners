@@ -109,7 +109,6 @@ def register_model():
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
             model_trained = len(learnable_parameters) > 0
             if not amp or not model_trained:
-                # training is not amp or model is not trained
                 model = model.to(dtype=self.dtype)
             else:
                 # model is trained and is amp
