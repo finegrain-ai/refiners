@@ -190,10 +190,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dtype(self) -> DType:
         dtype = getattr(torch, self.config.training.dtype, None)
         assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
-        if not self.config.training.amp and dtype == float16:
-            raise NotImplementedError(
-                "Float16 training is not implemented without amp. Try setting amp in training config to True."
-            )
         logger.info(f"Using dtype: {dtype}")
         return dtype
 
