@@ -106,7 +106,7 @@ def register_model():
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
-            if len(learnable_parameters) > 0:
+            if len(learnable_parameters) == 0:
                 model = model.to(dtype=self.dtype)
             self.models[name] = ModelItem(
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
