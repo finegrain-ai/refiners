@@ -355,7 +355,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor: ...
+    def compute_loss(self, batch: Batch) -> Tensor:
+        ...
 
     def compute_evaluation(self) -> None:
         pass
