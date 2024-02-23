@@ -10,7 +10,7 @@ from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import save_to_safetensors
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoder, CLIPTextEncoderG, CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import DoubleTextEncoder, TextEncoderWithPoolingL
 
 
 class Args(argparse.Namespace):
@@ -104,10 +104,16 @@ def main() -> None:
         default=False,
         help="Prints additional information during conversion. Default: False",
     )
+    parser.add_argument(
+        "--with_projection",
+        action="store_true",
+        default=False,
+        help="Add projection to first subfolder",
+    )
     args = parser.parse_args(namespace=Args())
     if args.output_path is None:
         args.output_path = f"{Path(args.source_path).stem}-{args.subfolder}.safetensors"
-    converter = setup_converter(args=args)
+    converter = setup_converter(args=args, with_projection=args.with_projection)
     if args.subfolder2 is not None:
         # Assume this is the second text encoder of Stable Diffusion XL
         args.subfolder = args.subfolder2
@@ -132,6 +138,17 @@ def main() -> None:
         if args.half:
             state_dict = {key: value.half() for key, value in state_dict.items()}
         save_to_safetensors(path=args.output_path, tensors=state_dict)
+    elif args.with_projection:
+        projection = cast(CLIPTextEncoder, converter.target_model)[-1]
+        assert isinstance(projection, fl.Linear)
+        text_encoder_l_with_projection = CLIPTextEncoderL()
+        text_encoder_l_with_projection.append(module=projection)
+        text_encoder_l_with_projection.load_state_dict(state_dict=converter.get_state_dict())
+        projection = text_encoder_l_with_projection.pop(index=-1)
+
+        tep = TextEncoderWithPoolingL(target=text_encoder_l_with_projection, projection=projection)
+        tep.inject()
+        text_encoder_l_with_projection._save_to_state_dict(path=args.output_path, half=args.half)
     else:
         converter.save_to_safetensors(path=args.output_path, half=args.half)
 

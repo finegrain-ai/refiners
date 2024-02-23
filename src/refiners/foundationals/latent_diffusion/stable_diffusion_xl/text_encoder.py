@@ -1,4 +1,4 @@
-from typing import cast
+from typing import cast, TypeVar
 
 from jaxtyping import Float
 from torch import Tensor, cat, device as Device, dtype as DType
@@ -9,12 +9,13 @@ from refiners.fluxion.context import Contexts
 from refiners.foundationals.clip.text_encoder import CLIPTextEncoderG, CLIPTextEncoderL
 from refiners.foundationals.clip.tokenizer import CLIPTokenizer
 
-
-class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
+T = TypeVar("T", bound="CLIPTextEncoderG | CLIPTextEncoderL")
+class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
     def __init__(
         self,
-        target: CLIPTextEncoderG,
+        target: T,
         projection: fl.Linear | None = None,
+        pool_features: int = 1280
     ) -> None:
         with self.setup_adapter(target=target):
             tokenizer = target.ensure_find(CLIPTokenizer)
@@ -30,8 +31,8 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
                         target[-2:],
                         projection
                         or fl.Linear(
-                            in_features=1280,
-                            out_features=1280,
+                            in_features=pool_features,
+                            out_features=pool_features,
                             use_bias=False,
                             device=target.device,
                             dtype=target.dtype,
@@ -44,7 +45,7 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
     def init_context(self) -> Contexts:
         return {"text_encoder_pooling": {"end_of_text_index": []}}
 
-    def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 1280"], Float[Tensor, "1 1280"]]:
+    def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 embed_dim"], Float[Tensor, "1 embed_dim"]]:
         return super().__call__(text)
 
     @property
@@ -55,11 +56,26 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
         position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()
         end_of_text_index.append(cast(int, position))
 
-    def pool(self, x: Float[Tensor, "1 77 1280"]) -> Float[Tensor, "1 1280"]:
+    def pool(self, x: Float[Tensor, "1 77 embed_dim"]) -> Float[Tensor, "1 embed_dim"]:
         end_of_text_index = self.use_context(context_name="text_encoder_pooling").get("end_of_text_index", [])
         assert len(end_of_text_index) == 1, "End of text index not found."
         return x[:, end_of_text_index[0], :]
 
+class TextEncoderWithPooling(TextEncoderWithPoolingGeneral[CLIPTextEncoderG]):
+    def __init__(
+        self,
+        target: CLIPTextEncoderG,
+        projection: fl.Linear | None = None,
+    ) -> None:
+        super().__init__(target, projection, pool_features=1280)
+
+class TextEncoderWithPoolingL(TextEncoderWithPoolingGeneral[CLIPTextEncoderL]):
+    def __init__(
+        self,
+        target: CLIPTextEncoderL,
+        projection: fl.Linear | None = None,
+    ) -> None:
+        super().__init__(target, projection, pool_features=768)
 
 class DoubleTextEncoder(fl.Chain):
     def __init__(

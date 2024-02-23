@@ -700,20 +700,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return ip_adapter
 
     @cached_property
-    def ddpm_solver(self) -> DDPM:
-        return DDPM(
-            num_inference_steps=1000,  # FIXME: harcoded value
-            device=self.device,
-        ).to(self.device, dtype=self.dtype)
-    def set_end_of_text_index(self, end_of_text_index: list[int], tokens: Tensor) -> None:
-        position = (tokens == self.text_encoder.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()
-        end_of_text_index.append(cast(int, position))
-
-    def pool(self, x: Float[Tensor, "1 77 1280"]) -> Float[Tensor, "1 1280"]:
-        end_of_text_index = self.use_context(context_name="text_encoder_pooling").get("end_of_text_index", [])
-        assert len(end_of_text_index) == 1, "End of text index not found."
-        return x[:, end_of_text_index[0], :]
-    @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
         return exp(self.ddpm_solver.signal_to_noise_ratios) ** 2
 
