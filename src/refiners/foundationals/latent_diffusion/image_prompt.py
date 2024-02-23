@@ -505,7 +505,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 None
 
             for i, cross_attn in enumerate(self.sub_adapters):
-                cross_attention_weights: dict[str, Tensor] = []
+                cross_attention_weights: dict[str, Tensor] = {}
                 for k, v in weights.items():
                     prefix = f"ip_adapter.{i:03d}."
                     if not k.startswith(prefix):
