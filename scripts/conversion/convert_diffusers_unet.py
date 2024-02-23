@@ -7,6 +7,7 @@ from diffusers import UNet2DConditionModel  # type: ignore
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import load_from_safetensors, load_tensors
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import SDXLLcmAdapter
 
@@ -28,7 +29,12 @@ def setup_converter(args: Args) -> ModelConverter:
         low_cpu_mem_usage=False,
     )
     if args.override_weights is not None:
-        sd = torch.load(args.override_weights)  # type: ignore
+        if args.override_weights.endswith(".pth"):
+            sd = load_tensors(args.override_weights)
+        elif args.override_weights.endswith(".safetensors"):
+            sd = load_from_safetensors(args.override_weights)
+        else:
+            raise ValueError(f"Unsupported file format: {args.override_weights}")
         source.load_state_dict(sd)
     source_in_channels: int = source.config.in_channels  # type: ignore
     source_clip_embedding_dim: int = source.config.cross_attention_dim  # type: ignore
