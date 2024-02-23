@@ -170,6 +170,19 @@ class CLIPImageEncoder(fl.Chain):
             fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
 
+class CLIPImageEncoderL(CLIPImageEncoder):
+    def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
+        super().__init__(
+            embedding_dim = 1024,
+            output_dim = 768,
+            patch_size = 14,
+            num_layers = 24,
+            num_attention_heads = 16,
+            feedforward_dim = 4096,
+            device=device,
+            dtype=dtype,
+        )
+
 
 class CLIPImageEncoderH(CLIPImageEncoder):
     """CLIP huge image encoder.
