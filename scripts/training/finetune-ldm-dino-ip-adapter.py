@@ -23,7 +23,8 @@ from torch import (
     no_grad,
     randint,
     float32,
-    zeros
+    zeros,
+    cat
 )
 from torch.cuda import empty_cache
 from torch.distributions import Beta
@@ -183,6 +184,7 @@ class IPBatch:
 
     latent: Tensor
     text_embedding: Tensor
+    pooled_text_embedding: Tensor
     image_embedding: Tensor
 
 class ComputeGradNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
@@ -261,6 +263,7 @@ class IPDataset(Dataset[IPBatch]):
         self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
         self.empty_text_embedding = self.trainer.text_encoder("").cpu().float()
+        self.empty_pooled_text_embedding = self.trainer.text_encoder("").cpu().float()[:, 1]
         self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).cpu().float()
     @staticmethod
     def download_images(
@@ -320,12 +323,26 @@ class IPDataset(Dataset[IPBatch]):
     @staticmethod
     def encode_captions(
         captions: list[str],
-        text_encoder: CLIPTextEncoderL,
+        text_encoder: CLIPTextEncoderL | TextEncoderWithPoolingL,
     ) -> dict[str, list[Tensor]]:
         """Encode the captions with the text encoder."""
-        return {
-            "text_embedding": [text_encoder(caption) for caption in captions],
+        output: dict[str, list[Tensor]] = {
+            "text_embedding": [],
         }
+        if isinstance(text_encoder, TextEncoderWithPoolingL):
+            output["pooled_text_embedding"] = []
+        for caption in captions:
+            if isinstance(text_encoder, CLIPTextEncoderL):
+                text_embedding = text_encoder(caption)
+                output["text_embedding"].append(text_embedding)
+            else:
+                text_embedding, pooled_text_embedding = text_encoder(caption)
+                assert isinstance(text_embedding, Tensor)
+                assert isinstance(pooled_text_embedding, Tensor)
+                output["text_embedding"].append(text_embedding)
+                output["pooled_text_embedding"].append(pooled_text_embedding)
+
+        return output
 
     @staticmethod
     def cond_transform(
@@ -502,7 +519,6 @@ class IPDataset(Dataset[IPBatch]):
             dataset = dataset.map(  # type: ignore
                 function=self.encode_captions,
                 input_columns=["caption"],
-                remove_columns=["caption"],
                 batched=True,
                 batch_size=50,  # FIXME: harcoded value
                 fn_kwargs={
@@ -553,6 +569,7 @@ class IPDataset(Dataset[IPBatch]):
             image_embedding = data[self.image_encoder_column]
             latent = data["lda_embedding"]
         text_embedding = data["text_embedding"]
+        pooled_text_embedding = data.get("pooled_text_embedding", self.empty_pooled_text_embedding)
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
             if dataset_config.zero_uncond:
@@ -561,10 +578,12 @@ class IPDataset(Dataset[IPBatch]):
                 image_embedding = self.black_image_embedding
         elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
             text_embedding = self.empty_text_embedding
+            pooled_text_embedding = self.empty_pooled_text_embedding
         elif rand_num < (
             dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate
         ):
             text_embedding = self.empty_text_embedding
+            pooled_text_embedding = self.empty_pooled_text_embedding
             if dataset_config.zero_uncond:
                 image_embedding = zeros_like(image_embedding)
             else:
@@ -573,6 +592,7 @@ class IPDataset(Dataset[IPBatch]):
         return IPBatch(
             latent=latent,
             text_embedding=text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
             image_embedding=image_embedding,
         )
 
@@ -591,10 +611,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def collate_fn(self, batch: list[IPBatch]) -> IPBatch:
         latents = cat(tensors=[item.latent for item in batch])
         text_embeddings = cat(tensors=[item.text_embedding for item in batch])
+        pooled_text_embeddings = cat(tensors=[item.pooled_text_embedding for item in batch])
         image_embeddings = cat([item.image_embedding for item in batch])
         return IPBatch(
             latent=latents,
             text_embedding=text_embeddings,
+            pooled_text_embedding=pooled_text_embeddings,
             image_embedding=image_embeddings,
         )
     @staticmethod
@@ -782,22 +804,27 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         latents = batch.latent.to(self.device, dtype=self.dtype)
         batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
+        if self.config.adapter.use_pooled_text_embedding:
+            pooled_text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         div_factor = self.config.adapter.image_embedding_div_factor
         image_embedding = batch.image_embedding.to(self.device, dtype=float32)/div_factor
         if do_palp:
             assert batch.uncond_text_embedding is not None
             assert batch.uncond_image_embedding is not None
-            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
+            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=self.dtype)
+            if self.config.adapter.use_pooled_text_embedding:
+                uncond_pooled_text_embedding: Tensor = self.dataset.empty_pooled_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
             if self.config.dataset.zero_uncond:
                 uncond_image_embedding = zeros_like(image_embedding)
             else:
-                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)/div_factor
+                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=self.dtype)/div_factor
 
         image_embedding = self.image_proj(image_embedding)
-
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
-
+        # set pooled text embedding
+        if self.config.adapter.use_pooled_text_embedding:
+            self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
         # set text embeddings context
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
@@ -849,10 +876,14 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             predicted_latent = self.remove_noise_from_latents(noisy_latents, prediction)
             text_alignment_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
             noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, text_alignment_noise)
+            if self.config.adapter.use_pooled_text_embedding:
+                self.adapter.set_pooled_text_embedding(uncond_pooled_text_embedding)
             self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(uncond_image_embedding)
             uncond_adapted_noise = self.unet(noisy_predicted_latent)
+            if self.config.adapter.use_pooled_text_embedding:
+                self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
             self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(image_embedding)
@@ -876,7 +907,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         sd = StableDiffusion_1(
             unet=self.unet,
             lda=self.lda,
-            clip_text_encoder=self.text_encoder,
             solver=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
             dtype=None
@@ -898,7 +928,26 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             images[f"condition images_{i}"] = cond_images[i]
         for prompt, cond_image in zip(prompts, cond_images):
             canvas_image = Image.new(mode="RGB", size=(512, 512 * num_images_per_prompt))
-            clip_text_embedding = sd.compute_clip_text_embedding(text=prompt).to(self.device, dtype=self.dtype)
+            conditional_embedding = self.text_encoder(prompt)
+            negative_embedding = self.text_encoder("")
+            if self.config.adapter.use_pooled_text_embedding:
+                assert isinstance(self.text_encoder, TextEncoderWithPoolingL)
+                assert isinstance(negative_embedding, tuple)
+                assert isinstance(negative_embedding[0], Tensor)
+                assert isinstance(negative_embedding[1], Tensor)
+                assert isinstance(conditional_embedding, tuple)
+                assert isinstance(conditional_embedding[0], Tensor)
+                assert isinstance(conditional_embedding[1], Tensor)
+                clip_text_embedding = cat(tensors=(negative_embedding[0], conditional_embedding[0]), dim=0)
+                pooled_clip_text_embedding = cat(tensors=(negative_embedding[1], conditional_embedding[1]), dim=0)
+            else:
+                assert isinstance(self.text_encoder, CLIPTextEncoderL)
+                assert isinstance(negative_embedding, Tensor)
+                assert isinstance(conditional_embedding, Tensor)
+                clip_text_embedding = cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+
+
+
             cond_resolution = self.config.adapter.resolution
             image_embedding = self.adapter.compute_image_embedding(
                 self.adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(self.device, dtype=self.dtype),
@@ -909,6 +958,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 logger.info(f"Generating image {i+1}/{num_images_per_prompt} for prompt: {prompt}")
                 x = randn(1, 4, 64, 64, device=self.device, dtype=self.dtype)
                 self.adapter.set_image_embedding(image_embedding)
+                if self.config.adapter.use_pooled_text_embedding:
+                    self.adapter.set_pooled_text_embedding(pooled_clip_text_embedding)
                 for step in sd.steps:
                     x = sd(
                         x=x,
