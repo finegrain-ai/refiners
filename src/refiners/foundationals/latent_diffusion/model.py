@@ -48,14 +48,18 @@ class LatentDiffusionModel(fl.Module, ABC):
             height // 8,
             width // 8,
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
+
         if init_image is None:
-            return noise
-        encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
-        return self.solver.add_noise(
-            x=encoded_image,
-            noise=noise,
-            step=self.solver.first_inference_step,
-        )
+            x = noise
+        else:
+            encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
+            x = self.solver.add_noise(
+                x=encoded_image,
+                noise=noise,
+                step=self.solver.first_inference_step,
+            )
+
+        return self.solver.scale_model_input(x, step=-1)
 
     @property
     def steps(self) -> list[int]:

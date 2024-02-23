@@ -826,8 +826,7 @@ def test_diffusion_std_random_init_euler(
     sd15.set_inference_steps(30)
 
     manual_seed(2)
-    x = torch.randn(1, 4, 64, 64, device=test_device)
-    x = x * euler_solver.init_noise_sigma
+    x = sd15.init_latents((512, 512)).to(sd15.device, sd15.dtype)
 
     for step in sd15.steps:
         x = sd15(
@@ -1997,11 +1996,7 @@ def test_diffusion_sdxl_euler_deterministic(
     time_ids = sdxl.default_time_ids
     sdxl.set_inference_steps(30)
     manual_seed(2)
-    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
-
-    # init latents must be scaled for Euler
-    # TODO make init_latents work
-    x = x * sdxl.solver.init_noise_sigma
+    x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
 
     for step in sdxl.steps:
         x = sdxl(
