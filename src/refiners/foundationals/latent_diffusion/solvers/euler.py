@@ -63,11 +63,15 @@ class Euler(Solver):
 
         Args:
             x: The model input.
-            step: The current step.
+            step: The current step. This method is called with `step=-1` in `init_latents`.
 
         Returns:
             The scaled model input.
         """
+
+        if step == -1:
+            return x * self.init_noise_sigma
+
         sigma = self.sigmas[step]
         return x / ((sigma**2 + 1) ** 0.5)
 
