@@ -26,7 +26,10 @@ from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
-from refiners.training_utils.callback import Callback, CallbackConfig
+from refiners.training_utils.callback import (
+    Callback,
+    CallbackConfig,
+)
 from refiners.training_utils.clock import ClockConfig, TrainingClock
 from refiners.training_utils.common import (
     compute_grad_norm,
