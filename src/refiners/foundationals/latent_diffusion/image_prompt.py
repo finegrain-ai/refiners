@@ -500,7 +500,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             # Hack to go around image projection with same weight name but different projection shape.
             try:
                 self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
-            except:
+            except Exception as e:
+                print(e)
                 None
 
             for i, cross_attn in enumerate(self.sub_adapters):
@@ -510,7 +511,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     if not k.startswith(prefix):
                         continue
                     cross_attention_weights.append(v)
-
+                print(len(cross_attention_weights))
                 assert len(cross_attention_weights) == 2
                 cross_attn.load_weights(*cross_attention_weights)
             if use_pooled_text_embedding:
