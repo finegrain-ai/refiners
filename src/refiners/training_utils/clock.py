@@ -195,6 +195,10 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.log(f"Epoch {trainer.clock.epoch} started.")
         self.meter_start_time = time.time()
 
+    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        trainer.clock.epoch += 1
+        trainer.clock.num_batches_processed = 0
+
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log(f"Step {trainer.clock.step} started.")
         self.data_time_meter.update(time.time() - self.meter_start_time)
@@ -238,6 +242,3 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log("Evaluation ended.")
 
-    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.epoch += 1
-        trainer.clock.num_batches_processed = 0
