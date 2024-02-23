@@ -56,7 +56,7 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
         print(tokens, self.tokenizer.end_of_text_token_id)
         print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True))
         print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1])
-        print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item())
+        print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1][0].item())
         position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1][0].item()
         end_of_text_index.append(cast(int, position))
 
