@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 from loguru import logger
 from torch import Tensor
 
+
 # Ported from open-muse
 class AverageMeter(object):
     """Computes and stores the average and current value"""
