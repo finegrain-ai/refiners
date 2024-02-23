@@ -38,6 +38,7 @@ from refiners.training_utils.common import (
 )
 from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
+from refiners.training_utils.batch import BaseBatch
 
 
 class WarmupScheduler(LRScheduler):
@@ -60,22 +61,21 @@ class WarmupScheduler(LRScheduler):
             self.scheduler.step(epoch=epoch)
             self._step_count += 1
 
-
-Batch = TypeVar("Batch")
+BatchType = TypeVar("BatchType", bound=BaseBatch)
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
 
 
-class _Dataset(Dataset[Batch]):
+class _Dataset(Dataset[BatchType]):
     """
     A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
     """
 
-    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
+    def __init__(self, get_item: Callable[[int], BatchType], length: int) -> None:
         assert length > 0, "Dataset length must be greater than 0."
         self.length = length
         self.get_item = get_item
 
-    def __getitem__(self, index: int) -> Batch:
+    def __getitem__(self, index: int) -> BatchType:
         return self.get_item(index)
 
     def __len__(self) -> int:
@@ -136,7 +136,7 @@ def register_callback():
     return decorator
 
 
-class Trainer(Generic[ConfigType, Batch], ABC):
+class Trainer(Generic[ConfigType, BatchType], ABC):
     def __init__(self, config: ConfigType) -> None:
         self._models: ModelRegistry = {}
         self._callbacks: CallbackRegistry = {}
@@ -294,7 +294,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return lr_scheduler
 
     @abstractmethod
-    def get_item(self, index: int) -> Batch:
+    def get_item(self, index: int) -> BatchType:
         """
         Returns a batch of data.
 
@@ -312,7 +312,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         ...
 
     @abstractmethod
-    def collate_fn(self, batch: list[Batch]) -> Batch:
+    def collate_fn(self, batch: list[BatchType]) -> BatchType:
         """
         Collate function for the dataloader.
 
@@ -322,7 +322,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         ...
 
     @cached_property
-    def dataset(self) -> Dataset[Batch]:
+    def dataset(self) -> Dataset[BatchType]:
         """
         Returns the dataset constructed with the `get_item` method.
         """
@@ -335,7 +335,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
+    def compute_loss(self, batch: BatchType) -> Tensor:
         ...
 
     def compute_evaluation(self) -> None:
@@ -359,7 +359,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.clock.is_evaluation_step:
             self.evaluate()
 
-    def step(self, batch: Batch) -> None:
+    def step(self, batch: BatchType) -> None:
         """Perform a single training step."""
         self._call_callbacks(event_name="on_compute_loss_begin")
         loss = self.compute_loss(batch=batch)

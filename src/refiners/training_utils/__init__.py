@@ -18,6 +18,7 @@ from refiners.training_utils.config import (
 from refiners.training_utils.gradient_clipping import GradientClippingConfig
 from refiners.training_utils.trainer import Trainer, register_callback, register_model
 from refiners.training_utils.wandb import WandbConfig, WandbMixin
+from refiners.training_utils.batch import BaseBatch
 
 refiners_requires = requires("refiners")
 assert refiners_requires is not None
@@ -55,4 +56,5 @@ __all__ = [
     "GradientClippingConfig",
     "Optimizers",
     "LRSchedulerType",
+    "BaseBatch"
 ]
