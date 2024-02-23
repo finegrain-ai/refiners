@@ -22,6 +22,7 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 
 class TrainingConfig(BaseModel):
     device: str = "cpu"
+    amp: bool = False
     dtype: str = "float32"
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
