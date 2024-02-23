@@ -33,7 +33,7 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
                         or fl.Linear(
                             in_features=pool_features,
                             out_features=pool_features,
-                            use_bias=False,
+                            bias=False,
                             device=target.device,
                             dtype=target.dtype,
                         ),
