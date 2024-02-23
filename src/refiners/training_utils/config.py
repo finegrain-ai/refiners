@@ -168,7 +168,6 @@ class BaseConfig(BaseModel):
     optimizer: OptimizerConfig
     lr_scheduler: LRSchedulerConfig
     clock: ClockConfig = ClockConfig()
-    timer: CallbackConfig
     gradient_clipping: GradientClippingConfig = GradientClippingConfig()
 
     model_config = ConfigDict(extra="forbid")

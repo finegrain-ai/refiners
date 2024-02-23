@@ -241,4 +241,3 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log("Evaluation ended.")
-
