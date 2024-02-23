@@ -57,7 +57,7 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
         print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True))
         print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1])
         print((tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item())
-        position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()
+        position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1][0].item()
         end_of_text_index.append(cast(int, position))
 
     def pool(self, x: Float[Tensor, "1 77 embed_dim"]) -> Float[Tensor, "1 embed_dim"]:
