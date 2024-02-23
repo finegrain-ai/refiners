@@ -367,14 +367,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.scaler is None:
             self.optimizer.step()
             return
-        scale_before = self.scaler.get_scale()  # type: ignore
         self.scaler.step(self.optimizer)  # type: ignore
         self.scaler.update()  # type: ignore
-        scale_after = self.scaler.get_scale()  # type: ignore
-        # If we reduced the loss scale, it means the optimizer step was skipped because of gradient overflow.
-        if scale_after < scale_before:
-            logger.info("Overflow in optimizer caused optimizer to skip")
-
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
