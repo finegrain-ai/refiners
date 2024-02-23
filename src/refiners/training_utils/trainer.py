@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
+from refiners.training_utils.batch import BaseBatch
 from refiners.training_utils.callback import (
     Callback,
     CallbackConfig,
@@ -38,7 +39,6 @@ from refiners.training_utils.common import (
 )
 from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
 from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
-from refiners.training_utils.batch import BaseBatch
 
 
 class WarmupScheduler(LRScheduler):
@@ -60,6 +60,7 @@ class WarmupScheduler(LRScheduler):
         else:
             self.scheduler.step(epoch=epoch)
             self._step_count += 1
+
 
 BatchType = TypeVar("BatchType", bound=BaseBatch)
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)

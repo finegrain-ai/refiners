@@ -4,6 +4,7 @@ from importlib.metadata import requires
 
 from packaging.requirements import Requirement
 
+from refiners.training_utils.batch import BaseBatch
 from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.config import (
@@ -18,7 +19,6 @@ from refiners.training_utils.config import (
 from refiners.training_utils.gradient_clipping import GradientClippingConfig
 from refiners.training_utils.trainer import Trainer, register_callback, register_model
 from refiners.training_utils.wandb import WandbConfig, WandbMixin
-from refiners.training_utils.batch import BaseBatch
 
 refiners_requires = requires("refiners")
 assert refiners_requires is not None
@@ -56,5 +56,5 @@ __all__ = [
     "GradientClippingConfig",
     "Optimizers",
     "LRSchedulerType",
-    "BaseBatch"
+    "BaseBatch",
 ]
