@@ -52,6 +52,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt imp
 from refiners.foundationals.latent_diffusion.solvers.ddpm import DDPM
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder, SD1UNet, StableDiffusion_1
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import TextEncoderWithPoolingL
 from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.foundationals.latent_diffusion.image_prompt import ImageProjection, PerceiverResampler
@@ -626,10 +627,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
 
     @register_model()
-    def text_encoder(self, text_encoder_config: ModelConfig) -> CLIPTextEncoderL:
-        return CLIPTextEncoderL(
+    def text_encoder(self, text_encoder_config: ModelConfig) -> CLIPTextEncoderL | TextEncoderWithPoolingL:
+        text_encoder = CLIPTextEncoderL(
             device=self.device,
         )
+        if not self.config.adapter.use_pooled_text_embedding:
+            return text_encoder
+        text_encoder_with_pooling = TextEncoderWithPoolingL(target=text_encoder)
+        text_encoder_with_pooling.inject()
+        return text_encoder_with_pooling
 
     @register_model()
     def image_encoder(self, image_encoder_config: ModelConfig) -> ViT:
