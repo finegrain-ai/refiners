@@ -26,23 +26,24 @@ def add_lcm_lora(
     manager: SDLoraManager,
     tensors: dict[str, torch.Tensor],
     name: str = "lcm",
-    scale: float = 1.0 / 8.0,
+    scale: float = 8.0 / 64.0,
     check_validity: bool = True,
 ) -> None:
-    """Add a LCM LoRA to SDXLUNet.
+    """Add a [LCM-LoRA](https://arxiv.org/abs/2311.05556) or a LoRA with similar structure
+    such as [SDXL-Lightning](https://arxiv.org/abs/2402.13929) to SDXLUNet.
 
     This is a complex LoRA so [SDLoraManager.add_loras()][refiners.foundationals.latent_diffusion.lora.SDLoraManager.add_loras]
     is not enough. Instead, we add the LoRAs to the UNet in several iterations, using the filtering mechanism of
     [auto_attach_loras][refiners.fluxion.adapters.lora.auto_attach_loras].
 
-    This LoRA can be used with or without CFG in SD.
+    LCM-LoRA can be used with or without CFG in SD.
     If you use CFG, typical values range from 1.0 (same as no CFG) to 2.0.
 
     Args:
-        manager: A SDLoraManager for SDXL
-        tensors: The `state_dict` of the LCM LoRA
+        manager: A SDLoraManager for SDXL.
+        tensors: The `state_dict` of the LoRA.
         name: The name of the LoRA.
-        scale: The scale to use for the LoRA (should generally not be changed).
+        scale: The scale to use for the LoRA (should generally not be changed, those LoRAs must use alpha / rank).
         check_validity: Perform additional checks, raise an exception if they fail.
     """
 
