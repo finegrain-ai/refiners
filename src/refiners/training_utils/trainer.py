@@ -111,7 +111,7 @@ def register_model():
             if not amp or not model_trained:
                 # training is not amp or model is not trained
                 model = model.to(dtype=self.dtype)
-            elif model_trained:
+            else:
                 # model is trained and is amp
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
