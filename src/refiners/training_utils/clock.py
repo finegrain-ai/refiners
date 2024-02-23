@@ -13,6 +13,25 @@ if TYPE_CHECKING:
 from loguru import logger
 from torch import Tensor
 
+# Ported from open-muse
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val: float = 0
+        self.avg: float = 0
+        self.sum: float = 0
+        self.count: int = 0
+
+    def update(self, val: float):
+        self.val = val
+        self.sum += val
+        self.count += 1
+        self.avg = self.sum / self.count
+
 
 class ClockConfig(CallbackConfig):
     verbose: bool = True
@@ -45,6 +64,11 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.num_batches_processed = 0
         self.num_minibatches_processed = 0
         self.loss: Tensor | None = None
+        self.meter_start_time: float = 0
+        self.batch_time_meter = AverageMeter()
+        self.forward_time_meter = AverageMeter()
+        self.backprop_time_meter = AverageMeter()
+        self.data_time_meter = AverageMeter()
 
     @cached_property
     def unit_to_steps(self) -> dict[TimeUnit, int]:
@@ -168,26 +192,51 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     def on_epoch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log(f"Epoch {trainer.clock.epoch} started.")
-
-    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.epoch += 1
-        trainer.clock.num_batches_processed = 0
+        self.meter_start_time = time.time()
 
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log(f"Step {trainer.clock.step} started.")
+        self.data_time_meter.update(time.time() - self.meter_start_time)
+
+    def on_compute_loss_begin(self, trainer: Trainer[BaseConfig, Any]) -> None:
+        self.meter_start_time = time.time()
+
+    def on_compute_loss_end(self, trainer: Trainer[BaseConfig, Any]) -> None:
+        self.forward_time_meter.update(time.time() - self.meter_start_time)
+
+    def on_backward_begin(self, trainer: Trainer[BaseConfig, Any]) -> None:
+        self.meter_start_time = time.time()
 
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.step += 1
         trainer.clock.num_batches_processed += 1
         trainer.clock.num_minibatches_processed += 1
+        if (not trainer.clock.is_optimizer_step) and (not trainer.clock.is_lr_scheduler_step):
+            self.backprop_time_meter.update(time.time() - self.meter_start_time)
 
     def on_optimizer_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log(f"Iteration {trainer.clock.iteration} ended.")
         trainer.clock.iteration += 1
         trainer.clock.num_minibatches_processed = 0
+        if not trainer.clock.is_lr_scheduler_step:
+            self.backprop_time_meter.update(time.time() - self.meter_start_time)
+
+    def on_lr_scheduler_step_end(self, trainer: Trainer[BaseConfig, Any]) -> None:
+        self.backprop_time_meter.update(time.time() - self.meter_start_time)
+
+    def on_batch_end(self, trainer: Trainer[BaseConfig, Any]) -> None:
+        data_time = self.data_time_meter.val
+        forward_time = self.forward_time_meter.val
+        backprop_time = self.backprop_time_meter.val
+        self.batch_time_meter.update(data_time + forward_time + backprop_time)
+        self.meter_start_time = time.time()
 
     def on_evaluate_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log("Evaluation started.")
 
     def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log("Evaluation ended.")
+
+    def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        trainer.clock.epoch += 1
+        trainer.clock.num_batches_processed = 0

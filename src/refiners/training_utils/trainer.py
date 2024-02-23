@@ -30,7 +30,6 @@ from refiners.training_utils.callback import (
     CallbackConfig,
 )
 from refiners.training_utils.clock import ClockConfig, TrainingClock
-from refiners.training_utils.timer import TrainingTimer
 from refiners.training_utils.common import (
     compute_grad_norm,
     count_learnable_parameters,
@@ -158,10 +157,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
-
-    @register_callback()
-    def timer(self, config: CallbackConfig) -> TrainingTimer:
-        return TrainingTimer()
 
     @register_callback()
     def gradient_clipping(self, config: GradientClippingConfig) -> GradientClipping:

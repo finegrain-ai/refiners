@@ -107,10 +107,10 @@ class WandbCallback(Callback["TrainerWithWandb"]):
 
     def on_batch_end(self, trainer: "TrainerWithWandb") -> None:
         batch_time, forward_time, backprop_time, data_time = (
-            trainer.timer.batch_time_meter.avg,
-            trainer.timer.forward_time_meter.avg,
-            trainer.timer.backprop_time_meter.avg,
-            trainer.timer.data_time_meter.avg,
+            trainer.clock.batch_time_meter.avg,
+            trainer.clock.forward_time_meter.avg,
+            trainer.clock.backprop_time_meter.avg,
+            trainer.clock.data_time_meter.avg,
         )
         if trainer.clock.is_evaluation_step:
             effective_batch_size = trainer.clock.batch_size * trainer.clock.num_step_per_iteration
