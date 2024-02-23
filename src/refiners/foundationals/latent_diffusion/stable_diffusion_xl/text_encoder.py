@@ -53,6 +53,7 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
         return self.ensure_find(CLIPTokenizer)
 
     def set_end_of_text_index(self, end_of_text_index: list[int], tokens: Tensor) -> None:
+        print(tokens, self.tokenizer.end_of_text_token_id)
         position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()
         end_of_text_index.append(cast(int, position))
 
