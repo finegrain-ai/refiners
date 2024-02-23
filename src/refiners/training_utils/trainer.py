@@ -5,40 +5,31 @@ from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 import torch
 from loguru import logger
-from torch import Tensor, device as Device, dtype as DType, nn, float16, float32
+from torch import Tensor
+from torch import device as Device
+from torch import dtype as DType
+from torch import float16, float32, nn
 from torch.autograd import backward
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import (
-    CosineAnnealingLR,
-    CosineAnnealingWarmRestarts,
-    CyclicLR,
-    ExponentialLR,
-    LambdaLR,
-    LRScheduler,
-    MultiplicativeLR,
-    MultiStepLR,
-    OneCycleLR,
-    ReduceLROnPlateau,
-    StepLR,
-)
+from torch.optim.lr_scheduler import (CosineAnnealingLR,
+                                      CosineAnnealingWarmRestarts, CyclicLR,
+                                      ExponentialLR, LambdaLR, LRScheduler,
+                                      MultiplicativeLR, MultiStepLR,
+                                      OneCycleLR, ReduceLROnPlateau, StepLR)
 from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import no_grad
-from refiners.training_utils.callback import (
-    Callback,
-    CallbackConfig,
-)
+from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.clock import ClockConfig, TrainingClock
-from refiners.training_utils.common import (
-    compute_grad_norm,
-    count_learnable_parameters,
-    human_readable_number,
-    scoped_seed,
-)
-from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
-from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
+from refiners.training_utils.common import (compute_grad_norm,
+                                            count_learnable_parameters,
+                                            human_readable_number, scoped_seed)
+from refiners.training_utils.config import (BaseConfig, LRSchedulerType,
+                                            ModelConfig)
+from refiners.training_utils.gradient_clipping import (GradientClipping,
+                                                       GradientClippingConfig)
 
 
 class WarmupScheduler(LRScheduler):
@@ -190,6 +181,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def dtype(self) -> DType:
         dtype = getattr(torch, self.config.training.dtype, None)
         assert isinstance(dtype, DType), f"Unknown dtype: {self.config.training.dtype}"
+        if not self.config.training.amp and dtype == float16:
+            raise NotImplementedError(
+                "Float16 training is not implemented without amp. Try setting amp in training config to True."
+            )
         logger.info(f"Using dtype: {dtype}")
         return dtype
 
@@ -351,8 +346,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
-        ...
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
     def compute_evaluation(self) -> None:
         pass
