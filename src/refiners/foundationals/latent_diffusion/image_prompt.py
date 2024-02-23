@@ -505,15 +505,13 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 None
 
             for i, cross_attn in enumerate(self.sub_adapters):
-                cross_attention_weights: list[Tensor] = []
+                cross_attention_weights: dict[str, Tensor] = []
                 for k, v in weights.items():
                     prefix = f"ip_adapter.{i:03d}."
                     if not k.startswith(prefix):
                         continue
-                    cross_attention_weights.append(v)
-                print(len(cross_attention_weights))
-                assert len(cross_attention_weights) == 2
-                cross_attn.load_weights(*cross_attention_weights)
+                    cross_attention_weights[k[len(prefix):]] = v
+                cross_attn.load_state_dict(cross_attention_weights)
             if use_pooled_text_embedding:
                 pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
                     k.removeprefix("pooled_text_embedding_proj."): v
