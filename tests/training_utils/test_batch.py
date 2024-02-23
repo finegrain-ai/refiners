@@ -99,3 +99,16 @@ def test_equality() -> None:
     assert not b1 != b2
     b3 = MockBatch(foo=randn(3, 10), bar=randn(3, 5), indices=[1, 2, 3])
     assert b3 != b1
+
+
+def test_slicing() -> None:
+    b1 = MockBatch(foo=randn(3, 10), bar=randn(3, 5), indices=[1, 2, 3])
+    b1_0 = b1[0]
+    assert len(b1_0) == 1
+    b1_21 = b1[1:3]
+    assert len(b1_21) == 2
+    assert MockBatch.collate([b1_0, b1_21]) == b1
+
+    b1_0_2 = b1[[0, 2]]
+    assert len(b1_0_2) == 2
+    assert MockBatch.collate([b1_0_2[0], b1[1], b1_0_2[1]]) == b1
