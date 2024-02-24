@@ -337,6 +337,7 @@ class ModelConverter:
             if diff > threshold:
                 print(source_output.mean(), target_output.mean())
                 print(source_output.std(), target_output.std())
+                print(norm(source_output), norm(target_output))
 
                 self._log(
                     f"Models diverged between {prev_source_key} and {source_key}, and between {prev_target_key} and"
