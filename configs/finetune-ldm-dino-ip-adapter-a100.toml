@@ -40,7 +40,7 @@ use_bias = true
 train = true
 use_rescaler = true
 save_folder = "/home/isamu/checkpoints"
-image_embedding_div_factor = 1
+image_embedding_div_factor = 3
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
