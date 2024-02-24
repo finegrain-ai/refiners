@@ -728,6 +728,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return ip_adapter
 
     @cached_property
+    def ddpm_solver(self) -> DDPM:
+        return DDPM(
+            num_inference_steps=1000,  # FIXME: harcoded value
+            device=self.device,
+        ).to(device=self.device)
+
+    @cached_property
     def signal_to_noise_ratios(self) -> Tensor:
         return exp(self.ddpm_solver.signal_to_noise_ratios) ** 2
 
