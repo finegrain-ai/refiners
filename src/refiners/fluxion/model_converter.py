@@ -335,9 +335,6 @@ class ModelConverter:
         for (source_key, source_output), (target_key, target_output) in zip(source_outputs, target_outputs):
             diff = norm(source_output - target_output.reshape(shape=source_output.shape)).item()
             if diff > threshold:
-                print(source_output.mean(), target_output.mean())
-                print(source_output.std(), target_output.std())
-                print(norm(source_output), norm(target_output))
 
                 self._log(
                     f"Models diverged between {prev_source_key} and {source_key}, and between {prev_target_key} and"
