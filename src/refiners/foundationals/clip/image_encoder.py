@@ -124,6 +124,7 @@ class CLIPImageEncoder(fl.Chain):
         num_attention_heads: int = 12,
         feedforward_dim: int = 3072,
         layer_norm_eps: float = 1e-5,
+        use_quick_gelu: bool = False,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
@@ -169,6 +170,12 @@ class CLIPImageEncoder(fl.Chain):
             fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
             fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
+        if use_quick_gelu:
+            for gelu, parent in self.walk(predicate=lambda m, _: isinstance(m, fl.GeLU)):
+                parent.replace(
+                    old_module=gelu,
+                    new_module=fl.GeLU(approximation=fl.GeLUApproximation.SIGMOID),
+                )
 
 class CLIPImageEncoderL(CLIPImageEncoder):
     def __init__(self, device: Device | str | None = None, dtype: DType | None = None) -> None:
@@ -179,6 +186,7 @@ class CLIPImageEncoderL(CLIPImageEncoder):
             num_layers = 24,
             num_attention_heads = 16,
             feedforward_dim = 4096,
+            use_quick_gelu=True,
             device=device,
             dtype=dtype,
         )
