@@ -23,6 +23,7 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 class TrainingConfig(BaseModel):
     device: str = "cpu"
     dtype: str = "float32"
+    amp: bool = False
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
     batch_size: int = 1
@@ -160,7 +161,6 @@ class ModelConfig(BaseModel):
     eps: float | None = None
     weight_decay: float | None = None
     checkpoint: str | None = None
-    train: bool = False
 
     model_config = ConfigDict(extra="forbid")
 

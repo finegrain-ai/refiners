@@ -24,7 +24,6 @@ checkpoint = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors"
 requires_grad = false
 
 [image_proj]
-train = true
 
 [adapter]
 image_encoder_type = "dinov2_vitl14_reg4"
@@ -37,7 +36,6 @@ fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
-train = true
 use_rescaler = true
 save_folder = "/home/isamu/checkpoints"
 image_embedding_div_factor = 3
@@ -53,6 +51,7 @@ dtype = "bfloat16"
 dataset_workers=8
 checkpoint_interval = {"number" = 10000, "unit" = "step"}
 device="cuda"
+amp = false
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"

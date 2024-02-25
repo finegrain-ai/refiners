@@ -120,13 +120,19 @@ def register_model():
             model = func(self, config)
             if config.checkpoint is not None:
                 model.load_from_safetensors(config.checkpoint)
+            amp: bool = self.config.training.amp
             model = model.to(self.device)
-            if not config.train or self.dtype == float32:
-                model = model.to(dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
-
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
+            model_trained = len(learnable_parameters) > 0
+            if not amp or not model_trained:
+                model = model.to(dtype=self.dtype)
+            else:
+                # model is trained and is amp
+                for learnable_parameter in learnable_parameters:
+                    learnable_parameter.to(dtype=float32)
+
             self.models[name] = ModelItem(
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
@@ -416,7 +422,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Perform a single training step."""
         start = time.time()
         self._call_callbacks(event_name="on_compute_loss_begin")
-        with autocast(dtype=self.dtype):
+        with autocast(dtype=self.dtype, enabled=self.config.training.amp):
             loss = self.compute_loss(batch=batch)
         self.loss = loss
         forward_time = time.time() - start
@@ -466,7 +472,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @scoped_seed(seed=get_evaluation_seed)
     def evaluate(self) -> None:
         """Evaluate the model."""
-        with autocast(dtype=self.dtype):
+        with autocast(dtype=self.dtype, enabled=self.config.training.amp):
             self.set_models_to_mode(mode="eval")
             self._call_callbacks(event_name="on_evaluate_begin")
             self.compute_evaluation()
