@@ -806,7 +806,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             alpha = self.config.adapter.palp_alpha
             beta = self.config.adapter.palp_beta
 
-
+        input_dtype = float32 if self.config.training.amp else self.dtype
         # retreive data from batch
         latents = batch.latent.to(self.device, dtype=self.dtype)
         batch_size = latents.shape[0]
@@ -814,7 +814,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         if self.config.adapter.use_pooled_text_embedding:
             pooled_text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         div_factor = self.config.adapter.image_embedding_div_factor
-        image_embedding = batch.image_embedding.to(self.device, dtype=float32)/div_factor
+        image_embedding = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
         if do_palp:
             assert batch.uncond_text_embedding is not None
             assert batch.uncond_image_embedding is not None
@@ -824,7 +824,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if self.config.dataset.zero_uncond:
                 uncond_image_embedding = zeros_like(image_embedding)
             else:
-                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=self.dtype)/div_factor
+                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=input_dtype)/div_factor
 
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
