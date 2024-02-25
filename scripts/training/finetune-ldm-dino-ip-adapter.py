@@ -911,12 +911,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     def compute_evaluation(self) -> None:
         # initialize an SD1.5 pipeline using the trainer's models
+        pipeline_dtype = None if self.config.training.amp else self.dtype
         sd = StableDiffusion_1(
             unet=self.unet,
             lda=self.lda,
             solver=DPMSolver(num_inference_steps=self.config.test_ldm.num_inference_steps),
             device=self.device,
-            dtype=None
+            dtype=pipeline_dtype
         )
         self.adapter.scale = self.config.adapter.inference_scale
         # retreive data from config
