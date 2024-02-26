@@ -5,7 +5,7 @@ from refiners.foundationals.latent_diffusion.auto_encoder import (
     LatentDiffusionAutoencoder,
 )
 from refiners.foundationals.latent_diffusion.freeu import SDFreeUAdapter
-from refiners.foundationals.latent_diffusion.solvers import DPMSolver, Solver
+from refiners.foundationals.latent_diffusion.solvers import DPMSolver, LCMSolver, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     SD1ControlnetAdapter,
     SD1IPAdapter,
@@ -18,6 +18,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     ControlLoraAdapter,
     DoubleTextEncoder,
     SDXLIPAdapter,
+    SDXLLcmAdapter,
     SDXLT2IAdapter,
     SDXLUNet,
     StableDiffusion_XL,
@@ -34,8 +35,10 @@ __all__ = [
     "SDXLUNet",
     "DoubleTextEncoder",
     "SDXLIPAdapter",
+    "SDXLLcmAdapter",
     "SDXLT2IAdapter",
     "DPMSolver",
+    "LCMSolver",
     "Solver",
     "CLIPTextEncoderL",
     "LatentDiffusionAutoencoder",
