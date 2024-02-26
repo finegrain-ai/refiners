@@ -194,7 +194,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def scaler(self) -> GradScaler | None:
-        if self.dtype != float16:
+        if self.dtype != float16 or not self.config.training.amp:
             return None
         return GradScaler()
 
