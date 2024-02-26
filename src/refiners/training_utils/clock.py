@@ -143,7 +143,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     @property
     def is_evaluation_step(self) -> bool:
-        return self.step % self.evaluation_interval_steps == 0
+        return self.iteration % self.evaluation_interval_steps == 0
 
     @property
     def is_checkpointing_step(self) -> bool:

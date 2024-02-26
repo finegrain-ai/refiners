@@ -163,7 +163,7 @@ class WandbMixin(ABC):
 
     def wandb_log(self, data: dict[str, WandbLoggable]) -> None:
         assert isinstance(self, Trainer), "WandbMixin must be mixed with a Trainer"
-        self.wandb.logger.log(data=data, step=self.clock.step)
+        self.wandb.logger.log(data=data, step=self.clock.iteration)
 
 
 class TrainerWithWandb(AnyTrainer, WandbMixin, ABC):
