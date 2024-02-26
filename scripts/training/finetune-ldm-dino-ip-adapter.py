@@ -238,11 +238,6 @@ class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
             tensors |= {f"image_proj.{key}": value for key, value in image_proj.state_dict().items()}
             for i, cross_attention_adapter in enumerate(cross_attention_adapters):
                 tensors |= {f"ip_adapter.{i:03d}.{key}": value for key, value in cross_attention_adapter.state_dict().items()}
-            if trainer.config.adapter.use_pooled_text_embedding:
-                tensors |= {
-                    f"pooled_text_embedding_proj.{key}": value
-                    for key, value in adapter.pooled_text_embedding_proj.state_dict().items()
-                }
             save_to_safetensors(
                 path= f"{trainer.config.adapter.save_folder}/step{trainer.clock.iteration}.safetensors",
                 tensors=tensors,
@@ -722,10 +717,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)
             adapter.image_cross_attention.to(self.device, float32)
-        if ip_adapter.use_pooled_text_embedding:
-            assert ip_adapter.pooled_text_embedding_proj is not None
-            ip_adapter.pooled_text_embedding_proj.requires_grad_(True)
-            ip_adapter.pooled_text_embedding_proj.to(self.device, float32)
 
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)

@@ -309,9 +309,9 @@ class ImageCrossAttention(fl.Chain):
         if use_pooled_text_embedding:
             key_contexts.append(
                 fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
+                    fl.UseContext(context="ip_adapter", key="pooled_text_embedding"),
                     fl.Linear(
-                        in_features=1280,
+                        in_features=768,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -322,9 +322,9 @@ class ImageCrossAttention(fl.Chain):
             )
             query_contexts.append(
                 fl.Chain(
-                    fl.UseContext(context="ip_adapter", key="pooled_text_timestep_embedding"),
+                    fl.UseContext(context="ip_adapter", key="pooled_text_embedding"),
                     fl.Linear(
-                        in_features=1280,
+                        in_features=768,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -417,20 +417,6 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         self.image_cross_attention.to(self.device, self.dtype)
 
 
-class PooledTextEmbeddingTimestepEncoder(fl.Passthrough):
-    def __init__(
-        self,
-        use_bias: bool = True,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
-    ) -> None:
-        super().__init__(
-            fl.UseContext("ip_adapter", "pooled_text_embedding"),
-            fl.Linear(768, 1280, bias=use_bias, device=device, dtype=dtype),
-            fl.SetContext("ip_adapter", "pooled_text_timestep_embedding"),
-        )
-
-
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     """Image Prompt adapter for a Stable Diffusion U-Net model.
 
@@ -471,12 +457,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             super().__init__(target)
         self.use_pooled_text_embedding = use_pooled_text_embedding
         self._pooled_text_embedding_proj = []
-        if use_pooled_text_embedding:
-            self._pooled_text_embedding_proj = [
-                PooledTextEmbeddingTimestepEncoder(
-                    use_bias, self.target.device, self.target.dtype
-                )
-            ]
         self.fine_grained = fine_grained
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(image_encoder)]
@@ -512,19 +492,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                         continue
                     cross_attention_weights[k[len(prefix):]] = v
                 cross_attn.load_state_dict(cross_attention_weights, strict=False)
-            if use_pooled_text_embedding:
-                pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
-                    k.removeprefix("pooled_text_embedding_proj."): v
-                    for k, v in weights.items()
-                    if k.startswith("pooled_text_embedding_proj.")
-                }
-                assert self.pooled_text_embedding_proj is not None
-                self.pooled_text_embedding_proj.load_state_dict(pooled_text_embedding_proj_state_dict, strict=strict)
-    @property
-    def pooled_text_embedding_proj(self) -> None | PooledTextEmbeddingTimestepEncoder:
-        if len(self._pooled_text_embedding_proj) == 0:
-            return None
-        return self._pooled_text_embedding_proj[0]
     @property
     def image_encoder(self) -> CLIPImageEncoderH | ViT:
         """The image encoder of the adapter."""
@@ -541,8 +508,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def inject(self: "TIPAdapter", parent: fl.Chain | None = None) -> "TIPAdapter":
         for adapter in self.sub_adapters:
             adapter.inject()
-        if self.use_pooled_text_embedding:
-            self.target.insert(0, self.pooled_text_embedding_proj)
         return super().inject(parent)
 
     def eject(self) -> None:
