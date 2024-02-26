@@ -263,8 +263,12 @@ class IPDataset(Dataset[IPBatch]):
         self.image_encoder_column += "_embedding"
         self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
-        self.empty_text_embedding = self.trainer.text_encoder("").float().cpu().float()
-        self.empty_pooled_text_embedding = self.trainer.text_encoder("").float().cpu().float()[:, 1]
+        if isinstance(self.trainer.text_encoder, TextEncoderWithPoolingL):
+            self.empty_text_embedding = self.trainer.text_encoder("")[0].float().cpu()
+            self.empty_pooled_text_embedding = self.trainer.text_encoder("")[1].float().cpu()
+        else:
+            self.empty_text_embedding = self.trainer.text_encoder("").float().cpu()
+            self.empty_pooled_text_embedding = self.trainer.text_encoder("").float().cpu()[:, 1]
         self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).float().cpu().float()
     @staticmethod
     def download_images(
