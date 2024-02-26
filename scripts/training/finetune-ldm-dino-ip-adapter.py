@@ -833,7 +833,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 uncond_image_embedding = zeros_like(image_embedding)
             else:
                 uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=input_dtype)/div_factor
-
+            uncond_image_embedding = self.image_proj(uncond_image_embedding)
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
@@ -855,10 +855,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             noisy_latents = self.add_noise_to_latents(latents, new_noise)
         else:
             noisy_latents = self.add_noise_to_latents(latents, noise)
-        print("pooled text shape", pooled_text_embeddings.shape)
-        print("text shape", text_embeddings.shape)
-        print("image shape", image_embedding.shape)
-
         # get prediction from unet
         prediction = self.unet(noisy_latents)
         # compute mse loss
@@ -896,10 +892,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(uncond_image_embedding)
-            print("pooled text shape", uncond_pooled_text_embedding.shape)
-            print("text shape", uncond_text_embedding.shape)
-            print("image shape", uncond_image_embedding.shape)
-
             uncond_adapted_noise = self.unet(noisy_predicted_latent)
             if self.config.adapter.use_pooled_text_embedding:
                 self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
