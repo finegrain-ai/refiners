@@ -100,12 +100,10 @@ def generation_and_clip_score_calc(args):
         device=device,
         dtype=dtype
     )
-    print("Starting gen")
     with torch.no_grad():
         gc.collect()
         torch.cuda.empty_cache()
         for scale in tqdm(scales):
-            print(scale)
             scale_dir = os.path.join(generation_path, str(scale))
             os.makedirs(scale_dir, exist_ok=True)
             adapter.scale = scale
@@ -328,3 +326,5 @@ def main() -> None:
     )
     args = parser.parse_args()
     generation_and_clip_score_calc(args)
+if __name__ == "__main__":
+    main()
