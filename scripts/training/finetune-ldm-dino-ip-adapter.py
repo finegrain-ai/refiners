@@ -262,9 +262,9 @@ class IPDataset(Dataset[IPBatch]):
         self.image_encoder_column += "_embedding"
         self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
-        self.empty_text_embedding = self.trainer.text_encoder("").cpu().float()
-        self.empty_pooled_text_embedding = self.trainer.text_encoder("").cpu().float()[:, 1]
-        self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).cpu().float()
+        self.empty_text_embedding = self.trainer.text_encoder("").float().cpu().float()
+        self.empty_pooled_text_embedding = self.trainer.text_encoder("").float().cpu().float()[:, 1]
+        self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).float().cpu().float()
     @staticmethod
     def download_images(
         urls: list[Any],
@@ -334,13 +334,13 @@ class IPDataset(Dataset[IPBatch]):
         for caption in captions:
             if isinstance(text_encoder, CLIPTextEncoderL):
                 text_embedding = text_encoder(caption)
-                output["text_embedding"].append(text_embedding)
+                output["text_embedding"].append(text_embedding.float().cpu())
             else:
                 text_embedding, pooled_text_embedding = text_encoder(caption)
                 assert isinstance(text_embedding, Tensor)
                 assert isinstance(pooled_text_embedding, Tensor)
-                output["text_embedding"].append(text_embedding)
-                output["pooled_text_embedding"].append(pooled_text_embedding)
+                output["text_embedding"].append(text_embedding.float().cpu())
+                output["pooled_text_embedding"].append(pooled_text_embedding.float().cpu())
 
         return output
 
@@ -372,7 +372,7 @@ class IPDataset(Dataset[IPBatch]):
         cond_images = [
             IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images
         ]
-        return {image_encoder_column: [image_encoder(cond_image).cpu() for cond_image in cond_images]}
+        return {image_encoder_column: [image_encoder(cond_image).float().cpu() for cond_image in cond_images]}
 
     @staticmethod
     def encode_lda_images(
@@ -398,7 +398,7 @@ class IPDataset(Dataset[IPBatch]):
             )
         image_compose = Compose(image_transforms)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
-        return {"lda_embedding": [lda.encode_image(image=image).cpu() for image in lda_images]}
+        return {"lda_embedding": [lda.encode_image(image=image).float().cpu() for image in lda_images]}
 
     @no_grad()
     def load_huggingface_dataset(self) -> datasets.Dataset:
