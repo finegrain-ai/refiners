@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,10 @@ class MockBatch(BaseBatch):
     foo: Tensor
     bar: Tensor
     indices: list[int]
+
+
+def test_inspect() -> None:
+    assert "(foo: torch.Tensor, bar: torch.Tensor, indices: list[int])" == str(inspect.signature(MockBatch))
 
 
 def test_single_batch() -> None:
@@ -99,6 +104,22 @@ def test_equality() -> None:
     assert not b1 != b2
     b3 = MockBatch(foo=randn(3, 10), bar=randn(3, 5), indices=[1, 2, 3])
     assert b3 != b1
+
+
+def test_collate() -> None:
+    b1 = MockBatch(foo=randn(3, 10), bar=randn(3, 5), indices=[1, 2, 3])
+    b2 = MockBatch(foo=randn(5, 10), bar=randn(5, 5), indices=[4, 5, 6, 7, 8])
+    b3 = MockBatch(foo=randn(1, 10), bar=randn(1, 5), indices=[9])
+    collated = MockBatch.collate([b1, b2, b3])
+    assert len(collated) == 9
+
+
+def test_add() -> None:
+    b1 = MockBatch(foo=randn(3, 10), bar=randn(3, 5), indices=[1, 2, 3])
+    b2 = MockBatch(foo=randn(5, 10), bar=randn(5, 5), indices=[4, 5, 6, 7, 8])
+    collated = MockBatch.collate([b1, b2])
+    added = b1 + b2
+    assert added == collated
 
 
 def test_slicing() -> None:

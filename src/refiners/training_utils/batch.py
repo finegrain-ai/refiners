@@ -1,3 +1,4 @@
+import typing
 from pathlib import Path
 from typing import Any, Type, TypeVar, cast, get_origin, get_type_hints
 
@@ -6,6 +7,7 @@ from torch import Tensor, cat, device as Device, dtype as DType, load as torch_l
 from refiners.fluxion.utils import summarize_tensor  # type: ignore
 
 T = TypeVar("T", bound="BaseBatch")
+from inspect import Parameter, Signature
 
 
 def simple_hint(hint: Type[Any]) -> Type[Any]:
@@ -17,11 +19,12 @@ def simple_hint(hint: Type[Any]) -> Type[Any]:
 
 class TypeCheckMeta(type):
     def __new__(cls, name: str, bases: tuple[type, ...], dct: dict[str, Any]) -> type:
-        new_class = super().__new__(cls, name, bases, dct)
+        new_class: type["BaseBatch"] = super().__new__(cls, name, bases, dct)
 
         if new_class.__name__ == "BaseBatch":
             return new_class
 
+        parameters: list[Parameter] = []
         type_hints = get_type_hints(new_class)
         if len(type_hints) == 0:
             raise ValueError(f"At least one attribute with type hint is required for {new_class.__name__}")
@@ -29,6 +32,9 @@ class TypeCheckMeta(type):
         for attr_key, attr_hint in type_hints.items():
             if not simple_hint(attr_hint) in [Tensor, list]:
                 raise TypeError(f"Type of '{attr_key}' must be Tensor or list, got {attr_hint}")
+            parameters.append(Parameter(attr_key, Parameter.POSITIONAL_OR_KEYWORD, annotation=attr_hint))
+
+        new_class.__signature__ = Signature(parameters=parameters)
         return new_class
 
 
@@ -36,6 +42,9 @@ AttrType = Tensor | list[Any]
 
 
 class BaseBatch(metaclass=TypeCheckMeta):
+    if typing.TYPE_CHECKING:
+        __signature__: Signature
+
     def __init__(self, **kwargs: AttrType):
         type_hints = get_type_hints(self.__class__)
 
@@ -101,6 +110,22 @@ class BaseBatch(metaclass=TypeCheckMeta):
 
         collated_instance = cls(**collated_attrs)
         return collated_instance
+
+    def __add__(self: T, other: Any) -> T:
+        if not isinstance(other, self.__class__):
+            raise ValueError(f"Unsupported type for addition: {type(other)}")
+
+        collated_attrs: dict[str, Any] = {}
+        type_hints = get_type_hints(self.__class__)
+        for type_key in type_hints.keys():
+            self_attr = getattr(self, type_key)
+            if isinstance(self_attr, Tensor):
+                collated_attrs[type_key] = cat(tensors=(self_attr, getattr(other, type_key)), dim=0)
+            elif isinstance(self_attr, list):
+                collated_attrs[type_key] = self_attr + getattr(other, type_key)
+            else:
+                raise ValueError(f"Unsupported attribute type for collation: {type(self_attr)}")
+        return self.__class__(**collated_attrs)
 
     def to(self: T, device: Device | None = None, dtype: DType | None = None) -> T:
         for type_key in get_type_hints(self.__class__):
