@@ -502,7 +502,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 self.image_proj.load_state_dict(image_proj_state_dict, strict=strict)
             except Exception as e:
                 print(e)
-                None
 
             for i, cross_attn in enumerate(self.sub_adapters):
                 cross_attention_weights: dict[str, Tensor] = {}
@@ -513,7 +512,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     cross_attention_weights[k[len(prefix):]] = v
                 print(cross_attention_weights.keys())
                 print(cross_attn.state_dict().keys())
-                cross_attn.load_state_dict(cross_attention_weights, strict=False)
+                cross_attn.load_state_dict(cross_attention_weights)
             if use_pooled_text_embedding:
                 pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
                     k.removeprefix("pooled_text_embedding_proj."): v
