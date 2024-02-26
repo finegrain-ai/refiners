@@ -79,7 +79,7 @@ class BaseBatch(metaclass=TypeCheckMeta):
                 raise TypeError(
                     f"Invalid type for attribute '{name}': Expected '{attr_type.__name__}', got '{type(value).__name__}'"
                 )
-            
+
             new_size = len(value) if isinstance(value, list) else value.shape[0]
 
             if check_size and new_size != len(self):
@@ -197,23 +197,27 @@ class BaseBatch(metaclass=TypeCheckMeta):
         return f"{self.__class__.__name__}(size={len(self)})[{','.join(attr_strs)}]"
 
     def __getitem__(self: T, key: slice | int | list[int] | list[bool]) -> T:
-        if isinstance(key, slice):
-            return self.__class__(
-                **{attr_name: getattr(self, attr_name)[key] for attr_name in self.__class__.attr_types()}
-            )
-        elif isinstance(key, int):
-            return self[key : key + 1]
-        else:  # list
-            if len(key) == 0:
-                raise ValueError("Empty list is not valid")
-            if isinstance(key[0], bool):
+        match key:
+            case key if isinstance(key, slice):
+                return self.__class__(
+                    **{attr_name: getattr(self, attr_name)[key] for attr_name in self.__class__.attr_types()}
+                )
+            case key if isinstance(key, int):
+                return self[key : key + 1]
+            case key if isinstance(key, list) and all(isinstance(x, bool) for x in key):
                 if len(key) != len(self):
-                    raise ValueError("Boolean list must have the same length as the batch")
+                    raise ValueError(
+                        f"Boolean list size (${len(key)}) must be the same length as batch size (${len(self)})"
+                    )
                 indices: list[int] = list(filter(lambda x: key[x], range(len(self))))
                 if len(indices) == 0:
                     raise ValueError("Boolean list must have at least one true value")
                 return self[indices]
-            else:  # list[int]
+            case key if isinstance(key, list):
+                if len(key) == 0:
+                    raise ValueError("Empty list is not valid")
                 indices = cast(list[int], key)
                 batch_list: list[T] = [self[i] for i in indices]
                 return self.__class__.collate(batch_list)
+            case _:
+                raise ValueError(f"Unsupported type for key: {type(key)}")
