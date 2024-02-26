@@ -1,13 +1,11 @@
-import typing
 from pathlib import Path
-from typing import Any, Type, TypeVar, cast, get_origin, get_type_hints
+from typing import Any, Type, TypeVar, cast, dataclass_transform, get_origin, get_type_hints
 
 from torch import Tensor, cat, device as Device, dtype as DType, load as torch_load, save as torch_save  # type: ignore
 
 from refiners.fluxion.utils import summarize_tensor  # type: ignore
 
 T = TypeVar("T", bound="BaseBatch")
-from inspect import Parameter, Signature
 
 
 def simple_hint(hint: Type[Any]) -> Type[Any]:
@@ -17,6 +15,7 @@ def simple_hint(hint: Type[Any]) -> Type[Any]:
     return origin
 
 
+@dataclass_transform()
 class TypeCheckMeta(type):
     def __new__(cls, name: str, bases: tuple[type, ...], dct: dict[str, Any]) -> type:
         new_class: type["BaseBatch"] = super().__new__(cls, name, bases, dct)
@@ -24,135 +23,141 @@ class TypeCheckMeta(type):
         if new_class.__name__ == "BaseBatch":
             return new_class
 
-        parameters: list[Parameter] = []
-        type_hints = get_type_hints(new_class)
-        if len(type_hints) == 0:
+        batch_attr_types = new_class.batch_attr_types()
+        if len(batch_attr_types) == 0:
             raise ValueError(f"At least one attribute with type hint is required for {new_class.__name__}")
 
-        for attr_key, attr_hint in type_hints.items():
+        for attr_key, attr_hint in batch_attr_types.items():
             if not simple_hint(attr_hint) in [Tensor, list]:
                 raise TypeError(f"Type of '{attr_key}' must be Tensor or list, got {attr_hint}")
-            parameters.append(Parameter(attr_key, Parameter.POSITIONAL_OR_KEYWORD, annotation=attr_hint))
 
-        new_class.__signature__ = Signature(parameters=parameters)
         return new_class
 
 
-AttrType = Tensor | list[Any]
+BatchAttrType = Tensor | list[Any]
 
 
 class BaseBatch(metaclass=TypeCheckMeta):
-    if typing.TYPE_CHECKING:
-        __signature__: Signature
+    @classmethod
+    def batch_attr_types(cls: Type[T]) -> dict[str, Type[BatchAttrType]]:
+        type_hints = get_type_hints(cls)
+        return {name: simple_hint(hint) for name, hint in type_hints.items() if name != "_length"}
 
-    def __init__(self, **kwargs: AttrType):
-        type_hints = get_type_hints(self.__class__)
+    def __init__(self, **kwargs: BatchAttrType):
+        batch_attr_types = self.__class__.batch_attr_types()
 
         size = None
 
         for arg_key in kwargs:
-            if arg_key not in type_hints:
+            if arg_key not in batch_attr_types:
                 raise ValueError(f"Attribute '{arg_key}' is not valid")
 
-        for type_key in type_hints:
-            type_hint = type_hints[type_key]
-
+        for type_key in batch_attr_types:
             if type_key not in kwargs:
                 raise ValueError(f"Missing required attribute '{type_key}'")
 
-            arg_value = kwargs[type_key]
-
-            simple_type_hint = simple_hint(type_hint)
-            if not isinstance(arg_value, simple_type_hint):
-                raise TypeError(
-                    f"Invalid type for attribute '{type_key}': Expected {simple_type_hint.__name__}, got {type(arg_value).__name__}"
-                )
-
-            if isinstance(arg_value, list):
-                new_size = len(arg_value)
-            else:
-                new_size = arg_value.shape[0]
-
-            if new_size == 0:
-                raise ValueError(f"Attribute '{type_key}' is empty, empty attributes are not permitted")
-
+        for arg_key in kwargs:
+            self.__setattr__(arg_key, kwargs[arg_key], check_size=False)
+            new_size = self.attr_length(arg_key)
             if size is not None and size != new_size:
-                raise ValueError(f"Attribute '{type_key}' has size {new_size}, expected {size}")
-
+                raise ValueError(f"Attribute '{arg_key}' has size {new_size}, expected {size}")
             size = new_size
 
-            setattr(self, type_key, kwargs[type_key])
+            if size == 0:
+                raise ValueError(f"Attribute '{arg_key}' is empty, empty attributes are not permitted")
 
         if size is None:
             raise ValueError(f"Empty batch is not valid")
 
-        self._length = size
-
-
-    def __getattr__(self, name: str) -> AttrType:
-        if name in get_type_hints(self.__class__):
+    def __getattr__(self, name: str) -> BatchAttrType:
+        if name in self.__class__.batch_attr_types():
             return getattr(self, name)
         else:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
-            
+
+    def __setattr__(self, name: str, value: Any, check_size: bool = True) -> None:
+        batch_attr_types = self.__class__.batch_attr_types()
+        if name in batch_attr_types:
+            simple_type_hint = batch_attr_types[name]
+            if not isinstance(value, simple_type_hint):
+                raise TypeError(
+                    f"Invalid type for attribute '{name}': Expected {simple_type_hint.__name__}, got {type(value).__name__}"
+                )
+            if isinstance(value, list):
+                new_size = len(value)
+            else:
+                new_size = value.shape[0]
+
+            if check_size and new_size != len(self):
+                raise ValueError(f"Attribute '{name}' has size {new_size}, expected {len(self)}")
+
+            super().__setattr__(name, value)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
     @classmethod
     def collate(cls: Type[T], batch_list: list[T]) -> T:
         collated_attrs: dict[str, Any] = {}
-        type_hints = get_type_hints(cls)
+        batch_attr_types = cls.batch_attr_types()
 
         if len(batch_list) == 0:
             raise ValueError(f"Cannot collate an empty list of {cls.__name__}")
 
-        for type_key in type_hints.keys():
-            attr_list: list[Tensor | list[Any]] = [obj.__getattr__(type_key) for obj in batch_list]
+        for type_key, simple_type_hint in batch_attr_types.items():
+            attr_list: list[BatchAttrType] = [getattr(obj, type_key) for obj in batch_list]
 
-            if all(isinstance(attr, Tensor) for attr in attr_list):
+            if simple_type_hint == Tensor:
                 tensor_tuple = cast(tuple[Tensor, ...], tuple(attr_list))
                 collated_attrs[type_key] = cat(tensor_tuple, dim=0)
             else:
                 collated_attrs[type_key] = [item for sublist in attr_list for item in sublist]
 
-        collated_instance = cls(**collated_attrs)
-        return collated_instance
+        return cls(**collated_attrs)
 
     def __add__(self: T, other: Any) -> T:
         if not isinstance(other, self.__class__):
             raise ValueError(f"Unsupported type for addition: {type(other)}")
 
         collated_attrs: dict[str, Any] = {}
-        type_hints = get_type_hints(self.__class__)
-        for type_key in type_hints.keys():
+        batch_attr_types = self.__class__.batch_attr_types()
+        for type_key, simple_type_hint in batch_attr_types.items():
             self_attr = getattr(self, type_key)
-            if isinstance(self_attr, Tensor):
+            if simple_type_hint == Tensor:
                 collated_attrs[type_key] = cat(tensors=(self_attr, getattr(other, type_key)), dim=0)
-            elif isinstance(self_attr, list):
-                collated_attrs[type_key] = self_attr + getattr(other, type_key)
             else:
-                raise ValueError(f"Unsupported attribute type for collation: {type(self_attr)}")
+                collated_attrs[type_key] = self_attr + getattr(other, type_key)
+
         return self.__class__(**collated_attrs)
 
     def to(self: T, device: Device | None = None, dtype: DType | None = None) -> T:
-        for type_key in get_type_hints(self.__class__):
+        batch_attr_types = self.__class__.batch_attr_types()
+        for type_key, simple_type_hint in batch_attr_types.items():
             value = getattr(self, type_key)
-            if isinstance(value, Tensor):
+            if simple_type_hint == Tensor:
                 setattr(self, type_key, value.to(device, dtype))
-            elif isinstance(value, list):
-                setattr(self, type_key, value)
             else:
-                raise ValueError(f"Unsupported attribute type for to: {type(value)}")
+                setattr(self, type_key, value)
+
         return self
 
-    def __len__(self) -> int:
-        return self._length
+    def attr_length(self, name: str) -> int:
+        value = self.__getattr__(name)
+        if isinstance(value, list):
+            return len(value)
+        else:
+            return value.shape[0]
 
-    def to_dict(self) -> dict[str, AttrType]:
-        return {type_key: getattr(self, type_key) for type_key in get_type_hints(self.__class__)}
+    def __len__(self) -> int:
+        return self.attr_length(list(self.__class__.batch_attr_types().keys())[0])
+
+    def to_dict(self) -> dict[str, BatchAttrType]:
+        return {type_key: getattr(self, type_key) for type_key in self.__class__.batch_attr_types()}
 
     def split(self: T) -> list[T]:
         result: list[T] = []
         l = len(self)
         for i in range(l):
-            args = {type_key: getattr(self, type_key)[i : i + 1] for type_key in get_type_hints(self.__class__)}
+            args = {type_key: getattr(self, type_key)[i : i + 1] for type_key in self.__class__.batch_attr_types()}
             result.append(self.__class__(**args))
         return result
 
@@ -192,7 +197,7 @@ class BaseBatch(metaclass=TypeCheckMeta):
 
     def __repr__(self) -> str:
         attr_strs: list[str] = []
-        for type_key in get_type_hints(self.__class__):
+        for type_key in self.__class__.batch_attr_types():
             attr_value = getattr(self, type_key)
             if isinstance(attr_value, list):
                 attr_strs.append(f"{type_key}={attr_value}")
@@ -203,7 +208,7 @@ class BaseBatch(metaclass=TypeCheckMeta):
     def __getitem__(self: T, key: slice | int | list[int] | list[bool]) -> T:
         if isinstance(key, slice):
             return self.__class__(
-                **{type_key: getattr(self, type_key)[key] for type_key in get_type_hints(self.__class__)}
+                **{type_key: getattr(self, type_key)[key] for type_key in self.__class__.batch_attr_types()}
             )
         elif isinstance(key, int):
             return self[key : key + 1]

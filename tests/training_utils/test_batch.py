@@ -1,4 +1,3 @@
-import inspect
 from pathlib import Path
 
 import pytest
@@ -31,10 +30,6 @@ class MockBatch(BaseBatch):
     indices: list[int]
 
 
-def test_inspect() -> None:
-    assert "(foo: torch.Tensor, bar: torch.Tensor, indices: list[int])" == str(inspect.signature(MockBatch))
-
-
 def test_single_batch() -> None:
     single = MockBatch(foo=randn(1, 10), bar=randn(1, 5), indices=[0])
     assert len(single) == 1
@@ -53,19 +48,19 @@ def test_l5_batch() -> None:
 
 def test_attr_type_error() -> None:
     with pytest.raises(TypeError) as excinfo:
-        MockBatch(foo="foo", bar=randn(6, 5))  # type: ignore
+        MockBatch(foo="foo", bar=randn(5, 5), indices=[0, 1, 2, 3, 4])  # type: ignore
 
     assert "Invalid type for attribute 'foo': Expected Tensor, got str" == str(excinfo.value)
 
 
 def test_extra_missing_attr() -> None:
     with pytest.raises(ValueError) as excinfo:
-        MockBatch(foo=randn(5, 10), bar=randn(5, 5))
+        MockBatch(foo=randn(5, 10), bar=randn(5, 5))  # type: ignore
 
     assert "Missing required attribute 'indices'" == str(excinfo.value)
 
     with pytest.raises(ValueError) as excinfo:
-        MockBatch(foo=randn(5, 10), bar=randn(5, 5), indices=[0, 1, 2], extra=["a", "b", "c"])
+        MockBatch(foo=randn(5, 10), bar=randn(5, 5), indices=[0, 1, 2], extra=["a", "b", "c"])  # type: ignore
 
     assert "Attribute 'extra' is not valid" == str(excinfo.value)
 
@@ -133,3 +128,26 @@ def test_slicing() -> None:
     b1_0_2 = b1[[0, 2]]
     assert len(b1_0_2) == 2
     assert MockBatch.collate([b1_0_2[0], b1[1], b1_0_2[1]]) == b1
+
+
+def test_repr() -> None:
+    b1 = MockBatch(foo=tensor([[1, 2]]), bar=tensor([[5, 6]]), indices=[1])
+    assert (
+        repr(b1)
+        == "MockBatch(size=1)[foo=Tensor(shape=(1, 2), dtype=int64, device=cpu, min=1.00, max=2.00, mean=1.50, std=0.71, norm=2.24, grad=False),bar=Tensor(shape=(1, 2), dtype=int64, device=cpu, min=5.00, max=6.00, mean=5.50, std=0.71, norm=7.81, grad=False),indices=[1]]"
+    )
+
+
+def test_getattr_setattr() -> None:
+    tensor1 = tensor([[1, 2]])
+    tensor2 = tensor([[5, 6]])
+    list1 = [10]
+    list2 = [20]
+    b1 = MockBatch(foo=tensor1, bar=tensor1, indices=list1)
+    assert (b1.foo == tensor1).all()
+    assert b1.indices == list1
+
+    b1.foo = tensor2
+    b1.indices = list2
+    assert (b1.foo == tensor2).all()
+    assert b1.indices == list2
