@@ -50,10 +50,10 @@ def generation_and_clip_score_calc(args):
     db_name =  "benchmark_dataset"
     prompts_and_config = "/home/isamu/custom_concept_101/custom-diffusion/customconcept101"
     single_concept_json = "dataset.json"
-    num_prompts = 5
-    num_images_per_prompt = 1
-    condition_scale = 7.5
-    image_embedding_div_factor = 1
+    num_prompts = args.num_prompts
+    num_images_per_prompt = args.num_images_per_prompt
+    condition_scale = args.condition_scale
+    image_embedding_div_factor = args.image_embedding_div_factor
     generation_path = args.generation_path
     checkpoint_path = args.checkpoint_path
     use_pooled_text_embedding=args.use_pooled_text_embedding
@@ -268,6 +268,38 @@ def main() -> None:
         action="store_true",
         help=(
             "Use timestep embed"
+        ),
+    )
+    parser.add_argument(
+        "--num_prompts",
+        type=int,
+        default=5,
+        help=(
+            "Number of prompts"
+        ),
+    )
+    parser.add_argument(
+        "--num_images_per_prompt",
+        type=int,
+        default=1,
+        help=(
+            "Number of images to generate per prompt"
+        ),
+    )
+    parser.add_argument(
+        "--condition_scale",
+        type=float,
+        default=7.5,
+        help=(
+            "Condition scale"
+        ),
+    )
+    parser.add_argument(
+        "--image_embedding_div_factor",
+        type=float,
+        default=1,
+        help=(
+            "Division factor by which to divide image embeddings"
         ),
     )
     args = parser.parse_args()
