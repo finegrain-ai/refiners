@@ -54,6 +54,8 @@ def generation_and_clip_score_calc(args):
     clip_image_encoder_h_path = "/home/isamu/refiners/tests/weights/CLIPImageEncoderH.safetensors"
     text_encoder_path = "/home/isamu/refiners/tests/weights/CLIPLWithProjection.safetensors"
     image_encoder_path = "/home/isamu/refiners/tests/weights/clip_image_l_vision.safetensors"
+    cond_resolution = 518
+
     num_prompts = args.num_prompts
     num_images_per_prompt = args.num_images_per_prompt
     condition_scale = args.condition_scale
@@ -69,6 +71,7 @@ def generation_and_clip_score_calc(args):
         data = json.load(f)
     unet = SD1UNet(in_channels=4).load_from_safetensors("/home/isamu/refiners/tests/weights/unet.safetensors").to(device, dtype=dtype).eval()
     if args.clip_image_encoder:
+        cond_resolution = 224
         image_encoder = CLIPImageEncoderH().load_from_safetensors(clip_image_encoder_h_path).to(device, dtype=dtype).eval()
     else:
         image_encoder = DINOv2_large_reg().load_from_safetensors("/home/isamu/refiners/tests/weights/dinov2_vitl14_reg4_pretrain.safetensors").to(device, dtype=dtype).eval()
@@ -154,7 +157,6 @@ def generation_and_clip_score_calc(args):
                 
                 
                 
-                    cond_resolution = 518
                     image_embedding = adapter.compute_image_embedding(
                         adapter.preprocess_image(cond_image, (cond_resolution, cond_resolution)).to(device, dtype=dtype),
                         div_factor=image_embedding_div_factor
