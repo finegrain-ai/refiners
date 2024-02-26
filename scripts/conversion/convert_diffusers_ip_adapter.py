@@ -140,8 +140,8 @@ def main() -> None:
         v_ip = f"{cross_attn_index}.to_v_ip.weight"
 
         # the name of the key is not checked at runtime, so we keep the original name
-        state_dict[f"ip_adapter.{i:03d}.to_k_ip.weight"] = ip_adapter_weights[k_ip]
-        state_dict[f"ip_adapter.{i:03d}.to_v_ip.weight"] = ip_adapter_weights[v_ip]
+        state_dict[f"ip_adapter.{i:03d}.Attention.Sum.ImageCrossAttention.Distribute.Sum_1.Chain.Linear.weight"] = ip_adapter_weights[k_ip]
+        state_dict[f"ip_adapter.{i:03d}.Attention.Sum.ImageCrossAttention.Distribute.Sum_2.Chain.Linear.weight"] = ip_adapter_weights[v_ip]
 
     if args.half:
         state_dict = {key: value.half() for key, value in state_dict.items()}

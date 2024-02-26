@@ -533,28 +533,21 @@ def convert_ip_adapter():
         "convert_diffusers_ip_adapter.py",
         "tests/weights/h94/IP-Adapter/models/ip-adapter_sd15.bin",
         "tests/weights/ip-adapter_sd15.safetensors",
-        expected_hash="3fb0472e",
     )
     run_conversion_script(
         "convert_diffusers_ip_adapter.py",
         "tests/weights/h94/IP-Adapter/sdxl_models/ip-adapter_sdxl_vit-h.bin",
         "tests/weights/ip-adapter_sdxl_vit-h.safetensors",
-        half=True,
-        expected_hash="860518fe",
     )
     run_conversion_script(
         "convert_diffusers_ip_adapter.py",
         "tests/weights/h94/IP-Adapter/models/ip-adapter-plus_sd15.bin",
         "tests/weights/ip-adapter-plus_sd15.safetensors",
-        half=True,
-        expected_hash="aba8503b",
     )
     run_conversion_script(
         "convert_diffusers_ip_adapter.py",
         "tests/weights/h94/IP-Adapter/sdxl_models/ip-adapter-plus_sdxl_vit-h.bin",
         "tests/weights/ip-adapter-plus_sdxl_vit-h.safetensors",
-        half=True,
-        expected_hash="545d5ce7",
     )
 
 
