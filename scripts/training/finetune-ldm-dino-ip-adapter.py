@@ -855,7 +855,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             noisy_latents = self.add_noise_to_latents(latents, new_noise)
         else:
             noisy_latents = self.add_noise_to_latents(latents, noise)
-
+        print("pooled text shape", pooled_text_embeddings.shape)
+        print("text shape", text_embeddings.shape)
+        print("image shape", image_embedding.shape)
 
         # get prediction from unet
         prediction = self.unet(noisy_latents)
@@ -885,15 +887,19 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
         if do_palp:
-            timestep = self.sample_timestep(batch_size)
             predicted_latent = self.remove_noise_from_latents(noisy_latents, prediction)
-            text_alignment_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-            noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, text_alignment_noise)
+            timestep = self.sample_timestep(batch_size)
+            palp_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
+            noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, palp_noise)
             if self.config.adapter.use_pooled_text_embedding:
                 self.adapter.set_pooled_text_embedding(uncond_pooled_text_embedding)
             self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(uncond_image_embedding)
+            print("pooled text shape", uncond_pooled_text_embedding.shape)
+            print("text shape", uncond_text_embedding.shape)
+            print("image shape", uncond_image_embedding.shape)
+
             uncond_adapted_noise = self.unet(noisy_predicted_latent)
             if self.config.adapter.use_pooled_text_embedding:
                 self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
