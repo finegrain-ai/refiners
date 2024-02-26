@@ -575,6 +575,9 @@ class IPDataset(Dataset[IPBatch]):
             latent = data["lda_embedding"]
         text_embedding = data["text_embedding"]
         pooled_text_embedding = data.get("pooled_text_embedding", self.empty_pooled_text_embedding)
+        print(pooled_text_embedding)
+        print(pooled_text_embedding.shape)
+
         rand_num = random.random()
         if rand_num < dataset_config.image_drop_rate:
             if dataset_config.zero_uncond:
