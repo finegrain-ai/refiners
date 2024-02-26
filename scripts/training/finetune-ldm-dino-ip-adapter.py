@@ -95,6 +95,7 @@ class AdapterConfig(ModelConfig):
     use_rescaler: bool = False
     image_embedding_div_factor: float = 1
     palp_rescale: bool = False
+    palp_steps: int = 4
 
 
 class DatasetConfig(BaseModel):
@@ -808,7 +809,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         4. Inject, and do cfg with unconditioned image text, and get conditioned and do cfg with some condition scale beta
         5. To the loss, add the difference between 3 and 4
         """
-        do_palp = self.config.adapter.do_palp
+        palp_step = (self.clock.step % self.clock.num_step_per_iteration) < self.config.adapter.palp_steps
+        do_palp = self.config.adapter.do_palp and palp_step
         if do_palp:
             assert self.config.dataset.image_drop_rate == 0
             assert self.config.dataset.text_drop_rate == 0

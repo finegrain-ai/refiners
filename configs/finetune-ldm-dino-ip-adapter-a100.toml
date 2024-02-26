@@ -41,6 +41,7 @@ save_folder = "/home/isamu/checkpoints_palp"
 image_embedding_div_factor = 3
 do_palp = true
 palp_rescale = true
+palp_steps = 1
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
