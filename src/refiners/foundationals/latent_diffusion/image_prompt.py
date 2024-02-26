@@ -242,7 +242,7 @@ def expand_dim(x: Float[Tensor, "batch embed_dim"], sequence_length: int = -1) -
     print(x.shape)
     if sequence_length == -1:
         return x
-    return x[:, None].repeat([1, sequence_length, 1])
+    return x[:, None, :].repeat([1, sequence_length, 1])
 
 
 class ImageCrossAttention(fl.Chain):
