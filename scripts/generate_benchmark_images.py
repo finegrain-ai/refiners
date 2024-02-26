@@ -162,6 +162,7 @@ def generation_and_clip_score_calc(args):
                     )
                     # TODO: pool text according to end of text id for pooled text embeds if given option
                     for i in range(num_images_per_prompt):
+                        file_path = os.path.join(scale_dir, f"{class_prompt}_{idx}_{i}.png")
                         x = randn(1, 4, 64, 64, device=device, dtype=dtype)
                         adapter.set_image_embedding(image_embedding)
                         if use_pooled_text_embedding:
@@ -184,7 +185,69 @@ def generation_and_clip_score_calc(args):
     del cross_attn_2d
     del image_proj
     del adapter
-    
+    text_encoder_l_with_projection = CLIPTextEncoderL(device=device, dtype=dtype)
+    clip_text_encoder = TextEncoderWithPoolingL(target=text_encoder_l_with_projection).inject()
+    text_encoder = clip_text_encoder.load_from_safetensors(text_encoder_path).to(device, dtype=dtype)
+    clip_image_encoder = CLIPImageEncoderL().load_from_safetensors(image_encoder_path).to(device, dtype=dtype)
+    base_data = {}
+    for elem in data:
+        class_prompt = elem['class_prompt']
+        
+        prompt_file = os.path.join(prompts_and_config, elem['prompt_filename'])
+        benchmark_dataset = os.path.join(custom_concept_base_path, db_name)
+        images_folder = elem['instance_data_dir'].replace("./benchmark_dataset", benchmark_dataset)
+        validation_image_paths = []
+        for image in os.listdir(images_folder):
+            image_path = os.path.join(images_folder, image)
+            validation_image_paths.append(image_path)
+            break
+        prompts = []
+        with open(prompt_file) as f:
+            for i, prompt in enumerate(f.readlines()):
+                if i >= num_prompts:
+                    break
+                prompts.append(prompt.replace("{}", class_prompt))
+        cond_image = PIL.Image.open(validation_image_paths[0])
+        if cond_image.mode != "RGB":
+            cond_image = cond_image.convert("RGB")
+        base_data[class_prompt] = {}
+        base_data[class_prompt]["image"] = cond_image
+        base_data[class_prompt]["prompts"] = prompts
+    clip_text = {}
+    clip_image = {}
+    w = 2.5
+    with torch.no_grad():
+        for scale in tqdm(scales):
+            clip_text[scale] = []
+            clip_image[scale] = []
+            
+            scale_dir = os.path.join(generation_path, str(scale))
+            for elem in data:
+                class_prompt = elem['class_prompt']
+                cond_image = base_data[class_prompt]["image"]
+                preprocessed_cond_image = clip_transform(cond_image, device, dtype)
+                cond_embed = clip_image_encoder(preprocessed_cond_image)
+                cond_embed = cond_embed / cond_embed.norm(p=2, dim=-1, keepdim=True)
+                prompts = base_data[class_prompt]["prompts"]
+                for idx, prompt in enumerate(prompts):
+                    prompt_embeds = text_encoder(prompt)[1]
+                    prompt_embeds = prompt_embeds / prompt_embeds.norm(p=2, dim=-1, keepdim=True)
+                    for i in range(num_images_per_prompt):
+                        generated_image = PIL.Image.open(os.path.join(scale_dir, f"{class_prompt}_{idx}_{i}.png"))
+                        preprocessed_generated_image = clip_transform(generated_image, device, dtype)
+                        generated_embeds = clip_image_encoder(preprocessed_generated_image)
+                        generated_embeds = generated_embeds / generated_embeds.norm(p=2, dim=-1, keepdim=True)
+                        clip_text_alignment = torch.sum(prompt_embeds*generated_embeds, dim=1)
+                        clip_text_alignment = torch.clip(clip_text_alignment * w, 0)
+                        clip_text_alignment = clip_text_alignment.float().cpu().detach().numpy()
+                        clip_text[scale].append(clip_text_alignment)
+                        clip_image_alignment = torch.sum(cond_embed*generated_embeds, dim=1)
+                        clip_image_alignment = torch.clip(clip_image_alignment, 0)
+                        clip_image_alignment = clip_image_alignment.float().cpu().detach().numpy()
+                        clip_image[scale].append(clip_image_alignment)
+    print(f"For {args.checkpoint_path}")
+    for scale in scales:
+        print(f"At scale: {scale}. Text alignment is {np.mean(clip_text[scale])/2.5} and Image alignment is {np.mean(clip_image[scale])}")
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Converts a CLIPTextEncoder from the library transformers from the HuggingFace Hub to refiners."
