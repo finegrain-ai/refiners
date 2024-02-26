@@ -510,9 +510,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     if not k.startswith(prefix):
                         continue
                     cross_attention_weights[k[len(prefix):]] = v
-                print(cross_attention_weights.keys())
-                print(cross_attn.state_dict().keys())
-                cross_attn.load_state_dict(cross_attention_weights)
+                cross_attn.load_state_dict(cross_attention_weights, strict=False)
             if use_pooled_text_embedding:
                 pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
                     k.removeprefix("pooled_text_embedding_proj."): v

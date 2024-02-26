@@ -1,7 +1,7 @@
 # test image score
 import os
 import json
-from refiners.foundationals.clip.image_encoder import CLIPImageEncoderL
+from refiners.foundationals.clip.image_encoder import CLIPImageEncoderL, CLIPImageEncoderH
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.text_encoder import TextEncoderWithPoolingL, CLIPTextEncoderL
 import PIL
 import PIL.Image
@@ -50,6 +50,9 @@ def generation_and_clip_score_calc(args):
     db_name =  "benchmark_dataset"
     prompts_and_config = "/home/isamu/custom_concept_101/custom-diffusion/customconcept101"
     single_concept_json = "dataset.json"
+    clip_image_encoder_h_path = "/home/isamu/refiners/tests/weights/CLIPImageEncoderH.safetensors"
+    text_encoder_path = "/home/isamu/refiners/tests/weights/CLIPLWithProjection.safetensors"
+    image_encoder_path = "/home/isamu/refiners/tests/weights/clip_image_l_vision.safetensors"
     num_prompts = args.num_prompts
     num_images_per_prompt = args.num_images_per_prompt
     condition_scale = args.condition_scale
@@ -64,7 +67,10 @@ def generation_and_clip_score_calc(args):
     with open(os.path.join(prompts_and_config, single_concept_json)) as f:
         data = json.load(f)
     unet = SD1UNet(in_channels=4).load_from_safetensors("/home/isamu/refiners/tests/weights/unet.safetensors").to(device, dtype=dtype).eval()
-    image_encoder = DINOv2_large_reg().load_from_safetensors("/home/isamu/refiners/tests/weights/dinov2_vitl14_reg4_pretrain.safetensors").to(device, dtype=dtype).eval()
+    if args.clip_image_encoder:
+        image_encoder = CLIPImageEncoderH().load_from_safetensors(clip_image_encoder_h_path).to(device, dtype=dtype).eval()
+    else:
+        image_encoder = DINOv2_large_reg().load_from_safetensors("/home/isamu/refiners/tests/weights/dinov2_vitl14_reg4_pretrain.safetensors").to(device, dtype=dtype).eval()
     lda = SD1Autoencoder().load_from_safetensors("/home/isamu/refiners/tests/weights/lda.safetensors").to(device, dtype=dtype).eval()
     text_encoder = CLIPTextEncoderL().load_from_safetensors("/home/isamu/refiners/tests/weights/CLIPTextEncoderL.safetensors").to(device, dtype=dtype).eval()
     cross_attn_2d = unet.ensure_find(CrossAttentionBlock2d)
@@ -168,8 +174,7 @@ def generation_and_clip_score_calc(args):
                         output_image = sd.lda.decode_latents(x=x)
                         output_image.save(os.path.join(scale_dir, f"{class_prompt}_{idx}_{i}.png"))
     
-    text_encoder_path = "/home/isamu/refiners/tests/weights/CLIPLWithProjection.safetensors"
-    image_encoder_path = "/home/isamu/refiners/tests/weights/clip_image_l_vision.safetensors"
+    
     text_encoder_l_with_projection = CLIPTextEncoderL(device=device, dtype=dtype)
     clip_text_encoder = TextEncoderWithPoolingL(target=text_encoder_l_with_projection).inject()
     text_encoder = clip_text_encoder.load_from_safetensors(text_encoder_path).to(device, dtype=dtype)
@@ -300,6 +305,15 @@ def main() -> None:
         default=1,
         help=(
             "Division factor by which to divide image embeddings"
+        ),
+    )
+    parser.add_argument(
+        "--clip_image_encoder",
+        type=bool,
+        default=False,
+        action="store_true",
+        help=(
+            "use clip image encoder"
         ),
     )
     args = parser.parse_args()
