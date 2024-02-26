@@ -512,6 +512,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                         continue
                     cross_attention_weights[k[len(prefix):]] = v
                 print(len(cross_attention_weights))
+                print(cross_attn.state_dict().keys())
                 cross_attn.load_state_dict(cross_attention_weights, strict=False)
             if use_pooled_text_embedding:
                 pooled_text_embedding_proj_state_dict: dict[str, Tensor] = {
