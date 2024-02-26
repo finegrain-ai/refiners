@@ -7,7 +7,7 @@ import torch
 from loguru import logger
 from torch import Tensor, device as Device, dtype as DType, float16, float32, nn
 from torch.autograd import backward
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.automatic_mixed_precision import GradScaler, autocast
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
@@ -106,7 +106,7 @@ def register_model():
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
-            if self.config.training.amp:
+            if self.config.training.automatic_mixed_precision:
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
             self.models[name] = ModelItem(
@@ -189,7 +189,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def scaler(self) -> GradScaler | None:
-        if self.dtype != float16 or not self.config.training.amp:
+        if self.dtype != float16 or not self.config.training.automatic_mixed_precision:
             return None
         return GradScaler()
 
@@ -384,7 +384,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""
         self._call_callbacks(event_name="on_compute_loss_begin")
-        with autocast(dtype=self.dtype, enabled=self.config.training.amp):
+        with autocast(dtype=self.dtype, enabled=self.config.training.automatic_mixed_precision):
             loss = self.compute_loss(batch=batch)
         self.loss = loss
         self._call_callbacks(event_name="on_compute_loss_end")
@@ -426,7 +426,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """Evaluate the model."""
         self.set_models_to_mode(mode="eval")
         self._call_callbacks(event_name="on_evaluate_begin")
-        with autocast(dtype=self.dtype, enabled=self.config.training.amp):
+        with autocast(dtype=self.dtype, enabled=self.config.training.automatic_mixed_precision):
             self.compute_evaluation()
         self._call_callbacks(event_name="on_evaluate_end")
         self.set_models_to_mode(mode="train")
