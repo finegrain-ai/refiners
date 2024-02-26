@@ -48,7 +48,7 @@ duration = {"number" = 1000000, "unit" = "step"}
 seed = 9752
 batch_size = 4
 gradient_accumulation = {"number" = 64, "unit" = "step"}
-evaluation_interval = {"number" = 250, "unit" = "step"}
+evaluation_interval = {"number" = 500, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
 dataset_workers=8
