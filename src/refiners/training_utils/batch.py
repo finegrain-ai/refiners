@@ -127,11 +127,9 @@ class BaseBatch(metaclass=TypeCheckMeta):
     def to(self: T, device: Device | None = None, dtype: DType | None = None) -> T:
         attr_types = self.__class__.attr_types()
         for attr_name, attr_type in attr_types.items():
-            value = getattr(self, attr_name)
             if attr_type == Tensor:
-                setattr(self, attr_name, value.to(device, dtype))
-            else:
-                setattr(self, attr_name, value)
+                value = cast(Tensor, self.__getattr__(attr_name))
+                self.__setattr__(attr_name, value.to(device, dtype))
 
         return self
 
