@@ -12,7 +12,7 @@ def test_inherit_no_attribute() -> None:
         class NoAttrBatch(BaseBatch):  # type: ignore
             pass
 
-    assert "At least one attribute with type hint is required for NoAttrBatch" == str(excinfo.value)
+    assert "At least one attribute is required for 'NoAttrBatch'" == str(excinfo.value)
 
 
 def test_inherit_non_list_errors() -> None:
@@ -21,7 +21,7 @@ def test_inherit_non_list_errors() -> None:
         class StrBatch(BaseBatch):  # type: ignore
             foo: str
 
-    assert "Type of 'foo' must be Tensor or list, got <class 'str'>" == str(excinfo.value)
+    assert "Type of 'foo' must be 'Tensor' or 'list', got 'str'" == str(excinfo.value)
 
 
 class MockBatch(BaseBatch):
@@ -50,7 +50,7 @@ def test_attr_type_error() -> None:
     with pytest.raises(TypeError) as excinfo:
         MockBatch(foo="foo", bar=randn(5, 5), indices=[0, 1, 2, 3, 4])  # type: ignore
 
-    assert "Invalid type for attribute 'foo': Expected Tensor, got str" == str(excinfo.value)
+    assert "Invalid type for attribute 'foo': Expected 'Tensor', got 'str'" == str(excinfo.value)
 
 
 def test_extra_missing_attr() -> None:
