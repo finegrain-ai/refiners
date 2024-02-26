@@ -102,15 +102,11 @@ def register_model():
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
-            amp: bool = self.config.training.amp
-            model = model.to(self.device)
+            model = model.to(self.device, dtype=self.dtype)
             if config.requires_grad is not None:
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
-            model_trained = len(learnable_parameters) > 0
-            if not amp or not model_trained:
-                model = model.to(dtype=self.dtype)
-            else:
+            if self.config.training.amp:
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
             self.models[name] = ModelItem(
