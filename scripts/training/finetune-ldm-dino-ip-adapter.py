@@ -826,8 +826,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         div_factor = self.config.adapter.image_embedding_div_factor
         image_embedding = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
         if do_palp:
-            assert batch.uncond_text_embedding is not None
-            assert batch.uncond_image_embedding is not None
             uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=self.dtype)
             if self.config.adapter.use_pooled_text_embedding:
                 uncond_pooled_text_embedding: Tensor = self.dataset.empty_pooled_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
