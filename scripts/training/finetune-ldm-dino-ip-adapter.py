@@ -512,7 +512,7 @@ class IPDataset(Dataset[IPBatch]):
                     },
                     desc="Encoding lda images into embeddings",  # type: ignore
                 )
-        if "text_embedding" not in dataset.features:
+        if "text_embedding" not in dataset.features or ("pooled_text_embedding" not in dataset.features and self.trainer.config.adapter.use_pooled_text_embedding):
             update_dataset = True
             # encode the captions into text embedding
             dataset = dataset.rename_column(dataset_config.caption_column, "caption")  # type: ignore
