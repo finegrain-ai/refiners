@@ -46,6 +46,7 @@ def clip_transform(
 def generation_and_clip_score_calc(args):
     device = torch.device("cuda")
     dtype = torch.bfloat16
+    scales = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     custom_concept_base_path = "/home/isamu/custom_concept_101"
     db_name =  "benchmark_dataset"
     prompts_and_config = "/home/isamu/custom_concept_101/custom-diffusion/customconcept101"
@@ -99,10 +100,12 @@ def generation_and_clip_score_calc(args):
         device=device,
         dtype=dtype
     )
+    print("Starting gen")
     with torch.no_grad():
         gc.collect()
         torch.cuda.empty_cache()
-        for scale in tqdm([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]):
+        for scale in tqdm(scales):
+            print(scale)
             scale_dir = os.path.join(generation_path, str(scale))
             os.makedirs(scale_dir, exist_ok=True)
             adapter.scale = scale
@@ -173,8 +176,15 @@ def generation_and_clip_score_calc(args):
                             )
                         output_image = sd.lda.decode_latents(x=x)
                         output_image.save(os.path.join(scale_dir, f"{class_prompt}_{idx}_{i}.png"))
-    
-    
+
+    adapter.eject()
+    del unet
+    del image_encoder
+    del lda
+    del text_encoder
+    del cross_attn_2d
+    del image_proj
+    del adapter
     text_encoder_l_with_projection = CLIPTextEncoderL(device=device, dtype=dtype)
     clip_text_encoder = TextEncoderWithPoolingL(target=text_encoder_l_with_projection).inject()
     text_encoder = clip_text_encoder.load_from_safetensors(text_encoder_path).to(device, dtype=dtype)
@@ -236,7 +246,7 @@ def generation_and_clip_score_calc(args):
                         clip_image_alignment = clip_image_alignment.float().cpu().detach().numpy()
                         clip_image[scale].append(clip_image_alignment)
     print(f"For {args.checkpoint_path}")
-    for scale in [0.5, 0.6, 0.7, 0.8, 0.9, 1]:
+    for scale in scales:
         print(f"At scale: {scale}. Text alignment is {np.mean(clip_text[scale])/2.5} and Image alignment is {np.mean(clip_image[scale])}")
 def main() -> None:
     parser = argparse.ArgumentParser(
