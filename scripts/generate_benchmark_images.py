@@ -268,7 +268,6 @@ def main() -> None:
     )
     parser.add_argument(
         "--use_pooled_text_embedding",
-        type=bool,
         action="store_true",
         help=(
             "Use pooled embed"
@@ -276,8 +275,6 @@ def main() -> None:
     )
     parser.add_argument(
         "--use_timestep_embedding",
-        type=bool,
-        default=False,
         action="store_true",
         help=(
             "Use timestep embed"
@@ -317,8 +314,6 @@ def main() -> None:
     )
     parser.add_argument(
         "--clip_image_encoder",
-        type=bool,
-        default=False,
         action="store_true",
         help=(
             "use clip image encoder"
