@@ -79,25 +79,29 @@ class BaseBatch(metaclass=TypeCheckMeta):
 
         self._length = size
 
+
+    def __getattr__(self, name: str) -> AttrType:
+        if name in get_type_hints(self.__class__):
+            return getattr(self, name)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+            
     @classmethod
     def collate(cls: Type[T], batch_list: list[T]) -> T:
         collated_attrs: dict[str, Any] = {}
         type_hints = get_type_hints(cls)
 
-        l = len(batch_list)
-
-        if l == 0:
+        if len(batch_list) == 0:
             raise ValueError(f"Cannot collate an empty list of {cls.__name__}")
 
         for type_key in type_hints.keys():
-            attr_list = [getattr(obj, type_key) for obj in batch_list]
+            attr_list: list[Tensor | list[Any]] = [obj.__getattr__(type_key) for obj in batch_list]
 
-            if isinstance(attr_list[0], Tensor):
-                collated_attrs[type_key] = cat(tensors=tuple(attr_list), dim=0)
-            elif isinstance(attr_list[0], list):
-                collated_attrs[type_key] = [item for sublist in attr_list for item in sublist]
+            if all(isinstance(attr, Tensor) for attr in attr_list):
+                tensor_tuple = cast(tuple[Tensor, ...], tuple(attr_list))
+                collated_attrs[type_key] = cat(tensor_tuple, dim=0)
             else:
-                raise ValueError(f"Unsupported attribute type for collation: {type(attr_list[0])}")
+                collated_attrs[type_key] = [item for sublist in attr_list for item in sublist]
 
         collated_instance = cls(**collated_attrs)
         return collated_instance
