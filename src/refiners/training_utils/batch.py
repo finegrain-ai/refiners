@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Any, Type, TypeVar, cast, dataclass_transform, get_origin, get_type_hints
+from typing import Any, Type, TypeVar, cast, get_origin, get_type_hints
 
 from torch import Tensor, cat, device as Device, dtype as DType, load as torch_load, save as torch_save  # type: ignore
+from typing_extensions import dataclass_transform
 
 from refiners.fluxion.utils import summarize_tensor  # type: ignore
 
