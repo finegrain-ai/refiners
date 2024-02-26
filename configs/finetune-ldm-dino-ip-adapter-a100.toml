@@ -39,7 +39,7 @@ use_bias = true
 use_rescaler = true
 save_folder = "/home/isamu/checkpoints_palp"
 image_embedding_div_factor = 3
-do_palp = true
+do_palp = false
 palp_rescale = true
 palp_steps = 8
 
