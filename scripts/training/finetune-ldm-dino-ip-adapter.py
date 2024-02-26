@@ -714,6 +714,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             adapter.image_cross_attention.requires_grad_(True)
             adapter.image_cross_attention.to(self.device, float32)
         if ip_adapter.use_pooled_text_embedding:
+            assert ip_adapter.pooled_text_embedding_proj is not None
             ip_adapter.pooled_text_embedding_proj.requires_grad_(True)
             ip_adapter.pooled_text_embedding_proj.to(self.device, float32)
 
