@@ -5,7 +5,7 @@ project = "finetune-ldm-ip-adapter"
 
 [ldm]
 offset_noise = 0
-# snr_gamma = 5
+snr_gamma = 5
 
 [unet]
 checkpoint = "tests/weights/unet.safetensors"
@@ -36,7 +36,7 @@ fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
-use_rescaler = true
+use_rescaler = false
 save_folder = "/home/isamu/checkpoints"
 image_embedding_div_factor = 3
 
@@ -51,11 +51,11 @@ dtype = "bfloat16"
 dataset_workers=8
 checkpoint_interval = {"number" = 10000, "unit" = "step"}
 device="cuda"
-amp = false
+amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 5e-5
+learning_rate = 1e-3
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2

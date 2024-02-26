@@ -854,8 +854,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # compute mse loss
         snr_gamma = self.config.ldm.snr_gamma
         rescaler = self.config.adapter.use_rescaler
+        loss = mse_loss(input=prediction.float(), target=noise.float(), reduction="none")
         if rescaler:
-            loss = mse_loss(input=prediction.float(), target=noise.float(), reduction="none")
             scales = tensor(
                 [self.approximate_loss(999 - int(t.item())) for t in timestep],
                 device=self.device,
@@ -863,7 +863,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             ).reshape(-1, 1, 1, 1)
             loss = (loss / scales).mean()
         elif snr_gamma is None:
-            loss = mse_loss(prediction.float(), noise.float(), reduction="mean")
+            loss = loss.mean()
         else:
             # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
             # Since we predict the noise instead of x_0, the original formulation is slightly changed.
@@ -874,8 +874,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
                 / signal_to_noise_ratios
             )
-
-            loss = mse_loss(prediction.float(), noise.float(), reduction="none")
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
         if do_palp:
@@ -905,8 +903,29 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.adapter.inject()
             cfg_default_noise = uncond_default_noise+alpha*(cond_default_noise-uncond_default_noise)
             cfg_adapted_noise = uncond_adapted_noise+beta*(cond_adapted_noise-uncond_adapted_noise)
-            loss += mse_loss(cfg_default_noise.float(), cfg_adapted_noise.float(), reduction="mean")
+            palp_loss = mse_loss(cfg_default_noise.float(), cfg_adapted_noise.float(), reduction="none")
+            if rescaler:
+                scales = tensor(
+                    [self.approximate_loss(999 - int(t.item())) for t in timestep],
+                    device=self.device,
+                    dtype=float32,
+                ).reshape(-1, 1, 1, 1)
+                palp_loss = (palp_loss / scales).mean()
+            elif snr_gamma is None:
+                palp_loss = palp_loss.mean()
+            else:
+                # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                # This is discussed in Section 4.2 of the same paper.
+                signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
 
+                mse_loss_weights = (
+                    stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
+                    / signal_to_noise_ratios
+                )
+                palp_loss = palp_loss.mean(dim=list(range(1, len(palp_loss.shape)))) * mse_loss_weights
+                palp_loss = palp_loss.mean()
+            loss += palp_loss
         return loss
 
     def compute_evaluation(self) -> None:
