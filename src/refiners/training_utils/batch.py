@@ -169,7 +169,7 @@ class BaseBatch(metaclass=TypeCheckMeta):
                 attr_strs.append(f"{type_key}={attr_value}")
             else:
                 attr_strs.append(f"{type_key}={summarize_tensor(attr_value)}")
-        return f"{self.__class__.__name__}({len(self)})[{','.join(attr_strs)}]"
+        return f"{self.__class__.__name__}(size={len(self)})[{','.join(attr_strs)}]"
 
     def __getitem__(self: T, key: slice | int | list[int] | list[bool]) -> T:
         if isinstance(key, slice):
