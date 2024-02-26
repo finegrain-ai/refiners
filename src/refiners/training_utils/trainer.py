@@ -111,7 +111,6 @@ def register_model():
             if not amp or not model_trained:
                 model = model.to(dtype=self.dtype)
             else:
-                # model is trained and is amp
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
             self.models[name] = ModelItem(
@@ -362,7 +361,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             return
         self.scaler.scale(scaled_loss).backward()  # type: ignore
 
-    # logic from accelerator
     def optimizer_step(self) -> None:
         if self.scaler is None:
             self.optimizer.step()
