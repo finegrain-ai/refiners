@@ -117,7 +117,7 @@ class ZeroConvolution(Passthrough):
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
-        self.scale = scale
+        self._scale = scale
 
         super().__init__(
             Conv2d(
@@ -130,6 +130,15 @@ class ZeroConvolution(Passthrough):
             Multiply(scale=scale),
             ResidualAccumulator(n=residual_index),
         )
+
+    @property
+    def scale(self) -> float:
+        return self._scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._scale = value
+        self.ensure_find(Multiply).scale = value
 
 
 class ControlLora(Passthrough):

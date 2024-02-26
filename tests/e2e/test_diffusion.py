@@ -12,6 +12,7 @@ from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
+    ControlLoraAdapter,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
@@ -26,9 +27,8 @@ from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule, SolverParams
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.control_lora import ControlLoraAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 from tests.utils import ensure_similar_images
@@ -600,7 +600,7 @@ def sd15_ddim_karras(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_solver = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    ddim_solver = DDIM(num_inference_steps=20, params=SolverParams(noise_schedule=NoiseSchedule.KARRAS))
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
@@ -758,6 +758,60 @@ def test_diffusion_std_random_init(
 
 
 @no_grad()
+def test_diffusion_batch2(sd15_std: StableDiffusion_1):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2 = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    step = sd15.steps[0]
+
+    manual_seed(2)
+    rand_b2 = torch.randn(2, 4, 64, 64, device=sd15.device)
+
+    x_b2 = sd15(
+        rand_b2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_b2,
+        condition_scale=7.5,
+    )
+
+    assert x_b2.shape == (2, 4, 64, 64)
+
+    rand_1 = rand_b2[0:1]
+    clip_text_embedding_1 = sd15.compute_clip_text_embedding(text=[prompt1], negative_text=[negative_prompt1])
+    x_1 = sd15(
+        rand_1,
+        step=step,
+        clip_text_embedding=clip_text_embedding_1,
+        condition_scale=7.5,
+    )
+
+    rand_2 = rand_b2[1:2]
+    clip_text_embedding_2 = sd15.compute_clip_text_embedding(text=[prompt2], negative_text=[negative_prompt2])
+    x_2 = sd15(
+        rand_2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_2,
+        condition_scale=7.5,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
+
+
+@no_grad()
 def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
@@ -772,8 +826,7 @@ def test_diffusion_std_random_init_euler(
     sd15.set_inference_steps(30)
 
     manual_seed(2)
-    x = torch.randn(1, 4, 64, 64, device=test_device)
-    x = x * euler_solver.init_noise_sigma
+    x = sd15.init_latents((512, 512)).to(sd15.device, sd15.dtype)
 
     for step in sd15.steps:
         x = sd15(
@@ -836,7 +889,6 @@ def test_diffusion_std_random_init_float16(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
@@ -1263,6 +1315,68 @@ def test_diffusion_lora(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_sdxl_batch2(sdxl_ddim: StableDiffusion_XL) -> None:
+    sdxl = sdxl_ddim
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2, pooled_text_embedding_b2 = sdxl.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    time_ids = sdxl.default_time_ids
+    time_ids_b2 = sdxl.default_time_ids.repeat(2, 1)
+
+    manual_seed(seed=2)
+    x_b2 = torch.randn(2, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    x_1 = x_b2[0:1]
+    x_2 = x_b2[1:2]
+
+    x_b2 = sdxl(
+        x_b2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_b2,
+        pooled_text_embedding=pooled_text_embedding_b2,
+        time_ids=time_ids_b2,
+    )
+
+    clip_text_embedding_1, pooled_text_embedding_1 = sdxl.compute_clip_text_embedding(
+        text=prompt1, negative_text=negative_prompt1
+    )
+
+    x_1 = sdxl(
+        x_1,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_1,
+        pooled_text_embedding=pooled_text_embedding_1,
+        time_ids=time_ids,
+    )
+
+    clip_text_embedding_2, pooled_text_embedding_2 = sdxl.compute_clip_text_embedding(
+        text=prompt2, negative_text=negative_prompt2
+    )
+
+    x_2 = sdxl(
+        x_2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_2,
+        pooled_text_embedding=pooled_text_embedding_2,
+        time_ids=time_ids,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
 
 
 @no_grad()
@@ -1882,11 +1996,7 @@ def test_diffusion_sdxl_euler_deterministic(
     time_ids = sdxl.default_time_ids
     sdxl.set_inference_steps(30)
     manual_seed(2)
-    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
-
-    # init latents must be scaled for Euler
-    # TODO make init_latents work
-    x = x * sdxl.solver.init_noise_sigma
+    x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
 
     for step in sdxl.steps:
         x = sdxl(
@@ -2168,29 +2278,9 @@ def test_style_aligned(
     ]
 
     # create (context) embeddings from prompts
-    # TODO: replace this logic with https://github.com/finegrain-ai/refiners/pull/263 when it gets merged
-    unconds: list[torch.Tensor] = []
-    conds: list[torch.Tensor] = []
-    pooled_unconds: list[torch.Tensor] = []
-    pooled_conds: list[torch.Tensor] = []
-    for prompt in set_of_prompts:
-        clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(text=prompt)
-
-        uncond, cond = clip_text_embedding.chunk(2)
-        pooled_uncond, pooled_cond = pooled_text_embedding.chunk(2)
-
-        unconds.append(uncond)
-        conds.append(cond)
-        pooled_unconds.append(pooled_uncond)
-        pooled_conds.append(pooled_cond)
-
-    uncond = torch.cat(unconds, dim=0)
-    cond = torch.cat(conds, dim=0)
-    pooled_uncond = torch.cat(pooled_unconds, dim=0)
-    pooled_cond = torch.cat(pooled_conds, dim=0)
-
-    clip_text_embedding = torch.cat((uncond, cond), dim=0)
-    pooled_text_embedding = torch.cat((pooled_uncond, pooled_cond), dim=0)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=set_of_prompts, negative_text=[""] * len(set_of_prompts)
+    )
 
     time_ids = sdxl.default_time_ids.repeat(len(set_of_prompts), 1)
 
