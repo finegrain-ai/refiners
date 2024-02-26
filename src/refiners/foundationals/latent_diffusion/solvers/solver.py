@@ -33,7 +33,8 @@ class TimestepSpacing(str, Enum):
     Attributes:
         LINSPACE: Sample N steps with linear interpolation, return a floating-point tensor.
         LINSPACE_ROUNDED: Same as LINSPACE but return an integer tensor with rounded timesteps.
-        LEADING: Sample N+1 steps, do not include the last timestep (i.e. bad - non-zero SNR). Used in DDIM.
+        LEADING: Sample N+1 steps, do not include the last timestep (i.e. bad - non-zero SNR).
+            Used in DDIM, with a mitigation for that issue.
         TRAILING: Sample N+1 steps, do not include the first timestep.
         CUSTOM: Use custom timespacing in solver (override `_generate_timesteps`, see DPM).
     """
