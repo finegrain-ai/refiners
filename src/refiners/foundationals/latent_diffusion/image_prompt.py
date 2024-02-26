@@ -470,10 +470,13 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         with self.setup_adapter(target):
             super().__init__(target)
         self.use_pooled_text_embedding = use_pooled_text_embedding
+        self._pooled_text_embedding_proj = []
         if use_pooled_text_embedding:
-            self.pooled_text_embedding_proj = PooledTextEmbeddingTimestepEncoder(
-                use_bias, self.target.device, self.target.dtype
-            )
+            self._pooled_text_embedding_proj = [
+                PooledTextEmbeddingTimestepEncoder(
+                    use_bias, self.target.device, self.target.dtype
+                )
+            ]
         self.fine_grained = fine_grained
         if fine_grained:
             self._grid_image_encoder = [self.convert_to_grid_features(image_encoder)]
@@ -517,8 +520,13 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                     for k, v in weights.items()
                     if k.startswith("pooled_text_embedding_proj.")
                 }
+                assert self.pooled_text_embedding_proj is not None
                 self.pooled_text_embedding_proj.load_state_dict(pooled_text_embedding_proj_state_dict, strict=strict)
-
+    @property
+    def pooled_text_embedding_proj(self) -> None | PooledTextEmbeddingTimestepEncoder:
+        if len(self._pooled_text_embedding_proj) == 0:
+            return None
+        return self._pooled_text_embedding_proj[0]
     @property
     def image_encoder(self) -> CLIPImageEncoderH | ViT:
         """The image encoder of the adapter."""
