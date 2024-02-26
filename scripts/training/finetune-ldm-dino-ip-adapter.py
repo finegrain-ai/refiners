@@ -91,7 +91,7 @@ class AdapterConfig(ModelConfig):
     use_bias: bool = False
     do_palp: bool = False
     palp_alpha: float = 7.5
-    palp_beta: float = 5
+    palp_beta: float = 1
     use_rescaler: bool = False
     image_embedding_div_factor: float = 1
 

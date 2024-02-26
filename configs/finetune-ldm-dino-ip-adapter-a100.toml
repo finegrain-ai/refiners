@@ -5,7 +5,7 @@ project = "finetune-ldm-ip-adapter"
 
 [ldm]
 offset_noise = 0
-snr_gamma = 5
+# snr_gamma = 5
 
 [unet]
 checkpoint = "tests/weights/unet.safetensors"
@@ -30,15 +30,16 @@ image_encoder_type = "dinov2_vitl14_reg4"
 resolution = 518
 scale = 1.0
 inference_scale = 1.0
-use_pooled_text_embedding = false
+use_pooled_text_embedding = true
 use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
-use_rescaler = false
-save_folder = "/home/isamu/checkpoints"
+use_rescaler = true
+save_folder = "/home/isamu/checkpoints_palp"
 image_embedding_div_factor = 3
+do_palp = true
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
@@ -55,7 +56,7 @@ amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1e-3
+learning_rate = 5e-5
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
@@ -77,9 +78,9 @@ resize_image_max_size = 518
 random_crop_size = 512
 center_crop_size = 512
 filter_min_image_size = false
-image_drop_rate = 0.05
-text_drop_rate = 0.05
-text_and_image_drop_rate = 0.05
+image_drop_rate = 0.0
+text_drop_rate = 0.0
+text_and_image_drop_rate = 0.0
 to_wds = false
 pre_encode =  true
 image_column = "image"
