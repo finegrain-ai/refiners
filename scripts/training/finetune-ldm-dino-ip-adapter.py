@@ -822,7 +822,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         batch_size = latents.shape[0]
         text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
         if self.config.adapter.use_pooled_text_embedding:
-            pooled_text_embeddings = batch.text_embedding.to(self.device, dtype=self.dtype)
+            pooled_text_embeddings = batch.pooled_text_embedding.to(self.device, dtype=self.dtype)
         div_factor = self.config.adapter.image_embedding_div_factor
         image_embedding = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
         if do_palp:

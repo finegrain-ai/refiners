@@ -239,7 +239,6 @@ class PerceiverResampler(fl.Chain):
         return {"perceiver_resampler": {"x": None}}
 
 def expand_dim(x: Float[Tensor, "batch embed_dim"], sequence_length: int = -1) -> Float[Tensor, "batch seq_len embed_dim"]:
-    print(x.shape)
     if sequence_length == -1:
         return x
     return x[:, None, :].repeat([1, sequence_length, 1])
