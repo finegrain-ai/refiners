@@ -22,7 +22,7 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 
 class TrainingConfig(BaseModel):
     device: str = "cpu"
-    amp: bool = True
+    automatic_mixed_precision: bool = True # Enables automatic mixed precision which allows float32 gradients while working with lower precision. This is the default for accelerate
     dtype: str = "float32"
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
