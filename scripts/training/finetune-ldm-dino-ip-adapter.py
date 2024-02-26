@@ -24,7 +24,7 @@ from torch import (
     randint,
     float32,
     zeros,
-    cat
+    norm
 )
 from torch.cuda import empty_cache
 from torch.distributions import Beta
@@ -726,7 +726,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             print(image_cross_attention[0])
             print(image_cross_attention[0][1])
             print(image_cross_attention[0][1][-1])
-            print(image_cross_attention[0][1][-1][1].weight)
+            print(norm(image_cross_attention[0][1][-1][1].weight))
+            print(norm(image_cross_attention[0][1][-1][1].bias))
+
 
 
 
