@@ -5,14 +5,14 @@ project = "finetune-ldm-ip-adapter"
 
 [ldm]
 offset_noise = 0
-snr_gamma = 5
+# snr_gamma = 5
 
 [unet]
 checkpoint = "tests/weights/unet.safetensors"
 requires_grad = false
 
 [text_encoder]
-checkpoint = "tests/weights/CLIPTextEncoderL.safetensors"
+checkpoint = "tests/weights/CLIPLWithProjection.safetensors"
 requires_grad = false
 
 [lda]
@@ -30,16 +30,17 @@ image_encoder_type = "dinov2_vitl14_reg4"
 resolution = 518
 scale = 1.0
 inference_scale = 1.0
-use_pooled_text_embedding = false
+use_pooled_text_embedding = true
 use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
 initializer_range = 0.02
 use_bias = true
-use_rescaler = false
+use_rescaler = true
 save_folder = "/home/isamu/checkpoints_minsnr"
 image_embedding_div_factor = 3
-do_palp = false
+do_palp = true
+palp_rescale = true
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
@@ -57,7 +58,7 @@ amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1e-3
+learning_rate = 5e-5
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
