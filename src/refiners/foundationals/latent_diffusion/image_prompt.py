@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload, List, Callabl
 
 from jaxtyping import Float
 from PIL import Image
-from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, tensor, zeros_like
+from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, tensor, zeros_like, norm
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -243,7 +243,10 @@ def expand_dim(x: Float[Tensor, "batch embed_dim"], sequence_length: int = -1) -
         return x
     return x[:, None, :].repeat([1, sequence_length, 1])
 
-
+class ValueReporter(fl.Module):
+    def __call__(self, x: Tensor) -> Tensor:
+        print(x.shape, norm(x))
+        return x
 class ImageCrossAttention(fl.Chain):
     def __init__(
         self,
@@ -317,7 +320,8 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
-                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length)),
+                    ValueReporter()
                 )
             )
             query_contexts.append(
@@ -330,7 +334,8 @@ class ImageCrossAttention(fl.Chain):
                         device=text_cross_attention.device,
                         dtype=text_cross_attention.dtype,
                     ),
-                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length))
+                    fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length)),
+                    ValueReporter()
                 )
             )
 
