@@ -345,8 +345,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
-        ...
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
     def compute_evaluation(self) -> None:
         pass
@@ -363,6 +362,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             return
         self.scaler.step(self.optimizer)  # type: ignore
         self.scaler.update()  # type: ignore
+
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
