@@ -481,7 +481,9 @@ class IPDataset(Dataset[IPBatch]):
                 desc="Capping image sizes",  # type: ignore
             )
         # encode cond images
+        print("Preencoding", self.trainer.config.dataset.pre_encode)
         if self.trainer.config.dataset.pre_encode:
+            print(dataset.features)
             if self.image_encoder_column not in dataset.features:
                 update_dataset = True
                 dataset = dataset.map(  # type: ignore
@@ -535,7 +537,7 @@ class IPDataset(Dataset[IPBatch]):
             columns=["text_embedding", self.image_encoder_column, "lda_embedding"],
         )
         if dataset_save_path and update_dataset:
-            dataset.save_to_disk(dataset_save_path)
+            dataset.save_to_disk(dataset_save_path+"_updated")
         return dataset  # type: ignore
 
     def transform(self, data: dict[str, Any]) -> IPBatch:
