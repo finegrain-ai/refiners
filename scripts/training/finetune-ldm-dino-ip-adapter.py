@@ -108,7 +108,7 @@ class DatasetConfig(BaseModel):
     resize_image_min_size: int = 512
     resize_image_max_size: int = 576
     filter_min_image_size: bool = False
-    random_crop_size: int | None = 512
+    random_crop_size: int | None = None
     center_crop_size: int | None = 512
     image_drop_rate: float = 0.05
     text_drop_rate: float = 0.05
@@ -379,7 +379,7 @@ class IPDataset(Dataset[IPBatch]):
     def encode_lda_images(
         images: list[Image.Image],
         lda: SD1Autoencoder,
-        random_crop_size: int | None = 512,
+        random_crop_size: int | None = None,
         center_crop_size: int | None = 512,
         horizontal_flip_probability: float = 0.5,
     ) -> dict[str, list[Tensor]]:
