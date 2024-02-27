@@ -12,8 +12,8 @@ checkpoint = "tests/weights/unet.safetensors"
 requires_grad = false
 
 [text_encoder]
-checkpoint = "tests/weights/CLIPLWithProjection.safetensors"
-# checkpoint = "tests/weights/CLIPTextEncoderL.safetensors"
+# checkpoint = "tests/weights/CLIPLWithProjection.safetensors"
+checkpoint = "tests/weights/CLIPTextEncoderL.safetensors"
 requires_grad = false
 
 [lda]
