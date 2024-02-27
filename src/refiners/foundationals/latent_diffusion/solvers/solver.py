@@ -1,8 +1,10 @@
+import dataclasses
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TypeVar
 
-from torch import Generator, Tensor, device as Device, dtype as DType, float32, linspace, log, sqrt
+import numpy as np
+from torch import Generator, Tensor, arange, device as Device, dtype as DType, float32, linspace, log, sqrt, tensor
 
 from refiners.fluxion import layers as fl
 
@@ -10,17 +12,84 @@ T = TypeVar("T", bound="Solver")
 
 
 class NoiseSchedule(str, Enum):
-    """An enumeration of noise schedules used to sample the noise schedule.
+    """An enumeration of schedules used to sample the noise.
 
     Attributes:
         UNIFORM: A uniform noise schedule.
-        QUADRATIC: A quadratic noise schedule.
+        QUADRATIC: A quadratic noise schedule. Corresponds to "Stable Diffusion" in [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 1.
         KARRAS: See [[arXiv:2206.00364] Elucidating the Design Space of Diffusion-Based Generative Models, Equation 5](https://arxiv.org/abs/2206.00364)
     """
 
     UNIFORM = "uniform"
     QUADRATIC = "quadratic"
     KARRAS = "karras"
+
+
+class TimestepSpacing(str, Enum):
+    """An enumeration of methods to space the timesteps.
+
+    See [[arXiv:2305.08891] Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/abs/2305.08891) table 2.
+
+    Attributes:
+        LINSPACE: Sample N steps with linear interpolation, return a floating-point tensor.
+        LINSPACE_ROUNDED: Same as LINSPACE but return an integer tensor with rounded timesteps.
+        LEADING: Sample N+1 steps, do not include the last timestep (i.e. bad - non-zero SNR).
+            Used in DDIM, with a mitigation for that issue.
+        TRAILING: Sample N+1 steps, do not include the first timestep.
+        CUSTOM: Use custom timespacing in solver (override `_generate_timesteps`, see DPM).
+    """
+
+    LINSPACE = "linspace"
+    LINSPACE_ROUNDED = "linspace_rounded"
+    LEADING = "leading"
+    TRAILING = "trailing"
+    CUSTOM = "custom"
+
+
+class ModelPredictionType(str, Enum):
+    """An enumeration of possible outputs of the model.
+
+    Attributes:
+        NOISE: The model predicts the noise (epsilon).
+        SAMPLE: The model predicts the denoised sample (x0).
+    """
+
+    NOISE = "noise"
+    SAMPLE = "sample"
+
+
+@dataclasses.dataclass(kw_only=True, frozen=True)
+class SolverParams:
+    """Common parameters for solvers.
+
+    Args:
+        num_train_timesteps: The number of timesteps used to train the diffusion process.
+        timesteps_spacing: The spacing to use for the timesteps.
+        timesteps_offset: The offset to use for the timesteps.
+        initial_diffusion_rate: The initial diffusion rate used to sample the noise schedule.
+        final_diffusion_rate: The final diffusion rate used to sample the noise schedule.
+        noise_schedule: The noise schedule used to sample the noise schedule.
+        model_prediction_type: Defines what the model predicts.
+    """
+
+    num_train_timesteps: int | None = None
+    timesteps_spacing: TimestepSpacing | None = None
+    timesteps_offset: int | None = None
+    initial_diffusion_rate: float | None = None
+    final_diffusion_rate: float | None = None
+    noise_schedule: NoiseSchedule | None = None
+    model_prediction_type: ModelPredictionType | None = None
+
+
+@dataclasses.dataclass(kw_only=True, frozen=True)
+class ResolvedSolverParams(SolverParams):
+    num_train_timesteps: int
+    timesteps_spacing: TimestepSpacing
+    timesteps_offset: int
+    initial_diffusion_rate: float
+    final_diffusion_rate: float
+    noise_schedule: NoiseSchedule
+    model_prediction_type: ModelPredictionType
 
 
 class Solver(fl.Module, ABC):
@@ -34,15 +103,23 @@ class Solver(fl.Module, ABC):
     """
 
     timesteps: Tensor
+    params: ResolvedSolverParams
+
+    default_params = ResolvedSolverParams(
+        num_train_timesteps=1000,
+        timesteps_spacing=TimestepSpacing.LINSPACE,
+        timesteps_offset=0,
+        initial_diffusion_rate=8.5e-4,
+        final_diffusion_rate=1.2e-2,
+        noise_schedule=NoiseSchedule.QUADRATIC,
+        model_prediction_type=ModelPredictionType.NOISE,
+    )
 
     def __init__(
         self,
         num_inference_steps: int,
-        num_train_timesteps: int = 1_000,
-        initial_diffusion_rate: float = 8.5e-4,
-        final_diffusion_rate: float = 1.2e-2,
-        noise_schedule: NoiseSchedule = NoiseSchedule.QUADRATIC,
         first_inference_step: int = 0,
+        params: SolverParams | None = None,
         device: Device | str = "cpu",
         dtype: DType = float32,
     ) -> None:
@@ -50,27 +127,32 @@ class Solver(fl.Module, ABC):
 
         Args:
             num_inference_steps: The number of inference steps to perform.
-            num_train_timesteps: The number of timesteps used to train the diffusion process.
-            initial_diffusion_rate: The initial diffusion rate used to sample the noise schedule.
-            final_diffusion_rate: The final diffusion rate used to sample the noise schedule.
-            noise_schedule: The noise schedule used to sample the noise schedule.
             first_inference_step: The first inference step to perform.
+            params: The common parameters for solvers.
             device: The PyTorch device to use for the solver's tensors.
             dtype: The PyTorch data type to use for the solver's tensors.
         """
         super().__init__()
+
         self.num_inference_steps = num_inference_steps
-        self.num_train_timesteps = num_train_timesteps
-        self.initial_diffusion_rate = initial_diffusion_rate
-        self.final_diffusion_rate = final_diffusion_rate
-        self.noise_schedule = noise_schedule
         self.first_inference_step = first_inference_step
+        self.params = self.resolve_params(params)
+
         self.scale_factors = self.sample_noise_schedule()
         self.cumulative_scale_factors = sqrt(self.scale_factors.cumprod(dim=0))
         self.noise_std = sqrt(1.0 - self.scale_factors.cumprod(dim=0))
         self.signal_to_noise_ratios = log(self.cumulative_scale_factors) - log(self.noise_std)
         self.timesteps = self._generate_timesteps()
+
         self.to(device=device, dtype=dtype)
+
+    def resolve_params(self, params: SolverParams | None) -> ResolvedSolverParams:
+        if params is None:
+            return dataclasses.replace(self.default_params)
+        return dataclasses.replace(
+            self.default_params,
+            **{k: v for k, v in dataclasses.asdict(params).items() if v is not None},
+        )
 
     @abstractmethod
     def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
@@ -87,14 +169,44 @@ class Solver(fl.Module, ABC):
         """
         ...
 
-    @abstractmethod
-    def _generate_timesteps(self) -> Tensor:
-        """Generate a tensor of timesteps.
+    @staticmethod
+    def generate_timesteps(
+        spacing: TimestepSpacing,
+        num_inference_steps: int,
+        num_train_timesteps: int = 1000,
+        offset: int = 0,
+    ) -> Tensor:
+        """Generate a tensor of timesteps according to a given spacing.
 
-        Note:
-            This method should be overridden by subclasses to provide the specific timesteps for the diffusion process.
+        Args:
+            spacing: The spacing to use for the timesteps.
+            num_inference_steps: The number of inference steps to perform.
+            num_train_timesteps: The number of timesteps used to train the diffusion process.
+            offset: The offset to use for the timesteps.
         """
-        ...
+        max_timestep = num_train_timesteps - 1 + offset
+        match spacing:
+            case TimestepSpacing.LINSPACE:
+                return tensor(np.linspace(offset, max_timestep, num_inference_steps), dtype=float32).flip(0)
+            case TimestepSpacing.LINSPACE_ROUNDED:
+                return tensor(np.linspace(offset, max_timestep, num_inference_steps).round().astype(int)).flip(0)
+            case TimestepSpacing.LEADING:
+                step_ratio = num_train_timesteps // num_inference_steps
+                return (arange(0, num_inference_steps, 1) * step_ratio + offset).flip(0)
+            case TimestepSpacing.TRAILING:
+                step_ratio = num_train_timesteps // num_inference_steps
+                max_timestep = num_train_timesteps - 1 + offset
+                return arange(max_timestep, offset, -step_ratio)
+            case TimestepSpacing.CUSTOM:
+                raise RuntimeError("generate_timesteps called with custom spacing")
+
+    def _generate_timesteps(self) -> Tensor:
+        return self.generate_timesteps(
+            spacing=self.params.timesteps_spacing,
+            num_inference_steps=self.num_inference_steps,
+            num_train_timesteps=self.params.num_train_timesteps,
+            offset=self.params.timesteps_offset,
+        )
 
     def add_noise(
         self,
@@ -177,15 +289,10 @@ class Solver(fl.Module, ABC):
         Returns:
             A new solver instance with the specified parameters.
         """
-        num_inference_steps = self.num_inference_steps if num_inference_steps is None else num_inference_steps
-        first_inference_step = self.first_inference_step if first_inference_step is None else first_inference_step
         return self.__class__(
-            num_inference_steps=num_inference_steps,
-            num_train_timesteps=self.num_train_timesteps,
-            initial_diffusion_rate=self.initial_diffusion_rate,
-            final_diffusion_rate=self.final_diffusion_rate,
-            noise_schedule=self.noise_schedule,
-            first_inference_step=first_inference_step,
+            num_inference_steps=self.num_inference_steps if num_inference_steps is None else num_inference_steps,
+            first_inference_step=self.first_inference_step if first_inference_step is None else first_inference_step,
+            params=dataclasses.replace(self.params),
             device=self.device,
             dtype=self.dtype,
         )
@@ -220,9 +327,9 @@ class Solver(fl.Module, ABC):
         """
         return (
             linspace(
-                start=self.initial_diffusion_rate ** (1 / power),
-                end=self.final_diffusion_rate ** (1 / power),
-                steps=self.num_train_timesteps,
+                start=self.params.initial_diffusion_rate ** (1 / power),
+                end=self.params.final_diffusion_rate ** (1 / power),
+                steps=self.params.num_train_timesteps,
             )
             ** power
         )
@@ -233,7 +340,7 @@ class Solver(fl.Module, ABC):
         Returns:
             A tensor representing the noise schedule.
         """
-        match self.noise_schedule:
+        match self.params.noise_schedule:
             case "uniform":
                 return 1 - self.sample_power_distribution(1)
             case "quadratic":
@@ -241,7 +348,7 @@ class Solver(fl.Module, ABC):
             case "karras":
                 return 1 - self.sample_power_distribution(7)
             case _:
-                raise ValueError(f"Unknown noise schedule: {self.noise_schedule}")
+                raise ValueError(f"Unknown noise schedule: {self.params.noise_schedule}")
 
     def to(self, device: Device | str | None = None, dtype: DType | None = None) -> "Solver":
         """Move the solver to the specified device and data type.

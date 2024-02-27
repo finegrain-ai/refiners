@@ -232,17 +232,25 @@ def download_vae_ft_mse():
 
 def download_loras():
     dest_folder = os.path.join(test_weights_dir, "loras", "pokemon-lora")
-    download_file("https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin", dest_folder)
+    download_file(
+        "https://huggingface.co/pcuenq/pokemon-lora/resolve/main/pytorch_lora_weights.bin",
+        dest_folder,
+        expected_hash="89992ea6",
+    )
 
     dest_folder = os.path.join(test_weights_dir, "loras", "dpo-lora")
     download_file(
-        "https://huggingface.co/radames/sdxl-DPO-LoRA/resolve/main/pytorch_lora_weights.safetensors", dest_folder
+        "https://huggingface.co/radames/sdxl-DPO-LoRA/resolve/main/pytorch_lora_weights.safetensors",
+        dest_folder,
+        expected_hash="a51e9144",
     )
 
     dest_folder = os.path.join(test_weights_dir, "loras", "sliders")
-    download_file("https://sliders.baulab.info/weights/xl_sliders/age.pt", dest_folder)
-    download_file("https://sliders.baulab.info/weights/xl_sliders/cartoon_style.pt", dest_folder)
-    download_file("https://sliders.baulab.info/weights/xl_sliders/eyesize.pt", dest_folder)
+    download_file("https://sliders.baulab.info/weights/xl_sliders/age.pt", dest_folder, expected_hash="908f07d3")
+    download_file(
+        "https://sliders.baulab.info/weights/xl_sliders/cartoon_style.pt", dest_folder, expected_hash="25652004"
+    )
+    download_file("https://sliders.baulab.info/weights/xl_sliders/eyesize.pt", dest_folder, expected_hash="ee170e4d")
 
 
 def download_preprocessors():
@@ -276,16 +284,18 @@ def download_controlnet():
 
 def download_control_lora_fooocus():
     base_folder = os.path.join(test_weights_dir, "lllyasviel", "misc")
-    control_loras = [
-        "control-lora-canny-rank128.safetensors",
-        "fooocus_xl_cpds_128.safetensors",
-    ]
 
-    for control_lora in control_loras:
-        download_file(
-            url=f"https://huggingface.co/lllyasviel/misc/resolve/main/{control_lora}",
-            dest_folder=base_folder,
-        )
+    download_file(
+        url=f"https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors",
+        dest_folder=base_folder,
+        expected_hash="4d505134",
+    )
+
+    download_file(
+        url=f"https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors",
+        dest_folder=base_folder,
+        expected_hash="d81aa461",
+    )
 
 
 def download_unclip():
@@ -380,6 +390,28 @@ def download_lcm_lora():
         dest_folder=test_weights_dir,
         filename="sdxl-lcm-lora.safetensors",
         expected_hash="6312a30a",
+    )
+
+
+def download_sdxl_lightning_base():
+    base_folder = os.path.join(test_weights_dir, "ByteDance/SDXL-Lightning")
+    download_file(
+        f"https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_unet.safetensors",
+        base_folder,
+        expected_hash="1b76cca3",
+    )
+    download_file(
+        f"https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_1step_unet_x0.safetensors",
+        base_folder,
+        expected_hash="38e605bd",
+    )
+
+
+def download_sdxl_lightning_lora():
+    download_file(
+        "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors",
+        dest_folder=test_weights_dir,
+        expected_hash="9783edac",
     )
 
 
@@ -682,6 +714,32 @@ def convert_lcm_base():
     )
 
 
+def convert_sdxl_lightning_base():
+    run_conversion_script(
+        "convert_diffusers_unet.py",
+        "tests/weights/stabilityai/stable-diffusion-xl-base-1.0",
+        "tests/weights/sdxl_lightning_4step_unet.safetensors",
+        additional_args=[
+            "--override-weights",
+            "tests/weights/ByteDance/SDXL-Lightning/sdxl_lightning_4step_unet.safetensors",
+        ],
+        half=True,
+        expected_hash="cfdc46da",
+    )
+
+    run_conversion_script(
+        "convert_diffusers_unet.py",
+        "tests/weights/stabilityai/stable-diffusion-xl-base-1.0",
+        "tests/weights/sdxl_lightning_1step_unet_x0.safetensors",
+        additional_args=[
+            "--override-weights",
+            "tests/weights/ByteDance/SDXL-Lightning/sdxl_lightning_1step_unet_x0.safetensors",
+        ],
+        half=True,
+        expected_hash="21166a64",
+    )
+
+
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
     download_sd15("runwayml/stable-diffusion-v1-5")
@@ -700,6 +758,8 @@ def download_all():
     download_control_lora_fooocus()
     download_lcm_base()
     download_lcm_lora()
+    download_sdxl_lightning_base()
+    download_sdxl_lightning_lora()
 
 
 def convert_all():
@@ -717,6 +777,7 @@ def convert_all():
     convert_dinov2()
     convert_control_lora_fooocus()
     convert_lcm_base()
+    convert_sdxl_lightning_base()
 
 
 def main():

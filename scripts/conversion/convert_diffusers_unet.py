@@ -7,6 +7,7 @@ from diffusers import UNet2DConditionModel  # type: ignore
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import load_from_safetensors, load_tensors
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import SDXLLcmAdapter
 
@@ -27,6 +28,14 @@ def setup_converter(args: Args) -> ModelConverter:
         subfolder=args.subfolder,
         low_cpu_mem_usage=False,
     )
+    if args.override_weights is not None:
+        if args.override_weights.endswith(".pth"):
+            sd = load_tensors(args.override_weights)
+        elif args.override_weights.endswith(".safetensors"):
+            sd = load_from_safetensors(args.override_weights)
+        else:
+            raise ValueError(f"Unsupported file format: {args.override_weights}")
+        source.load_state_dict(sd)
     source_in_channels: int = source.config.in_channels  # type: ignore
     source_clip_embedding_dim: int = source.config.cross_attention_dim  # type: ignore
     source_has_time_ids: bool = source.config.addition_embed_type == "text_time"  # type: ignore
@@ -93,6 +102,15 @@ def main() -> None:
         help=(
             "Can be a path to a .bin file, a .safetensors file or a model name from the HuggingFace Hub. Default:"
             " runwayml/stable-diffusion-v1-5"
+        ),
+    )
+    parser.add_argument(
+        "--override-weights",
+        type=str,
+        default=None,
+        help=(
+            "Path to a weights file to override the source model (keeping its config). "
+            "This is useful for models distributed as .pth files."
         ),
     )
     parser.add_argument(
