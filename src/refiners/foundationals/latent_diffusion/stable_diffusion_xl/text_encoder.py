@@ -15,7 +15,8 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
         self,
         target: T,
         projection: fl.Linear | None = None,
-        pool_features: int = 1280
+        pool_features: int = 1280,
+        slice_target: bool = True
     ) -> None:
         with self.setup_adapter(target=target):
             tokenizer = target.ensure_find(CLIPTokenizer)
@@ -24,11 +25,11 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
                 fl.SetContext(
                     context="text_encoder_pooling", key="end_of_text_index", callback=self.set_end_of_text_index
                 ),
-                target[1:-2],
+                target[1:-2] if slice_target else target,
                 fl.Parallel(
                     fl.Identity(),
                     fl.Chain(
-                        target[-2:],
+                        target[-2:] if slice_target else fl.Identity(),
                         projection
                         or fl.Linear(
                             in_features=pool_features,
@@ -75,7 +76,7 @@ class TextEncoderWithPoolingL(TextEncoderWithPoolingGeneral[CLIPTextEncoderL]):
         target: CLIPTextEncoderL,
         projection: fl.Linear | None = None,
     ) -> None:
-        super().__init__(target, projection, pool_features=768)
+        super().__init__(target, projection, pool_features=768, slice_target=False)
 
 class DoubleTextEncoder(fl.Chain):
     def __init__(
