@@ -5,7 +5,7 @@ project = "finetune-ldm-ip-adapter"
 
 [ldm]
 offset_noise = 0
-# snr_gamma = 5
+snr_gamma = 5
 
 [unet]
 checkpoint = "tests/weights/unet.safetensors"
@@ -35,11 +35,10 @@ use_pooled_text_embedding = true
 use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
-# initializer_range = 0.02
-initializer_range = 0.00
+initializer_range = 0.02
 use_bias = true
-use_rescaler = true
-save_folder = "/home/isamu/checkpoints_palp"
+use_rescaler = false
+save_folder = "/home/isamu/checkpoints_minsnr"
 image_embedding_div_factor = 3
 do_palp = false
 palp_rescale = true
@@ -48,8 +47,10 @@ palp_steps = 8
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
 seed = 9752
-batch_size = 4
-gradient_accumulation = {"number" = 64, "unit" = "step"}
+# batch_size = 4
+# gradient_accumulation = {"number" = 64, "unit" = "step"}
+batch_size = 16
+gradient_accumulation = {"number" = 16, "unit" = "step"}
 evaluation_interval = {"number" = 500, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
@@ -60,7 +61,8 @@ amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 5e-5
+# learning_rate = 5e-5
+learning_rate = 1e-3
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
@@ -82,9 +84,12 @@ resize_image_max_size = 518
 random_crop_size = 512
 center_crop_size = 512
 filter_min_image_size = false
-image_drop_rate = 0.0
-text_drop_rate = 0.0
-text_and_image_drop_rate = 0.0
+# image_drop_rate = 0.0
+# text_drop_rate = 0.0
+# text_and_image_drop_rate = 0.0
+image_drop_rate = 0.05
+text_drop_rate = 0.05
+text_and_image_drop_rate = 0.05
 to_wds = false
 pre_encode =  true
 image_column = "image"

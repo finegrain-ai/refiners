@@ -720,19 +720,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
         for module in ip_adapter.modules():
             _init_learnable_weights(module, self.config.adapter.initializer_range)
-        for adapter in ip_adapter.sub_adapters:
-            image_cross_attention = adapter.image_cross_attention
-            print(image_cross_attention)
-            print(image_cross_attention[0])
-            print(image_cross_attention[0][1])
-            print(image_cross_attention[0][1][-1])
-            print(image_cross_attention[0][1][-1][0])
-            print(norm(image_cross_attention[0][1][-1][1].weight))
-
-
-
-
-
 
         i=0
         for param in ip_adapter.parameters():

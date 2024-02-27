@@ -351,7 +351,6 @@ class ImageCrossAttention(fl.Chain):
                 num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
             ),
             fl.Multiply(self.scale),
-            ValueReporter()
         )
     @property
     def scale(self) -> float:
