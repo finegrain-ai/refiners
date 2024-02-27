@@ -12,8 +12,8 @@ checkpoint = "tests/weights/unet.safetensors"
 requires_grad = false
 
 [text_encoder]
-# checkpoint = "tests/weights/CLIPLWithProjection.safetensors"
-checkpoint = "tests/weights/CLIPTextEncoderL.safetensors"
+checkpoint = "tests/weights/CLIPLWithProjection.safetensors"
+# checkpoint = "tests/weights/CLIPTextEncoderL.safetensors"
 requires_grad = false
 
 [lda]
@@ -31,7 +31,7 @@ image_encoder_type = "dinov2_vitl14_reg4"
 resolution = 518
 scale = 1.0
 inference_scale = 1.0
-use_pooled_text_embedding = false
+use_pooled_text_embedding = true
 use_timestep_embedding = true
 fine_grained = true
 initialize_model = true
