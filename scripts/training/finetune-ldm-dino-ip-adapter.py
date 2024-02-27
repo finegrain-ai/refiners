@@ -399,6 +399,7 @@ class IPDataset(Dataset[IPBatch]):
             )
         image_compose = Compose(image_transforms)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
+        print(lda_images)
         return {"lda_embedding": [lda.image_to_latents(image=image).float().cpu() for image in lda_images]}
 
     @no_grad()
