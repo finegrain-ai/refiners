@@ -481,9 +481,7 @@ class IPDataset(Dataset[IPBatch]):
                 desc="Capping image sizes",  # type: ignore
             )
         # encode cond images
-        print("Preencoding", self.trainer.config.dataset.pre_encode)
         if self.trainer.config.dataset.pre_encode:
-            print(dataset.features)
             if self.image_encoder_column not in dataset.features:
                 update_dataset = True
                 dataset = dataset.map(  # type: ignore
