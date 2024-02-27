@@ -25,7 +25,7 @@ class TextEncoderWithPoolingGeneral(fl.Chain, Adapter[T]):
                 fl.SetContext(
                     context="text_encoder_pooling", key="end_of_text_index", callback=self.set_end_of_text_index
                 ),
-                target[1:-2] if slice_target else target,
+                target[1:-2] if slice_target else target[1:],
                 fl.Parallel(
                     fl.Identity(),
                     fl.Chain(
