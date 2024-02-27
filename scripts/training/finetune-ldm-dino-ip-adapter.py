@@ -398,8 +398,9 @@ class IPDataset(Dataset[IPBatch]):
                 RandomHorizontalFlip(p=horizontal_flip_probability),
             )
         image_compose = Compose(image_transforms)
+        print(image_compose)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
-        print(lda_images)
+        print(type(lda_images[0]))
         return {"lda_embedding": [lda.image_to_latents(image=image).float().cpu() for image in lda_images]}
 
     @no_grad()
