@@ -917,6 +917,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.adapter.set_image_embedding(image_embedding)
             cond_adapted_noise = self.unet(noisy_predicted_latent)
             self.adapter.eject()
+            print(timestep)
             self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
             self.unet.set_timestep(timestep=timestep)
             uncond_default_noise = self.unet(noisy_predicted_latent)
