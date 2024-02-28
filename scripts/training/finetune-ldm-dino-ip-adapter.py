@@ -372,6 +372,7 @@ class IPDataset(Dataset[IPBatch]):
         dtype: DType,
         cond_resolution: int,
     ) -> dict[str, list[Tensor]]:
+        print(type(images[0]))
         cond_images = [
             IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images
         ]
@@ -502,7 +503,6 @@ class IPDataset(Dataset[IPBatch]):
                 )
             if self.trainer.config.adapter.layernorm_dino and (str(self.image_encoder_column+"_layernorm") not in dataset.features):
                 update_dataset = True
-                print(type(dataset[0]["image"]))
                 dataset = dataset.map(  # type: ignore
                     function=self.encode_cond_images,
                     input_columns=["image"],
