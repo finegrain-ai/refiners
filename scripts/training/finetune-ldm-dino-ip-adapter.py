@@ -372,7 +372,6 @@ class IPDataset(Dataset[IPBatch]):
         dtype: DType,
         cond_resolution: int,
     ) -> dict[str, list[Tensor]]:
-        print(type(images[0]))
         cond_images = [
             IPDataset.cond_transform(image, device, dtype, (cond_resolution, cond_resolution)) for image in images
         ]
