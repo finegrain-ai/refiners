@@ -95,6 +95,7 @@ class AdapterConfig(ModelConfig):
     palp_beta: float = 1
     use_rescaler: bool = False
     image_embedding_div_factor: float = 1
+    pooled_text_div_factor: float = 1
     palp_rescale: bool = False
     palp_steps: int = 4
     layernorm_dino: bool = False
@@ -855,7 +856,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         self.adapter.set_image_embedding(image_embedding)
         # set pooled text embedding
         if self.config.adapter.use_pooled_text_embedding:
-            self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
+            self.adapter.set_pooled_text_embedding(pooled_text_embeddings/self.config.adapter.pooled_text_div_factor)
         # set text embeddings context
         self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
 
@@ -904,13 +905,13 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             palp_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
             noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, palp_noise)
             if self.config.adapter.use_pooled_text_embedding:
-                self.adapter.set_pooled_text_embedding(uncond_pooled_text_embedding)
+                self.adapter.set_pooled_text_embedding(uncond_pooled_text_embedding/self.config.adapter.pooled_text_div_factor)
             self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(uncond_image_embedding)
             uncond_adapted_noise = self.unet(noisy_predicted_latent)
             if self.config.adapter.use_pooled_text_embedding:
-                self.adapter.set_pooled_text_embedding(pooled_text_embeddings)
+                self.adapter.set_pooled_text_embedding(pooled_text_embeddings/self.config.adapter.pooled_text_div_factor)
             self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
             self.unet.set_timestep(timestep=timestep)
             self.adapter.set_image_embedding(image_embedding)
@@ -1011,7 +1012,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 x = randn(1, 4, 64, 64, device=self.device, dtype=self.dtype)
                 self.adapter.set_image_embedding(image_embedding)
                 if self.config.adapter.use_pooled_text_embedding:
-                    self.adapter.set_pooled_text_embedding(pooled_clip_text_embedding)
+                    self.adapter.set_pooled_text_embedding(pooled_clip_text_embedding/self.config.adapter.pooled_text_div_factor)
                 for step in sd.steps:
                     x = sd(
                         x=x,
