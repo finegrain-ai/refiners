@@ -444,7 +444,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
         use_bias: bool = True,
-        sequence_length: int = -1
+        sequence_length: int = -1,
+        layernorm_dino: bool = False
     ) -> None:
         """Initialize the adapter.
 
@@ -456,6 +457,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             fine_grained: Whether to use fine-grained image prompt.
             weights: The weights of the IPAdapter.
         """
+        self.layernorm_dino: bool = layernorm_dino
         with self.setup_adapter(target):
             super().__init__(target)
         self.use_pooled_text_embedding = use_pooled_text_embedding
@@ -666,7 +668,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             transformer_layers = encoder_clone[-1]
             assert isinstance(transformer_layers, fl.Chain) and len(transformer_layers) == 32
             transformer_layers.pop()
-        else:
+        elif not self.layernorm_dino:
             assert isinstance(encoder_clone[-1], fl.LayerNorm)  # final normalization
             encoder_clone.pop()
         return encoder_clone

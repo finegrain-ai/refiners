@@ -70,6 +70,7 @@ import webdataset as wds
 from refiners.fluxion.utils import load_from_safetensors
 import gc
 import math
+import shutil
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
@@ -96,6 +97,7 @@ class AdapterConfig(ModelConfig):
     image_embedding_div_factor: float = 1
     palp_rescale: bool = False
     palp_steps: int = 4
+    layernorm_dino: bool = False
 
 
 class DatasetConfig(BaseModel):
@@ -498,6 +500,22 @@ class IPDataset(Dataset[IPBatch]):
                     },
                     desc="Encoding conditional images into embeddings",  # type: ignore
                 )
+            if self.trainer.config.adapter.layernorm_dino and (str(self.image_encoder_column+"_layernorm") not in dataset.features):
+                update_dataset = True
+                dataset = dataset.map(  # type: ignore
+                    function=self.encode_cond_images,
+                    input_columns=["image"],
+                    batched=True,
+                    batch_size=50,  # FIXME: harcoded value
+                    fn_kwargs={
+                        "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
+                        "image_encoder_column": self.image_encoder_column+"_layernorm",
+                        "device": self.trainer.device,
+                        "dtype": self.trainer.dtype,
+                        "cond_resolution": self.cond_resolution,
+                    },
+                    desc="Encoding conditional images into embeddings",  # type: ignore
+                )
             if "lda_embedding" not in dataset.features:
                 update_dataset = True
                 dataset = dataset.map(  # type: ignore
@@ -535,7 +553,10 @@ class IPDataset(Dataset[IPBatch]):
             columns=["text_embedding", self.image_encoder_column, "lda_embedding"],
         )
         if dataset_save_path and update_dataset:
-            dataset.save_to_disk(dataset_save_path)
+            dataset.save_to_disk(dataset_save_path+"_update")
+            del dataset
+            shutil.rmtree(dataset_save_path)
+            os.rename(dataset_save_path+"_update", dataset_save_path)
         return dataset  # type: ignore
 
     def transform(self, data: dict[str, Any]) -> IPBatch:
@@ -713,6 +734,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
+            layernorm_dino=self.config.adapter.layernorm_dino
         ).inject()
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)

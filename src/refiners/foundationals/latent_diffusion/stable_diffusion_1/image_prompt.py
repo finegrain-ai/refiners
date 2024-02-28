@@ -55,6 +55,7 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
         use_bias: bool = True,
+        layernorm_dino: bool = False
     ) -> None:
         image_encoder = image_encoder or CLIPImageEncoderH(device=target.device, dtype=target.dtype)
 
@@ -79,5 +80,6 @@ class SD1IPAdapter(IPAdapter[SD1UNet]):
             use_timestep_embedding=use_timestep_embedding,
             use_pooled_text_embedding=use_pooled_text_embedding,
             use_bias=use_bias,
-            sequence_length=sequence_length
+            sequence_length=sequence_length,
+            layernorm_dino=layernorm_dino
         )
