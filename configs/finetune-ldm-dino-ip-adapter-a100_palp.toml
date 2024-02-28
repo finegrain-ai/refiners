@@ -45,6 +45,9 @@ do_palp = true
 palp_rescale = true
 palp_steps = 8
 layernorm_dino = false
+non_palp_image_drop_rate = 0.05
+non_palp_text_drop_rate = 0.05
+non_palp_text_and_image_drop_rate = 0.05
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}

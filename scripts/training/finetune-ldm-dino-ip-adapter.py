@@ -99,6 +99,9 @@ class AdapterConfig(ModelConfig):
     palp_rescale: bool = False
     palp_steps: int = 4
     layernorm_dino: bool = False
+    non_palp_image_drop_rate: float = 0.05
+    non_palp_text_drop_rate: float = 0.05
+    non_palp_text_and_image_drop_rate: float = 0.05
 
 
 class DatasetConfig(BaseModel):
@@ -851,6 +854,28 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             else:
                 uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=input_dtype)/div_factor
             uncond_image_embedding = self.image_proj(uncond_image_embedding)
+        if self.config.adapter.do_palp and not palp_step:
+            # Clean up and remove redundancy
+            for i in range(batch_size):
+                adapter_config =  self.config.adapter
+                rand_num = random.random()
+                if rand_num < adapter_config.non_palp_image_drop_rate:
+                    if self.config.dataset.zero_uncond:
+                        image_embedding[i] = zeros_like(image_embedding[i])
+                    else:
+                        image_embedding[i] = self.dataset.black_image_embedding
+                elif rand_num < (adapter_config.non_palp_image_drop_rate + adapter_config.non_palp_text_drop_rate):
+                    text_embeddings[i] = self.dataset.empty_text_embedding
+                    pooled_text_embeddings[i] = self.dataset.empty_pooled_text_embedding
+                elif rand_num < (
+                    adapter_config.non_palp_image_drop_rate + adapter_config.non_palp_text_drop_rate + adapter_config.non_palp_text_and_image_drop_rate
+                ):
+                    text_embeddings[i] = self.dataset.empty_text_embedding
+                    pooled_text_embeddings[i] = self.dataset.empty_pooled_text_embedding
+                    if self.config.dataset.zero_uncond:
+                        image_embedding[i] = zeros_like(image_embedding)
+                    else:
+                        image_embedding[i] = self.dataset.black_image_embedding
         image_embedding = self.image_proj(image_embedding)
         # set IP embeddings context
         self.adapter.set_image_embedding(image_embedding)
