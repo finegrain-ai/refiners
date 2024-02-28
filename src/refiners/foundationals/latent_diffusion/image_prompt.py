@@ -294,7 +294,6 @@ class ImageCrossAttention(fl.Chain):
                         dtype=text_cross_attention.dtype,
                     ),
                     fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length)),
-                    ValueReporter()
                 )
             )
             query_contexts.append(
@@ -322,7 +321,6 @@ class ImageCrossAttention(fl.Chain):
                         dtype=text_cross_attention.dtype,
                     ),
                     fl.Lambda(lambda x: expand_dim(x, sequence_length=sequence_length)),
-                    ValueReporter()
                 )
             )
             query_contexts.append(
