@@ -460,7 +460,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.layernorm_dino: bool = layernorm_dino
         with self.setup_adapter(target):
             super().__init__(target)
-        self.use_pooled_text_embedding = use_pooled_text_embedding
         self._pooled_text_embedding_proj = []
         self.fine_grained = fine_grained
         if fine_grained:
@@ -518,8 +517,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
     def eject(self) -> None:
         for adapter in self.sub_adapters:
             adapter.eject()
-        if self.use_pooled_text_embedding:
-            self.target.pop(0)
         super().eject()
 
     @property
