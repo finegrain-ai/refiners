@@ -43,7 +43,7 @@ image_embedding_div_factor = 40
 pooled_text_div_factor = 10
 do_palp = true
 palp_rescale = true
-palp_steps = 2
+palp_steps = 8
 layernorm_dino = false
 palp_alpha = 15
 palp_beta =7.5
@@ -69,7 +69,7 @@ amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 5e-5
+learning_rate = 5e-4
 # learning_rate = 1e-4
 betas = [0.9, 0.999]
 eps = 1e-8
