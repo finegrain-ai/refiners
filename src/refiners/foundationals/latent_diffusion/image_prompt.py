@@ -464,7 +464,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self._pooled_text_embedding_proj = []
         self.fine_grained = fine_grained
         if fine_grained:
-            self._grid_image_encoder = [self.convert_to_grid_features(image_encoder)]
+            self._grid_image_encoder = [self.convert_to_grid_features(image_encoder, layernorm_dino)]
         else:
             self._image_encoder = [self.convert_to_pooled_features(image_encoder)]
 
@@ -657,7 +657,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         return encoder_clone
 
     @staticmethod
-    def convert_to_grid_features(image_encoder: CLIPImageEncoderH | ViT) -> CLIPImageEncoderH | ViT:
+    def convert_to_grid_features(image_encoder: CLIPImageEncoderH | ViT, layernorm_dino: bool = False) -> CLIPImageEncoderH | ViT:
         encoder_clone = image_encoder.structural_copy()
         if isinstance(image_encoder, CLIPImageEncoderH):
             assert isinstance(encoder_clone[-1], fl.Linear)  # final proj
@@ -668,7 +668,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             transformer_layers = encoder_clone[-1]
             assert isinstance(transformer_layers, fl.Chain) and len(transformer_layers) == 32
             transformer_layers.pop()
-        elif not self.layernorm_dino:
+        elif not layernorm_dino:
             assert isinstance(encoder_clone[-1], fl.LayerNorm)  # final normalization
             encoder_clone.pop()
         return encoder_clone
