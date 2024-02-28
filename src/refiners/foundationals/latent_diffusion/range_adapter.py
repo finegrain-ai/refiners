@@ -5,7 +5,7 @@ from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, ex
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
-
+from typing import Callable
 
 def compute_sinusoidal_embedding(
     x: Int[Tensor, "*batch 1"],
@@ -83,3 +83,38 @@ class RangeAdapter2d(fl.Sum, Adapter[fl.Conv2d]):
         use_context_module = self.ensure_find(fl.UseContext)
         assert use_context_module.context == "range_adapter"
         use_context_module.key = value
+
+
+
+class AffineRangeAdapter2d(fl.Chain, Adapter[fl.Chain]):
+    def __init__(
+        self,
+        target: fl.Chain,
+        channels: int,
+        embedding_dim: int,
+        context_key: str,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        self.channels = channels
+        self.embedding_dim = embedding_dim
+        self.context_key = context_key
+
+        add_one_func : Callable[[Tensor], Tensor]= lambda x: x + 1
+        encoding_chain = fl.Chain(
+            fl.UseContext("range_adapter", context_key),
+            fl.SiLU(),
+            fl.Linear(in_features=embedding_dim, out_features=2 * channels, device=device, dtype=dtype),
+            fl.Reshape(2 * channels, 1, 1),
+            fl.Parallel(
+                fl.Chain(fl.Slicing(dim=1, start=0, end=channels), fl.Lambda(add_one_func)),
+                fl.Slicing(dim=1, start=channels, end=2 * channels),
+            ),
+        )
+
+        affine_ops_func : Callable[[Tensor, Tensor], Tensor] = lambda x, affine_params: x * affine_params[0] + affine_params[1]
+        with self.setup_adapter(target):
+            super().__init__(
+                fl.Parallel(target, encoding_chain),
+                fl.Lambda(affine_ops_func),
+            )
