@@ -32,9 +32,9 @@ jobs:
           enable-cache: true
           cache-prefix: "refiners-rye-cache"
 
-      - name: add home shims dir to PATH
+      - name: add Rye shims dir to PATH
         if: steps.changes.outputs.sources == 'true'
-        run: echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
 
       - name: pin python
         if: steps.changes.outputs.sources == 'true'
