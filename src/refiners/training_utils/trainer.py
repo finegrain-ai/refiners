@@ -107,6 +107,7 @@ def register_model():
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
             if self.config.training.automatic_mixed_precision:
+                # For all parameters we train in automatic mixed precision we want them to be in float32.
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
             self.models[name] = ModelItem(
