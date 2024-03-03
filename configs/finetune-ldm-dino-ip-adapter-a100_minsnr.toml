@@ -69,7 +69,7 @@ amp = true
 
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
-learning_rate = 1e-4
+learning_rate = 3e-4
 #learning_rate = 5e-5
 betas = [0.9, 0.999]
 eps = 1e-8
