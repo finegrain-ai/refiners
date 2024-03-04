@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Rye
         if: steps.changes.outputs.sources == 'true'
-        uses: eifinger/setup-rye@v1
+        uses: eifinger/setup-rye@v2
         with:
           enable-cache: true
           cache-prefix: "refiners-rye-cache"
