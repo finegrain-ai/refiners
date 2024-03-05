@@ -1395,7 +1395,8 @@ def test_diffusion_sdxl_lora(
     prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
     negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
 
-    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale)
+    manager = SDLoraManager(sdxl, unet_inclusions=["CrossAttentionBlock"])
+    manager.add_loras("dpo", lora_weights, scale=lora_scale)
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt, negative_text=negative_prompt
