@@ -50,6 +50,7 @@ palp_beta =7.5
 non_palp_image_drop_rate = 0.05
 non_palp_text_drop_rate = 0.05
 non_palp_text_and_image_drop_rate = 0.05
+weighted_sum = true
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}

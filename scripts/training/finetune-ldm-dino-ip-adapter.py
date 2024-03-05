@@ -102,6 +102,7 @@ class AdapterConfig(ModelConfig):
     non_palp_image_drop_rate: float = 0.05
     non_palp_text_drop_rate: float = 0.05
     non_palp_text_and_image_drop_rate: float = 0.05
+    weighted_sum: bool = False
 
 
 class DatasetConfig(BaseModel):
@@ -738,7 +739,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_encoder=self.image_encoder,
             image_proj=self.image_proj,
             use_bias=self.config.adapter.use_bias,
-            layernorm_dino=self.config.adapter.layernorm_dino
+            layernorm_dino=self.config.adapter.layernorm_dino,
+            weighted_sum=self.config.adapter.weighted_sum
         ).inject()
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)

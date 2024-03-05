@@ -361,6 +361,15 @@ class ImageCrossAttention(fl.Chain):
         self._scale = value
         self.ensure_find(fl.Multiply).scale = value
 
+class WeightedSum(fl.Chain):
+    _TAG = "WeightedSum"
+    def __init__(self, chain_1: fl.Module, chain_2: fl.Module) -> None:
+        super().__init__(chain_1, chain_2)
+
+    def forward(self, *args: Tensor) -> Tensor:
+        ref = self[0](*args)
+        output =  ref + self[1](*args)
+        return (output / output.norm()) * ref.norm()
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
     def __init__(
@@ -370,8 +379,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         use_timestep_embedding: bool = False,
         use_pooled_text_embedding: bool = False,
         sequence_length: int = -1,
+        weighted_sum: bool = False
     ) -> None:
         self._scale = scale
+        sum_method = fl.Sum if not weighted_sum else WeightedSum
         with self.setup_adapter(target):
             clone = target.structural_copy()
             scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
@@ -384,7 +395,7 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
             )
             clone.replace(
                 old_module=scaled_dot_product,
-                new_module=fl.Sum(
+                new_module=sum_method(
                     scaled_dot_product,
                     image_cross_attention,
                 ),
@@ -445,7 +456,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         use_pooled_text_embedding: bool = False,
         use_bias: bool = True,
         sequence_length: int = -1,
-        layernorm_dino: bool = False
+        layernorm_dino: bool = False,
+        weighted_sum: bool = False
     ) -> None:
         """Initialize the adapter.
 
@@ -475,7 +487,8 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
                 scale=scale,
                 use_timestep_embedding=use_timestep_embedding,
                 use_pooled_text_embedding=use_pooled_text_embedding,
-                sequence_length=sequence_length
+                sequence_length=sequence_length,
+                weighted_sum=weighted_sum
             )
             for cross_attn in filter(lambda attn: type(attn) != fl.SelfAttention, target.layers(fl.Attention))
         ]
