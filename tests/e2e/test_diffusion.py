@@ -1430,14 +1430,18 @@ def test_diffusion_sdxl_multiple_loras(
 ) -> None:
     sdxl = sdxl_ddim
     expected_image = expected_sdxl_multi_loras
-    _, dpo = lora_data_dpo
-    loras, scales = lora_sliders
-    loras["dpo"] = dpo
+    _, dpo_weights = lora_data_dpo
+    slider_loras, slider_scales = lora_sliders
 
     manager = SDLoraManager(sdxl)
-    for lora_name, lora_weights in loras.items():
-        manager.add_loras(lora_name, lora_weights, scales[lora_name])
-    manager.add_loras("dpo", dpo, 1.4)
+    for lora_name, lora_weights in slider_loras.items():
+        manager.add_loras(
+            lora_name,
+            lora_weights,
+            slider_scales[lora_name],
+            unet_inclusions=["SelfAttention", "ResidualBlock", "Downsample", "Upsample"],
+        )
+    manager.add_loras("dpo", dpo_weights, 1.4, unet_inclusions=["CrossAttentionBlock"])
 
     # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
     # except that we are using DDIM instead of sde-dpmsolver++
