@@ -143,11 +143,17 @@ class SDLoraManager:
         loras_excluded = {k: v for k, v in unet_loras.items() if any(x in k for x in preprocess.keys())}
         loras_remaining = {k: v for k, v in unet_loras.items() if k not in loras_excluded}
 
-        for exc, v in preprocess.items():
-            ls = {k: v for k, v in loras_excluded.items() if exc in k}
-            auto_attach_loras(ls, self.unet, include=[v], debug_map=debug_map)
+        for exc_k, exc_v in preprocess.items():
+            ls = {k: v for k, v in loras_excluded.items() if exc_k in k}
+            auto_attach_loras(ls, self.unet, include=[exc_v], debug_map=debug_map)
 
-        auto_attach_loras(loras_remaining, self.unet, exclude=exclude, include=include, debug_map=debug_map)
+        auto_attach_loras(
+            loras_remaining,
+            self.unet,
+            exclude=[*exclude, *preprocess.values()],
+            include=include,
+            debug_map=debug_map,
+        )
 
     def remove_loras(self, *names: str) -> None:
         """Remove multiple LoRAs from the target.
