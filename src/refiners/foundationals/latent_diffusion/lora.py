@@ -1,5 +1,4 @@
 from typing import Any, Iterator, cast
-from warnings import warn
 
 from torch import Tensor
 
@@ -115,9 +114,7 @@ class SDLoraManager:
                 (keys are the names of the LoRAs, values are the LoRAs to add to the text encoder)
         """
         text_encoder_loras = {key: loras[key] for key in loras.keys() if "text" in key}
-        failed = auto_attach_loras(text_encoder_loras, self.clip_text_encoder)
-        if failed:
-            warn(f"failed to attach {len(failed)}/{len(text_encoder_loras)} loras to the text encoder")
+        auto_attach_loras(text_encoder_loras, self.clip_text_encoder)
 
     def add_loras_to_unet(self, loras: dict[str, Lora[Any]], /) -> None:
         """Add multiple LoRAs to the U-Net.
@@ -130,9 +127,7 @@ class SDLoraManager:
         exclude = [
             block for s, block in self.unet_exclusions.items() if all([s not in key for key in unet_loras.keys()])
         ]
-        failed = auto_attach_loras(unet_loras, self.unet, exclude=exclude)
-        if failed:
-            warn(f"failed to attach {len(failed)}/{len(unet_loras)} loras to the unet")
+        auto_attach_loras(unet_loras, self.unet, exclude=exclude)
 
     def remove_loras(self, *names: str) -> None:
         """Remove multiple LoRAs from the target.
