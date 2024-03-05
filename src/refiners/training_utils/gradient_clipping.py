@@ -40,8 +40,10 @@ class GradientClipping(Callback["Trainer[BaseConfig, Any]"]):
     def __init__(self, config: GradientClippingConfig) -> None:
         self.config = config
 
-    def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+    def on_optimizer_step_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         clip_norm = self.config.clip_grad_norm
+        if trainer.scaler is not None:
+            trainer.scaler.unscale_(trainer.optimizer)
         if clip_norm is not None:
             clip_gradient_norm(
                 parameters=trainer.learnable_parameters, total_norm=trainer.total_gradient_norm, clip_norm=clip_norm
