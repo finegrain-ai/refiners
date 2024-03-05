@@ -460,6 +460,9 @@ def _auto_attach_loras(
             adapter, parent = attached
             if parent is None:
                 # `adapter` is already attached and `lora` has been added to it
+                if debug_map is not None:
+                    path = adapter.get_path()
+                    debug_map.append((key, path))
                 continue
             if debug_map is not None:
                 path = adapter.target.get_path(parent)
