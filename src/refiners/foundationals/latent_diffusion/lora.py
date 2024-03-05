@@ -95,25 +95,6 @@ class SDLoraManager:
         # set the scale of the LoRA
         self.set_scale(name, scale)
 
-    def add_multiple_loras(
-        self,
-        /,
-        tensors: dict[str, dict[str, Tensor]],
-        scale: dict[str, float] | None = None,
-    ) -> None:
-        """Load multiple LoRAs from a dictionary of `state_dict`.
-
-        Args:
-            tensors: The dictionary of `state_dict` of the LoRAs to load
-                (keys are the names of the LoRAs, values are the `state_dict` of the LoRAs).
-            scale: The scales to use for the LoRAs.
-
-        Raises:
-            AssertionError: If the manager already has a LoRA with the same name.
-        """
-        for name, lora_tensors in tensors.items():
-            self.add_loras(name, tensors=lora_tensors, scale=scale[name] if scale else 1.0)
-
     def add_loras_to_text_encoder(self, loras: dict[str, Lora[Any]], /) -> None:
         """Add multiple LoRAs to the text encoder.
 

@@ -251,11 +251,8 @@ This is dead simple as [`SDLoraManager`][refiners.foundationals.latent_diffusion
 ```py
 # Load LoRAs weights from disk and inject them into target
 manager = SDLoraManager(sdxl)
-scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
-pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-manager.add_multiple_loras(
-    {"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights}
-)
+manager.add_loras("scifi-lora", load_from_safetensors("Sci-fi_Environments_sdxl.safetensors"))
+manager.add_loras("pixel-art-lora", load_from_safetensors("pixel-art-xl-v1.1.safetensors"))
 ```
 
 Adapters such as LoRAs also have a [scale][refiners.fluxion.adapters.Lora.scale] (roughly) quantifying the effect of this Adapter.
@@ -264,12 +261,8 @@ Refiners allows setting different scales for each Adapter, allowing the user to 
 ```py
 # Load LoRAs weights from disk and inject them into target
 manager = SDLoraManager(sdxl)
-scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
-pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-manager.add_multiple_loras(
-    tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-    scale={"scifi-lora": 1.0, "pixel-art-lora": 1.4},
-)
+manager.add_loras("scifi-lora", load_from_safetensors("Sci-fi_Environments_sdxl.safetensors"), scale=1.0)
+manager.add_loras("pixel-art-lora", load_from_safetensors("pixel-art-xl-v1.1.safetensors"), scale=1.4)
 ```
 
 ??? example "Expand to see the entire end-to-end code"
@@ -291,10 +284,8 @@ manager.add_multiple_loras(
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.0, "pixel-art-lora": 1.4},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.0)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.4)
 
     # Hyperparameters
     prompt = "a futuristic castle surrounded by a forest, mountains in the background"
@@ -416,10 +407,8 @@ with torch.no_grad():
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.5, "pixel-art-lora": 1.55},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.5)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.55)
 
     # Load IP-Adapter
     ip_adapter = SDXLIPAdapter(
@@ -543,10 +532,8 @@ with torch.no_grad():
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.5, "pixel-art-lora": 1.55},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.5)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.55)
 
     # Load IP-Adapter
     ip_adapter = SDXLIPAdapter(

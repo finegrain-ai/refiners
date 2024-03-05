@@ -36,13 +36,15 @@ def test_add_loras(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> 
 
 
 def test_add_multiple_loras(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None:
-    manager.add_multiple_loras({"pokemon-lora": weights, "pokemon-lora2": weights})
+    manager.add_loras("pokemon-lora", weights)
+    manager.add_loras("pokemon-lora2", weights)
     assert "pokemon-lora" in manager.names
     assert "pokemon-lora2" in manager.names
 
 
 def test_remove_loras(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None:
-    manager.add_multiple_loras({"pokemon-lora": weights, "pokemon-lora2": weights})
+    manager.add_loras("pokemon-lora", weights)
+    manager.add_loras("pokemon-lora2", weights)
     manager.remove_loras("pokemon-lora")
     assert "pokemon-lora" not in manager.names
     assert "pokemon-lora2" in manager.names
@@ -53,7 +55,8 @@ def test_remove_loras(manager: SDLoraManager, weights: dict[str, torch.Tensor]) 
 
 
 def test_remove_all(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None:
-    manager.add_multiple_loras({"pokemon-lora": weights, "pokemon-lora2": weights})
+    manager.add_loras("pokemon-lora", weights)
+    manager.add_loras("pokemon-lora2", weights)
     manager.remove_all()
     assert len(manager.names) == 0
 

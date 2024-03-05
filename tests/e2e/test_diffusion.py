@@ -335,7 +335,6 @@ def lora_sliders(test_weights_path: Path) -> tuple[dict[str, dict[str, torch.Ten
     }, {
         "age": 0.3,
         "cartoon_style": -0.2,
-        "dpo": 1.4,
         "eyesize": -0.2,
     }
 
@@ -1436,7 +1435,10 @@ def test_diffusion_sdxl_multiple_loras(
     loras, scales = lora_sliders
     loras["dpo"] = dpo
 
-    SDLoraManager(sdxl).add_multiple_loras(loras, scales)
+    manager = SDLoraManager(sdxl)
+    for lora_name, lora_weights in loras.items():
+        manager.add_loras(lora_name, lora_weights, scales[lora_name])
+    manager.add_loras("dpo", dpo, 1.4)
 
     # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
     # except that we are using DDIM instead of sde-dpmsolver++
