@@ -66,7 +66,6 @@ def add_lcm_lora(
         debug_map=debug_map,
     )
 
-    # Do *not* check for time because some keys include both `resnets` and `time_emb_proj`.
     exclusions = {
         "res": "ResidualBlock",
         "downsample": "Downsample",
