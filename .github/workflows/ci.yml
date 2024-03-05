@@ -44,13 +44,13 @@ jobs:
         if: steps.changes.outputs.sources == 'true'
         run: rye sync --all-features
 
-      - name: ruff format
+      - name: rye fmt
         if: steps.changes.outputs.sources == 'true'
-        run: rye run ruff format --check .
+        run: rye fmt --check
 
-      - name: ruff check
+      - name: rye lint
         if: steps.changes.outputs.sources == 'true'
-        run: rye run ruff check .
+        run: rye lint
 
       - name: typecheck
         if: steps.changes.outputs.sources == 'true'

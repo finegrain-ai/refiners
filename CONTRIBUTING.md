@@ -23,10 +23,11 @@ Once Rye is installed, you can clone the repository and run `rye sync` to instal
 
 ## Linting
 
-We use [ruff](https://docs.astral.sh/ruff/) to lint our code. You can lint your code by running.
+We use the standard integration of [ruff](https://docs.astral.sh/ruff/) in Rye to lint and format our code. You can lint your code by running:
 
 ```bash
-rye run lint
+rye fmt
+rye lint --fix
 ```
 
 We also enforce strict type checking with [pyright](https://github.com/microsoft/pyright). You can run the type checker with:
