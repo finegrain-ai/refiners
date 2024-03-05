@@ -115,6 +115,7 @@ class SDLoraManager:
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         preprocess: dict[str, str] | None = None,
+        debug_map: list[tuple[str, str]] | None = None,
     ) -> None:
         """Add multiple LoRAs to the U-Net.
 
@@ -144,9 +145,9 @@ class SDLoraManager:
 
         for exc, v in preprocess.items():
             ls = {k: v for k, v in loras_excluded.items() if exc in k}
-            auto_attach_loras(ls, self.unet, include=[v])
+            auto_attach_loras(ls, self.unet, include=[v], debug_map=debug_map)
 
-        auto_attach_loras(loras_remaining, self.unet, exclude=exclude, include=include)
+        auto_attach_loras(loras_remaining, self.unet, exclude=exclude, include=include, debug_map=debug_map)
 
     def remove_loras(self, *names: str) -> None:
         """Remove multiple LoRAs from the target.
