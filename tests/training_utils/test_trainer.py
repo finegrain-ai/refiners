@@ -1,5 +1,4 @@
 import warnings
-from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -10,6 +9,7 @@ from torch.optim import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
+from refiners.training_utils.batch import BaseBatch
 from refiners.training_utils.common import TimeUnit, count_learnable_parameters, human_readable_number
 from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.training_utils.trainer import (
@@ -22,8 +22,7 @@ from refiners.training_utils.trainer import (
 )
 
 
-@dataclass
-class MockBatch:
+class MockBatch(BaseBatch):
     inputs: torch.Tensor
     targets: torch.Tensor
 

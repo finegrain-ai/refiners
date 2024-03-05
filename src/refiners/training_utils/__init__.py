@@ -4,6 +4,7 @@ from importlib.metadata import requires
 
 from packaging.requirements import Requirement
 
+from refiners.training_utils.batch import BaseBatch
 from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.config import (
@@ -55,4 +56,5 @@ __all__ = [
     "GradientClippingConfig",
     "Optimizers",
     "LRSchedulerType",
+    "BaseBatch",
 ]
