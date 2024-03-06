@@ -253,6 +253,20 @@ def download_loras():
     )
     download_file("https://sliders.baulab.info/weights/xl_sliders/eyesize.pt", dest_folder, expected_hash="ee170e4d")
 
+    dest_folder = os.path.join(test_weights_dir, "loras")
+    download_file(
+        "https://civitai.com/api/download/models/140624",
+        filename="Sci-fi_Environments_sdxl.safetensors",
+        dest_folder=dest_folder,
+        expected_hash="6a4afda8",
+    )
+    download_file(
+        "https://civitai.com/api/download/models/135931",
+        filename="pixel-art-xl-v1.1.safetensors",
+        dest_folder=dest_folder,
+        expected_hash="71aaa6ca",
+    )
+
 
 def download_preprocessors():
     dest_folder = os.path.join(test_weights_dir, "carolineec", "informativedrawings")
