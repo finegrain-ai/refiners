@@ -152,7 +152,7 @@ from PIL import Image
 from refiners.fluxion.utils import image_to_tensor
 
 def generate_mask(size: int, seed: int | None = None) -> Generator[torch.Tensor, None, None]:
-    """Generate a tensor of a grayscale mask of size `size` using random rectangles."""
+    """Generate a tensor of a binary mask of size `size` using random rectangles."""
     if seed is None:
         seed = random.randint(0, 2**32 - 1)
     random.seed(seed)
@@ -186,10 +186,9 @@ mask = next(generate_mask(64, seed=42))
 tensor_to_image(mask).save("mask.png")
 ```
 
-Here are a few examples of generated images:
+Here are a two examples of generated masks:
 ![alt text](sample-0.png)
 ![alt text](sample-1.png)
-![alt text](sample-2.png)
 
 ## Trainer
 
@@ -444,6 +443,10 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
 ```
 
 ![alt text](loss-logging.png)
+
+## Wrap up
+
+You can train this toy model using the code below:
 
 ??? complete end-to-end code "Expand to see the full code."
 
