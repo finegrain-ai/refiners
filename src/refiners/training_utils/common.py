@@ -38,7 +38,7 @@ def human_readable_number(number: int) -> str:
 def seed_everything(seed: int | None = None) -> None:
     if seed is None:
         seed = random.randint(0, 2**32 - 1)
-        logger.info(f"Using random seed: {seed}")
+    logger.info(f"Using random seed: {seed}")
     random.seed(a=seed)
     np.random.seed(seed=seed)
     manual_seed(seed=seed)
@@ -67,6 +67,7 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
             actual_seed = seed(*args) if callable(seed) else seed
             seed_everything(seed=actual_seed)
             result = func(*args, **kwargs)
+            logger.debug(f"Restoring previous seed state")
             random.setstate(random_state)
             np.random.set_state(numpy_state)
             torch.set_rng_state(torch_state)
