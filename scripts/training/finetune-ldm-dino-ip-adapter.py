@@ -24,7 +24,9 @@ from torch import (
     randint,
     float32,
     zeros,
-    norm
+    ones,
+    norm,
+    multinomial
 )
 from torch.cuda import empty_cache
 from torch.distributions import Beta
@@ -103,6 +105,11 @@ class AdapterConfig(ModelConfig):
     non_palp_text_drop_rate: float = 0.05
     non_palp_text_and_image_drop_rate: float = 0.05
     weighted_sum: bool = False
+    timestep_bias_strategy: str = "none"
+    timestep_bias_portion: float = 0.5
+    timestep_bias_begin: int = 0
+    timestep_bias_end: int = 1000
+    timestep_bias_multiplier: float = 1.0
 
 
 class DatasetConfig(BaseModel):
@@ -158,6 +165,46 @@ def _init_learnable_weights(module: Module, initializer_range: float):
         if hasattr(module, "bias") and module.bias is not None and module.bias.requires_grad:
             module.bias.data.zero_()
 
+# taken from simpletuner
+def generate_timestep_weights(args: AdapterConfig, num_timesteps: int) -> Tensor:
+    weights = ones(num_timesteps)
+
+    # Determine the indices to bias
+    num_to_bias = int(args.timestep_bias_portion * num_timesteps)
+
+    if args.timestep_bias_strategy == "later":
+        bias_indices = slice(-num_to_bias, None)
+    elif args.timestep_bias_strategy == "earlier":
+        bias_indices = slice(0, num_to_bias)
+    elif args.timestep_bias_strategy == "range":
+        # Out of the possible 1000 timesteps, we might want to focus on eg. 200-500.
+        range_begin = args.timestep_bias_begin
+        range_end = args.timestep_bias_end
+        if range_begin < 0:
+            raise ValueError(
+                "When using the range strategy for timestep bias, you must provide a beginning timestep greater or equal to zero."
+            )
+        if range_end > num_timesteps:
+            raise ValueError(
+                "When using the range strategy for timestep bias, you must provide an ending timestep smaller than the number of timesteps."
+            )
+        bias_indices = slice(range_begin, range_end)
+    else:  # 'none' or any other string
+        return weights
+    if args.timestep_bias_multiplier <= 0:
+        raise ValueError(
+            "The parameter --timestep_bias_multiplier is not intended to be used to disable the training of specific timesteps."
+            " If it was intended to disable timestep bias, use `--timestep_bias_strategy none` instead."
+            " A timestep bias multiplier less than or equal to 0 is not allowed."
+        )
+
+    # Apply the bias
+    weights[bias_indices] *= args.timestep_bias_multiplier
+
+    # Normalize
+    weights /= weights.sum()
+
+    return weights
 
 class TestIPDiffusionConfig(TestDiffusionConfig):
     """Configuration to test the diffusion model, during the `evaluation` loop of the trainer."""
@@ -769,17 +816,18 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def signal_to_noise_ratios(self) -> Tensor:
         return exp(self.ddpm_solver.signal_to_noise_ratios) ** 2
 
-
+    @cached_property
+    def timestep_weights(self) -> Tensor:
+        return generate_timestep_weights(self.config.adapter, 1000).to(self.device, dtype=self.dtype)
     def load_dataset(self) -> IPDataset:
         return IPDataset(trainer=self)
 
     def sample_timestep(self, batch_size: int, /) -> Tensor:
         """Sample a timestep from a uniform distribution."""
         assert isinstance(self, Trainer), "This mixin can only be used with a Trainer"
-        random_steps = randint(0, 1000, (batch_size,))
+        random_steps = 999-multinomial(self.timestep_weights, batch_size, replacement=True).long()
         self.random_steps = random_steps
         return self.ddpm_solver.timesteps[random_steps]
-    
 
     def add_noise_to_latents(
         self, latents: Tensor, noise: Tensor
