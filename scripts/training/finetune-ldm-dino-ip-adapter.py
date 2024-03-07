@@ -818,7 +818,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
     @cached_property
     def timestep_weights(self) -> Tensor:
-        return generate_timestep_weights(self.config.adapter, 1000).to(self.device, dtype=self.dtype)
+        return generate_timestep_weights(self.config.adapter, 1000).to(self.device, dtype=float32)
     def load_dataset(self) -> IPDataset:
         return IPDataset(trainer=self)
 
