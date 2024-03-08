@@ -7,7 +7,7 @@ import torch
 from loguru import logger
 from torch import Tensor, device as Device, dtype as DType, float16, float32, nn
 from torch.autograd import backward
-from torch.cuda.automatic_mixed_precision import GradScaler, autocast
+from torch.cuda.amp import GradScaler, autocast
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
