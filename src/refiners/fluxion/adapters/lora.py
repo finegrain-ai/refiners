@@ -129,8 +129,7 @@ class Lora(Generic[T], fl.Chain, ABC):
         return loras
 
     @abstractmethod
-    def is_compatible(self, layer: fl.WeightedModule, /) -> bool:
-        ...
+    def is_compatible(self, layer: fl.WeightedModule, /) -> bool: ...
 
     def auto_attach(
         self,
