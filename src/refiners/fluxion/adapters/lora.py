@@ -486,10 +486,11 @@ def auto_attach_loras(
     """Auto-attach several LoRA layers to a Chain.
 
     Args:
-        loras: A dictionary of LoRA layers associated to their respective key.
+        loras: A dictionary of LoRA layers associated to their respective key. The keys are typically
+            derived from the state dict and only used for `debug_map` and the return value.
         target: The target Chain.
-        include: A list of layer names, only layers with such a layer in its parents will be considered.
-        exclude: A list of layer names, layers with such a layer in its parents will not be considered.
+        include: A list of layer names, only layers with such a layer in their ancestors will be considered.
+        exclude: A list of layer names, layers with such a layer in their ancestors will not be considered.
         sanity_check: Check that LoRAs passed are correctly attached.
         debug_map: Pass a list to get a debug mapping of key - path pairs of attached points.
     Returns:
@@ -507,7 +508,7 @@ def auto_attach_loras(
             f"sanity check failed: {len(debug_map_1)} / {len(loras)} LoRA layers attached, {len(failed_keys_1)} failed"
         )
 
-    # Sanity check: if we re-run the attach, all layers should fail.
+    # Extra sanity check: if we re-run the attach, all layers should fail.
     debug_map_2: list[tuple[str, str]] = []
     failed_keys_2 = _auto_attach_loras(loras_copy, target, include=include, exclude=exclude, debug_map=debug_map_2)
     if debug_map_2 or len(failed_keys_2) != len(loras):
