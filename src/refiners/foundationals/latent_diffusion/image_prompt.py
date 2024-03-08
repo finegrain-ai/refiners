@@ -424,10 +424,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         for cross_attn in self.sub_adapters:
             cross_attn.scale = value
 
-    def set_scale(self, scale: float) -> None:
-        for cross_attn in self.sub_adapters:
-            cross_attn.scale = scale
-
     def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
         """Set the CLIP image embedding context.
 

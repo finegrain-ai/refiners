@@ -2109,7 +2109,7 @@ def test_t2i_adapter_xl_canny(
     sdxl.set_inference_steps(30)
 
     t2i_adapter = SDXLT2IAdapter(target=sdxl.unet, name=name, weights=load_from_safetensors(weights_path)).inject()
-    t2i_adapter.set_scale(0.8)
+    t2i_adapter.scale = 0.8
 
     condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
@@ -2238,8 +2238,8 @@ def test_hello_world(
     condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
-    ip_adapter.set_scale(0.85)
-    t2i_adapter.set_scale(0.8)
+    ip_adapter.scale = 0.85
+    t2i_adapter.scale = 0.8
     sdxl.set_inference_steps(50, first_step=1)
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
