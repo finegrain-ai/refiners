@@ -4,6 +4,7 @@ Download and convert weights for testing
 To see what weights will be downloaded and converted, run:
 DRY_RUN=1 python scripts/prepare_test_weights.py
 """
+
 import hashlib
 import os
 import subprocess

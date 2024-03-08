@@ -440,18 +440,15 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
 
     @overload
-    def compute_clip_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor:
-        ...
+    def compute_clip_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor: ...
 
     @overload
-    def compute_clip_image_embedding(self, image_prompt: Image.Image) -> Tensor:
-        ...
+    def compute_clip_image_embedding(self, image_prompt: Image.Image) -> Tensor: ...
 
     @overload
     def compute_clip_image_embedding(
         self, image_prompt: list[Image.Image], weights: list[float] | None = None
-    ) -> Tensor:
-        ...
+    ) -> Tensor: ...
 
     def compute_clip_image_embedding(
         self,
