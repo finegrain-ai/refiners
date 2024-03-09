@@ -110,7 +110,7 @@ torch.set_grad_enabled(False)
 finegrained = True
 
 CLIP_TEXT_WITH_PROJECTION = "tests/weights/CLIPLWithProjection.safetensors"
-DINO_IMAGE_ENCODER = "tests/weights/dinov2_vitl14_reg4_pretrain_finegrained.safetensors"
+DINO_IMAGE_ENCODER = "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors"
 LDA = "tests/weights/lda.safetensors"
 
 CLIP_TEXT_EXT = f"CLIPL.pth"
