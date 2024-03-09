@@ -116,7 +116,7 @@ LDA = "tests/weights/lda.safetensors"
 CLIP_TEXT_EXT = f"CLIPL.pth"
 CLIP_TEXT_POOLED_EXT = f"CLIPLPool.pth"
 DINO_IMAGE_ENCODER_EXT = f"dinov2_vitl14_reg4_pretrain_{'finegrained' if finegrained else 'default'}.pth"
-LDA_EXT = f"lda.pth"
+SD15_LDA_EXT = f"lda.pth"
 
 PHOTO_CONCEPT = "gs://bounty-program-data/photo-concept-bucket-webdataset/"
 PHOTO_CONCEPT_PREENCODED = "gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded"
