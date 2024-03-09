@@ -118,7 +118,7 @@ CLIP_TEXT_POOLED_EXT = f"CLIPLPool.pth"
 DINO_IMAGE_ENCODER_EXT = f"dinov2_vitl14_reg4_pretrain_{'finegrained' if finegrained else 'default'}.pth"
 SD15_LDA_EXT = f"lda.pth"
 
-PHOTO_CONCEPT = "gs://bounty-program-data/photo-concept-bucket-webdataset/"
+PHOTO_CONCEPT = "gs://bounty-program-data/photo-concept-bucket-webdataset"
 PHOTO_CONCEPT_PREENCODED = "gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded"
 logger = logging.getLogger(__name__)
 
