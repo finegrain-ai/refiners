@@ -278,7 +278,7 @@ class ImageCrossAttention(fl.Chain):
             fl.Lambda(lambda qkv, mask: (qkv[0], qkv[1], qkv[2], mask)),
             IPScaledDotProductAttention(
                 ScaledDotProductAttention(
-                    num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
+                    num_heads=text_cross_attention.num_heads
                 )
             ),
             fl.Lambda(lambda x: self.sum_across_images(x, num_image_prompts)),
@@ -318,7 +318,6 @@ class IPScaledDotProductAttention(fl.Module):
         key: Float[Tensor, "batch num_keys embedding_dim"],
         value: Float[Tensor, "batch num_values embedding_dim"],
         ip_attention_mask: Float[Tensor, "batch ..."],
-        is_causal: bool | None = None,
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
         batch_size = query.shape[0]
         num_queries = query.shape[1]
@@ -337,8 +336,9 @@ class IPScaledDotProductAttention(fl.Module):
         ip_attention_mask = F.interpolate(  # type: ignore
             ip_attention_mask[:, None], size=(mask_width, mask_height), mode="bicubic"
         )[:, 0]
+
         ip_attention_mask = ip_attention_mask.reshape((batch_size, -1, 1)).repeat(1, 1, embedding_dim)  # type: ignore
-        output = self.attention(query, key, value, is_causal=is_causal)
+        output = self.attention(query, key, value)
         return output * ip_attention_mask  # type: ignore
 
 
