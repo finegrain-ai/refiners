@@ -1,12 +1,11 @@
 import math
-from functools import partial
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, List
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import refiners.fluxion.layers as fl
 import torch.nn.functional as F
 from jaxtyping import Float
 from PIL import Image
-from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, zeros_like, sum
+from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, tensor, zeros_like, sum
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -264,7 +263,7 @@ class ImageCrossAttention(fl.Chain):
                 fl.Chain(
                     fl.UseContext(context="ip_adapter", key="clip_image_embedding"),
                     fl.Linear(
-                        in_features=text_cross_attention.key_embedding_dim,
+                        in_features=text_cross_attention.value_embedding_dim,
                         out_features=text_cross_attention.inner_dim,
                         bias=text_cross_attention.use_bias,
                         device=text_cross_attention.device,
@@ -376,11 +375,11 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
     @property
     def image_key_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[1].Linear
+        return self.image_cross_attention.layer(("Distribute", 1, "Linear"), fl.Linear)
 
     @property
     def image_value_projection(self) -> fl.Linear:
-        return self.image_cross_attention.Distribute[2].Linear
+        return self.image_cross_attention.layer(("Distribute", 2, "Linear"), fl.Linear)
 
     @property
     def scale(self) -> float:
@@ -398,6 +397,12 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
 
 class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
+    """Image Prompt adapter for a Stable Diffusion U-Net model.
+
+    See [[arXiv:2308.06721] IP-Adapter: Text Compatible Image Prompt Adapter for Text-to-Image Diffusion Models](https://arxiv.org/abs/2308.06721)
+    for more details.
+    """
+
     # Prevent PyTorch module registration
     _clip_image_encoder: list[CLIPImageEncoderH]
     _grid_image_encoder: list[CLIPImageEncoderH]
@@ -413,6 +418,16 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         weights: dict[str, Tensor] | None = None,
         num_image_prompts: int = 1
     ) -> None:
+        """Initialize the adapter.
+
+        Args:
+            target: The target model to adapt.
+            clip_image_encoder: The CLIP image encoder to use.
+            image_proj: The image projection to use.
+            scale: The scale to use for the image prompt.
+            fine_grained: Whether to use fine-grained image prompt.
+            weights: The weights of the IPAdapter.
+        """
         with self.setup_adapter(target):
             super().__init__(target)
 
@@ -451,6 +466,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     @property
     def clip_image_encoder(self) -> CLIPImageEncoderH:
+        """The CLIP image encoder of the adapter."""
         return self._clip_image_encoder[0]
 
     @property
@@ -474,6 +490,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
     @property
     def scale(self) -> float:
+        """The scale of the adapter."""
         return self.sub_adapters[0].scale
 
     @scale.setter
@@ -481,18 +498,72 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         for cross_attn in self.sub_adapters:
             cross_attn.scale = value
 
-    def set_scale(self, scale: float) -> None:
-        for cross_attn in self.sub_adapters:
-            cross_attn.scale = scale
-
     def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
-        self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
+        """Set the CLIP image embedding context.
 
+        Note:
+            This is required by `ImageCrossAttention`.
+
+        Args:
+            image_embedding: The CLIP image embedding to set.
+        """
+        self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
     def set_clip_image_embedding_from_tuple(self, image_embedding:tuple[Tensor]) -> None:
         self.set_context("ip_adapter", {"clip_image_embedding": cat(image_embedding, dim=0)})
+    @overload
+    def compute_clip_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor: ...
 
-    # These should be concatenated to the CLIP text embedding before setting the UNet context
-    def compute_clip_image_embedding(self, image_prompt: Tensor) -> Tensor:
+    @overload
+    def compute_clip_image_embedding(self, image_prompt: Image.Image) -> Tensor: ...
+
+    @overload
+    def compute_clip_image_embedding(
+        self, image_prompt: list[Image.Image], weights: list[float] | None = None
+    ) -> Tensor: ...
+
+    def compute_clip_image_embedding(
+        self,
+        image_prompt: Tensor | Image.Image | list[Image.Image],
+        weights: list[float] | None = None,
+        concat_batches: bool = True,
+    ) -> Tensor:
+        """Compute the CLIP image embedding.
+
+        Args:
+            image_prompt: The image prompt to use.
+            weights: The scale to use for the image prompt.
+            concat_batches: Whether to concatenate the batches.
+
+        Returns:
+            The CLIP image embedding.
+        """
+        if isinstance(image_prompt, Image.Image):
+            image_prompt = self.preprocess_image(image_prompt)
+        elif isinstance(image_prompt, list):
+            assert all(isinstance(image, Image.Image) for image in image_prompt)
+            image_prompt = cat([self.preprocess_image(image) for image in image_prompt])
+
+        negative_embedding, conditional_embedding = self._compute_clip_image_embedding(image_prompt)
+
+        batch_size = image_prompt.shape[0]
+        if weights is not None:
+            assert len(weights) == batch_size, f"Got {len(weights)} weights for {batch_size} images"
+            if any(weight != 1.0 for weight in weights):
+                conditional_embedding *= (
+                    tensor(weights, device=conditional_embedding.device, dtype=conditional_embedding.dtype)
+                    .unsqueeze(-1)
+                    .unsqueeze(-1)
+                )
+
+        if batch_size > 1 and concat_batches:
+            # Create a longer image tokens sequence when a batch of images is given
+            # See https://github.com/tencent-ailab/IP-Adapter/issues/99
+            negative_embedding = cat(negative_embedding.chunk(batch_size), dim=1)
+            conditional_embedding = cat(conditional_embedding.chunk(batch_size), dim=1)
+
+        return cat((negative_embedding, conditional_embedding))
+
+    def _compute_clip_image_embedding(self, image_prompt: Tensor) -> tuple[Tensor, Tensor]:
         image_encoder = self.clip_image_encoder if not self.fine_grained else self.grid_image_encoder
         clip_embedding = image_encoder(image_prompt)
         conditional_embedding = self.image_proj(clip_embedding)
@@ -502,7 +573,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             # See https://github.com/tencent-ailab/IP-Adapter/blob/d580c50/tutorial_train_plus.py#L351-L352
             clip_embedding = image_encoder(zeros_like(image_prompt))
             negative_embedding = self.image_proj(clip_embedding)
-        return cat((negative_embedding, conditional_embedding))
+        return negative_embedding, conditional_embedding
 
     def preprocess_image(
         self,
@@ -511,7 +582,18 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         mean: list[float] | None = None,
         std: list[float] | None = None,
     ) -> Tensor:
-        # Default mean and std are parameters from https://github.com/openai/CLIP
+        """Preprocess the image.
+
+        Note:
+            The default mean and std are parameters from
+            https://github.com/openai/CLIP
+
+        Args:
+            image: The image to preprocess.
+            size: The size to resize the image to.
+            mean: The mean to use for normalization.
+            std: The standard deviation to use for normalization.
+        """
         return normalize(
             image_to_tensor(image.resize(size), device=self.target.device, dtype=self.target.dtype),
             mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
@@ -526,9 +608,9 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         assert isinstance(encoder_clone[-3], fl.Lambda)  # pooling (classif token)
         for _ in range(3):
             encoder_clone.pop()
-        transfomer_layers = encoder_clone[-1]
-        assert isinstance(transfomer_layers, fl.Chain) and len(transfomer_layers) == 32
-        transfomer_layers.pop()
+        transformer_layers = encoder_clone[-1]
+        assert isinstance(transformer_layers, fl.Chain) and len(transformer_layers) == 32
+        transformer_layers.pop()
         return encoder_clone
 
     def set_mask(self, mask: tuple[Tensor, ...] = tuple()) -> None:

@@ -1,5 +1,3 @@
-from typing import Iterable, cast
-
 from torch import Tensor, device as Device, dtype as DType
 
 from refiners.fluxion.adapters.adapter import Adapter
@@ -93,28 +91,31 @@ class Controlnet(Passthrough):
 
         # We run the condition encoder at each step. Caching the result
         # is not worth it as subsequent runs take virtually no time (FG-374).
-        self.DownBlocks[0].append(
+
+        self.layer(("DownBlocks", 0), Chain).append(
             Residual(
                 UseContext("controlnet", f"condition_{name}"),
                 ConditionEncoder(device=device, dtype=dtype),
             ),
         )
         for residual_block in self.layers(ResidualBlock):
-            chain = residual_block.Chain
+            chain = residual_block.layer("Chain", Chain)
             RangeAdapter2d(
-                target=chain.Conv2d_1,
+                target=chain.layer("Conv2d_1", Conv2d),
                 channels=residual_block.out_channels,
                 embedding_dim=1280,
                 context_key=f"timestep_embedding_{name}",
                 device=device,
                 dtype=dtype,
             ).inject(chain)
-        for n, block in enumerate(cast(Iterable[Chain], self.DownBlocks)):
-            assert hasattr(block[0], "out_channels"), (
+        for n, block in enumerate(self.layer("DownBlocks", DownBlocks)):
+            assert isinstance(block, Chain)
+            b0 = block[0]
+            assert hasattr(b0, "out_channels"), (
                 "The first block of every subchain in DownBlocks is expected to respond to `out_channels`,"
-                f" {block[0]} does not."
+                f" {b0} does not."
             )
-            out_channels: int = block[0].out_channels
+            assert isinstance(out_channels := b0.out_channels, int)
             block.append(
                 Passthrough(
                     Conv2d(
@@ -123,7 +124,7 @@ class Controlnet(Passthrough):
                     Lambda(self._store_nth_residual(n)),
                 )
             )
-        self.MiddleBlock.append(
+        self.layer("MiddleBlock", MiddleBlock).append(
             Passthrough(
                 Conv2d(in_channels=1280, out_channels=1280, kernel_size=1, device=device, dtype=dtype),
                 Lambda(self._store_nth_residual(12)),
@@ -166,11 +167,20 @@ class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
         self.target.remove(self._controlnet[0])
         super().eject()
 
+    @property
+    def controlnet(self) -> Controlnet:
+        return self._controlnet[0]
+
     def init_context(self) -> Contexts:
         return {"controlnet": {f"condition_{self.name}": None}}
 
-    def set_scale(self, scale: float) -> None:
-        self._controlnet[0].scale = scale
+    @property
+    def scale(self) -> float:
+        return self._controlnet[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._controlnet[0].scale = value
 
     def set_controlnet_condition(self, condition: Tensor) -> None:
         self.set_context("controlnet", {f"condition_{self.name}": condition})

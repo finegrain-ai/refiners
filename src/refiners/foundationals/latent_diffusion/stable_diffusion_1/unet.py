@@ -6,6 +6,11 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.foundationals.latent_diffusion.cross_attention import CrossAttentionBlock2d
 from refiners.foundationals.latent_diffusion.range_adapter import RangeAdapter2d, RangeEncoder
+from refiners.foundationals.latent_diffusion.unet import (
+    ResidualAccumulator,
+    ResidualBlock,
+    ResidualConcatenator,
+)
 
 
 class TimestepEncoder(fl.Passthrough):
@@ -19,54 +24,6 @@ class TimestepEncoder(fl.Passthrough):
             fl.UseContext("diffusion", "timestep"),
             RangeEncoder(320, 1280, device=device, dtype=dtype),
             fl.SetContext("range_adapter", context_key),
-        )
-
-
-class ResidualBlock(fl.Sum):
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        num_groups: int = 32,
-        eps: float = 1e-5,
-        device: Device | str | None = None,
-        dtype: DType | None = None,
-    ) -> None:
-        if in_channels % num_groups != 0 or out_channels % num_groups != 0:
-            raise ValueError("Number of input and output channels must be divisible by num_groups.")
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.num_groups = num_groups
-        self.eps = eps
-        shortcut = (
-            fl.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, device=device, dtype=dtype)
-            if in_channels != out_channels
-            else fl.Identity()
-        )
-        super().__init__(
-            fl.Chain(
-                fl.GroupNorm(channels=in_channels, num_groups=num_groups, eps=eps, device=device, dtype=dtype),
-                fl.SiLU(),
-                fl.Conv2d(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    padding=1,
-                    device=device,
-                    dtype=dtype,
-                ),
-                fl.GroupNorm(channels=out_channels, num_groups=num_groups, eps=eps, device=device, dtype=dtype),
-                fl.SiLU(),
-                fl.Conv2d(
-                    in_channels=out_channels,
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    padding=1,
-                    device=device,
-                    dtype=dtype,
-                ),
-            ),
-            shortcut,
         )
 
 
@@ -205,36 +162,24 @@ class MiddleBlock(fl.Chain):
         )
 
 
-class ResidualAccumulator(fl.Passthrough):
-    def __init__(self, n: int) -> None:
-        self.n = n
-
-        super().__init__(
-            fl.Residual(
-                fl.UseContext(context="unet", key="residuals").compose(func=lambda residuals: residuals[self.n])
-            ),
-            fl.SetContext(context="unet", key="residuals", callback=self.update),
-        )
-
-    def update(self, residuals: list[Tensor | float], x: Tensor) -> None:
-        residuals[self.n] = x
-
-
-class ResidualConcatenator(fl.Chain):
-    def __init__(self, n: int) -> None:
-        self.n = n
-
-        super().__init__(
-            fl.Concatenate(
-                fl.Identity(),
-                fl.UseContext(context="unet", key="residuals").compose(lambda residuals: residuals[self.n]),
-                dim=1,
-            ),
-        )
-
-
 class SD1UNet(fl.Chain):
-    def __init__(self, in_channels: int, device: Device | str | None = None, dtype: DType | None = None) -> None:
+    """Stable Diffusion 1.5 U-Net.
+
+    See [[arXiv:2112.10752] High-Resolution Image Synthesis with Latent Diffusion Models](https://arxiv.org/abs/2112.10752) for more details."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        """Initialize the U-Net.
+
+        Args:
+            in_channels: The number of input channels.
+            device: The PyTorch device to use for computation.
+            dtype: The PyTorch dtype to use for computation.
+        """
         self.in_channels = in_channels
         super().__init__(
             TimestepEncoder(device=device, dtype=dtype),
@@ -259,9 +204,9 @@ class SD1UNet(fl.Chain):
             ),
         )
         for residual_block in self.layers(ResidualBlock):
-            chain = residual_block.Chain
+            chain = residual_block.layer("Chain", fl.Chain)
             RangeAdapter2d(
-                target=chain.Conv2d_1,
+                target=chain.layer("Conv2d_1", fl.Conv2d),
                 channels=residual_block.out_channels,
                 embedding_dim=1280,
                 context_key="timestep_embedding",
@@ -282,7 +227,23 @@ class SD1UNet(fl.Chain):
         }
 
     def set_clip_text_embedding(self, clip_text_embedding: Tensor) -> None:
+        """Set the CLIP text embedding.
+
+        Note:
+            This context is required by the `CLIPLCrossAttention` blocks.
+
+        Args:
+            clip_text_embedding: The CLIP text embedding.
+        """
         self.set_context("cross_attention_block", {"clip_text_embedding": clip_text_embedding})
 
     def set_timestep(self, timestep: Tensor) -> None:
+        """Set the timestep.
+
+        Note:
+            This context is required by `TimestepEncoder`.
+
+        Args:
+            timestep: The timestep.
+        """
         self.set_context("diffusion", {"timestep": timestep})

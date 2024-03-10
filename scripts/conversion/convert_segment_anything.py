@@ -10,8 +10,8 @@ from torch import Tensor
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.model_converter import ModelConverter
-from refiners.fluxion.utils import manual_seed, save_to_safetensors
-from refiners.foundationals.segment_anything.image_encoder import SAMViTH
+from refiners.fluxion.utils import load_tensors, manual_seed, save_to_safetensors
+from refiners.foundationals.segment_anything.image_encoder import PositionalEncoder, SAMViTH
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
 from refiners.foundationals.segment_anything.prompt_encoder import MaskEncoder, PointEncoder
 
@@ -136,7 +136,8 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_state_dict=source_state_dict, target_state_dict=target_state_dict, state_dict_mapping=mapping
     )
 
-    embed = pos_embed.reshape_as(refiners_sam_vit_h.PositionalEncoder.Parameter.weight)
+    positional_encoder = refiners_sam_vit_h.layer("PositionalEncoder", PositionalEncoder)
+    embed = pos_embed.reshape_as(positional_encoder.layer("Parameter", fl.Parameter).weight)
     converted_source["PositionalEncoder.Parameter.weight"] = embed  # type: ignore
     converted_source.update(rel_items)
 
@@ -245,7 +246,7 @@ def main() -> None:
     args = parser.parse_args(namespace=Args())
 
     sam_h = build_sam_vit_h()  # type: ignore
-    sam_h.load_state_dict(state_dict=torch.load(f=args.source_path))  # type: ignore
+    sam_h.load_state_dict(state_dict=load_tensors(args.source_path))
 
     vit_state_dict = convert_vit(vit=sam_h.image_encoder)
     mask_decoder_state_dict = convert_mask_decoder(mask_decoder=sam_h.mask_decoder)

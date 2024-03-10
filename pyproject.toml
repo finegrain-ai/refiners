@@ -1,7 +1,7 @@
 [project]
 name = "refiners"
-version = "0.2.0"
-description = "The simplest way to train and run adapters on top of foundational models"
+version = "0.4.0"
+description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
 dependencies = [
@@ -13,6 +13,16 @@ dependencies = [
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
+classifiers = [
+    "Typing :: Typed",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+]
 
 [project.optional-dependencies]
 training = [
@@ -22,14 +32,11 @@ training = [
     "torchvision>=0.16.1",
     "loguru>=0.7.2",
     "wandb>=0.16.0",
-    # Added scipy as a work around until this PR gets merged:
-    # https://github.com/TimDettmers/bitsandbytes/pull/525
-    "scipy>=1.11.4",
     "datasets>=2.15.0",
     "tomli>=2.0.1",
 ]
 test = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
     "invisible-watermark>=0.2.0",
@@ -39,11 +46,18 @@ test = [
     "segment-anything-py>=1.0",
 ]
 conversion = [
-    "diffusers>=0.24.0",
+    "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
     "requests>=2.26.0",
     "tqdm>=4.62.3",
+]
+doc = [
+    # required by mkdocs to format the signatures
+    "black>=24.1.1",
+    "mkdocs-material>=9.5.6",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-literate-nav>=0.6.1",
 ]
 
 [build-system]
@@ -54,11 +68,11 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright == 1.1.342",
-    "ruff>=0.0.292",
+    "pyright==1.1.349",
     "docformatter>=1.7.5",
-    "pytest>=7.4.2",
-    "mkdocs-material>=9.5.3",
+    "pytest>=8.0.0",
+    "coverage>=7.4.1",
+    "typos>=1.18.2",
 ]
 
 
@@ -66,22 +80,31 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.rye.scripts]
-lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
+test-cov = "coverage run -m pytest"
+# Work around for "Couldn't parse" errors due to e.g. opencv-python:
+# https://github.com/nedbat/coveragepy/issues/1653
+build-html-cov = { cmd = "coverage html", env = { PYTHONWARNINGS = "ignore:Couldn't parse::coverage.report_core" } }
+serve-cov-report = { chain = [
+    "build-html-cov",
+    "python -m http.server 8080 -b 127.0.0.1 -d htmlcov",
+] }
 
 [tool.black]
 line-length = 120
 
 [tool.ruff]
 src = ["src"] # see https://docs.astral.sh/ruff/settings/#src
+line-length = 120
+
+[tool.ruff.lint]
 select = [
-  "I", # isort
+    "I", # isort
 ]
 ignore = [
     "F722", # forward-annotation-syntax-error, because of Jaxtyping
     "E731", # do-not-assign-lambda
 ]
-line-length = 120
 
 [tool.ruff.lint.isort]
 # Allow this kind of import on a single line:
@@ -96,5 +119,24 @@ black = true
 [tool.pyright]
 include = ["src/refiners", "tests", "scripts"]
 strict = ["*"]
-exclude = ["**/__pycache__"]
+exclude = ["**/__pycache__", "tests/weights"]
 reportMissingTypeStubs = "warning"
+
+[tool.coverage.run]
+branch = true
+source = ["src/refiners"]
+
+# Also apply to HTML output, where appropriate
+[tool.coverage.report]
+ignore_errors = true # see `build-html-cov` for details
+exclude_also = [
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.typos.default]
+extend-words = { adaptee = "adaptee" }
+extend-ignore-identifiers-re = ["NDArray*"]

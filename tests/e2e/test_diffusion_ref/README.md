@@ -45,8 +45,18 @@ Special cases:
     - `expected_t2i_adapter_xl_canny.png`
     - `expected_image_sdxl_ip_adapter_plus_woman.png`
     - `expected_cutecat_sdxl_ddim_random_init_sag.png`
+    - `expected_cutecat_sdxl_euler_random_init.png`
     - `expected_restart.png`
     - `expected_freeu.png`
+    - `expected_dropy_slime_9752.png`
+    - `expected_sdxl_dpo_lora.png`
+    - `expected_sdxl_multi_loras.png`
+    - `expected_image_ip_adapter_multi.png`
+    - `expected_controllora_CPDS.png`
+    - `expected_controllora_PyraCanny.png`
+    - `expected_controllora_PyraCanny+CPDS.png`
+    - `expected_controllora_disabled.png`
+    - `expected_style_aligned.png`
 
 ## Other images
 
@@ -75,6 +85,8 @@ Special cases:
 - `woman.png` [comes from tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter/blob/8b96670cc5c8ef00278b42c0c7b62fe8a74510b9/assets/images/woman.png).
 
 - `statue.png` [comes from tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/assets/images/statue.png).
+
+- `cutecat_guide_PyraCanny.png` and `cutecat_guide_CPDS.png` were [generated inside Fooocus](https://github.com/lllyasviel/Fooocus/blob/e8d88d3e250e541c6daf99d6ef734e8dc3cfdc7f/extras/preprocessors.py).
 
 ## VAE without randomness
 

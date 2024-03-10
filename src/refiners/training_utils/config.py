@@ -6,61 +6,33 @@ from typing import Any, Callable, Iterable, Literal, Type, TypeVar
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
-from pydantic import BaseModel, validator
-from torch.nn import Parameter
+from pydantic import BaseModel, ConfigDict, field_validator
+from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
-from typing_extensions import TypedDict  # https://errors.pydantic.dev/2.0b3/u/typed-dict-version
 
-import refiners.fluxion.layers as fl
-from refiners.training_utils.dropout import apply_dropout, apply_gyro_dropout
+from refiners.training_utils.clock import ClockConfig
+from refiners.training_utils.common import TimeUnit, TimeValue, parse_number_unit_field
+from refiners.training_utils.gradient_clipping import GradientClippingConfig
 
-__all__ = [
-    "parse_number_unit_field",
-    "TimeUnit",
-    "TimeValue",
-    "TrainingConfig",
-    "OptimizerConfig",
-    "Optimizers",
-]
-
-
-class TimeUnit(Enum):
-    STEP = "step"
-    EPOCH = "epoch"
-    ITERATION = "iteration"
-    DEFAULT = "step"
-
-
-class TimeValue(TypedDict):
-    number: int
-    unit: TimeUnit
-
-
-def parse_number_unit_field(value: str | int | dict[str, str | int]) -> TimeValue:
-    match value:
-        case str(value_str):
-            number, unit = value_str.split(sep=":")
-            return {"number": int(number.strip()), "unit": TimeUnit(value=unit.strip().lower())}
-        case int(number):
-            return {"number": number, "unit": TimeUnit.DEFAULT}
-        case {"number": int(number), "unit": str(unit)}:
-            return {"number": number, "unit": TimeUnit(value=unit.lower())}
-        case _:
-            raise ValueError(f"Unsupported value format: {value}")
+# PyTorch optimizer parameters type
+# TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
+# See https://github.com/pytorch/pytorch/pull/111114
+ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 
 
 class TrainingConfig(BaseModel):
+    device: str = "cpu"
+    dtype: str = "float32"
     duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     seed: int = 0
-    gpu_index: int = 0
     batch_size: int = 1
     gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
-    clip_grad_norm: float | None = None
-    clip_grad_value: float | None = None
     evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     evaluation_seed: int = 0
 
-    @validator("duration", "gradient_accumulation", "evaluation_interval", pre=True)
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("duration", "gradient_accumulation", "evaluation_interval", mode="before")
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
@@ -74,7 +46,7 @@ class Optimizers(str, Enum):
     Prodigy = "Prodigy"
 
 
-class SchedulerType(str, Enum):
+class LRSchedulerType(str, Enum):
     STEP_LR = "StepLR"
     EXPONENTIAL_LR = "ExponentialLR"
     REDUCE_LR_ON_PLATEAU = "ReduceLROnPlateau"
@@ -89,8 +61,8 @@ class SchedulerType(str, Enum):
     DEFAULT = "ConstantLR"
 
 
-class SchedulerConfig(BaseModel):
-    scheduler_type: SchedulerType = SchedulerType.DEFAULT
+class LRSchedulerConfig(BaseModel):
+    type: LRSchedulerType = LRSchedulerType.DEFAULT
     update_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
     warmup: TimeValue = {"number": 0, "unit": TimeUnit.ITERATION}
     gamma: float = 0.1
@@ -106,7 +78,9 @@ class SchedulerConfig(BaseModel):
     max_lr: float | list[float] = 0
     eta_min: float = 0
 
-    @validator("update_interval", "warmup", pre=True)
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("update_interval", "warmup", mode="before")
     def parse_field(cls, value: Any) -> TimeValue:
         return parse_number_unit_field(value)
 
@@ -118,17 +92,19 @@ class OptimizerConfig(BaseModel):
     eps: float = 1e-8
     weight_decay: float = 0.0
 
-    def get(self, model_parameters: Iterable[Parameter]) -> Optimizer:
+    model_config = ConfigDict(extra="forbid")
+
+    def get(self, params: ParamsT) -> Optimizer:
         match self.optimizer:
             case Optimizers.SGD:
                 return SGD(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     weight_decay=self.weight_decay,
                 )
             case Optimizers.Adam:
                 return Adam(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -136,7 +112,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.AdamW:
                 return AdamW(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -144,7 +120,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.AdamW8bit:
                 return AdamW8bit(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     eps=self.eps,
@@ -152,7 +128,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.Lion8bit:
                 return Lion8bit(
-                    params=model_parameters,
+                    params=params,
                     lr=self.learning_rate,
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
@@ -162,7 +138,7 @@ class OptimizerConfig(BaseModel):
                     warn("Prodigy learning rate is not 1.0, this might cause instability.")
                 return Prodigy(
                     lr=self.learning_rate,
-                    params=model_parameters,
+                    params=params,
                     betas=self.betas,
                     weight_decay=self.weight_decay,  # type: ignore
                     safeguard_warmup=True,
@@ -171,61 +147,29 @@ class OptimizerConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    checkpoint: Path | None = None
-    train: bool = True
-    learning_rate: float | None = None  # TODO: Implement this
+    # If None, then requires_grad will NOT be changed when loading the model
+    # this can be useful if you want to train only a part of the model
+    requires_grad: bool | None = None
+    # Optional, per-model optimizer parameters
+    learning_rate: float | None = None
+    betas: tuple[float, float] | None = None
+    eps: float | None = None
+    weight_decay: float | None = None
 
-
-class GyroDropoutConfig(BaseModel):
-    total_subnetworks: int = 512
-    concurent_subnetworks: int = 64
-    iters_per_epoch: int = 512
-    num_features_threshold: float = 5e5
-
-
-class DropoutConfig(BaseModel):
-    dropout_probability: float = 0.0
-    gyro_dropout: GyroDropoutConfig | None = None
-
-    def apply_dropout(self, model: fl.Chain) -> None:
-        if self.dropout_probability > 0.0:
-            if self.gyro_dropout is not None:
-                apply_gyro_dropout(module=model, probability=self.dropout_probability, **self.gyro_dropout.model_dump())
-            else:
-                apply_dropout(module=model, probability=self.dropout_probability)
-
-
-class WandbConfig(BaseModel):
-    mode: Literal["online", "offline", "disabled"] = "online"
-    project: str
-    entity: str = "finegrain"
-    name: str | None = None
-    tags: list[str] = []
-    group: str | None = None
-    job_type: str | None = None
-    notes: str | None = None
-
-
-class CheckpointingConfig(BaseModel):
-    save_folder: Path | None = None
-    save_interval: TimeValue = {"number": 1, "unit": TimeUnit.EPOCH}
-
-    @validator("save_interval", pre=True)
-    def parse_field(cls, value: Any) -> TimeValue:
-        return parse_number_unit_field(value)
+    model_config = ConfigDict(extra="forbid")
 
 
 T = TypeVar("T", bound="BaseConfig")
 
 
 class BaseConfig(BaseModel):
-    models: dict[str, ModelConfig]
-    wandb: WandbConfig
     training: TrainingConfig
     optimizer: OptimizerConfig
-    scheduler: SchedulerConfig
-    dropout: DropoutConfig
-    checkpointing: CheckpointingConfig
+    lr_scheduler: LRSchedulerConfig
+    clock: ClockConfig = ClockConfig()
+    gradient_clipping: GradientClippingConfig = GradientClippingConfig()
+
+    model_config = ConfigDict(extra="forbid")
 
     @classmethod
     def load_from_toml(cls: Type[T], toml_path: Path | str) -> T:

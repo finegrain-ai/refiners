@@ -23,10 +23,11 @@ Once Rye is installed, you can clone the repository and run `rye sync` to instal
 
 ## Linting
 
-We use [ruff](https://docs.astral.sh/ruff/) to lint our code. You can lint your code by running.
+We use the standard integration of [ruff](https://docs.astral.sh/ruff/) in Rye to lint and format our code. You can lint your code by running:
 
 ```bash
-rye run lint
+rye fmt
+rye lint --fix
 ```
 
 We also enforce strict type checking with [pyright](https://github.com/microsoft/pyright). You can run the type checker with:
@@ -42,13 +43,13 @@ Running end-to-end tests is pretty compute-intensive, and you must convert all t
 First, install test dependencies with:
 
 ```bash
-rye sync --features test,conversion
+rye sync --all-features
 ```
 
-Then, download and convert all the necessary weights. Be aware that this will use around 50 GB of disk space:
+Then, download and convert all the necessary weights. Be aware that this will use around 100 GB of disk space:
 
 ```bash
-rye run python scripts/prepare_test_weights.py
+python scripts/prepare_test_weights.py
 ```
 
 Finally, run the tests:
@@ -67,4 +68,16 @@ You can enforce running tests on CPU. Tests that require a GPU will be skipped.
 
 ```bash
 REFINERS_TEST_DEVICE=cpu rye run pytest
+```
+
+You can collect [code coverage](https://github.com/nedbat/coveragepy) data while running tests with, e.g.:
+
+```bash
+rye run test-cov
+```
+
+Then, browse the corresponding HTML report with:
+
+```bash
+rye run serve-cov-report
 ```

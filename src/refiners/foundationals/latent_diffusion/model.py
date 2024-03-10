@@ -7,9 +7,7 @@ from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
-from refiners.foundationals.latent_diffusion.schedulers.scheduler import Scheduler
-
-T = TypeVar("T", bound="fl.Module")
+from refiners.foundationals.latent_diffusion.solvers import Solver
 
 TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionModel")
 
@@ -17,10 +15,11 @@ TLatentDiffusionModel = TypeVar("TLatentDiffusionModel", bound="LatentDiffusionM
 class LatentDiffusionModel(fl.Module, ABC):
     def __init__(
         self,
-        unet: fl.Module,
+        unet: fl.Chain,
         lda: LatentDiffusionAutoencoder,
-        clip_text_encoder: fl.Module,
-        scheduler: Scheduler,
+        clip_text_encoder: fl.Chain,
+        solver: Solver,
+        classifier_free_guidance: bool = True,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
@@ -30,23 +29,16 @@ class LatentDiffusionModel(fl.Module, ABC):
         self.unet = unet.to(device=self.device, dtype=self.dtype)
         self.lda = lda.to(device=self.device, dtype=self.dtype)
         self.clip_text_encoder = clip_text_encoder.to(device=self.device, dtype=self.dtype)
-        self.scheduler = scheduler.to(device=self.device, dtype=self.dtype)
+        self.solver = solver.to(device=self.device, dtype=self.dtype)
+        self.classifier_free_guidance = classifier_free_guidance
 
-    def set_num_inference_steps(self, num_inference_steps: int) -> None:
-        initial_diffusion_rate = self.scheduler.initial_diffusion_rate
-        final_diffusion_rate = self.scheduler.final_diffusion_rate
-        device, dtype = self.scheduler.device, self.scheduler.dtype
-        self.scheduler = self.scheduler.__class__(
-            num_inference_steps,
-            initial_diffusion_rate=initial_diffusion_rate,
-            final_diffusion_rate=final_diffusion_rate,
-        ).to(device=device, dtype=dtype)
+    def set_inference_steps(self, num_steps: int, first_step: int = 0) -> None:
+        self.solver = self.solver.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
 
     def init_latents(
         self,
         size: tuple[int, int],
         init_image: Image.Image | None = None,
-        first_step: int = 0,
         noise: Tensor | None = None,
     ) -> Tensor:
         height, width = size
@@ -56,61 +48,76 @@ class LatentDiffusionModel(fl.Module, ABC):
             height // 8,
             width // 8,
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
+
         if init_image is None:
-            return noise
-        encoded_image = self.lda.encode_image(image=init_image.resize(size=(width, height)))
-        return self.scheduler.add_noise(x=encoded_image, noise=noise, step=self.steps[first_step])
+            x = noise
+        else:
+            encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
+            x = self.solver.add_noise(
+                x=encoded_image,
+                noise=noise,
+                step=self.solver.first_inference_step,
+            )
+
+        return self.solver.scale_model_input(x, step=-1)
 
     @property
     def steps(self) -> list[int]:
-        return self.scheduler.steps
+        return self.solver.inference_steps
 
     @abstractmethod
-    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
-        ...
+    def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None: ...
 
     @abstractmethod
-    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None:
-        ...
+    def set_self_attention_guidance(self, enable: bool, scale: float = 1.0) -> None: ...
 
     @abstractmethod
-    def has_self_attention_guidance(self) -> bool:
-        ...
+    def has_self_attention_guidance(self) -> bool: ...
 
     @abstractmethod
     def compute_self_attention_guidance(
         self, x: Tensor, noise: Tensor, step: int, *, clip_text_embedding: Tensor, **kwargs: Tensor
-    ) -> Tensor:
-        ...
+    ) -> Tensor: ...
 
     def forward(
         self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5, **kwargs: Tensor
     ) -> Tensor:
-        timestep = self.scheduler.timesteps[step].unsqueeze(dim=0)
+        if self.classifier_free_guidance:
+            assert clip_text_embedding.shape[0] % 2 == 0, f"invalid batch size: {clip_text_embedding.shape[0]}"
+
+        timestep = self.solver.timesteps[step].unsqueeze(dim=0)
         self.set_unet_context(timestep=timestep, clip_text_embedding=clip_text_embedding, **kwargs)
 
-        latents = torch.cat(tensors=(x, x))  # for classifier-free guidance
-        # scale latents for schedulers that need it
-        latents = self.scheduler.scale_model_input(latents, step=step)
-        unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
+        latents = torch.cat(tensors=(x, x)) if self.classifier_free_guidance else x
+        # scale latents for solvers that need it
+        latents = self.solver.scale_model_input(latents, step=step)
 
-        # classifier-free guidance
-        noise = unconditional_prediction + condition_scale * (conditional_prediction - unconditional_prediction)
-        x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
-
-        if self.has_self_attention_guidance():
-            noise += self.compute_self_attention_guidance(
-                x=x, noise=unconditional_prediction, step=step, clip_text_embedding=clip_text_embedding, **kwargs
+        if self.classifier_free_guidance:
+            unconditional_prediction, conditional_prediction = self.unet(latents).chunk(2)
+            predicted_noise = unconditional_prediction + condition_scale * (
+                conditional_prediction - unconditional_prediction
             )
+            x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
+            if self.has_self_attention_guidance():
+                predicted_noise += self.compute_self_attention_guidance(
+                    x=x,
+                    noise=unconditional_prediction,
+                    step=step,
+                    clip_text_embedding=clip_text_embedding,
+                    **kwargs,
+                )
+        else:
+            predicted_noise = self.unet(latents)
+            x = x.narrow(dim=1, start=0, length=4)  # support > 4 channels for inpainting
 
-        return self.scheduler(x, noise=noise, step=step)
+        return self.solver(x, predicted_noise=predicted_noise, step=step)
 
     def structural_copy(self: TLatentDiffusionModel) -> TLatentDiffusionModel:
         return self.__class__(
             unet=self.unet.structural_copy(),
             lda=self.lda.structural_copy(),
             clip_text_encoder=self.clip_text_encoder.structural_copy(),
-            scheduler=self.scheduler,
+            solver=self.solver,
             device=self.device,
             dtype=self.dtype,
         )

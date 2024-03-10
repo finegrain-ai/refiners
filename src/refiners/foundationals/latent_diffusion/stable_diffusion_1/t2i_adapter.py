@@ -25,7 +25,7 @@ class SD1T2IAdapter(T2IAdapter[SD1UNet]):
 
     def inject(self: "SD1T2IAdapter", parent: fl.Chain | None = None) -> "SD1T2IAdapter":
         for n, feat in zip(self.residual_indices, self._features, strict=True):
-            block = self.target.DownBlocks[n]
+            block = self.target.layer(("DownBlocks", n), fl.Chain)
             for t2i_layer in block.layers(layer_type=T2IFeatures):
                 assert t2i_layer.name != self.name, f"T2I-Adapter named {self.name} is already injected"
             block.insert_before_type(ResidualAccumulator, feat)
@@ -33,5 +33,5 @@ class SD1T2IAdapter(T2IAdapter[SD1UNet]):
 
     def eject(self: "SD1T2IAdapter") -> None:
         for n, feat in zip(self.residual_indices, self._features, strict=True):
-            self.target.DownBlocks[n].remove(feat)
+            self.target.layer(("DownBlocks", n), fl.Chain).remove(feat)
         super().eject()

@@ -5,92 +5,315 @@
 #   pre: false
 #   features: []
 #   all-features: true
+#   with-sources: false
 
 -e file:.
-aiohttp==3.9.1
+aiohttp==3.9.3
+    # via datasets
+    # via fsspec
 aiosignal==1.3.1
+    # via aiohttp
 annotated-types==0.6.0
+    # via pydantic
 appdirs==1.4.4
+    # via wandb
 async-timeout==4.0.3
-attrs==23.1.0
-bitsandbytes==0.41.3
-certifi==2023.11.17
+    # via aiohttp
+attrs==23.2.0
+    # via aiohttp
+babel==2.14.0
+    # via mkdocs-material
+bitsandbytes==0.42.0
+    # via refiners
+black==24.2.0
+    # via refiners
+certifi==2024.2.2
+    # via requests
+    # via sentry-sdk
 charset-normalizer==3.3.2
+    # via requests
 click==8.1.7
-datasets==2.15.0
-diffusers==0.24.0
-dill==0.3.7
+    # via black
+    # via mkdocs
+    # via mkdocstrings
+    # via wandb
+colorama==0.4.6
+    # via griffe
+    # via mkdocs-material
+datasets==2.18.0
+    # via refiners
+diffusers==0.26.3
+    # via refiners
+dill==0.3.8
+    # via datasets
+    # via multiprocess
 docker-pycreds==0.4.0
+    # via wandb
 filelock==3.13.1
-frozenlist==1.4.0
-fsspec==2023.10.0
+    # via datasets
+    # via diffusers
+    # via huggingface-hub
+    # via torch
+    # via transformers
+    # via triton
+frozenlist==1.4.1
+    # via aiohttp
+    # via aiosignal
+fsspec==2024.2.0
+    # via datasets
+    # via huggingface-hub
+    # via torch
+ghp-import==2.1.0
+    # via mkdocs
 gitdb==4.0.11
-gitpython==3.1.40
-huggingface-hub==0.19.4
+    # via gitpython
+gitpython==3.1.42
+    # via wandb
+griffe==0.41.3
+    # via mkdocstrings-python
+huggingface-hub==0.21.3
+    # via datasets
+    # via diffusers
+    # via tokenizers
+    # via transformers
 idna==3.6
-importlib-metadata==7.0.0
+    # via requests
+    # via yarl
+importlib-metadata==7.0.1
+    # via diffusers
 invisible-watermark==0.2.0
-jaxtyping==0.2.24
-jinja2==3.1.2
+    # via refiners
+jaxtyping==0.2.25
+    # via refiners
+jinja2==3.1.3
+    # via mkdocs
+    # via mkdocs-material
+    # via mkdocstrings
+    # via torch
 loguru==0.7.2
-markupsafe==2.1.3
+    # via refiners
+markdown==3.5.2
+    # via mkdocs
+    # via mkdocs-autorefs
+    # via mkdocs-material
+    # via mkdocstrings
+    # via pymdown-extensions
+markupsafe==2.1.5
+    # via jinja2
+    # via mkdocs
+    # via mkdocs-autorefs
+    # via mkdocstrings
+mergedeep==1.3.4
+    # via mkdocs
+mkdocs==1.5.3
+    # via mkdocs-autorefs
+    # via mkdocs-literate-nav
+    # via mkdocs-material
+    # via mkdocstrings
+mkdocs-autorefs==1.0.1
+    # via mkdocstrings
+mkdocs-literate-nav==0.6.1
+    # via refiners
+mkdocs-material==9.5.12
+    # via refiners
+mkdocs-material-extensions==1.3.1
+    # via mkdocs-material
+mkdocstrings==0.24.1
+    # via mkdocstrings-python
+    # via refiners
+mkdocstrings-python==1.8.0
+    # via mkdocstrings
 mpmath==1.3.0
-multidict==6.0.4
-multiprocess==0.70.15
+    # via sympy
+multidict==6.0.5
+    # via aiohttp
+    # via yarl
+multiprocess==0.70.16
+    # via datasets
+mypy-extensions==1.0.0
+    # via black
 networkx==3.2.1
-numpy==1.26.2
+    # via torch
+numpy==1.26.4
+    # via datasets
+    # via diffusers
+    # via invisible-watermark
+    # via jaxtyping
+    # via opencv-python
+    # via pandas
+    # via pyarrow
+    # via pywavelets
+    # via scipy
+    # via torchvision
+    # via transformers
 nvidia-cublas-cu12==12.1.3.1
+    # via nvidia-cudnn-cu12
+    # via nvidia-cusolver-cu12
+    # via torch
 nvidia-cuda-cupti-cu12==12.1.105
+    # via torch
 nvidia-cuda-nvrtc-cu12==12.1.105
+    # via torch
 nvidia-cuda-runtime-cu12==12.1.105
+    # via torch
 nvidia-cudnn-cu12==8.9.2.26
+    # via torch
 nvidia-cufft-cu12==11.0.2.54
+    # via torch
 nvidia-curand-cu12==10.3.2.106
+    # via torch
 nvidia-cusolver-cu12==11.4.5.107
+    # via torch
 nvidia-cusparse-cu12==12.1.0.106
-nvidia-nccl-cu12==2.18.1
+    # via nvidia-cusolver-cu12
+    # via torch
+nvidia-nccl-cu12==2.19.3
+    # via torch
 nvidia-nvjitlink-cu12==12.3.101
+    # via nvidia-cusolver-cu12
+    # via nvidia-cusparse-cu12
 nvidia-nvtx-cu12==12.1.105
-opencv-python==4.8.1.78
+    # via torch
+opencv-python==4.9.0.80
+    # via invisible-watermark
 packaging==23.2
-pandas==2.1.4
-pillow==10.1.0
+    # via black
+    # via datasets
+    # via huggingface-hub
+    # via mkdocs
+    # via refiners
+    # via transformers
+paginate==0.5.6
+    # via mkdocs-material
+pandas==2.2.1
+    # via datasets
+pathspec==0.12.1
+    # via black
+    # via mkdocs
+pillow==10.2.0
+    # via diffusers
+    # via invisible-watermark
+    # via refiners
+    # via torchvision
 piq==0.8.0
+    # via refiners
+platformdirs==4.2.0
+    # via black
+    # via mkdocs
+    # via mkdocstrings
 prodigyopt==1.0
-protobuf==4.25.1
-psutil==5.9.6
-pyarrow==14.0.1
+    # via refiners
+protobuf==4.25.3
+    # via wandb
+psutil==5.9.8
+    # via wandb
+pyarrow==15.0.0
+    # via datasets
 pyarrow-hotfix==0.6
-pydantic==2.5.2
-pydantic-core==2.14.5
-python-dateutil==2.8.2
-pytz==2023.3.post1
+    # via datasets
+pydantic==2.6.3
+    # via refiners
+pydantic-core==2.16.3
+    # via pydantic
+pygments==2.17.2
+    # via mkdocs-material
+pymdown-extensions==10.7.1
+    # via mkdocs-material
+    # via mkdocstrings
+python-dateutil==2.9.0.post0
+    # via ghp-import
+    # via pandas
+pytz==2024.1
+    # via pandas
 pywavelets==1.5.0
+    # via invisible-watermark
 pyyaml==6.0.1
-regex==2023.10.3
+    # via datasets
+    # via huggingface-hub
+    # via mkdocs
+    # via pymdown-extensions
+    # via pyyaml-env-tag
+    # via transformers
+    # via wandb
+pyyaml-env-tag==0.1
+    # via mkdocs
+regex==2023.12.25
+    # via diffusers
+    # via mkdocs-material
+    # via transformers
 requests==2.31.0
-safetensors==0.4.1
-scipy==1.11.4
+    # via datasets
+    # via diffusers
+    # via huggingface-hub
+    # via mkdocs-material
+    # via refiners
+    # via transformers
+    # via wandb
+safetensors==0.4.2
+    # via diffusers
+    # via refiners
+    # via transformers
+scipy==1.12.0
+    # via bitsandbytes
 segment-anything-py==1.0
-sentry-sdk==1.38.0
+    # via refiners
+sentry-sdk==1.40.6
+    # via wandb
 setproctitle==1.3.3
+    # via wandb
+setuptools==69.1.1
+    # via wandb
 six==1.16.0
+    # via docker-pycreds
+    # via python-dateutil
 smmap==5.0.1
+    # via gitdb
 sympy==1.12
-tokenizers==0.15.0
+    # via torch
+tokenizers==0.15.2
+    # via transformers
 tomli==2.0.1
-torch==2.1.1
-torchvision==0.16.1
-tqdm==4.66.1
-transformers==4.35.2
-triton==2.1.0
+    # via black
+    # via refiners
+torch==2.2.1
+    # via invisible-watermark
+    # via refiners
+    # via segment-anything-py
+    # via torchvision
+torchvision==0.17.1
+    # via piq
+    # via refiners
+    # via segment-anything-py
+tqdm==4.66.2
+    # via datasets
+    # via huggingface-hub
+    # via refiners
+    # via transformers
+transformers==4.38.2
+    # via refiners
+triton==2.2.0
+    # via torch
 typeguard==2.13.3
-typing-extensions==4.8.0
-tzdata==2023.3
-urllib3==2.1.0
-wandb==0.16.1
+    # via jaxtyping
+typing-extensions==4.10.0
+    # via black
+    # via huggingface-hub
+    # via jaxtyping
+    # via pydantic
+    # via pydantic-core
+    # via torch
+tzdata==2024.1
+    # via pandas
+urllib3==2.2.1
+    # via requests
+    # via sentry-sdk
+wandb==0.16.3
+    # via refiners
+watchdog==4.0.0
+    # via mkdocs
 xxhash==3.4.1
+    # via datasets
 yarl==1.9.4
+    # via aiohttp
 zipp==3.17.0
-# The following packages are considered to be unsafe in a requirements file:
-setuptools==69.0.2
+    # via importlib-metadata

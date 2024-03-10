@@ -1,7 +1,7 @@
 from typing import cast
 
 from jaxtyping import Float
-from torch import Tensor, cat, device as Device, dtype as DType
+from torch import Tensor, cat, device as Device, dtype as DType, split
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -40,7 +40,7 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
     def init_context(self) -> Contexts:
         return {"text_encoder_pooling": {"end_of_text_index": []}}
 
-    def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 1280"], Float[Tensor, "1 1280"]]:
+    def __call__(self, text: str | list[str]) -> tuple[Float[Tensor, "batch 77 1280"], Float[Tensor, "batch 1280"]]:
         return super().__call__(text)
 
     @property
@@ -48,13 +48,14 @@ class TextEncoderWithPooling(fl.Chain, Adapter[CLIPTextEncoderG]):
         return self.ensure_find(CLIPTokenizer)
 
     def set_end_of_text_index(self, end_of_text_index: list[int], tokens: Tensor) -> None:
-        position = (tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()
-        end_of_text_index.append(cast(int, position))
+        for str_tokens in split(tokens, 1):
+            position = (str_tokens == self.tokenizer.end_of_text_token_id).nonzero(as_tuple=True)[1].item()  # type: ignore
+            end_of_text_index.append(cast(int, position))
 
-    def pool(self, x: Float[Tensor, "1 77 1280"]) -> Float[Tensor, "1 1280"]:
+    def pool(self, x: Float[Tensor, "batch 77 1280"]) -> Float[Tensor, "batch 1280"]:
         end_of_text_index = self.use_context(context_name="text_encoder_pooling").get("end_of_text_index", [])
-        assert len(end_of_text_index) == 1, "End of text index not found."
-        return x[:, end_of_text_index[0], :]
+        assert len(end_of_text_index) == x.shape[0], "End of text index not found."
+        return cat([x[i : i + 1, end_of_text_index[i], :] for i in range(x.shape[0])], dim=0)
 
 
 class DoubleTextEncoder(fl.Chain):
@@ -70,16 +71,30 @@ class DoubleTextEncoder(fl.Chain):
         text_encoder_g = text_encoder_g or CLIPTextEncoderG(device=device, dtype=dtype)
         super().__init__(
             fl.Parallel(text_encoder_l[:-2], text_encoder_g),
-            fl.Lambda(func=self.concatenate_embeddings),
+            fl.Lambda(self.concatenate_embeddings),
         )
-        TextEncoderWithPooling(target=text_encoder_g, projection=projection).inject(parent=self.Parallel)
+        tep = TextEncoderWithPooling(target=text_encoder_g, projection=projection)
+        tep.inject(self.layer("Parallel", fl.Parallel))
 
-    def __call__(self, text: str) -> tuple[Float[Tensor, "1 77 2048"], Float[Tensor, "1 1280"]]:
+    def __call__(self, text: str | list[str]) -> tuple[Float[Tensor, "batch 77 2048"], Float[Tensor, "batch 1280"]]:
         return super().__call__(text)
 
     def concatenate_embeddings(
         self, text_embedding_l: Tensor, text_embedding_with_pooling: tuple[Tensor, Tensor]
     ) -> tuple[Tensor, Tensor]:
         text_embedding_g, pooled_text_embedding = text_embedding_with_pooling
-        text_embedding = cat(tensors=[text_embedding_l, text_embedding_g], dim=-1)
+        text_embedding = cat((text_embedding_l, text_embedding_g), dim=-1)
         return text_embedding, pooled_text_embedding
+
+    def structural_copy(self: "DoubleTextEncoder") -> "DoubleTextEncoder":
+        old_tep = self.ensure_find(TextEncoderWithPooling)
+        old_tep.eject()
+        copy = super().structural_copy()
+        old_tep.inject()
+
+        new_text_encoder_g = copy.ensure_find(CLIPTextEncoderG)
+        projection = old_tep.layer(("Parallel", "Chain", "Linear"), fl.Linear)
+
+        new_tep = TextEncoderWithPooling(target=new_text_encoder_g, projection=projection)
+        new_tep.inject(copy.layer("Parallel", fl.Parallel))
+        return copy

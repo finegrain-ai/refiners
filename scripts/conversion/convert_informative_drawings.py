@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import load_tensors
 from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings import InformativeDrawings
 
 try:
@@ -27,7 +28,7 @@ class Args(argparse.Namespace):
 
 def setup_converter(args: Args) -> ModelConverter:
     source = Generator(3, 1, 3)
-    source.load_state_dict(state_dict=torch.load(f=args.source_path, map_location="cpu"))  # type: ignore
+    source.load_state_dict(state_dict=load_tensors(args.source_path))
     source.eval()
     target = InformativeDrawings()
     x = torch.randn(1, 3, 512, 512)

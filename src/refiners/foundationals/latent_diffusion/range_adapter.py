@@ -24,23 +24,23 @@ def compute_sinusoidal_embedding(
 class RangeEncoder(fl.Chain):
     def __init__(
         self,
-        sinuosidal_embedding_dim: int,
+        sinusoidal_embedding_dim: int,
         embedding_dim: int,
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
-        self.sinuosidal_embedding_dim = sinuosidal_embedding_dim
+        self.sinusoidal_embedding_dim = sinusoidal_embedding_dim
         self.embedding_dim = embedding_dim
         super().__init__(
-            fl.Lambda(self.compute_sinuosoidal_embedding),
+            fl.Lambda(self.compute_sinusoidal_embedding),
             fl.Converter(set_device=False, set_dtype=True),
-            fl.Linear(in_features=sinuosidal_embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
+            fl.Linear(in_features=sinusoidal_embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
             fl.SiLU(),
             fl.Linear(in_features=embedding_dim, out_features=embedding_dim, device=device, dtype=dtype),
         )
 
-    def compute_sinuosoidal_embedding(self, x: Int[Tensor, "*batch 1"]) -> Float[Tensor, "*batch 1 embedding_dim"]:
-        return compute_sinusoidal_embedding(x, embedding_dim=self.sinuosidal_embedding_dim)
+    def compute_sinusoidal_embedding(self, x: Int[Tensor, "*batch 1"]) -> Float[Tensor, "*batch 1 embedding_dim"]:
+        return compute_sinusoidal_embedding(x, embedding_dim=self.sinusoidal_embedding_dim)
 
 
 class RangeAdapter2d(fl.Sum, Adapter[fl.Conv2d]):
@@ -55,14 +55,31 @@ class RangeAdapter2d(fl.Sum, Adapter[fl.Conv2d]):
     ) -> None:
         self.channels = channels
         self.embedding_dim = embedding_dim
-        self.context_key = context_key
+
         with self.setup_adapter(target):
             super().__init__(
                 target,
                 fl.Chain(
                     fl.UseContext("range_adapter", context_key),
                     fl.SiLU(),
-                    fl.Linear(in_features=embedding_dim, out_features=channels, device=device, dtype=dtype),
-                    fl.View(-1, channels, 1, 1),
+                    fl.Linear(
+                        in_features=embedding_dim,
+                        out_features=channels,
+                        device=device,
+                        dtype=dtype,
+                    ),
+                    fl.Reshape(channels, 1, 1),
                 ),
             )
+
+    @property
+    def context_key(self) -> str:
+        use_context_module = self.ensure_find(fl.UseContext)
+        assert use_context_module.context == "range_adapter"
+        return use_context_module.key
+
+    @context_key.setter
+    def context_key(self, value: str) -> None:
+        use_context_module = self.ensure_find(fl.UseContext)
+        assert use_context_module.context == "range_adapter"
+        use_context_module.key = value

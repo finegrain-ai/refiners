@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: ["**"]
   pull_request_target:
     types: [labeled]
 
@@ -14,26 +15,43 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
+      - name: check changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            sources:
+              - src/**
+              - tests/**
+              - scripts/**
+
       - name: Install Rye
-        uses: eifinger/setup-rye@v1
+        if: steps.changes.outputs.sources == 'true'
+        uses: eifinger/setup-rye@v2
         with:
           enable-cache: true
-          cache-prefix: 'refiners-rye-cache'
+          cache-prefix: "refiners-rye-cache"
 
-      - name: add home shims dir to PATH
-        run: echo "$HOME/.rye/shims" >> $GITHUB_PATH
+      - name: add Rye shims dir to PATH
+        if: steps.changes.outputs.sources == 'true'
+        run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
 
       - name: pin python
+        if: steps.changes.outputs.sources == 'true'
         run: rye pin 3.10
 
       - name: rye sync
+        if: steps.changes.outputs.sources == 'true'
         run: rye sync --all-features
 
-      - name: ruff format
-        run: rye run ruff format --check .
+      - name: rye fmt
+        if: steps.changes.outputs.sources == 'true'
+        run: rye fmt --check
 
-      - name: ruff check
-        run: rye run ruff check .
+      - name: rye lint
+        if: steps.changes.outputs.sources == 'true'
+        run: rye lint
 
       - name: typecheck
+        if: steps.changes.outputs.sources == 'true'
         run: rye run pyright

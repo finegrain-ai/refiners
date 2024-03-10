@@ -1,13 +1,18 @@
-from typing import Any
+import warnings
+from abc import ABC
+from pathlib import Path
+from typing import Any, Literal
 
-import wandb
 from PIL import Image
 
-__all__ = [
-    "WandbLogger",
-    "WandbLoggable",
-]
+from refiners.training_utils.callback import Callback, CallbackConfig
+from refiners.training_utils.config import BaseConfig
+from refiners.training_utils.trainer import Trainer, register_callback
 
+with warnings.catch_warnings():
+    # TODO: remove when https://github.com/wandb/wandb/issues/6711 gets solved
+    warnings.filterwarnings("ignore", category=DeprecationWarning, message="pkg_resources is deprecated as an API")
+    import wandb
 
 number = float | int
 WandbLoggable = number | Image.Image | list[number] | dict[str, list[number]]
@@ -60,3 +65,81 @@ class WandbLogger:
     @property
     def run_name(self) -> str:
         return self.wandb_run.name or ""  # type: ignore
+
+
+class WandbConfig(CallbackConfig):
+    """
+    Wandb configuration.
+
+    See https://docs.wandb.ai/ref/python/init for more details.
+    """
+
+    mode: Literal["online", "offline", "disabled"] = "disabled"
+    project: str
+    entity: str | None = None
+    save_code: bool | None = None
+    name: str | None = None
+    tags: list[str] = []
+    group: str | None = None
+    job_type: str | None = None
+    notes: str | None = None
+    dir: Path | None = None
+    resume: bool | Literal["allow", "must", "never", "auto"] | None = None
+    reinit: bool | None = None
+    magic: bool | None = None
+    anonymous: Literal["never", "allow", "must"] | None = None
+    id: str | None = None
+
+
+AnyTrainer = Trainer[BaseConfig, Any]
+
+
+class WandbCallback(Callback["TrainerWithWandb"]):
+    def __init__(self, config: WandbConfig, /, trainer_config: dict[str, Any]) -> None:
+        self.config = config
+        self.epoch_losses: list[float] = []
+        self.iteration_losses: list[float] = []
+        self.logger = WandbLogger({**config.model_dump(), "config": trainer_config})
+
+    def on_train_begin(self, trainer: "TrainerWithWandb") -> None:
+        self.epoch_losses = []
+        self.iteration_losses = []
+
+    def on_compute_loss_end(self, trainer: "TrainerWithWandb") -> None:
+        loss_value = trainer.loss.detach().cpu().item()
+        self.epoch_losses.append(loss_value)
+        self.iteration_losses.append(loss_value)
+        trainer.wandb_log(data={"step_loss": loss_value})
+
+    def on_optimizer_step_end(self, trainer: "TrainerWithWandb") -> None:
+        avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
+        trainer.wandb_log(data={"average_iteration_loss": avg_iteration_loss})
+        self.iteration_losses = []
+
+    def on_epoch_end(self, trainer: "TrainerWithWandb") -> None:
+        avg_epoch_loss = sum(self.epoch_losses) / len(self.epoch_losses)
+        trainer.wandb_log(data={"average_epoch_loss": avg_epoch_loss, "epoch": trainer.clock.epoch})
+        self.epoch_losses = []
+
+    def on_lr_scheduler_step_end(self, trainer: "TrainerWithWandb") -> None:
+        trainer.wandb_log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
+
+    def on_backward_end(self, trainer: "TrainerWithWandb") -> None:
+        trainer.wandb_log(data={"total_grad_norm": trainer.total_gradient_norm})
+
+
+class WandbMixin(ABC):
+    config: Any
+    wandb_logger: WandbLogger
+
+    @register_callback()
+    def wandb(self, config: WandbConfig) -> WandbCallback:
+        return WandbCallback(config, trainer_config=self.config.model_dump())
+
+    def wandb_log(self, data: dict[str, WandbLoggable]) -> None:
+        assert isinstance(self, Trainer), "WandbMixin must be mixed with a Trainer"
+        self.wandb.logger.log(data=data, step=self.clock.step)
+
+
+class TrainerWithWandb(AnyTrainer, WandbMixin, ABC):
+    pass

@@ -1,5 +1,5 @@
 site_name: Refiners
-site_decription: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
+site_description: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
 repo_name: Refiners
 repo_url: https://github.com/finegrain-ai/refiners
 edit_uri: edit/main/docs/
@@ -8,6 +8,7 @@ theme:
   favicon: assets/favicon.svg
   logo: assets/favicon.svg
   name: material
+  custom_dir: docs/overrides
   palette:
     primary: deep orange
     accent: deep orange
@@ -19,25 +20,56 @@ theme:
     - navigation.expand
     - navigation.path
     - toc.follow
-    - toc.integrate
     - navigation.tabs.sticky
+    - content.code.copy
+    - announce.dismiss
+plugins:
+  - search
+  - tags
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          import:
+            - https://docs.python.org/3/objects.inv
+            - https://pytorch.org/docs/master/objects.inv
+            - https://docs.kidger.site/jaxtyping/objects.inv
+          options:
+            show_bases: true
+            show_source: true
+            show_root_toc_entry: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_if_no_docstring: false
+            filters:
+              - "!^_"
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+watch:
+  - src/refiners
 extra_css:
   - stylesheets/extra.css
 nav:
   - Home: 
-    - index.md
-  - Getting started: getting_started.md
-  - Models: 
-    - models/index.md
-    - models/latent_diffusion.md
-    - models/segment_anything.md
-  - Fluxion:
-    - fluxion/index.md
-    - fluxion/adapters.md
-  - Training utils: 
-    - training_utils/index.md
-  - Contributing:
-    - contributing/index.md
+    - Welcome: index.md
+    - Manifesto: home/why.md
+  - Getting started:
+    - getting-started/recommended.md
+    - getting-started/advanced.md
+  - Key Concepts:
+    - concepts/chain.md
+    - concepts/context.md
+    - concepts/adapter/index.md
+  - Guides:
+    - Adapting SDXL: guides/adapting_sdxl/index.md
+    - Training 101: guides/training_101/index.md
+  - API Reference:
+      - Refiners: reference/
 extra:
   social:
     - icon: fontawesome/brands/discord
@@ -49,5 +81,24 @@ extra:
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/finegrain-ai/
 markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
+validation:
+  links:
+    absolute_links: info  # use relative_to_docs when we switch to mkdocs 1.6
