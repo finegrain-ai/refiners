@@ -256,16 +256,13 @@ class Chain(ContextModule):
         self._modules = generate_unique_names(tuple(modules))  # type: ignore
 
     @overload
-    def __getitem__(self, key: int) -> Module:
-        ...
+    def __getitem__(self, key: int) -> Module: ...
 
     @overload
-    def __getitem__(self, key: str) -> Module:
-        ...
+    def __getitem__(self, key: str) -> Module: ...
 
     @overload
-    def __getitem__(self, key: slice) -> "Chain":
-        ...
+    def __getitem__(self, key: slice) -> "Chain": ...
 
     def __getitem__(self, key: int | str | slice) -> Module:
         if isinstance(key, slice):
@@ -324,16 +321,14 @@ class Chain(ContextModule):
         self,
         predicate: Callable[[Module, "Chain"], bool] | None = None,
         recurse: bool = False,
-    ) -> Iterator[tuple[Module, "Chain"]]:
-        ...
+    ) -> Iterator[tuple[Module, "Chain"]]: ...
 
     @overload
     def walk(
         self,
         predicate: type[T],
         recurse: bool = False,
-    ) -> Iterator[tuple[T, "Chain"]]:
-        ...
+    ) -> Iterator[tuple[T, "Chain"]]: ...
 
     def walk(
         self,

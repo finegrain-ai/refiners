@@ -66,26 +66,10 @@ def add_lcm_lora(
         debug_map=debug_map,
     )
 
-    # Do *not* check for time because some keys include both `resnets` and `time_emb_proj`.
-    exclusions = {
-        "res": "ResidualBlock",
-        "downsample": "Downsample",
-        "upsample": "Upsample",
-    }
-    loras_excluded = {k: v for k, v in loras.items() if any(x in k for x in exclusions.keys())}
-    loras_remaining = {k: v for k, v in loras.items() if k not in loras_excluded and k not in loras_projs}
-
-    auto_attach_loras(
-        loras_remaining,
-        unet,
-        exclude=[*exclusions.values(), "TimestepEncoder"],
+    manager.add_loras_to_unet(
+        {k: v for k, v in loras.items() if k not in loras_projs},
         debug_map=debug_map,
     )
-
-    # Process exclusions one by one to avoid mixing them up.
-    for exc, v in exclusions.items():
-        ls = {k: v for k, v in loras_excluded.items() if exc in k}
-        auto_attach_loras(ls, unet, include=[v], debug_map=debug_map)
 
     if debug_map is not None:
         _check_validity(debug_map)

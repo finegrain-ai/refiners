@@ -170,11 +170,17 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.log(f"Epoch {trainer.clock.epoch} started.")
 
     def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        self.log(f"Epoch {trainer.clock.epoch} ended.")
         trainer.clock.epoch += 1
         trainer.clock.num_batches_processed = 0
 
     def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        if self.num_minibatches_processed == 0:
+            self.log(f"Iteration {trainer.clock.iteration} started.")
         self.log(f"Step {trainer.clock.step} started.")
+
+    def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        self.log(f"Step {trainer.clock.step} ended.")
 
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.step += 1

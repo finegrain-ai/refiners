@@ -1,6 +1,6 @@
 [project]
 name = "refiners"
-version = "0.3.1"
+version = "0.4.0"
 description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
@@ -69,7 +69,6 @@ build-backend = "hatchling.build"
 managed = true
 dev-dependencies = [
     "pyright==1.1.349",
-    "ruff>=0.2.0",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
@@ -81,7 +80,6 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.rye.scripts]
-lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
 test-cov = "coverage run -m pytest"
 # Work around for "Couldn't parse" errors due to e.g. opencv-python:

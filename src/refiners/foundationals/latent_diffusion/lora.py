@@ -1,5 +1,4 @@
 from typing import Any, Iterator, cast
-from warnings import warn
 
 from torch import Tensor
 
@@ -47,6 +46,11 @@ class SDLoraManager:
         /,
         tensors: dict[str, Tensor],
         scale: float = 1.0,
+        unet_inclusions: list[str] | None = None,
+        unet_exclusions: list[str] | None = None,
+        unet_preprocess: dict[str, str] | None = None,
+        text_encoder_inclusions: list[str] | None = None,
+        text_encoder_exclusions: list[str] | None = None,
     ) -> None:
         """Load a single LoRA from a `state_dict`.
 
@@ -57,6 +61,19 @@ class SDLoraManager:
             name: The name of the LoRA.
             tensors: The `state_dict` of the LoRA to load.
             scale: The scale to use for the LoRA.
+            unet_inclusions: A list of layer names, only layers with such a layer
+                in their ancestors will be considered when patching the UNet.
+            unet_exclusions: A list of layer names, layers with such a layer in
+                their ancestors will not be considered when patching the UNet.
+                If this is `None` then it defaults to `["TimestepEncoder"]`.
+            unet_preprocess: A map between parts of state dict keys and layer names.
+                This is used to attach some keys to specific parts of the UNet.
+                You should leave it set to `None` (it has a default value),
+                otherwise read the source code to understand how it works.
+            text_encoder_inclusions: A list of layer names, only layers with such a layer
+                in their ancestors will be considered when patching the text encoder.
+            text_encoder_exclusions: A list of layer names, layers with such a layer in
+                their ancestors will not be considered when patching the text encoder.
 
         Raises:
             AssertionError: If the Manager already has a LoRA with the same name.
@@ -82,57 +99,100 @@ class SDLoraManager:
             loras = {f"unet_{key}": value for key, value in loras.items()}
 
         # attach the LoRA to the target
-        self.add_loras_to_unet(loras)
-        self.add_loras_to_text_encoder(loras)
+        self.add_loras_to_unet(loras, include=unet_inclusions, exclude=unet_exclusions, preprocess=unet_preprocess)
+        self.add_loras_to_text_encoder(loras, include=text_encoder_inclusions, exclude=text_encoder_exclusions)
 
         # set the scale of the LoRA
         self.set_scale(name, scale)
 
-    def add_multiple_loras(
+    def _get_lora_weights(self, base: fl.Chain, name: str, accum: dict[str, Tensor]) -> None:
+        prev_parent: fl.Chain | None = None
+        n = 0
+        for lora_adapter, parent in base.walk(LoraAdapter):
+            lora = next((l for l in lora_adapter.lora_layers if l.name == name), None)
+            if lora is None:
+                continue
+            n = (parent == prev_parent) and n + 1 or 1
+            pfx = f"{parent.get_path()}.{n}.{lora_adapter.target.__class__.__name__}"
+            accum[f"{pfx}.down.weight"] = lora.down.weight
+            accum[f"{pfx}.up.weight"] = lora.up.weight
+            prev_parent = parent
+
+    def get_lora_weights(self, name: str) -> dict[str, Tensor]:
+        r: dict[str, Tensor] = {}
+        self._get_lora_weights(self.unet, name, r)
+        self._get_lora_weights(self.clip_text_encoder, name, r)
+        return r
+
+    def add_loras_to_text_encoder(
         self,
+        loras: dict[str, Lora[Any]],
         /,
-        tensors: dict[str, dict[str, Tensor]],
-        scale: dict[str, float] | None = None,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+        debug_map: list[tuple[str, str]] | None = None,
     ) -> None:
-        """Load multiple LoRAs from a dictionary of `state_dict`.
-
-        Args:
-            tensors: The dictionary of `state_dict` of the LoRAs to load
-                (keys are the names of the LoRAs, values are the `state_dict` of the LoRAs).
-            scale: The scales to use for the LoRAs.
-
-        Raises:
-            AssertionError: If the manager already has a LoRA with the same name.
-        """
-        for name, lora_tensors in tensors.items():
-            self.add_loras(name, tensors=lora_tensors, scale=scale[name] if scale else 1.0)
-
-    def add_loras_to_text_encoder(self, loras: dict[str, Lora[Any]], /) -> None:
-        """Add multiple LoRAs to the text encoder.
+        """Add multiple LoRAs to the text encoder. See `add_loras` for details about arguments.
 
         Args:
             loras: The dictionary of LoRAs to add to the text encoder.
                 (keys are the names of the LoRAs, values are the LoRAs to add to the text encoder)
         """
         text_encoder_loras = {key: loras[key] for key in loras.keys() if "text" in key}
-        failed = auto_attach_loras(text_encoder_loras, self.clip_text_encoder)
-        if failed:
-            warn(f"failed to attach {len(failed)}/{len(text_encoder_loras)} loras to the text encoder")
+        auto_attach_loras(
+            text_encoder_loras,
+            self.clip_text_encoder,
+            exclude=exclude,
+            include=include,
+            debug_map=debug_map,
+        )
 
-    def add_loras_to_unet(self, loras: dict[str, Lora[Any]], /) -> None:
-        """Add multiple LoRAs to the U-Net.
+    def add_loras_to_unet(
+        self,
+        loras: dict[str, Lora[Any]],
+        /,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+        preprocess: dict[str, str] | None = None,
+        debug_map: list[tuple[str, str]] | None = None,
+    ) -> None:
+        """Add multiple LoRAs to the U-Net. See `add_loras` for details about arguments.
 
         Args:
             loras: The dictionary of LoRAs to add to the U-Net.
                 (keys are the names of the LoRAs, values are the LoRAs to add to the U-Net)
         """
         unet_loras = {key: loras[key] for key in loras.keys() if "unet" in key}
-        exclude = [
-            block for s, block in self.unet_exclusions.items() if all([s not in key for key in unet_loras.keys()])
-        ]
-        failed = auto_attach_loras(unet_loras, self.unet, exclude=exclude)
-        if failed:
-            warn(f"failed to attach {len(failed)}/{len(unet_loras)} loras to the unet")
+
+        if exclude is None:
+            exclude = ["TimestepEncoder"]
+
+        if preprocess is None:
+            preprocess = {
+                "res": "ResidualBlock",
+                "downsample": "Downsample",
+                "upsample": "Upsample",
+            }
+
+        if include is not None:
+            preprocess = {k: v for k, v in preprocess.items() if v in include}
+
+        preprocess = {k: v for k, v in preprocess.items() if v not in exclude}
+
+        loras_excluded = {k: v for k, v in unet_loras.items() if any(x in k for x in preprocess.keys())}
+        loras_remaining = {k: v for k, v in unet_loras.items() if k not in loras_excluded}
+
+        for exc_k, exc_v in preprocess.items():
+            ls = {k: v for k, v in loras_excluded.items() if exc_k in k}
+            auto_attach_loras(ls, self.unet, include=[exc_v], debug_map=debug_map)
+
+        auto_attach_loras(
+            loras_remaining,
+            self.unet,
+            exclude=[*exclude, *preprocess.values()],
+            include=include,
+            debug_map=debug_map,
+        )
 
     def remove_loras(self, *names: str) -> None:
         """Remove multiple LoRAs from the target.
@@ -210,15 +270,6 @@ class SDLoraManager:
     def lora_adapters(self) -> list[LoraAdapter]:
         """List of all the LoraAdapters managed by the SDLoraManager."""
         return list(self.unet.layers(LoraAdapter)) + list(self.clip_text_encoder.layers(LoraAdapter))
-
-    @property
-    def unet_exclusions(self) -> dict[str, str]:
-        return {
-            "time": "TimestepEncoder",
-            "res": "ResidualBlock",
-            "downsample": "Downsample",
-            "upsample": "Upsample",
-        }
 
     @property
     def scales(self) -> dict[str, float]:

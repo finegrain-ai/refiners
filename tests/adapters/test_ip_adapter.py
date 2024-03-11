@@ -10,13 +10,11 @@ from refiners.foundationals.latent_diffusion.image_prompt import ImageCrossAtten
 
 
 @overload
-def new_adapter(target: SD1UNet) -> SD1IPAdapter:
-    ...
+def new_adapter(target: SD1UNet) -> SD1IPAdapter: ...
 
 
 @overload
-def new_adapter(target: SDXLUNet) -> SDXLIPAdapter:
-    ...
+def new_adapter(target: SDXLUNet) -> SDXLIPAdapter: ...
 
 
 def new_adapter(target: SD1UNet | SDXLUNet) -> SD1IPAdapter | SDXLIPAdapter:

@@ -58,9 +58,9 @@ Then, define the inference parameters by setting the appropriate prompt / seed /
 prompt = "a futuristic castle surrounded by a forest, mountains in the background"
 seed = 42
 sdxl.set_inference_steps(50, first_step=0)
-sdxl.set_self_attention_guidance(
-    enable=True, scale=0.75
-)  # Enable self-attention guidance to enhance the quality of the generated images
+
+# Enable self-attention guidance to enhance the quality of the generated images
+sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
 # ... Inference process
 
@@ -76,10 +76,10 @@ with no_grad():  # Disable gradient calculation for memory-efficient inference
     )
     time_ids = sdxl.default_time_ids
 
-    manual_seed(seed=seed)
+    manual_seed(seed)
 
-    # Using a higher latents inner dim to improve resolution of generated images
-    x = torch.randn(size=(1, 4, 256, 256), device=sdxl.device, dtype=sdxl.dtype)
+    # SDXL typically generates 1024x1024, here we use a higher resolution.
+    x = sdxl.init_latents((2048, 2048)).to(sdxl.device, sdxl.dtype)
 
     # Diffusion process
     for step in sdxl.steps:
@@ -131,8 +131,8 @@ predicted_image.save("vanilla_sdxl.png")
 
         manual_seed(seed=seed)
 
-        # Using a higher latents inner dim to improve resolution of generated images
-        x = torch.randn(size=(1, 4, 256, 256), device=sdxl.device, dtype=sdxl.dtype)
+        # SDXL typically generates 1024x1024, here we use a higher resolution.
+        x = sdxl.init_latents((2048, 2048)).to(sdxl.device, sdxl.dtype)
 
         # Diffusion process
         for step in sdxl.steps:
@@ -213,8 +213,8 @@ manager.add_loras("scifi-lora", tensors=scifi_lora_weights)
 
         manual_seed(seed=seed)
 
-        # Using a higher latents inner dim to improve resolution of generated images
-        x = torch.randn(size=(1, 4, 256, 256), device=sdxl.device, dtype=sdxl.dtype)
+        # SDXL typically generates 1024x1024, here we use a higher resolution.
+        x = sdxl.init_latents((2048, 2048)).to(sdxl.device, sdxl.dtype)
 
         # Diffusion process
         for step in sdxl.steps:
@@ -251,11 +251,8 @@ This is dead simple as [`SDLoraManager`][refiners.foundationals.latent_diffusion
 ```py
 # Load LoRAs weights from disk and inject them into target
 manager = SDLoraManager(sdxl)
-scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
-pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-manager.add_multiple_loras(
-    {"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights}
-)
+manager.add_loras("scifi-lora", load_from_safetensors("Sci-fi_Environments_sdxl.safetensors"))
+manager.add_loras("pixel-art-lora", load_from_safetensors("pixel-art-xl-v1.1.safetensors"))
 ```
 
 Adapters such as LoRAs also have a [scale][refiners.fluxion.adapters.Lora.scale] (roughly) quantifying the effect of this Adapter.
@@ -264,12 +261,8 @@ Refiners allows setting different scales for each Adapter, allowing the user to 
 ```py
 # Load LoRAs weights from disk and inject them into target
 manager = SDLoraManager(sdxl)
-scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
-pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-manager.add_multiple_loras(
-    tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-    scale={"scifi-lora": 1.0, "pixel-art-lora": 1.4},
-)
+manager.add_loras("scifi-lora", load_from_safetensors("Sci-fi_Environments_sdxl.safetensors"), scale=1.0)
+manager.add_loras("pixel-art-lora", load_from_safetensors("pixel-art-xl-v1.1.safetensors"), scale=1.4)
 ```
 
 ??? example "Expand to see the entire end-to-end code"
@@ -291,10 +284,8 @@ manager.add_multiple_loras(
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.0, "pixel-art-lora": 1.4},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.0)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.4)
 
     # Hyperparameters
     prompt = "a futuristic castle surrounded by a forest, mountains in the background"
@@ -313,8 +304,8 @@ manager.add_multiple_loras(
 
         manual_seed(seed=seed)
 
-        # Using a higher latents inner dim to improve resolution of generated images
-        x = torch.randn(size=(1, 4, 256, 256), device=sdxl.device, dtype=sdxl.dtype)
+        # SDXL typically generates 1024x1024, here we use a higher resolution.
+        x = sdxl.init_latents((2048, 2048)).to(sdxl.device, sdxl.dtype)
 
         # Diffusion process
         for step in sdxl.steps:
@@ -416,10 +407,8 @@ with torch.no_grad():
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.5, "pixel-art-lora": 1.55},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.5)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.55)
 
     # Load IP-Adapter
     ip_adapter = SDXLIPAdapter(
@@ -451,7 +440,7 @@ with torch.no_grad():
         ip_adapter.set_clip_image_embedding(clip_image_embedding)
 
         manual_seed(seed=seed)
-        x = torch.randn(size=(1, 4, 128, 128), device=sdxl.device, dtype=sdxl.dtype)
+        x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
 
         # Diffusion process
         for step in sdxl.steps:
@@ -543,10 +532,8 @@ with torch.no_grad():
     manager = SDLoraManager(sdxl)
     scifi_lora_weights = load_from_safetensors("Sci-fi_Environments_sdxl.safetensors")
     pixel_art_lora_weights = load_from_safetensors("pixel-art-xl-v1.1.safetensors")
-    manager.add_multiple_loras(
-        tensors={"scifi-lora": scifi_lora_weights, "pixel-art-lora": pixel_art_lora_weights},
-        scale={"scifi-lora": 1.5, "pixel-art-lora": 1.55},
-    )
+    manager.add_loras("scifi-lora", scifi_lora_weights, scale=1.5)
+    manager.add_loras("pixel-art-lora", pixel_art_lora_weights, scale=1.55)
 
     # Load IP-Adapter
     ip_adapter = SDXLIPAdapter(
@@ -591,7 +578,7 @@ with torch.no_grad():
         t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
         manual_seed(seed=seed)
-        x = torch.randn(size=(1, 4, 128, 128), device=sdxl.device, dtype=sdxl.dtype)
+        x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
 
         # Diffusion process
         for step in sdxl.steps:
