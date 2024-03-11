@@ -115,7 +115,8 @@ LDA = "tests/weights/lda.safetensors"
 
 CLIP_TEXT_EXT = f"CLIPL.pth"
 CLIP_TEXT_POOLED_EXT = f"CLIPLPool.pth"
-DINO_IMAGE_ENCODER_EXT = f"dinov2_vitl14_reg4_pretrain_{'finegrained' if finegrained else 'default'}.pth"
+DINO_IMAGE_ENCODER_EXT = f"dinov2_vitl14_reg4_pretrain.pth"
+DINO_IMAGE_ENCODER_NO_NORM_EXT = f"dinov2_vitl14_reg4_pretrain_no_norm.pth"
 LDA_EXT = f"sd15_lda.pth"
 
 PHOTO_CONCEPT = "gs://bounty-program-data/photo-concept-bucket-webdataset"
@@ -197,6 +198,7 @@ class Uploads:
         encoder_hidden_states,
         pooled_text_embedding,
         encoded_image_dino,
+        encoded_image_dino_no_norm,
         encoded_image_lda,
         metadata,
     ):
@@ -207,6 +209,7 @@ class Uploads:
             encoder_hidden_states,
             pooled_text_embedding,
             encoded_image_dino,
+            encoded_image_dino_no_norm,
             encoded_image_lda,
             metadata,
         )
@@ -225,32 +228,40 @@ class Uploads:
         encoder_hidden_states,
         pooled_text_embeddings,
         encoded_image_dinos,
+        encoded_image_dino_no_norms,
         encoded_image_ldas,
         metadata,
     ):
         encoder_hidden_states = torch.unbind(encoder_hidden_states)
         pooled_text_embeddings = torch.unbind(pooled_text_embeddings)
         encoded_image_dinos = torch.unbind(encoded_image_dinos)
+        encoded_image_dino_no_norms = torch.unbind(encoded_image_dino_no_norms)
         encoded_image_ldas = torch.unbind(encoded_image_ldas)
 
         for (
             __key__,
             __url__,
             encoded_image_dino,
+            encoded_image_dino_no_norm,
             encoded_image_lda,
-            encoder_hidden_states,
+            encoder_hidden_state,
+            pooled_text_embedding,
             metadata,
         ) in zip(
             __key__,
             __url__,
             encoded_image_dinos,
+            encoded_image_dino_no_norms,
             encoded_image_ldas,
             encoder_hidden_states,
+            pooled_text_embeddings,
             metadata,
         ):
             encoded_image_dino = encoded_image_dino.clone().to("cpu")
+            encoded_image_dino_no_norm = encoded_image_dino_no_norm.clone().to("cpu")
             encoded_image_lda = encoded_image_lda.clone().to("cpu")
-            encoder_hidden_states = encoder_hidden_states.clone().to("cpu")
+            encoder_hidden_state = encoder_hidden_state.clone().to("cpu")
+            pooled_text_embedding = pooled_text_embedding.clone().to("cpu")
 
             if self.skip_upload:
                 continue
@@ -286,9 +297,10 @@ class Uploads:
             sample = {
                 "__key__": __key__,
                 DINO_IMAGE_ENCODER_EXT: encoded_image_dino,
+                DINO_IMAGE_ENCODER_NO_NORM_EXT: encoded_image_dino_no_norm,
                 LDA_EXT: encoded_image_lda,
-                CLIP_TEXT_EXT: encoder_hidden_states,
-                CLIP_TEXT_POOLED_EXT: pooled_text_embeddings,
+                CLIP_TEXT_EXT: encoder_hidden_state,
+                CLIP_TEXT_POOLED_EXT: pooled_text_embedding,
                 "json": metadata,
             }
 
@@ -447,11 +459,15 @@ def main():
     text_encoder.requires_grad_(False)
     text_encoder.load_from_safetensors(CLIP_TEXT_WITH_PROJECTION)
 
+    image_encoder_no_norm = DINOv2_large_reg().to("cuda")
+    image_encoder_no_norm.requires_grad_(False)
+    image_encoder_no_norm.load_from_safetensors(DINO_IMAGE_ENCODER)
+    # remove final layernorm for finegrained
+    image_encoder_no_norm.pop()
+
     image_encoder = DINOv2_large_reg().to("cuda")
     image_encoder.requires_grad_(False)
     image_encoder.load_from_safetensors(DINO_IMAGE_ENCODER)
-    # remove final layernorm for finegrained
-    image_encoder.pop()
 
     shard_range = "{" + format_shard_number(args.start_shard) + ".." + format_shard_number(args.end_shard) + "}"
     download_shards = f"pipe:gsutil cp {args.dataset}/{shard_range}.tar -"
@@ -537,6 +553,7 @@ def main():
             image = torch.stack(all_images)
             lda_image = torch.stack(lda_images)
             encoded_image_dino = image_encoder(image)
+            encoded_image_dino_no_norm = image_encoder_no_norm(image)
             encoded_image_lda = lda(lda_image)
 
 
@@ -546,6 +563,7 @@ def main():
                 encoder_hidden_states,
                 pooled_text_embedding,
                 encoded_image_dino,
+                encoded_image_dino_no_norm,
                 encoded_image_lda,
                 metadata,
             )
