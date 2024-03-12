@@ -906,7 +906,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # each worker is iterating over this
         return wds.DataPipeline(*pipeline).with_epoch(num_worker_batches)
     def load_dataset(self) -> IPDataset:
-        if self.trainer.config.dataset.webdataset:
+        if self.config.dataset.webdataset:
             return self.load_web_dataset()
         else:
             return IPDataset(trainer=self)
