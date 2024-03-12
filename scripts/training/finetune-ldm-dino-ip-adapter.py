@@ -921,7 +921,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         num_batches = num_worker_batches * num_workers
         num_samples = num_batches * global_batch_size
 
-        if self.trainer.config.dataset.webdataset:
+        if self.config.dataset.webdataset:
             dataloader = wds.WebLoader(
                 self.dataset,
                 batch_size=None,
