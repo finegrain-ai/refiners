@@ -38,22 +38,11 @@ initialize_model = true
 initializer_range = 0.02
 use_bias = true
 use_rescaler = true
-save_folder = "/home/isamu/checkpoints_rescaler_weighted_sum"
+save_folder = "/home/isamu/checkpoints/full_training"
 image_embedding_div_factor = 1
 pooled_text_div_factor = 10
-do_palp = false
-palp_rescale = true
-palp_steps = 8
 layernorm_dino = false
-palp_alpha = 15
-palp_beta =7.5
-non_palp_image_drop_rate = 0.05
-non_palp_text_drop_rate = 0.05
-non_palp_text_and_image_drop_rate = 0.05
 weighted_sum = true
-timestep_bias_multiplier = 2.0
-timestep_bias_strategy = "earlier"
-timestep_bias_portion = 0.5
 
 [training]
 duration = {"number" = 1000000, "unit" = "step"}
@@ -88,6 +77,8 @@ update_interval = "1:step"
 
 [dataset]
 hf_repo = "1aurent/unsplash-lite-palette"
+webdataset = true
+train_shards_path_or_url = "pipe:gsutil cp gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded/{00000..00056}.tar -"
 revision = "main"
 split = "train"
 horizontal_flip_probability = 0.0
@@ -95,9 +86,6 @@ resize_image_min_size = 512
 resize_image_max_size = 518
 center_crop_size = 512
 filter_min_image_size = false
-# image_drop_rate = 0.0
-# text_drop_rate = 0.0
-# text_and_image_drop_rate = 0.0
 image_drop_rate = 0.05
 text_drop_rate = 0.05
 text_and_image_drop_rate = 0.05

@@ -296,7 +296,7 @@ class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
 
     def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
         if trainer.clock.is_evaluation_step:
-            adapter = trainer.adapter
+            os.makedirs(trainer.config.adapter.save_folder, exist_ok=True)
             cross_attention_adapters = trainer.adapter.sub_adapters
             image_proj = trainer.adapter.image_proj
 
