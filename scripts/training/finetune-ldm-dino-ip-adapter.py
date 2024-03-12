@@ -890,7 +890,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.empty_pooled_text_embedding = self.text_encoder("").float().cpu()[:, 1]
         self.black_image_embedding = self.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.device, dtype=self.dtype)).float().cpu()
     def load_web_dataset(self) -> wds.DataPipeline:
-        all_keys = ["text_embedding", "pooled_text_embedding", "lda_embedding", "image_embedding"]
+        all_keys = ["text_embedding", "pooled_text_embedding", "latent", "image_embedding"]
         if self.config.adapter.layernorm_dino:
             image_encoder_pth = "dinov2_vitl14_reg4_pretrain.pth"
         else:
@@ -899,7 +899,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             all_keys.remove("pooled_text_embedding")
         processing_pipeline = [
             wds.decode(wds.handle_extension("pth", wds.autodecode.torch_loads), handler=wds.ignore_and_continue),
-            wds.map(filter_keys(set(all_keys))),
             wds.rename(
                 text_embedding="CLIPL.pth".lower(),
                 pooled_text_embedding="CLIPLPool.pth".lower(),
@@ -907,6 +906,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 image_embedding=image_encoder_pth,
                 handler=wds.warn_and_continue,
             ),
+            wds.map(filter_keys(set(all_keys))),
         ]
         pipeline = [
             wds.ResampledShards(self.config.dataset.train_shards_path_or_url),
