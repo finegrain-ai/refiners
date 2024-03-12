@@ -899,6 +899,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             all_keys.remove("pooled_text_embedding")
         processing_pipeline = [
             wds.decode(wds.handle_extension("pth", wds.autodecode.torch_loads), handler=wds.ignore_and_continue),
+            wds.map(filter_keys(set(all_keys))),
             wds.rename(
                 text_embedding="CLIPL.pth".lower(),
                 pooled_text_embedding="CLIPLPool.pth".lower(),
@@ -906,7 +907,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
                 image_embedding=image_encoder_pth,
                 handler=wds.warn_and_continue,
             ),
-            wds.map(filter_keys(set(all_keys))),
         ]
         pipeline = [
             wds.ResampledShards(self.config.dataset.train_shards_path_or_url),
