@@ -533,28 +533,27 @@ def main():
                 image_ = image_.view(height, width, channels)
                 image_ = image_.permute((2, 0, 1)).contiguous()
 
-                if mode != "1" and image_.dtype == torch.uint8:
-                    image_ = image_.to(dtype=torch.float32).div(255)
+                image_ = image_.to(dtype=torch.float32).div(255)
 
                 lda_image_ = TF.resize(
                     image_, size=args.lda_resolution, interpolation=InterpolationMode.BILINEAR, antialias=True
                 )
 
                 lda_image_ = TF.center_crop(image_, args.lda_resolution)
-                lda_images.append(lda_image_)
+                lda_images.append(2*lda_image_-1)
                 image_ = TF.resize(
                     image_, size=args.resolution, interpolation=InterpolationMode.BILINEAR, antialias=True
                 )
 
                 image_ = TF.center_crop(image_, args.resolution)
-
+                image_ = normalize(image_, mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
                 all_images.append(image_)
 
             image = torch.stack(all_images)
             lda_image = torch.stack(lda_images)
             encoded_image_dino = image_encoder(image)
             encoded_image_dino_no_norm = image_encoder_no_norm(image)
-            encoded_image_lda = lda(lda_image)
+            encoded_image_lda = lda.encode(lda_image)
 
 
             uploads.submit(
