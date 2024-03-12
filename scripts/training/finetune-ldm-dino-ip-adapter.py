@@ -913,7 +913,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             tarfile_to_samples_nothrow,
             wds.shuffle(self.config.dataset.shuffle_buffer_size),
             *processing_pipeline,
-            wds.batched(self.config.training.batch_size, partial=False, collation_fn=collate_fn_from_dict),
+            wds.batched(self.config.training.batch_size, partial=False, collation_fn=self.collate_fn_from_dict),
         ]
         global_batch_size = self.config.training.batch_size
         num_workers = self.config.training.dataset_workers
