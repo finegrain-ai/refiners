@@ -885,8 +885,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         processing_pipeline = [
             wds.decode(wds.handle_extension("pth", wds.autodecode.torch_loads), handler=wds.ignore_and_continue),
             wds.rename(
-                text_embedding="CLIPL.pth",
-                pooled_text_embedding="CLIPLPool.pth",
+                text_embedding="CLIPL.pth".lower(),
+                pooled_text_embedding="CLIPLPool.pth".lower(),
                 lda_embedding="sd15_lda.pth",
                 image_embedding=image_encoder_pth,
                 handler=wds.warn_and_continue,
