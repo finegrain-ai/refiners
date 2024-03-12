@@ -28,6 +28,8 @@ from torch import (
     norm,
     multinomial
 )
+from torch.utils.data import DataLoader, Dataset, default_collate
+
 from torch.cuda import empty_cache
 from torch.distributions import Beta
 from torch.nn import Module, Linear, Embedding, LayerNorm
@@ -73,6 +75,13 @@ from refiners.fluxion.utils import load_from_safetensors
 import gc
 import math
 import shutil
+from webdataset.tariterators import (
+    base_plus_ext,
+    tar_file_expander,
+    url_opener,
+    valid_sample,
+)
+
 
 # some images of the unsplash lite dataset are bigger than the default limit
 Image.MAX_IMAGE_PIXELS = 200_000_000
@@ -127,7 +136,9 @@ class DatasetConfig(BaseModel):
     image_drop_rate: float = 0.05
     text_drop_rate: float = 0.05
     text_and_image_drop_rate: float = 0.05
-    to_wds: bool = False  # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
+    webdataset: bool = False  # TODO: It seems like using webdatasets increase data fetching speed by around 40% https://github.com/huggingface/pytorch-image-models/discussions/1524
+    train_shards_path_or_url: str | None = None
+    shuffle_buffer_size: int = 1000
     pre_encode: bool = False  # TODO
     image_column: str = "image"
     caption_column: str = "caption"
@@ -135,6 +146,7 @@ class DatasetConfig(BaseModel):
     save_path: str | None = None
     dataset_length: int | None = None
     zero_uncond: bool = False
+    num_training_examples: int = 567597
 
 
 # Adapted from https://github.com/huggingface/open-muse
@@ -296,6 +308,48 @@ class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
                 path= f"{trainer.config.adapter.save_folder}/step{trainer.clock.iteration}.safetensors",
                 tensors=tensors,
             )
+
+def filter_keys(key_set):
+    def _f(dictionary):
+        return {k: v for k, v in dictionary.items() if k in key_set}
+
+    return _f
+def group_by_keys_nothrow(data, keys=base_plus_ext, lcase=True, suffixes=None, handler=None):
+    """Return function over iterator that groups key, value pairs into samples.
+
+    :param keys: function that splits the key into key and extension (base_plus_ext)
+    :param lcase: convert suffixes to lower case (Default value = True)
+    """
+    current_sample = None
+    for filesample in data:
+        assert isinstance(filesample, dict)
+        fname, value = filesample["fname"], filesample["data"]
+        prefix, suffix = keys(fname)
+        if prefix is None:
+            continue
+        if lcase:
+            suffix = suffix.lower()
+        # FIXME webdataset version throws if suffix in current_sample, but we have a potential for
+        #  this happening in the current LAION400m dataset if a tar ends with same prefix as the next
+        #  begins, rare, but can happen since prefix aren't unique across tar files in that dataset
+        if current_sample is None or prefix != current_sample["__key__"] or suffix in current_sample:
+            if valid_sample(current_sample):
+                yield current_sample
+            current_sample = dict(__key__=prefix, __url__=filesample["__url__"])
+        if suffixes is None or suffix in suffixes:
+            current_sample[suffix] = value
+    if valid_sample(current_sample):
+        yield current_sample
+
+
+def tarfile_to_samples_nothrow(src, handler=wds.warn_and_continue):
+    # NOTE this is a re-impl of the webdataset impl with group_by_keys that doesn't throw
+    streams = url_opener(src, handler=handler)
+    files = tar_file_expander(streams, handler=handler)
+    samples = group_by_keys_nothrow(files, handler=handler)
+    return samples
+
+
 class IPDataset(Dataset[IPBatch]):
     """Dataset for the IP adapter.
 
@@ -307,19 +361,7 @@ class IPDataset(Dataset[IPBatch]):
     def __init__(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
         super().__init__()
         self.trainer = trainer
-        self.image_encoder_column: str = self.trainer.config.adapter.image_encoder_type
-        if self.trainer.config.adapter.fine_grained:
-            self.image_encoder_column += "_fine_grained"
-        self.image_encoder_column += "_embedding"
-        self.cond_resolution: int = self.trainer.config.adapter.resolution
         self.dataset = self.load_huggingface_dataset()
-        if isinstance(self.trainer.text_encoder, TextEncoderWithPoolingL):
-            self.empty_text_embedding = self.trainer.text_encoder("")[0].float().cpu()
-            self.empty_pooled_text_embedding = self.trainer.text_encoder("")[1].float().cpu()
-        else:
-            self.empty_text_embedding = self.trainer.text_encoder("").float().cpu()
-            self.empty_pooled_text_embedding = self.trainer.text_encoder("").float().cpu()[:, 1]
-        self.black_image_embedding = self.trainer.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.trainer.device, dtype=self.trainer.dtype)).float().cpu().float()
     @staticmethod
     def download_images(
         urls: list[Any],
@@ -454,7 +496,6 @@ class IPDataset(Dataset[IPBatch]):
         image_compose = Compose(image_transforms)
         lda_images: List[Image.Image] = [image_compose(image) for image in images]
         return {"lda_embedding": [lda.image_to_latents(image=image).float().cpu() for image in lda_images]}
-
     @no_grad()
     def load_huggingface_dataset(self) -> datasets.Dataset:
         """Load the dataset from Hugging Face and apply some pre-processing."""
@@ -536,7 +577,7 @@ class IPDataset(Dataset[IPBatch]):
             )
         # encode cond images
         if self.trainer.config.dataset.pre_encode:
-            if self.image_encoder_column not in dataset.features:
+            if "image_embedding" not in dataset.features:
                 update_dataset = True
                 dataset = dataset.map(  # type: ignore
                     function=self.encode_cond_images,
@@ -545,14 +586,14 @@ class IPDataset(Dataset[IPBatch]):
                     batch_size=50,  # FIXME: harcoded value
                     fn_kwargs={
                         "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
-                        "image_encoder_column": self.image_encoder_column,
+                        "image_encoder_column": "image_embedding",
                         "device": self.trainer.device,
                         "dtype": self.trainer.dtype,
                         "cond_resolution": self.cond_resolution,
                     },
                     desc="Encoding conditional images into embeddings",  # type: ignore
                 )
-            if self.trainer.config.adapter.layernorm_dino and (str(self.image_encoder_column+"_layernorm") not in dataset.features):
+            if self.trainer.config.adapter.layernorm_dino and ("image_embedding_layernorm" not in dataset.features):
                 update_dataset = True
                 dataset = dataset.map(  # type: ignore
                     function=self.encode_cond_images,
@@ -561,7 +602,7 @@ class IPDataset(Dataset[IPBatch]):
                     batch_size=50,  # FIXME: harcoded value
                     fn_kwargs={
                         "image_encoder": self.trainer.adapter.image_encoder,  # weights must be loaded to get same hash everytime
-                        "image_encoder_column": self.image_encoder_column+"_layernorm",
+                        "image_encoder_column": "image_embedding_layernorm",
                         "device": self.trainer.device,
                         "dtype": self.trainer.dtype,
                         "cond_resolution": self.cond_resolution,
@@ -602,7 +643,7 @@ class IPDataset(Dataset[IPBatch]):
         dataset.set_format(  # type: ignore
             type="torch",
             output_all_columns=True,
-            columns=["text_embedding", self.image_encoder_column, "lda_embedding"],
+            columns=["text_embedding", "image_embedding", "lda_embedding"],
         )
         if dataset_save_path and update_dataset:
             dataset.save_to_disk(dataset_save_path+"_update")
@@ -613,11 +654,10 @@ class IPDataset(Dataset[IPBatch]):
 
     def transform(self, data: dict[str, Any]) -> IPBatch:
         """Apply transforms to data."""
-        dataset_config = self.trainer.config.dataset
         if not self.trainer.config.dataset.pre_encode:
             image = data["image"]
             cond_image = self.cond_transform(
-                image, self.trainer.device, self.trainer.dtype, (self.cond_resolution, self.cond_resolution)
+                image, self.trainer.device, self.trainer.dtype, (self.trainer.cond_resolution, self.trainer.cond_resolution)
             )
             image_embedding = self.trainer.adapter.image_encoder(cond_image)
             # apply augmentation to the image
@@ -640,32 +680,13 @@ class IPDataset(Dataset[IPBatch]):
             # encode the image into latent
             latent = self.trainer.lda.encode_image(image=image)  # type: ignore
         else:
-            image_embedding = data[self.image_encoder_column]
+            image_embedding = data["image_embedding"]
             latent = data["lda_embedding"]
         text_embedding = data["text_embedding"]
-        pooled_text_embedding = data.get("pooled_text_embedding", self.empty_pooled_text_embedding)
+        pooled_text_embedding = data.get("pooled_text_embedding", self.trainer.empty_pooled_text_embedding)
         if not isinstance(pooled_text_embedding, Tensor):
             assert isinstance(pooled_text_embedding, list)
             pooled_text_embedding = Tensor(pooled_text_embedding)
-
-        rand_num = random.random()
-        if rand_num < dataset_config.image_drop_rate:
-            if dataset_config.zero_uncond:
-                image_embedding = zeros_like(image_embedding)
-            else:
-                image_embedding = self.black_image_embedding
-        elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
-            text_embedding = self.empty_text_embedding
-            pooled_text_embedding = self.empty_pooled_text_embedding
-        elif rand_num < (
-            dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate
-        ):
-            text_embedding = self.empty_text_embedding
-            pooled_text_embedding = self.empty_pooled_text_embedding
-            if dataset_config.zero_uncond:
-                image_embedding = zeros_like(image_embedding)
-            else:
-                image_embedding = self.black_image_embedding
 
         return IPBatch(
             latent=latent,
@@ -705,6 +726,29 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         c = -13.269541143845919
         C = 0.36245161978354973
         return a * timestep**exponent + b * math.exp(-c / (timestep - 1001)) + C
+    def drop_latents(self, image_embedding, text_embedding, pooled_text_embedding=None):
+        dataset_config = self.config.dataset
+        rand_num = random.random()
+        if rand_num < dataset_config.image_drop_rate:
+            if dataset_config.zero_uncond:
+                image_embedding = zeros_like(image_embedding)
+            else:
+                image_embedding = self.black_image_embedding
+        elif rand_num < (dataset_config.image_drop_rate + dataset_config.text_drop_rate):
+            text_embedding = self.empty_text_embedding
+            if self.config.adapter.use_pooled_text_embedding:
+                pooled_text_embedding = self.empty_pooled_text_embedding
+        elif rand_num < (
+            dataset_config.image_drop_rate + dataset_config.text_drop_rate + dataset_config.text_and_image_drop_rate
+        ):
+            text_embedding = self.empty_text_embedding
+            if self.config.adapter.use_pooled_text_embedding:
+                pooled_text_embedding = self.empty_pooled_text_embedding
+            if dataset_config.zero_uncond:
+                image_embedding = zeros_like(image_embedding)
+            else:
+                image_embedding = self.black_image_embedding
+        return image_embedding, text_embedding, pooled_text_embedding
     @cached_property
     def dataset_length(self) -> int:
         """
@@ -819,9 +863,79 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     @cached_property
     def timestep_weights(self) -> Tensor:
         return generate_timestep_weights(self.config.adapter, 1000).to(self.device, dtype=float32)
-    def load_dataset(self) -> IPDataset:
-        return IPDataset(trainer=self)
+    def get_constants(self):
+        self.cond_resolution: int = self.config.adapter.resolution
+        if isinstance(self.text_encoder, TextEncoderWithPoolingL):
+            self.empty_text_embedding = self.text_encoder("")[0].float().cpu()
+            self.empty_pooled_text_embedding = self.text_encoder("")[1].float().cpu()
+        else:
+            self.empty_text_embedding = self.text_encoder("").float().cpu()
+            self.empty_pooled_text_embedding = self.text_encoder("").float().cpu()[:, 1]
+        self.black_image_embedding = self.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.device, dtype=self.dtype)).float().cpu()
+    def load_web_dataset(self) -> wds.DataPipeline:
+        all_keys = ["text_embedding", "pooled_text_embedding", "lda_embedding", "image_embedding"]
+        if self.trainer.config.adapter.layernorm_dino:
+            image_encoder_pth = "dinov2_vitl14_reg4_pretrain.pth"
+        else:
+            image_encoder_pth = "dinov2_vitl14_reg4_pretrain_no_norm.pth"
+        if isinstance(self.trainer.text_encoder, CLIPTextEncoderL):
+            all_keys.remove("pooled_text_embedding")
+        processing_pipeline = [
+            wds.decode(wds.handle_extension("pth", wds.autodecode.torch_loads), handler=wds.ignore_and_continue),
+            wds.rename(
+                text_embedding="CLIPL.pth",
+                pooled_text_embedding="CLIPLPool.pth",
+                lda_embedding="sd15_lda.pth",
+                image_embedding=image_encoder_pth,
+                handler=wds.warn_and_continue,
+            ),
+            wds.map(filter_keys(set(all_keys))),
+        ]
+        pipeline = [
+            wds.ResampledShards(self.trainer.config.dataset.train_shards_path_or_url),
+            tarfile_to_samples_nothrow,
+            wds.shuffle(self.trainer.config.dataset.shuffle_buffer_size),
+            *processing_pipeline,
+            wds.batched(self.trainer.config.training.batch_size, partial=False, collation_fn=default_collate),
+        ]
+        global_batch_size = self.trainer.config.training.batch_size
+        num_workers = self.trainer.config.training.dataset_workers
+        num_train_examples = self.training.config.dataset.num_train_examples
+        num_worker_batches = math.ceil(num_train_examples / (global_batch_size * num_workers))  # per dataloader worker
 
+        # each worker is iterating over this
+        return wds.DataPipeline(*pipeline).with_epoch(num_worker_batches)
+    def load_dataset(self) -> IPDataset:
+        if self.trainer.config.dataset.webdataset:
+            return self.load_web_dataset()
+        else:
+            return IPDataset(trainer=self)
+    @cached_property
+    def dataloader(self) -> DataLoader[Any]:
+        global_batch_size = self.trainer.config.training.batch_size
+        num_workers = self.trainer.config.training.dataset_workers
+        num_train_examples = self.training.config.dataset.num_train_examples
+        num_batches = math.ceil(num_train_examples / global_batch_size)
+        num_worker_batches = math.ceil(num_train_examples / (global_batch_size * num_workers))  # per dataloader worker
+        num_batches = num_worker_batches * num_workers
+        num_samples = num_batches * global_batch_size
+
+        if self.trainer.config.dataset.webdataset:
+            dataloader = wds.WebLoader(
+                self.dataset,
+                batch_size=None,
+                shuffle=False,
+                num_workers=num_workers,
+                pin_memory=True,
+                persistent_workers=True,
+            )
+            dataloader.num_batches = num_batches
+            dataloader.num_samples = num_samples
+            return dataloader
+        else:
+            return DataLoader(
+                dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
+            )
     def sample_timestep(self, batch_size: int, /) -> Tensor:
         """Sample a timestep from a uniform distribution."""
         assert isinstance(self, Trainer), "This mixin can only be used with a Trainer"
@@ -864,28 +978,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         )
 
     def compute_loss(self, batch: IPBatch) -> Tensor:
-        """
-        For adapting this to PALP, the changes needed are
-        1. We need to guarantee that we have both the correct text and image embeddings
-        2. We need both the negative and the positive embeddings
-        3. We do CFG where the base pretrained model has a higher cfg than us
-
-        Then, the steps are
-        1. Predict the original latent given noisy latent+scheduler with injected model(I think)
-        2. Given the predicted x_0 we add noise to it again at timestep t to get x'_t(for now I'm thinking of using same timestep)
-        3. Eject adapter from unet and compute the empty embeds and the text conditioned embeds and do a cfg with some alpha condition scale
-        4. Inject, and do cfg with unconditioned image text, and get conditioned and do cfg with some condition scale beta
-        5. To the loss, add the difference between 3 and 4
-        """
-        palp_step = (self.clock.step % self.clock.num_step_per_iteration) < self.config.adapter.palp_steps
-        do_palp = self.config.adapter.do_palp and palp_step
-        if do_palp:
-            assert self.config.dataset.image_drop_rate == 0
-            assert self.config.dataset.text_drop_rate == 0
-            assert self.config.dataset.text_and_image_drop_rate == 0
-            alpha = self.config.adapter.palp_alpha
-            beta = self.config.adapter.palp_beta
-
         input_dtype = float32 if self.config.training.amp else self.dtype
         # retreive data from batch
         latents = batch.latent.to(self.device, dtype=self.dtype)
@@ -894,41 +986,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         if self.config.adapter.use_pooled_text_embedding:
             pooled_text_embeddings = batch.pooled_text_embedding.to(self.device, dtype=self.dtype)
         div_factor = self.config.adapter.image_embedding_div_factor
-        image_embedding = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
-        if do_palp:
-            uncond_text_embedding: Tensor = self.dataset.empty_text_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=self.dtype)
+        image_embeddings = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
+        for i in range(batch_size):
             if self.config.adapter.use_pooled_text_embedding:
-                uncond_pooled_text_embedding: Tensor = self.dataset.empty_pooled_text_embedding.repeat((batch_size, 1)).to(self.device, dtype=self.dtype)
-            if self.config.dataset.zero_uncond:
-                uncond_image_embedding = zeros_like(image_embedding)
+                image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i] = self.drop_latents(image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i])
             else:
-                uncond_image_embedding: Tensor = self.dataset.black_image_embedding.repeat((batch_size, 1, 1)).to(self.device, dtype=input_dtype)/div_factor
-            uncond_image_embedding = self.image_proj(uncond_image_embedding)
-        if self.config.adapter.do_palp and not palp_step:
-            # Clean up and remove redundancy
-            for i in range(batch_size):
-                adapter_config =  self.config.adapter
-                rand_num = random.random()
-                if rand_num < adapter_config.non_palp_image_drop_rate:
-                    if self.config.dataset.zero_uncond:
-                        image_embedding[i] = zeros_like(image_embedding[i])
-                    else:
-                        image_embedding[i] = self.dataset.black_image_embedding
-                elif rand_num < (adapter_config.non_palp_image_drop_rate + adapter_config.non_palp_text_drop_rate):
-                    text_embeddings[i] = self.dataset.empty_text_embedding
-                    pooled_text_embeddings[i] = self.dataset.empty_pooled_text_embedding
-                elif rand_num < (
-                    adapter_config.non_palp_image_drop_rate + adapter_config.non_palp_text_drop_rate + adapter_config.non_palp_text_and_image_drop_rate
-                ):
-                    text_embeddings[i] = self.dataset.empty_text_embedding
-                    pooled_text_embeddings[i] = self.dataset.empty_pooled_text_embedding
-                    if self.config.dataset.zero_uncond:
-                        image_embedding[i] = zeros_like(image_embedding)
-                    else:
-                        image_embedding[i] = self.dataset.black_image_embedding
-        image_embedding = self.image_proj(image_embedding)
+                image_embeddings[i], text_embeddings[i], _ = self.drop_latents(image_embeddings[i], text_embeddings[i])
+        image_embeddings = self.image_proj(image_embeddings)
         # set IP embeddings context
-        self.adapter.set_image_embedding(image_embedding)
+        self.adapter.set_image_embedding(image_embeddings)
         # set pooled text embedding
         if self.config.adapter.use_pooled_text_embedding:
             self.adapter.set_pooled_text_embedding(pooled_text_embeddings/self.config.adapter.pooled_text_div_factor)
@@ -974,59 +1040,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             )
             loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
             loss = loss.mean()
-        if do_palp:
-            predicted_latent = self.remove_noise_from_latents(noisy_latents, prediction)
-            timestep = self.sample_timestep(batch_size)
-            palp_noise = self.sample_noise(size=latents.shape, dtype=latents.dtype)
-            noisy_predicted_latent = self.add_noise_to_latents(predicted_latent, palp_noise)
-            if self.config.adapter.use_pooled_text_embedding:
-                self.adapter.set_pooled_text_embedding(uncond_pooled_text_embedding/self.config.adapter.pooled_text_div_factor)
-            self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
-            self.unet.set_timestep(timestep=timestep)
-            self.adapter.set_image_embedding(uncond_image_embedding)
-            uncond_adapted_noise = self.unet(noisy_predicted_latent)
-            if self.config.adapter.use_pooled_text_embedding:
-                self.adapter.set_pooled_text_embedding(pooled_text_embeddings/self.config.adapter.pooled_text_div_factor)
-            self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
-            self.unet.set_timestep(timestep=timestep)
-            self.adapter.set_image_embedding(image_embedding)
-            cond_adapted_noise = self.unet(noisy_predicted_latent)
-            self.adapter.eject()
-            self.unet.set_clip_text_embedding(clip_text_embedding=uncond_text_embedding)
-            self.unet.set_timestep(timestep=timestep)
-            uncond_default_noise = self.unet(noisy_predicted_latent)
-            self.unet.set_clip_text_embedding(clip_text_embedding=text_embeddings)
-            self.unet.set_timestep(timestep=timestep)
-            cond_default_noise = self.unet(noisy_predicted_latent)
-            self.adapter.inject()
-            cfg_default_noise = uncond_default_noise+alpha*(cond_default_noise-uncond_default_noise)
-            cfg_adapted_noise = uncond_adapted_noise+beta*(cond_adapted_noise-uncond_adapted_noise)
-            palp_loss = mse_loss(cfg_default_noise.float(), cfg_adapted_noise.float(), reduction="none")
-            if self.config.adapter.palp_rescale:
-                if rescaler:
-                    scales = tensor(
-                        [self.approximate_loss(999 - int(t.item())) for t in timestep],
-                        device=self.device,
-                        dtype=float32,
-                    ).reshape(-1, 1, 1, 1)
-                    palp_loss = (palp_loss / scales).mean()
-                elif snr_gamma is None:
-                    palp_loss = palp_loss.mean()
-                else:
-                    # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
-                    # Since we predict the noise instead of x_0, the original formulation is slightly changed.
-                    # This is discussed in Section 4.2 of the same paper.
-                    signal_to_noise_ratios = self.signal_to_noise_ratios[timestep]
-
-                    mse_loss_weights = (
-                        stack([signal_to_noise_ratios, snr_gamma * ones_like(timestep)], dim=1).min(dim=1)[0]
-                        / signal_to_noise_ratios
-                    )
-                    palp_loss = palp_loss.mean(dim=list(range(1, len(palp_loss.shape)))) * mse_loss_weights
-                    palp_loss = palp_loss.mean()
-            else:
-                palp_loss = palp_loss.mean()
-            loss += palp_loss
         return loss
 
     def compute_evaluation(self) -> None:
