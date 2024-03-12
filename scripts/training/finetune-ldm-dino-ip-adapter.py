@@ -913,9 +913,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         return IPDataset(trainer=self)
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
-        global_batch_size = self.trainer.config.training.batch_size
-        num_workers = self.trainer.config.training.dataset_workers
-        num_train_examples = self.training.config.dataset.num_train_examples
+        global_batch_size = self.config.training.batch_size
+        num_workers = self.config.training.dataset_workers
+        num_train_examples = self.config.dataset.num_train_examples
         num_batches = math.ceil(num_train_examples / global_batch_size)
         num_worker_batches = math.ceil(num_train_examples / (global_batch_size * num_workers))  # per dataloader worker
         num_batches = num_worker_batches * num_workers
