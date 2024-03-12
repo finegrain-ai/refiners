@@ -146,7 +146,7 @@ class DatasetConfig(BaseModel):
     save_path: str | None = None
     dataset_length: int | None = None
     zero_uncond: bool = False
-    num_training_examples: int = 567597
+    num_train_examples: int = 567597
 
 
 # Adapted from https://github.com/huggingface/open-muse
