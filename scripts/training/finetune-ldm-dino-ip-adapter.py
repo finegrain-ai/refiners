@@ -1007,6 +1007,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             if self.config.adapter.use_pooled_text_embedding:
                 image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i] = self.drop_latents(image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i])
             else:
+                print(image_embeddings.shape)
+                print(type(image_embeddings))
+
                 image_embeddings[i], text_embeddings[i], _ = self.drop_latents(image_embeddings[i], text_embeddings[i])
         image_embeddings = self.image_proj(image_embeddings)
         # set IP embeddings context
