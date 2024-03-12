@@ -90,7 +90,7 @@ class OptimizerConfig(BaseModel):
     learning_rate: float = 1e-4
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
-    weight_decay: float = 0.0
+    weight_decay: float = 1e-2
 
     model_config = ConfigDict(extra="forbid")
 
