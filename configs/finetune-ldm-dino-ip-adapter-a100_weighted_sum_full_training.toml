@@ -104,7 +104,7 @@ zero_uncond = false
 
 [test_ldm]
 num_inference_steps = 30
-num_images_per_prompt = 0
+num_images_per_prompt = 1
 prompts = [
     "A dog flying over a castle",
     "Cute cats watching a tv",
