@@ -756,6 +756,8 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
 
         This is used to compute the number of batches per epoch.
         """
+        if self.config.dataset.webdataset:
+            return self.config.dataset.num_train_examples
         return len(self.dataset)
     @register_model()
     def lda(self, lda_config: ModelConfig) -> SD1Autoencoder:
@@ -908,8 +910,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
     def load_dataset(self) -> IPDataset:
         if self.config.dataset.webdataset:
             return self.load_web_dataset()
-        else:
-            return IPDataset(trainer=self)
+        return IPDataset(trainer=self)
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
         global_batch_size = self.trainer.config.training.batch_size
@@ -932,10 +933,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             dataloader.num_batches = num_batches
             dataloader.num_samples = num_samples
             return dataloader
-        else:
-            return DataLoader(
-                dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
-            )
+        return DataLoader(
+            dataset=self.dataset, batch_size=self.config.training.batch_size, num_workers=self.config.training.dataset_workers, shuffle=True, collate_fn=self.collate_fn
+        )
     def sample_timestep(self, batch_size: int, /) -> Tensor:
         """Sample a timestep from a uniform distribution."""
         assert isinstance(self, Trainer), "This mixin can only be used with a Trainer"
