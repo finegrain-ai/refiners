@@ -874,11 +874,11 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         self.black_image_embedding = self.image_encoder(zeros((1, 3, self.cond_resolution, self.cond_resolution)).to(self.device, dtype=self.dtype)).float().cpu()
     def load_web_dataset(self) -> wds.DataPipeline:
         all_keys = ["text_embedding", "pooled_text_embedding", "lda_embedding", "image_embedding"]
-        if self.trainer.config.adapter.layernorm_dino:
+        if self.config.adapter.layernorm_dino:
             image_encoder_pth = "dinov2_vitl14_reg4_pretrain.pth"
         else:
             image_encoder_pth = "dinov2_vitl14_reg4_pretrain_no_norm.pth"
-        if isinstance(self.trainer.text_encoder, CLIPTextEncoderL):
+        if isinstance(self.text_encoder, CLIPTextEncoderL):
             all_keys.remove("pooled_text_embedding")
         processing_pipeline = [
             wds.decode(wds.handle_extension("pth", wds.autodecode.torch_loads), handler=wds.ignore_and_continue),
@@ -892,15 +892,15 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             wds.map(filter_keys(set(all_keys))),
         ]
         pipeline = [
-            wds.ResampledShards(self.trainer.config.dataset.train_shards_path_or_url),
+            wds.ResampledShards(self.config.dataset.train_shards_path_or_url),
             tarfile_to_samples_nothrow,
-            wds.shuffle(self.trainer.config.dataset.shuffle_buffer_size),
+            wds.shuffle(self.config.dataset.shuffle_buffer_size),
             *processing_pipeline,
-            wds.batched(self.trainer.config.training.batch_size, partial=False, collation_fn=default_collate),
+            wds.batched(self.config.training.batch_size, partial=False, collation_fn=default_collate),
         ]
-        global_batch_size = self.trainer.config.training.batch_size
-        num_workers = self.trainer.config.training.dataset_workers
-        num_train_examples = self.training.config.dataset.num_train_examples
+        global_batch_size = self.config.training.batch_size
+        num_workers = self.config.training.dataset_workers
+        num_train_examples = self.config.dataset.num_train_examples
         num_worker_batches = math.ceil(num_train_examples / (global_batch_size * num_workers))  # per dataloader worker
 
         # each worker is iterating over this
