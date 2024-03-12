@@ -721,12 +721,12 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             image_embedding=image_embeddings,
         )
     def collate_fn_from_dict(self, batch: list[dict]) -> IPBatch:
-        latents = cat(tensors=[item["latent"] for item in batch])
-        text_embeddings = cat(tensors=[item["text_embedding"] for item in batch])
+        latents = cat(tensors=[item["latent"][None] for item in batch])
+        text_embeddings = cat(tensors=[item["text_embedding"][None] for item in batch])
         pooled_text_embeddings = None
         if self.config.adapter.use_pooled_text_embedding:
-            pooled_text_embeddings = cat(tensors=[item["pooled_text_embedding"] for item in batch])
-        image_embeddings = cat([item["image_embedding"] for item in batch])
+            pooled_text_embeddings = cat(tensors=[item["pooled_text_embedding"][None] for item in batch])
+        image_embeddings = cat([item["image_embedding"][None] for item in batch])
         return IPBatch(
             latent=latents,
             text_embedding=text_embeddings,
