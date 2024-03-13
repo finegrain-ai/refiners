@@ -184,7 +184,7 @@ class SDLoraManager:
 
         for exc_k, exc_v in preprocess.items():
             ls = {k: v for k, v in loras_excluded.items() if exc_k in k}
-            auto_attach_loras(ls, self.unet, include=[exc_v], debug_map=debug_map)
+            auto_attach_loras(ls, self.unet, include=[exc_v], exclude=exclude, debug_map=debug_map)
 
         auto_attach_loras(
             loras_remaining,
