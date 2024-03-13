@@ -1003,7 +1003,6 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             pooled_text_embeddings = batch.pooled_text_embedding.to(self.device, dtype=self.dtype)
         div_factor = self.config.adapter.image_embedding_div_factor
         image_embeddings = batch.image_embedding.to(self.device, dtype=input_dtype)/div_factor
-        print(image_embeddings.shape, latents.shape, text_embeddings.shape)
         for i in range(batch_size):
             if self.config.adapter.use_pooled_text_embedding:
                 image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i] = self.drop_latents(image_embeddings[i], text_embeddings[i], pooled_text_embeddings[i])
