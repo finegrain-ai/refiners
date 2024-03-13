@@ -55,7 +55,7 @@ evaluation_interval = {"number" = 500, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
 # dtype = "float32"
-dataset_workers=8
+dataset_workers=4
 checkpoint_interval = {"number" = 10000, "unit" = "step"}
 device="cuda"
 amp = true
