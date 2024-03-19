@@ -7,19 +7,18 @@ from typing import Any, Callable, Iterable
 import numpy as np
 import torch
 from loguru import logger
-from torch import Tensor, cuda, nn
+from torch import cuda, nn
 
 from refiners.fluxion.utils import manual_seed
 
 
 def compute_grad_norm(parameters: Iterable[nn.Parameter]) -> float:
     """
-    Computes the gradient norm of the parameters of a given model similar to `clip_grad_norm_` returned value.
+    Computes the gradient norm of the parameters in the given iterable.
+
+    We use the `torch.nn.utils.clip_grad_norm_` function to process the gradients efficiently on the GPU or CPU.
     """
-    gradients: list[Tensor] = [p.grad.detach() for p in parameters if p.grad is not None]
-    assert gradients, "The model has no gradients to compute the norm."
-    total_norm = torch.stack(tensors=[gradient.norm() for gradient in gradients]).norm().item()  # type: ignore
-    return total_norm  # type: ignore
+    return nn.utils.clip_grad.clip_grad_norm_(parameters, float("inf")).item()
 
 
 def count_learnable_parameters(parameters: Iterable[nn.Parameter]) -> int:

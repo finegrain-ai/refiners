@@ -37,7 +37,6 @@ from refiners.training_utils.common import (
     scoped_seed,
 )
 from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
-from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
 
 
 class WarmupScheduler(LRScheduler):
@@ -160,10 +159,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
-
-    @register_callback()
-    def gradient_clipping(self, config: GradientClippingConfig) -> GradientClipping:
-        return GradientClipping(config)
 
     @property
     def models(self) -> ModelRegistry:
@@ -351,6 +346,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
+            max_norm = self.config.training.gradient_clipping_max_norm or float("inf")
+            self.grad_norm = nn.utils.clip_grad.clip_grad_norm_(self.learnable_parameters, max_norm=max_norm).item()
             self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
