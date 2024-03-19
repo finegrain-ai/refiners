@@ -220,13 +220,14 @@ Example:
 
 ```python
 from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulers
+from refiners.training_utils.common import TimeUnit, TimeValue
 
 class AutoencoderConfig(BaseConfig):
     # Since we are using a synthetic dataset, we will use a arbitrary fixed epoch size.
     epoch_size: int = 2048
 
 training = TrainingConfig(
-    duration="1000:epoch",
+    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32"
@@ -335,11 +336,11 @@ We can also evaluate the model using the `compute_evaluation` method.
 
 ```python
 training = TrainingConfig(
-    duration="1000:epoch",
+    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32",
-    evaluation_interval="50:epoch" # We set the evaluation to be done every 10 epochs
+    evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
 )
 
 class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
@@ -459,6 +460,8 @@ You can train this toy model using the code below:
     import torch
     from loguru import logger
     from PIL import Image
+    from torch.nn import functional as F
+
     from refiners.fluxion import layers as fl
     from refiners.fluxion.utils import image_to_tensor, tensor_to_image
     from refiners.training_utils import (
@@ -476,7 +479,7 @@ You can train this toy model using the code below:
         register_callback,
         register_model,
     )
-    from torch.nn import functional as F
+    from refiners.training_utils.common import TimeUnit, TimeValue
 
 
     class ConvBlock(fl.Chain):
@@ -487,7 +490,7 @@ You can train this toy model using the code below:
                     out_channels=out_channels,
                     kernel_size=3,
                     padding=1,
-                    groups=min(in_channels, out_channels)
+                    groups=min(in_channels, out_channels),
                 ),
                 fl.LayerNorm2d(out_channels),
                 fl.SiLU(),
@@ -576,9 +579,7 @@ You can train this toy model using the code below:
         random.seed(seed)
 
         while True:
-            rectangle = Image.new(
-                "L", (random.randint(1, size), random.randint(1, size)), color=255
-            )
+            rectangle = Image.new("L", (random.randint(1, size), random.randint(1, size)), color=255)
             mask = Image.new("L", (size, size))
             mask.paste(
                 rectangle,
@@ -627,11 +628,11 @@ You can train this toy model using the code below:
     )
 
     training = TrainingConfig(
-        duration="1000:epoch",  # type: ignore
+        duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
         batch_size=32,
         device="cuda" if torch.cuda.is_available() else "cpu",
         dtype="float32",
-        evaluation_interval="50:epoch",  # type: ignore
+        evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
     )
 
     optimizer = OptimizerConfig(
@@ -639,9 +640,7 @@ You can train this toy model using the code below:
         learning_rate=1e-4,
     )
 
-    lr_scheduler = LRSchedulerConfig(
-        type=LRSchedulerType.CONSTANT_LR
-    )
+    lr_scheduler = LRSchedulerConfig(type=LRSchedulerType.CONSTANT_LR)
 
     config = AutoencoderConfig(
         training=training,
@@ -672,9 +671,7 @@ You can train this toy model using the code below:
             return Autoencoder()
 
         def compute_loss(self, batch: Batch) -> torch.Tensor:
-            x_reconstructed = self.autoencoder.decoder(
-                self.autoencoder.encoder(batch.image)
-            )
+            x_reconstructed = self.autoencoder.decoder(self.autoencoder.encoder(batch.image))
             return F.binary_cross_entropy(x_reconstructed, batch.image)
 
         def compute_evaluation(self) -> None:
@@ -687,14 +684,14 @@ You can train this toy model using the code below:
                 x_reconstructed = self.autoencoder.decoder(self.autoencoder.encoder(mask))
                 loss = F.mse_loss(x_reconstructed, mask)
                 validation_losses.append(loss.detach().cpu().item())
-                grid.append((tensor_to_image(mask), tensor_to_image((x_reconstructed>0.5).float())))
+                grid.append((tensor_to_image(mask), tensor_to_image((x_reconstructed > 0.5).float())))
 
             mean_loss = sum(validation_losses) / len(validation_losses)
             logger.info(f"Mean validation loss: {mean_loss}, epoch: {self.clock.epoch}")
 
             import matplotlib.pyplot as plt
 
-            _, axes = plt.subplots(4, 2, figsize=(8, 16)) # type: ignore
+            _, axes = plt.subplots(4, 2, figsize=(8, 16))  # type: ignore
 
             for i, (mask, reconstructed) in enumerate(grid):
                 axes[i, 0].imshow(mask, cmap="gray")

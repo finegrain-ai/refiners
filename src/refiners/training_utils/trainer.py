@@ -241,7 +241,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
         config = self.config.lr_scheduler
-        scheduler_step_size = config.update_interval["number"]
+        scheduler_step_size = config.update_interval.number
 
         match config.type:
             case LRSchedulerType.CONSTANT_LR:
@@ -286,7 +286,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case _:
                 raise ValueError(f"Unknown scheduler type: {config.type}")
 
-        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval["unit"])
+        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval.unit)
         if warmup_scheduler_steps > 0:
             lr_scheduler = WarmupScheduler(
                 optimizer=self.optimizer,

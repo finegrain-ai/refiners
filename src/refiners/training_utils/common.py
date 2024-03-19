@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Iterable
@@ -7,7 +8,6 @@ import numpy as np
 import torch
 from loguru import logger
 from torch import Tensor, cuda, nn
-from typing_extensions import TypedDict
 
 from refiners.fluxion.utils import manual_seed
 
@@ -79,26 +79,32 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
     return decorator
 
 
-class TimeUnit(Enum):
+class TimeUnit(str, Enum):
     STEP = "step"
     EPOCH = "epoch"
     ITERATION = "iteration"
     DEFAULT = "step"
 
 
-class TimeValue(TypedDict):
+@dataclass
+class TimeValue:
     number: int
     unit: TimeUnit
 
 
-def parse_number_unit_field(value: str | int | dict[str, str | int]) -> TimeValue:
+TimeValueInput = str | int | dict[str, str | int] | TimeValue
+
+
+def parse_number_unit_field(value: TimeValueInput) -> TimeValue:
     match value:
         case str(value_str):
             number, unit = value_str.split(sep=":")
-            return {"number": int(number.strip()), "unit": TimeUnit(value=unit.strip().lower())}
+            return TimeValue(number=int(number.strip()), unit=TimeUnit(value=unit.strip().lower()))
         case int(number):
-            return {"number": number, "unit": TimeUnit.DEFAULT}
+            return TimeValue(number=number, unit=TimeUnit.DEFAULT)
         case {"number": int(number), "unit": str(unit)}:
-            return {"number": number, "unit": TimeUnit(value=unit.lower())}
+            return TimeValue(number=number, unit=TimeUnit(value=unit.lower()))
+        case TimeValue(number, unit):
+            return TimeValue(number=number, unit=unit)
         case _:
             raise ValueError(f"Unsupported value format: {value}")
