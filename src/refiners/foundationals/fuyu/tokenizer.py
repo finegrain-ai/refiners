@@ -3,16 +3,15 @@ import json
 from pathlib import Path
 from typing import List
 
-from torch import Tensor, cat, tensor
+from torch import Tensor, tensor
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion import pad
 
 
 class FuyuTokenizer(fl.Module):
     def __init__(
             self, 
-            vocabulary_path: str,
+            vocabulary_path: str | Path = Path(__file__).resolve().parent / "tokenizer.json.gz",
         ):
         super().__init__()
 
@@ -20,16 +19,6 @@ class FuyuTokenizer(fl.Module):
             config = json.load(f)
         
         self.vocabulary_path=vocabulary_path
-
-        #special tokens
-        self.unknown_token = config['added_tokens'][0]
-        self.pad_token = self.unknown_token
-        # self.end_of_sentence_token = config['added_tokens'][1]
-        self.eos_token = '<0x04>'
-        self.bos_token = '<s>'
-        self.speaker = "|SPEAKER|"
-        self.newline = "|NEWLINE|"
-
         #for normalization
         self.prepend_char = config['normalizer']['normalizers'][0]['prepend']
         self.replace_pattern = config['normalizer']['normalizers'][1]['pattern']['String']
@@ -38,6 +27,16 @@ class FuyuTokenizer(fl.Module):
         self.token_to_log_proba = {token: log_proba for token, log_proba in config['model']['vocab']}
         self.token_to_id = {token: i for i, (token, _) in enumerate(config['model']['vocab'])}
         self.id_to_token = {i: token for token, i in self.token_to_id.items()}
+
+        #special tokens
+        self.unknown_token = config['added_tokens'][0]
+        self.pad_token = self.unknown_token
+        self.eos_token = config['added_tokens'][1]
+
+        self.next_token_id = self.token_to_id['<0x04>']
+        self.bos_token_id = self.token_to_id['<s>']
+        self.speaker_token_id = self.token_to_id["|SPEAKER|"]
+        self.newline_token_id = self.token_to_id["|NEWLINE|"]
 
     def _calculate_best_segmentation(self, text: str) -> List[int]: 
         N = len(text)
@@ -63,50 +62,36 @@ class FuyuTokenizer(fl.Module):
         i = N
         while i > 0:
             j = backpointer[i]
-            token = text[j:i] if text[j:i] in self.token_to_id else self.unk['content']
+            token = text[j:i] if text[j:i] in self.token_to_id else self.unknown_token['content']
             tokens.append(self.token_to_id.get(token, self.unknown_token['id']))
             i = j
 
         # Append bos token
-        tokens.append(self.token_to_id[self.bos_token])
+        tokens.append(self.bos_token_id)
         tokens.reverse()
-        # Append eos token
-        tokens.append(self.token_to_id[self.eos_token])
+        tokens.append(self.next_token_id)
         return tokens
     
     def encode(self, text: str) -> Tensor:
         normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
+        normalized_text.replace('\n', '|NEWLINE|')
         tokens = self._calculate_best_segmentation(normalized_text)
         return tensor(tokens).unsqueeze(dim=0)
     
-    def forward(self, text: str | list[str]) -> Tensor:
-        if isinstance(text, str):
-            return self.encode(text)
-        else:
-            assert isinstance(text, list), f"Expected type `str` or `list[str]`, got {type(text)}"
-            tokens = [self.encode(txt) for txt in text]
-            sequence_len = max(sequence.shape[1] for sequence in tokens)
-            padded_tokkens = [
-                pad(x=sequence, pad=(sequence_len - sequence.shape[1], 0), value=self.token_to_id[self.bos_token]) 
-                for sequence in tokens
-                ]
-            padded_tokkens = cat(padded_tokkens)
-
-        return(padded_tokkens)
+    def forward(self, text: str) -> Tensor:
+        return self.encode(text)
 
     def decode(self, tokens: list[int]) -> str:
-        # Reverse mapping from token ID to token
-        id_to_token = {i: token for token, i in self.token_to_id.items()}
-        
         decoded_tokens = []
         for token_id in tokens:
             # Skip special tokens like unknown, pad, or eos in the decoded output
-            if token_id in [self.unknown_token['id'], self.pad_token['id'], self.token_to_id[self.eos_token], self.token_to_id[self.bos_token]]:
+            token_id = token_id.item()
+            if token_id in [self.unknown_token['id'], self.pad_token['id'], self.eos_token['id'], self.bos_token_id, self.next_token_id]:
                 continue
-            token = id_to_token.get(token_id, self.unknown_token['content'])  # Use unk content if token_id is not found
+            token = self.id_to_token.get(token_id, self.unknown_token['content'])  # Use unk content if token_id is not found
             decoded_tokens.append(token)
         
         # Join all tokens to form the original string
-        decoded_text = ''.join(decoded_tokens).replace(self.prepend_char, ' ').strip()
+        decoded_text = ''.join(decoded_tokens).replace(self.replace_char, self.replace_pattern).strip()
         
         return decoded_text
