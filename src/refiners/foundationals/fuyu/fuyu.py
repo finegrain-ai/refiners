@@ -1,11 +1,11 @@
 from dataclasses import dataclass
+from typing import Any
 
 from torch import device as Device, dtype as DType, float16 as Tfloat16, float32 as Tfloat32
 
 import refiners.fluxion.layers as fl
-from refiners.foundationals.clip.tokenizer import CLIPTokenizer
-from refiners.foundationals.fuyu.common import Softmax
 from refiners.foundationals.fuyu.input_processor import InputEncoder
+from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
 
 
@@ -37,9 +37,9 @@ class Fuyu8b:
     feedforward_dim: int = 16_384
     max_sequence_length: int = 16_384
     vocabulary_size: int = 262_144
-    tokenizer: CLIPTokenizer | None = CLIPTokenizer(sequence_length=16_384)
+    tokenizer: FuyuTokenizer | None = FuyuTokenizer()
     patch_size: int = 30
-    padding_value: int = 1
+    padding_value: float = 1.0/255
     num_layers: int = 36
     num_heads: int = 64
     norm_eps: float = 1e-5
@@ -58,7 +58,7 @@ class Fuyu(fl.Chain):
         feedforward_dim: int,
         max_sequence_length: int,
         vocabulary_size: int,
-        tokenizer: CLIPTokenizer | None,
+        tokenizer: FuyuTokenizer | None,
         patch_size: int,
         padding_value: int,
         num_layers: int,
@@ -111,6 +111,7 @@ class Fuyu(fl.Chain):
                 bias=False,
                 device=device,
                 dtype=dtype
-            ),
-            Softmax()
+            )
         )
+    def init_context(self) -> dict[str, dict[str, Any]]:
+        return {"attention": {"mask": None}}
