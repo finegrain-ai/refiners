@@ -1,7 +1,9 @@
 import argparse
-from pathlib import Path
+import logging
+import os
 
 import torch
+from tqdm import tqdm
 from transformers import FuyuForCausalLM
 
 from refiners.fluxion.utils import load_tensors, save_to_safetensors
@@ -13,15 +15,15 @@ def convert_fuyu_huggingface(weights: dict[str, torch.Tensor]) -> None:
     depth = max([int(k.split(".")[3]) for k in weights.keys() if k.startswith("language_model.model.layers.")]) + 1
 
     rename_keys: list[tuple[str, str]] = [
-        ("vision_embed_token.bias", "InputEncoder.ImageEncoder.Linear.bias"),
-        ("vision_embed_token.weight", "InputEncoder.ImageEncoder.Linear.weight"),
-        ("language_model.model.embed_tokens.weight", "InputEncoder.TextEncoder.TokenEncoder.weight")
+        ("vision_embed_tokens.bias", "InputEncoder.image_encoder.Linear.bias"),
+        ("vision_embed_tokens.weight", "InputEncoder.image_encoder.Linear.weight"),
+        ("language_model.model.embed_tokens.weight", "InputEncoder.token_encoder.weight"),
         ("language_model.model.final_layernorm.weight", "LayerNorm.weight"),
         ("language_model.model.final_layernorm.bias", "LayerNorm.bias"),
         ("language_model.lm_head.weight", "Linear.weight")
     ]
 
-    for i in range(depth):
+    for i in tqdm(range(depth), desc="Modifying state dict"):
         rename_keys.append(
             (
                 f"language_model.model.layers.{i}.input_layernorm.weight", 
@@ -35,25 +37,25 @@ def convert_fuyu_huggingface(weights: dict[str, torch.Tensor]) -> None:
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.mlp.dense_4h_to_h.weight", 
+                f"language_model.model.layers.{i}.mlp.dense_h_to_4h.weight", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_2.FeedForward.Linear_1.weight"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.mlp.dense_4h_to_h.bias", 
+                f"language_model.model.layers.{i}.mlp.dense_h_to_4h.bias", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_2.FeedForward.Linear_1.bias"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.mlp.dense_h_to_4h.weight", 
+                f"language_model.model.layers.{i}.mlp.dense_4h_to_h.weight", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_2.FeedForward.Linear_2.weight"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.mlp.dense_h_to_4h.bias", 
+                f"language_model.model.layers.{i}.mlp.dense_4h_to_h.bias", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_2.FeedForward.Linear_2.bias"
             )
         )
@@ -95,8 +97,8 @@ def convert_fuyu_huggingface(weights: dict[str, torch.Tensor]) -> None:
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.self_attn.q_layernorm.bias", 
-                f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_2.LayerNorm.bias"
+                f"language_model.model.layers.{i}.self_attn.q_layernorm.weight", 
+                f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_2.LayerNorm.weight"
             )
         )
         rename_keys.append(
@@ -138,9 +140,9 @@ def main() -> None:
         type=str,
         dest="output_path",
         default=None,
+        required=True,
         help=(
-            "Path to save the converted model. If not specified, the output path will be the source path with the"
-            " extension changed to .safetensors."
+            "Path to save the converted model"
         ),
     )
     parser.add_argument("--half", action="store_true", dest="half")
@@ -150,14 +152,15 @@ def main() -> None:
         weights = load_tensors(args.source_path)
     else:
         model_id = "adept/fuyu-8b"
-        source = FuyuForCausalLM.from_pretrained(model_id)
+        source = FuyuForCausalLM.from_pretrained(model_id, low_cpu_mem_usage=True)
         weights = source.state_dict()
 
     convert_fuyu_huggingface(weights)
     if args.half:
         weights = {key: value.half() for key, value in weights.items()}
-    if args.output_path is None:
-        args.output_path = f"{Path(args.source_path).stem}.safetensors"
+    output_dir = os.path.split(args.output_path)[0]
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     save_to_safetensors(path=args.output_path, tensors=weights)
 
 
