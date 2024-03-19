@@ -107,6 +107,66 @@ class ViTEmbeddings(fl.Chain):
         )
 
 
+class CLIPImageEncoderWithoutProj(fl.Chain):
+    """Contrastive Language-Image Pretraining (CLIP) image encoder without a projection.
+
+    See [[arXiv:2103.00020] Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)
+    for more details.
+    """
+
+    def __init__(
+        self,
+        image_size: int = 224,
+        embedding_dim: int = 768,
+        patch_size: int = 32,
+        num_layers: int = 12,
+        num_attention_heads: int = 12,
+        feedforward_dim: int = 3072,
+        layer_norm_eps: float = 1e-5,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        """Initialize a CLIP image encoder.
+
+        Args:
+            image_size: The size of the input image.
+            embedding_dim: The dimension of the embedding.
+            patch_size: The size of the patches.
+            num_layers: The number of layers.
+            num_attention_heads: The number of attention heads.
+            feedforward_dim: The dimension of the feedforward layer.
+            layer_norm_eps: The epsilon value for normalization.
+            device: The PyTorch device to use.
+            dtype: The PyTorch data type to use.
+        """
+        self.image_size = image_size
+        self.embedding_dim = embedding_dim
+        self.patch_size = patch_size
+        self.num_layers = num_layers
+        self.num_attention_heads = num_attention_heads
+        self.feedforward_dim = feedforward_dim
+        cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
+        super().__init__(
+            ViTEmbeddings(
+                image_size=image_size, embedding_dim=embedding_dim, patch_size=patch_size, device=device, dtype=dtype
+            ),
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+            fl.Chain(
+                TransformerLayer(
+                    embedding_dim=embedding_dim,
+                    feedforward_dim=feedforward_dim,
+                    num_attention_heads=num_attention_heads,
+                    layer_norm_eps=layer_norm_eps,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(num_layers)
+            ),
+            fl.Lambda(func=cls_token_pooling),
+            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
+        )
+
+
 class CLIPImageEncoder(fl.Chain):
     """Contrastive Language-Image Pretraining (CLIP) image encoder.
 
@@ -148,25 +208,18 @@ class CLIPImageEncoder(fl.Chain):
         self.num_layers = num_layers
         self.num_attention_heads = num_attention_heads
         self.feedforward_dim = feedforward_dim
-        cls_token_pooling: Callable[[Tensor], Tensor] = lambda x: x[:, 0, :]
         super().__init__(
-            ViTEmbeddings(
-                image_size=image_size, embedding_dim=embedding_dim, patch_size=patch_size, device=device, dtype=dtype
+            CLIPImageEncoderWithoutProj(
+                image_size,
+                embedding_dim,
+                patch_size,
+                num_layers,
+                num_attention_heads,
+                feedforward_dim,
+                layer_norm_eps,
+                device,
+                dtype,
             ),
-            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
-            fl.Chain(
-                TransformerLayer(
-                    embedding_dim=embedding_dim,
-                    feedforward_dim=feedforward_dim,
-                    num_attention_heads=num_attention_heads,
-                    layer_norm_eps=layer_norm_eps,
-                    device=device,
-                    dtype=dtype,
-                )
-                for _ in range(num_layers)
-            ),
-            fl.Lambda(func=cls_token_pooling),
-            fl.LayerNorm(normalized_shape=embedding_dim, eps=layer_norm_eps, device=device, dtype=dtype),
             fl.Linear(in_features=embedding_dim, out_features=output_dim, bias=False, device=device, dtype=dtype),
         )
 
