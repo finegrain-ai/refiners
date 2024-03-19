@@ -23,11 +23,11 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 class TrainingConfig(BaseModel):
     device: str = "cpu"
     dtype: str = "float32"
-    duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    duration: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
     seed: int = 0
     batch_size: int = 1
-    gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
-    evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    gradient_accumulation: TimeValue = TimeValue(number=1, unit=TimeUnit.STEP)
+    evaluation_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
     evaluation_seed: int = 0
 
     model_config = ConfigDict(extra="forbid")
@@ -63,8 +63,8 @@ class LRSchedulerType(str, Enum):
 
 class LRSchedulerConfig(BaseModel):
     type: LRSchedulerType = LRSchedulerType.DEFAULT
-    update_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
-    warmup: TimeValue = {"number": 0, "unit": TimeUnit.ITERATION}
+    update_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    warmup: TimeValue = TimeValue(number=0, unit=TimeUnit.ITERATION)
     gamma: float = 0.1
     lr_lambda: Callable[[int], float] | None = None
     mode: Literal["min", "max"] = "min"
