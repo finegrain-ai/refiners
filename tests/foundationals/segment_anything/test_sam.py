@@ -91,6 +91,13 @@ def sam_h(sam_h_weights: Path, test_device: torch.device) -> SegmentAnythingH:
 
 
 @pytest.fixture(scope="module")
+def sam_h_single_output(sam_h_weights: Path, test_device: torch.device) -> SegmentAnythingH:
+    sam_h = SegmentAnythingH(multimask_output=False, device=test_device)
+    sam_h.load_from_safetensors(tensors_path=sam_h_weights)
+    return sam_h
+
+
+@pytest.fixture(scope="module")
 def ref_path(test_sam_path: Path) -> Path:
     return test_sam_path / "test_sam_ref"
 
@@ -389,6 +396,34 @@ def test_predictor_dense_mask(
         facebook_dense_mask = torch.as_tensor(facebook_dense_masks[i])
         assert dense_mask_prediction.shape == facebook_dense_mask.shape
         assert isclose(intersection_over_union(dense_mask_prediction, facebook_dense_mask), 1.0, rel_tol=5e-05)
+
+
+def test_predictor_single_output(
+    facebook_sam_h_predictor: FacebookSAMPredictor,
+    sam_h_single_output: SegmentAnythingH,
+    truck: Image.Image,
+    one_prompt: SAMPrompt,
+) -> None:
+    predictor = facebook_sam_h_predictor
+    predictor.set_image(np.array(truck))
+
+    facebook_masks, facebook_scores, _ = predictor.predict(  # type: ignore
+        **one_prompt.facebook_predict_kwargs(),  # type: ignore
+        multimask_output=False,
+    )
+
+    assert len(facebook_masks) == 1
+
+    masks, scores, _ = sam_h_single_output.predict(truck, **one_prompt.__dict__)
+    masks = masks.squeeze(0)
+    scores = scores.squeeze(0)
+
+    assert len(masks) == 1
+
+    mask_prediction = masks[0].cpu()
+    facebook_mask = torch.as_tensor(facebook_masks[0])
+    assert isclose(intersection_over_union(mask_prediction, facebook_mask), 1.0, rel_tol=5e-05)
+    assert isclose(scores[0].item(), facebook_scores[0].item(), rel_tol=1e-05)
 
 
 def test_mask_encoder(

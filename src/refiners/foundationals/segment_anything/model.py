@@ -233,6 +233,7 @@ class SegmentAnythingH(SegmentAnything):
         point_encoder: PointEncoder | None = None,
         mask_encoder: MaskEncoder | None = None,
         mask_decoder: MaskDecoder | None = None,
+        multimask_output: bool | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
@@ -243,13 +244,20 @@ class SegmentAnythingH(SegmentAnything):
             point_encoder: The point encoder to use.
             mask_encoder: The mask encoder to use.
             mask_decoder: The mask decoder to use.
+            multimask_output: Whether to use multimask output.
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
         image_encoder = image_encoder or SAMViTH()
         point_encoder = point_encoder or PointEncoder()
         mask_encoder = mask_encoder or MaskEncoder()
-        mask_decoder = mask_decoder or MaskDecoder()
+
+        if mask_decoder:
+            assert (
+                mask_decoder.multimask_output == multimask_output
+            ), f"mask_decoder.multimask_output {mask_decoder.multimask_output} should match multimask_output (${multimask_output})"
+        else:
+            mask_decoder = MaskDecoder(multimask_output) if multimask_output is not None else MaskDecoder()
 
         super().__init__(
             image_encoder=image_encoder,
