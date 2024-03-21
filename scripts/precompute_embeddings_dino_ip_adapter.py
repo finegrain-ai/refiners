@@ -539,7 +539,7 @@ def main():
                     image_, size=args.lda_resolution, interpolation=InterpolationMode.BILINEAR, antialias=True
                 )
 
-                lda_image_ = TF.center_crop(image_, args.lda_resolution)
+                lda_image_ = TF.center_crop(lda_image_, args.lda_resolution)
                 lda_images.append(2*lda_image_-1)
                 image_ = TF.resize(
                     image_, size=args.resolution, interpolation=InterpolationMode.BILINEAR, antialias=True
