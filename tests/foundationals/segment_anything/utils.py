@@ -54,6 +54,23 @@ class FacebookSAMPredictor:
     ) -> tuple[NDArray, NDArray, NDArray]: ...
 
 
+class FacebookSAMPredictorHQ:
+    model: FacebookSAM
+
+    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None: ...
+
+    def predict(
+        self,
+        point_coords: NDArray | None = None,
+        point_labels: NDArray | None = None,
+        box: NDArray | None = None,
+        mask_input: NDArray | None = None,
+        multimask_output: bool = True,
+        return_logits: bool = False,
+        hq_token_only: bool = False,
+    ) -> tuple[NDArray, NDArray, NDArray]: ...
+
+
 @dataclass
 class SAMPrompt:
     foreground_points: Sequence[tuple[float, float]] | None = None

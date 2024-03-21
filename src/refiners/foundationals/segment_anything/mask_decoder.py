@@ -1,5 +1,5 @@
 import torch
-from torch import Tensor, device as Device, dtype as DType, nn
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
@@ -10,7 +10,7 @@ from refiners.foundationals.segment_anything.transformer import (
 
 
 class EmbeddingsAggregator(fl.ContextModule):
-    def forward(self, iou_mask_tokens: Tensor) -> Tensor:
+    def forward(self, tokens: Tensor) -> Tensor:
         mask_decoder = self.ensure_parent
         mask_decoder_context = mask_decoder.use_context(context_name="mask_decoder")
         image_embedding = mask_decoder_context["image_embedding"]
@@ -18,7 +18,7 @@ class EmbeddingsAggregator(fl.ContextModule):
         mask_embedding = mask_decoder_context["mask_embedding"]
         dense_positional_embedding = mask_decoder_context["dense_positional_embedding"]
 
-        sparse_embedding = torch.cat(tensors=(iou_mask_tokens, point_embedding), dim=1)
+        sparse_embedding = torch.cat(tensors=(tokens, point_embedding), dim=1)
         dense_embedding = (image_embedding + mask_embedding).flatten(start_dim=2).transpose(1, 2)
         if dense_positional_embedding.shape != dense_embedding.shape:
             dense_positional_embedding = dense_positional_embedding.flatten(start_dim=2).transpose(1, 2)
@@ -108,10 +108,11 @@ class DenseEmbeddingUpscaling(fl.Chain):
             ),
             fl.GeLU(),
             fl.Flatten(start_dim=2),
+            fl.SetContext(context="mask_decoder", key="upscaled_dense_embedding"),
         )
 
 
-class IOUMaskEncoder(fl.WeightedModule):
+class MaskDecoderTokens(fl.Chain):
     def __init__(
         self,
         embedding_dim: int = 256,
@@ -119,14 +120,13 @@ class IOUMaskEncoder(fl.WeightedModule):
         device: Device | str | None = None,
         dtype: DType | None = None,
     ) -> None:
-        super().__init__()
         self.embedding_dim = embedding_dim
         self.num_mask_tokens = num_mask_tokens
-        # aka prompt tokens + output token (for IoU scores prediction)
-        self.weight = nn.Parameter(data=torch.randn(num_mask_tokens + 1, embedding_dim, device=device, dtype=dtype))
-
-    def forward(self) -> Tensor:
-        return self.weight.unsqueeze(dim=0)
+        # aka output tokens (single-mask output + multi-mask output) + IoU token
+        super().__init__(
+            fl.UseContext(context="mask_decoder", key="image_embedding"),  # use Context to infer batch size
+            fl.Parameter(num_mask_tokens + 1, embedding_dim, device=device, dtype=dtype),
+        )
 
 
 class MaskPrediction(fl.Chain):
@@ -178,7 +178,6 @@ class IOUPrediction(fl.Chain):
 
         super().__init__(
             fl.Slicing(dim=1, start=0, end=1),
-            fl.Squeeze(dim=0),
             fl.MultiLinear(
                 input_dim=embedding_dim,
                 output_dim=num_mask_tokens,
@@ -188,6 +187,39 @@ class IOUPrediction(fl.Chain):
                 dtype=dtype,
             ),
             fl.Slicing(dim=-1, start=1) if multimask_output else fl.Slicing(dim=-1, start=0, end=1),
+            fl.Squeeze(dim=1),
+        )
+
+
+class Predictions(fl.Parallel):
+    def __init__(
+        self,
+        embedding_dim: int,
+        num_mask_tokens: int,
+        multimask_output: bool,
+        num_layers: int = 3,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ) -> None:
+        self.embedding_dim = embedding_dim
+        self.num_mask_tokens = num_mask_tokens
+        self.num_layers = num_layers
+        super().__init__(
+            MaskPrediction(
+                embedding_dim=embedding_dim,
+                num_mask_tokens=num_mask_tokens,
+                multimask_output=multimask_output,
+                device=device,
+                dtype=dtype,
+            ),
+            IOUPrediction(
+                embedding_dim=embedding_dim,
+                num_layers=num_layers,
+                num_mask_tokens=num_mask_tokens,
+                multimask_output=multimask_output,
+                device=device,
+                dtype=dtype,
+            ),
         )
 
 
@@ -213,7 +245,7 @@ class MaskDecoder(fl.Chain):
         num_mask_tokens = self.num_multimask_outputs + 1
 
         super().__init__(
-            IOUMaskEncoder(embedding_dim=embedding_dim, num_mask_tokens=num_mask_tokens, device=device, dtype=dtype),
+            MaskDecoderTokens(embedding_dim=embedding_dim, num_mask_tokens=num_mask_tokens, device=device, dtype=dtype),
             EmbeddingsAggregator(),
             Transformer(
                 *(
@@ -230,22 +262,12 @@ class MaskDecoder(fl.Chain):
                 SparseCrossDenseAttention(embedding_dim=embedding_dim, device=device, dtype=dtype),
                 fl.LayerNorm(normalized_shape=embedding_dim, device=device, dtype=dtype),
             ),
-            fl.Parallel(
-                MaskPrediction(
-                    embedding_dim=embedding_dim,
-                    num_mask_tokens=num_mask_tokens,
-                    multimask_output=multimask_output,
-                    device=device,
-                    dtype=dtype,
-                ),
-                IOUPrediction(
-                    embedding_dim=embedding_dim,
-                    num_layers=3,
-                    num_mask_tokens=num_mask_tokens,
-                    multimask_output=multimask_output,
-                    device=device,
-                    dtype=dtype,
-                ),
+            Predictions(
+                embedding_dim=embedding_dim,
+                num_mask_tokens=num_mask_tokens,
+                multimask_output=multimask_output,
+                device=device,
+                dtype=dtype,
             ),
         )
 

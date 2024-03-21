@@ -255,6 +255,7 @@ safetensors==0.4.2
     # via transformers
 scipy==1.12.0
     # via bitsandbytes
+segment-anything-hq==0.3
 segment-anything-py==1.0
     # via refiners
 sentry-sdk==1.40.6
@@ -270,6 +271,7 @@ smmap==5.0.1
     # via gitdb
 sympy==1.12
     # via torch
+timm==0.9.16
 tokenizers==0.15.2
     # via transformers
 tomli==2.0.1

@@ -57,15 +57,6 @@ def facebook_sam_h_weights(test_weights_path: Path) -> Path:
 
 
 @pytest.fixture(scope="module")
-def sam_h_weights(test_weights_path: Path) -> Path:
-    sam_h_weights = test_weights_path / "segment-anything-h.safetensors"
-    if not sam_h_weights.is_file():
-        warn(f"could not find weights at {sam_h_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sam_h_weights
-
-
-@pytest.fixture(scope="module")
 def facebook_sam_h(facebook_sam_h_weights: Path, test_device: torch.device) -> FacebookSAM:
     from segment_anything import build_sam_vit_h  # type: ignore
 
@@ -98,11 +89,6 @@ def sam_h_single_output(sam_h_weights: Path, test_device: torch.device) -> Segme
 
 
 @pytest.fixture(scope="module")
-def ref_path(test_sam_path: Path) -> Path:
-    return test_sam_path / "test_sam_ref"
-
-
-@pytest.fixture
 def truck(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "truck.jpg").convert("RGB")
 
@@ -283,14 +269,14 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
 
     mapping = converter.map_state_dicts(source_args=inputs, target_args={})
     assert mapping is not None
-    mapping["IOUMaskEncoder"] = "iou_token"
+    mapping["MaskDecoderTokens.Parameter"] = "iou_token"
 
     state_dict = converter._convert_state_dict(  # type: ignore
         source_state_dict=facebook_mask_decoder.state_dict(),
         target_state_dict=refiners_mask_decoder.state_dict(),
         state_dict_mapping=mapping,
     )
-    state_dict["IOUMaskEncoder.weight"] = torch.cat(
+    state_dict["MaskDecoderTokens.Parameter.weight"] = torch.cat(
         [facebook_mask_decoder.iou_token.weight, facebook_mask_decoder.mask_tokens.weight], dim=0
     )  # type: ignore
     refiners_mask_decoder.load_state_dict(state_dict=state_dict)
@@ -462,3 +448,26 @@ def test_mask_encoder(
 
     assert facebook_mask_input.shape == mask_input.shape
     assert torch.allclose(dense_embeddings, fb_dense_embeddings, atol=1e-4, rtol=1e-4)
+
+
+@no_grad()
+def test_batch_mask_decoder(sam_h: SegmentAnythingH) -> None:
+    batch_size = 5
+
+    image_embedding = torch.randn(1, 256, 64, 64, device=sam_h.device, dtype=sam_h.dtype).repeat(batch_size, 1, 1, 1)
+    mask_embedding = torch.randn(1, 256, 64, 64, device=sam_h.device, dtype=sam_h.dtype).repeat(batch_size, 1, 1, 1)
+    dense_positional_embedding = torch.randn(1, 256, 64, 64, device=sam_h.device, dtype=sam_h.dtype).repeat(
+        batch_size, 1, 1, 1
+    )
+    point_embedding = torch.randn(1, 2, 256, device=sam_h.device, dtype=sam_h.dtype).repeat(batch_size, 1, 1)
+
+    sam_h.mask_decoder.set_image_embedding(image_embedding)
+    sam_h.mask_decoder.set_mask_embedding(mask_embedding)
+    sam_h.mask_decoder.set_point_embedding(point_embedding)
+    sam_h.mask_decoder.set_dense_positional_embedding(dense_positional_embedding)
+
+    mask_prediction, iou_prediction = sam_h.mask_decoder()
+
+    assert mask_prediction.shape == (batch_size, 3, 256, 256)
+    assert iou_prediction.shape == (batch_size, 3)
+    assert torch.equal(mask_prediction[0], mask_prediction[1])

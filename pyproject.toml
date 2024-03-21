@@ -44,6 +44,11 @@ test = [
     # An unofficial Python package for Meta AI's Segment Anything Model:
     # https://github.com/opengeos/segment-anything
     "segment-anything-py>=1.0",
+    # Official Python package for HQ-SAM
+    "segment-anything-hq>=0.3",
+    # HQ-SAM missing dependency:
+    # https://github.com/SysCV/sam-hq/pull/59
+    "timm>=0.5.0",
 ]
 conversion = [
     "diffusers>=0.26.1",
@@ -140,3 +145,10 @@ exclude_also = [
 [tool.typos.default]
 extend-words = { adaptee = "adaptee" }
 extend-ignore-identifiers-re = ["NDArray*"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::UserWarning:segment_anything_hq.modeling.tiny_vit_sam.*",
+    "ignore::DeprecationWarning:timm.models.layers.*",
+    "ignore::DeprecationWarning:timm.models.registry.*"
+]
