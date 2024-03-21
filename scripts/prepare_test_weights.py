@@ -366,6 +366,13 @@ def download_sam():
     )
 
 
+def download_hq_sam():
+    weights_folder = os.path.join(test_weights_dir)
+    download_file(
+        "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_h.pth", weights_folder, expected_hash="66da2472"
+    )
+
+
 def download_dinov2():
     # For conversion
     weights_folder = os.path.join(test_weights_dir)
@@ -661,7 +668,16 @@ def convert_sam():
         "convert_segment_anything.py",
         "tests/weights/sam_vit_h_4b8939.pth",
         "tests/weights/segment-anything-h.safetensors",
-        expected_hash="b62ad5ed",
+        expected_hash="5ffb976f",
+    )
+
+
+def convert_hq_sam():
+    run_conversion_script(
+        "convert_hq_segment_anything.py",
+        "tests/weights/sam_hq_vit_h.pth",
+        "tests/weights/refiners-sam-hq-vit-h.safetensors",
+        expected_hash="b2f5e79f",
     )
 
 
@@ -769,6 +785,7 @@ def download_all():
     download_ip_adapter()
     download_t2i_adapter()
     download_sam()
+    download_hq_sam()
     download_dinov2()
     download_control_lora_fooocus()
     download_lcm_base()
@@ -789,6 +806,7 @@ def convert_all():
     convert_ip_adapter()
     convert_t2i_adapter()
     convert_sam()
+    convert_hq_sam()
     convert_dinov2()
     convert_control_lora_fooocus()
     convert_lcm_base()
