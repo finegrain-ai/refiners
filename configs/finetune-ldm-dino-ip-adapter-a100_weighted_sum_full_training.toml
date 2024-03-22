@@ -46,7 +46,7 @@ weighted_sum = true
 checkpoint_path = "/home/isamu/checkpoints/full_training_cropped/step62000.safetensors"
 
 [training]
-duration = {"number" = 1000000, "unit" = "step"}
+duration = {"number" = 1000000000, "unit" = "step"}
 seed = 9752
 # batch_size = 4
 # gradient_accumulation = {"number" = 64, "unit" = "step"}
@@ -96,7 +96,6 @@ image_column = "image"
 caption_column = "ai_description"
 download_images = true
 save_path = "/home/isamu/unsplash_pre_encode_15k"
-dataset_length = 15000
 zero_uncond = false
 
 # [checkpointing]
