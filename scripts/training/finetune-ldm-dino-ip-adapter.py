@@ -119,6 +119,7 @@ class AdapterConfig(ModelConfig):
     timestep_bias_begin: int = 0
     timestep_bias_end: int = 1000
     timestep_bias_multiplier: float = 1.0
+    checkpoint_path: str | None = None
 
 
 class DatasetConfig(BaseModel):
@@ -837,7 +838,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         ip_adapter = SD1IPAdapter(
             target=self.unet,
             weights=load_from_safetensors(self.config.adapter.checkpoint)
-            if self.config.adapter.checkpoint is not None
+            if self.config.adapter.checkpoint_path is not None
             else None,
             strict=False,
             fine_grained=self.config.adapter.fine_grained,
