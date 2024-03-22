@@ -77,6 +77,10 @@ class StableDiffusion_XL(LatentDiffusionModel):
         """
 
         text = [text] if isinstance(text, str) else text
+
+        if not self.classifier_free_guidance:
+            return self.clip_text_encoder(text)
+
         negative_text = [negative_text] if isinstance(negative_text, str) else negative_text
         assert len(text) == len(negative_text), "The length of the text list and negative_text should be the same"
 
