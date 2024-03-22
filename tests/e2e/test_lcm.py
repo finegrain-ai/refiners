@@ -114,8 +114,7 @@ def test_lcm_base(
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_base
 
-    # *NOT* compute_clip_text_embedding! We disable classifier-free guidance.
-    clip_text_embedding, pooled_text_embedding = sdxl.clip_text_encoder(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
 
     manual_seed(2)
@@ -163,7 +162,6 @@ def test_lcm_lora_with_guidance(
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0 if condition_scale == 1.0 else expected_lcm_lora_1_2
 
-    # *NOT* clip_text_encoder! We use classifier-free guidance here.
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
     assert time_ids.shape == (2, 6)  # CFG
@@ -213,8 +211,7 @@ def test_lcm_lora_without_guidance(
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0
 
-    # *NOT* compute_clip_text_embedding! We disable classifier-free guidance.
-    clip_text_embedding, pooled_text_embedding = sdxl.clip_text_encoder(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
     assert time_ids.shape == (1, 6)  # no CFG
 
