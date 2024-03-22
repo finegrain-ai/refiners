@@ -268,8 +268,8 @@ class SegmentAnythingH(SegmentAnything):
 
         if mask_decoder:
             assert (
-                mask_decoder.multimask_output == multimask_output
-            ), f"mask_decoder.multimask_output {mask_decoder.multimask_output} should match multimask_output (${multimask_output})"
+                multimask_output is None or mask_decoder.multimask_output == multimask_output
+            ), f"mask_decoder.multimask_output {mask_decoder.multimask_output} should match multimask_output ({multimask_output})"
         else:
             mask_decoder = MaskDecoder(multimask_output) if multimask_output is not None else MaskDecoder()
 

@@ -21,6 +21,7 @@ from refiners.fluxion import manual_seed
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import image_to_tensor, load_tensors, no_grad
 from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention, RelativePositionAttention
+from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
 from refiners.foundationals.segment_anything.model import ImageEmbedding, SegmentAnythingH
 from refiners.foundationals.segment_anything.transformer import TwoWayTransformerLayer
 
@@ -122,6 +123,19 @@ def test_fused_self_attention(facebook_sam_h: FacebookSAM) -> None:
     assert y_2.shape == x.shape
 
     assert torch.equal(input=y_1, other=y_2)
+
+
+def test_mask_decoder_arg() -> None:
+    mask_decoder_default = MaskDecoder()
+    sam_h = SegmentAnythingH(mask_decoder=mask_decoder_default)
+
+    assert sam_h.mask_decoder == mask_decoder_default
+
+
+def test_multimask_output_error() -> None:
+    mask_decoder_multimask_output = MaskDecoder(multimask_output=True)
+    with pytest.raises(AssertionError, match="multimask_output"):
+        SegmentAnythingH(mask_decoder=mask_decoder_multimask_output, multimask_output=False)
 
 
 @no_grad()
