@@ -21,6 +21,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added [HQ-SAM](https://arxiv.org/abs/2306.01567) for high quality mask prediction with Segment Anything
 - Added [SDXL-Lightning](https://arxiv.org/abs/2402.13929)
 - Added [Latent Consistency Models](https://arxiv.org/abs/2310.04378) and [LCM-LoRA](https://arxiv.org/abs/2311.05556) for Stable Diffusion XL
 - Added [Style Aligned adapter](https://arxiv.org/abs/2312.02133) to Stable Diffusion models
