@@ -837,7 +837,7 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         # At the point this gets called the unet, image_encoder, and image_proj will get called thanks to @register_model
         ip_adapter = SD1IPAdapter(
             target=self.unet,
-            weights=load_from_safetensors(self.config.adapter.checkpoint)
+            weights=load_from_safetensors(self.config.adapter.checkpoint_path)
             if self.config.adapter.checkpoint_path is not None
             else None,
             strict=False,
