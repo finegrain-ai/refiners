@@ -821,8 +821,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
             self.image_encoder, self.unet, cross_attn_2d, self.config.adapter.fine_grained, self.config.adapter.use_bias, device=self.device, dtype=float32
         )
         image_proj.requires_grad_(True)
-        for module in image_proj.modules():
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        if self.config.adapter.checkpoint_path is None:
+            for module in image_proj.modules():
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
         i=0
         for param in image_proj.parameters():
             if param.requires_grad:
@@ -854,9 +855,9 @@ class AdapterLatentDiffusionTrainer(Trainer[AdapterLatentDiffusionConfig, IPBatc
         for adapter in ip_adapter.sub_adapters:
             adapter.image_cross_attention.requires_grad_(True)
             adapter.image_cross_attention.to(self.device, float32)
-
-        for module in ip_adapter.modules():
-            _init_learnable_weights(module, self.config.adapter.initializer_range)
+        if self.config.adapter.checkpoint_path is None:
+            for module in ip_adapter.modules():
+                _init_learnable_weights(module, self.config.adapter.initializer_range)
 
         i=0
         for param in ip_adapter.parameters():
