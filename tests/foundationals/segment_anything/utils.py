@@ -40,6 +40,7 @@ class FacebookSAM(nn.Module):
 
 class FacebookSAMPredictor:
     model: FacebookSAM
+    features: Tensor
 
     def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None: ...
 
