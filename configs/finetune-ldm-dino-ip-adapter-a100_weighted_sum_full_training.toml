@@ -38,12 +38,11 @@ initialize_model = true
 initializer_range = 0.02
 use_bias = true
 use_rescaler = true
-save_folder = "/home/isamu/checkpoints/full_training"
+save_folder = "/home/isamu/checkpoints/full_training_64_batch_size"
 image_embedding_div_factor = 1
 pooled_text_div_factor = 10
 layernorm_dino = false
 weighted_sum = true
-checkpoint_path = "/home/isamu/checkpoints/full_training_cropped/step62000.safetensors"
 
 [training]
 duration = {"number" = 1000000000, "unit" = "step"}
@@ -51,7 +50,7 @@ seed = 9752
 # batch_size = 4
 # gradient_accumulation = {"number" = 64, "unit" = "step"}
 batch_size = 16
-gradient_accumulation = {"number" =8, "unit" = "step"}
+gradient_accumulation = {"number" =4, "unit" = "step"}
 evaluation_interval = {"number" = 500, "unit" = "step"}
 evaluation_seed = 9752
 dtype = "bfloat16"
@@ -64,7 +63,7 @@ amp = true
 [optimizer]
 optimizer = "AdamW8bit"  # "SGD", "Adam", "AdamW", "AdamW8bit", "Lion8bit"
 # learning_rate = 5e-4
-learning_rate = 5e-5
+learning_rate = 1e-4
 betas = [0.9, 0.999]
 eps = 1e-8
 weight_decay = 1e-2
@@ -104,7 +103,7 @@ zero_uncond = false
 
 [test_ldm]
 num_inference_steps = 30
-num_images_per_prompt = 1
+num_images_per_prompt = 4
 prompts = [
     "A dog flying over a castle",
     "Cute cats watching a tv",
