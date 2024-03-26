@@ -96,8 +96,10 @@ def download_file(
             print(f"❌{skip_icon} {response.status_code} ERROR {readable_size:<8} {url}")
         return
 
-    if skip_existing and os.path.exists(dest_filename):
+    if skip_existing and is_downloaded:
         print(f"{skip_icon}️ Skipping previously downloaded {url}")
+        if expected_hash is not None:
+            check_hash(dest_filename, expected_hash)
         return
 
     os.makedirs(dest_folder, exist_ok=True)
