@@ -149,7 +149,6 @@ class FuyuSelfAttention(fl.Chain):
         norm_eps: float = 1e-6,
         partial_rotary_factor: float = 0.5,
         use_bias: bool = True,
-        is_causal: bool = False,
         is_optimized: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None
@@ -162,7 +161,6 @@ class FuyuSelfAttention(fl.Chain):
             base: constant used to compute theta in the Rotary Positional Embedding
             norm_eps: epsilon for Layer Norm
             use_bias: Whether to use bias in the linear layers.
-            is_causal: Whether to use causal attention.
             is_optimized: Whether to use optimized attention.
             device: The device to use.
             dtype: The dtype to use.
@@ -174,7 +172,6 @@ class FuyuSelfAttention(fl.Chain):
         self.num_heads = num_heads
         self.heads_dim = embedding_dim // num_heads
         self.use_bias = use_bias
-        self.is_causal = is_causal
         self.is_optimized = is_optimized
         self.base = base
         self.norm_eps = norm_eps
@@ -202,7 +199,6 @@ class FuyuSelfAttention(fl.Chain):
             ),
             ScaledDotProductAttentionWithAttnMask(
                 num_heads=self.num_heads,
-                is_causal=self.is_causal,
                 is_optimized=self.is_optimized
             ),
             fl.Linear(  # Output projection [B seqlen embedding dim]
@@ -226,7 +222,6 @@ class FuyuTransformerLayer(fl.Chain):
         base: int = 10_000,
         partial_rotary_factor: float = 0.5,
         use_bias: bool = True,
-        is_causal: bool = True,
         is_optimized: bool = True,
         device: Device | str | None = None,
         dtype: DType | None = None
@@ -254,7 +249,6 @@ class FuyuTransformerLayer(fl.Chain):
                     norm_eps=self.norm_eps,
                     partial_rotary_factor=self.partial_rotary_factor,
                     use_bias=use_bias,
-                    is_causal=is_causal,
                     is_optimized=is_optimized,
                     device=device,
                     dtype=dtype

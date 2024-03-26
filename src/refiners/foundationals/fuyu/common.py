@@ -78,7 +78,6 @@ def scaled_dot_product_attention(
     query: Float[Tensor, "batch source_sequence_length dim"],
     key: Float[Tensor, "batch target_sequence_length dim"],
     value: Float[Tensor, "batch target_sequence_length dim"],
-    is_causal: bool = False,
     attn_mask : Float[Tensor, "batch target_sequence_length source_sequence_length"] = None,
 ) -> Float[Tensor, "batch source_sequence_length dim"]:
     """Scaled Dot Product Attention.
@@ -89,43 +88,36 @@ def scaled_dot_product_attention(
     See [[arXiv:1706.03762] Attention Is All You Need (Equation 1)](https://arxiv.org/abs/1706.03762) for more details.
     See also [torch.nn.functional.scaled_dot_product_attention](https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html).
     """
+    #compute attention in float32
     return _scaled_dot_product_attention(
-        query=query.to(torch.float32),
-        key=key.to(torch.float32),
-        value=value.to(torch.float32),
-        is_causal=is_causal,
+        query=query.float(),
+        key=key.float(),
+        value=value.float(),
         attn_mask=attn_mask
-    ).to(torch.float16)
+    )
 
 
 def scaled_dot_product_attention_non_optimized(
     query: Float[Tensor, "batch source_sequence_length dim"],
     key: Float[Tensor, "batch target_sequence_length dim"],
     value: Float[Tensor, "batch target_sequence_length dim"],
-    is_causal: bool = False,
     attn_mask : Float[Tensor, "batch target_sequence_length source_sequence_length"] = None
 ) -> Float[Tensor, "batch source_sequence_length dim"]:
     """Non-optimized Scaled Dot Product Attention.
 
     See [[arXiv:1706.03762] Attention Is All You Need (Equation 1)](https://arxiv.org/abs/1706.03762) for more details.
     """
-    if is_causal:
-        # TODO: implement causal attention
-        raise NotImplementedError(
-            "Causal attention for `scaled_dot_product_attention_non_optimized` is not yet implemented"
-        )
-    elif attn_mask is not None:
+    if attn_mask is not None:
         # TODO: implement masking => if mask composed of 0 and 1, large negative value instead of 0
         # and 0 instead of 1. Add before softmax
         raise NotImplementedError(
             "attention masking for `scaled_dot_product_attention_non_optimized` is not yet implemented"
         )
-    else:
-        dim = query.shape[-1]
-        attention = query @ key.permute(0, 1, 3, 2)
-        attention = attention / math.sqrt(dim)
-        attention = torch.softmax(input=attention, dim=-1)
-        return attention @ value
+    dim = query.shape[-1]
+    attention = query @ key.permute(0, 1, 3, 2)
+    attention = attention / math.sqrt(dim)
+    attention = torch.softmax(input=attention.float(), dim=-1)
+    return attention @ value
     
 class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
     """Scaled Dot Product Attention.
@@ -162,7 +154,6 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
     def __init__(
         self,
         num_heads: int = 1,
-        is_causal: bool = False,
         is_optimized: bool = True,
         slice_size: int | None = None,
     ) -> None:
@@ -170,13 +161,11 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
 
         Args:
             num_heads: The number of heads to use.
-            is_causal: Whether to use causal attention.
             is_optimized: Whether to use optimized attention.
             slice_size: The slice size to use for the optimized attention.
         """
         super().__init__()
         self.num_heads = num_heads
-        self.is_causal = is_causal
         self.is_optimized = is_optimized
         self.slice_size = slice_size
         self.dot_product = (
@@ -244,14 +233,15 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
         Split the input tensors (query, key, value) into multiple heads along the embedding dimension,
         then compute the scaled dot product attention for each head, and finally merge the heads back.
         """
+        # the attention is cast in float32
+        dtype = query.dtype
         return self._merge_multi_head(
             x=self.dot_product(
                 query=self._split_to_multi_head(query),
                 key=self._split_to_multi_head(key),
                 value=self._split_to_multi_head(value),
-                is_causal=self.is_causal,
                 attn_mask=attn_mask,
-            )
+            ).to(dtype)
         )
 
     def _split_to_multi_head(

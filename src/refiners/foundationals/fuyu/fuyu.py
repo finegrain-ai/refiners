@@ -24,7 +24,6 @@ def create_fuyu(config):
         base=config.base,
         partial_rotary_factor=config.partial_rotary_factor,
         use_bias=config.use_bias,
-        is_causal=config.is_causal,
         is_optimized=config.is_optimized,
         device=config.device,
         dtype=config.dtype
@@ -46,7 +45,6 @@ class Fuyu8b:
     base: int = 25_000
     partial_rotary_factor: float = 0.5
     use_bias: bool = True
-    is_causal: bool = True
     is_optimized: bool = True
     device: Device | str | None = 'cuda'
     dtype: DType | None = Tfloat16
@@ -67,7 +65,6 @@ class Fuyu(fl.Chain):
         base: int,
         partial_rotary_factor:float,
         use_bias: bool,
-        is_causal: bool,
         is_optimized: bool,
         device: Device | str | None,
         dtype: DType | None
@@ -92,7 +89,6 @@ class Fuyu(fl.Chain):
                     base=base,
                     partial_rotary_factor=partial_rotary_factor,
                     use_bias=use_bias,
-                    is_causal=is_causal,
                     is_optimized=is_optimized,
                     device=device,
                     dtype=dtype

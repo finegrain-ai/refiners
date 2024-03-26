@@ -1,6 +1,6 @@
 from typing import List, Tuple
 
-from torch import Tensor, bool as tbool, cat, device as Device, dtype as DType, ones, tensor
+from torch import Tensor, bool as tbool, cat, device as Device, dtype as DType, ones, tensor, tril
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import TokenEncoder
@@ -137,11 +137,13 @@ class InputEncoder(fl.ContextModule):
                 # No padding needed, use the encoded image as is
                 padded_encoded_image = encoded_image[i].unsqueeze(0)
             padded_encoded_images.append(padded_encoded_image)
-            attn_mask[i, :padding_length, :padding_length] = 0
+            attn_mask[i, :padding_length, :] = 0
+            attn_mask[i, :, :padding_length] = 0
 
-        encoded_inputs = cat([cat((pim, et), dim=1) for pim, et in zip(padded_encoded_images, encoded_text)], dim=0)
-
+        causal_mask = tril(ones((max_len, max_len), device=self.device, dtype=tbool))
+        attn_mask = attn_mask & causal_mask.unsqueeze(0)
         context = self.use_context(context_name="attention")
         context.update({"mask": attn_mask})
 
+        encoded_inputs = cat([cat((pim, et), dim=1) for pim, et in zip(padded_encoded_images, encoded_text)], dim=0)
         return encoded_inputs
