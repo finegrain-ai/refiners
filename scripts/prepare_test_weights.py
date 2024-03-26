@@ -303,13 +303,13 @@ def download_control_lora_fooocus():
     download_file(
         url=f"https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors",
         dest_folder=base_folder,
-        expected_hash="4d505134",
+        expected_hash="fec9e32b",
     )
 
     download_file(
         url=f"https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors",
         dest_folder=base_folder,
-        expected_hash="d81aa461",
+        expected_hash="fc04b120",
     )
 
 
