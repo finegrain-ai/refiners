@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import gc
 
 import torch
 from tqdm import tqdm
@@ -85,25 +86,25 @@ def convert_fuyu_huggingface(weights: dict[str, torch.Tensor]) -> None:
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.self_attn.k_layernorm.weight", 
+                f"language_model.model.layers.{i}.self_attn.q_layernorm.weight", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_1.LayerNorm.weight"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.self_attn.k_layernorm.bias", 
+                f"language_model.model.layers.{i}.self_attn.q_layernorm.bias", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_1.LayerNorm.bias"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.self_attn.q_layernorm.weight", 
+                f"language_model.model.layers.{i}.self_attn.k_layernorm.weight", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_2.LayerNorm.weight"
             )
         )
         rename_keys.append(
             (
-                f"language_model.model.layers.{i}.self_attn.q_layernorm.bias", 
+                f"language_model.model.layers.{i}.self_attn.k_layernorm.bias", 
                 f"FuyuTransformer.FuyuTransformerLayer_{i+1}.Residual_1.FuyuSelfAttention.QKVProjection.Parallel.Chain_2.LayerNorm.bias"
             )
         )
@@ -152,17 +153,24 @@ def main() -> None:
         weights = load_tensors(args.source_path)
     else:
         model_id = "adept/fuyu-8b"
-        source = FuyuForCausalLM.from_pretrained(model_id, low_cpu_mem_usage=True)
+        source = FuyuForCausalLM.from_pretrained(model_id)
         weights = source.state_dict()
+        del source
+        gc.collect()
+        
 
     convert_fuyu_huggingface(weights)
     if args.half:
         weights = {key: value.half() for key, value in weights.items()}
+
+    weights = {key: value for key, value in weights.items()}
     output_dir = os.path.split(args.output_path)[0]
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    save_to_safetensors(path=args.output_path, tensors=weights)
-
+    torch.save(weights, args.output_path)
+    # save_to_safetensors(path=args.output_path, tensors=weights)
+    
+    
 
 if __name__ == "__main__":
     main()
