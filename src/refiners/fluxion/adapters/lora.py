@@ -505,6 +505,8 @@ def auto_attach_loras(
     loras_copy = {key: Lora.from_weights(lora.name, lora.down.weight, lora.up.weight) for key, lora in loras.items()}
     debug_map_1: list[tuple[str, str]] = []
     failed_keys_1 = _auto_attach_loras(loras, target, include=include, exclude=exclude, debug_map=debug_map_1)
+    if debug_map is not None:
+        debug_map += debug_map_1
     if len(debug_map_1) != len(loras) or failed_keys_1:
         raise ValueError(
             f"sanity check failed: {len(debug_map_1)} / {len(loras)} LoRA layers attached, {len(failed_keys_1)} failed"
@@ -518,6 +520,4 @@ def auto_attach_loras(
             f"sanity check failed: {len(debug_map_2)} / {len(loras)} LoRA layers attached twice, {len(failed_keys_2)} skipped"
         )
 
-    if debug_map is not None:
-        debug_map += debug_map_1
     return failed_keys_1
