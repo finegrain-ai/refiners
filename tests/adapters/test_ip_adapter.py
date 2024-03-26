@@ -35,6 +35,10 @@ def test_inject_eject(k_unet: type[SD1UNet] | type[SDXLUNet], test_device: torch
     assert repr(unet) != initial_repr
     adapter.eject()
     assert repr(unet) == initial_repr
+    adapter.inject()
+    assert repr(unet) != initial_repr
+    adapter.eject()
+    assert repr(unet) == initial_repr
 
 
 @no_grad()
