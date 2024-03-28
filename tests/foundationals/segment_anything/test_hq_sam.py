@@ -346,3 +346,19 @@ def test_batch_mask_decoder(sam_h: SegmentAnythingH, hq_adapter_weights: Path) -
     assert mask_prediction.shape == (batch_size, 1, 256, 256)
     assert iou_prediction.shape == (batch_size, 1)
     assert torch.equal(mask_prediction[0], mask_prediction[1])
+
+
+def test_hq_sam_load_save_weights(sam_h: SegmentAnythingH, hq_adapter_weights: Path, test_device: torch.device) -> None:
+    weights = load_from_safetensors(hq_adapter_weights, device=test_device)
+
+    hq_sam_adapter = HQSAMAdapter(sam_h)
+    out_weights_init = hq_sam_adapter.weights
+
+    assert set(out_weights_init.keys()) == set(weights.keys())
+
+    hq_sam_adapter = HQSAMAdapter(sam_h, weights=weights)
+    out_weights = hq_sam_adapter.weights
+
+    assert set(out_weights.keys()) == set(weights.keys())
+    for key in out_weights.keys():
+        assert torch.equal(out_weights[key], weights[key])
