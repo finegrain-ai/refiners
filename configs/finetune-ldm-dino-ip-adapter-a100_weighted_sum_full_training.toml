@@ -80,8 +80,8 @@ update_interval = "1:step"
 [dataset]
 hf_repo = "1aurent/unsplash-lite-palette"
 webdataset = true
-# train_shards_path_or_url = "pipe:gsutil cp gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded/{00000..00056}.tar -"
-train_shards_path_or_url = "pipe:gsutil cp gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded/{00000..00056}.tar /tmp/$$ && cat /tmp$$; rm -rf /tmp/$$"
+train_shards_path_or_url = "pipe:gsutil -m cp gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded/{00000..00056}.tar -"
+# train_shards_path_or_url = "pipe:gsutil cp gs://bounty-program-data/photo-concept-bucket-webdataset_preencoded/{00000..00056}.tar /tmp/$$ && cat /tmp$$; rm -rf /tmp/$$"
 revision = "main"
 split = "train"
 horizontal_flip_probability = 0.0
