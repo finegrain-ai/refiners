@@ -1,4 +1,5 @@
 from refiners.foundationals.clip.image_encoder import (
+    CLIPImageEncoderWithoutProj,
     CLIPImageEncoder,
     CLIPImageEncoderG,
     CLIPImageEncoderH,
@@ -15,6 +16,7 @@ __all__ = [
     "CLIPTextEncoderL",
     "CLIPTextEncoderH",
     "CLIPTextEncoderG",
+    "CLIPImageEncoderWithoutProj",
     "CLIPImageEncoder",
     "CLIPImageEncoderG",
     "CLIPImageEncoderH",
