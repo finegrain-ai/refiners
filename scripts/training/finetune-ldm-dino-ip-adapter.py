@@ -120,6 +120,7 @@ class AdapterConfig(ModelConfig):
     timestep_bias_end: int = 1000
     timestep_bias_multiplier: float = 1.0
     checkpoint_path: str | None = None
+    checkpoint_steps: int = 2000
 
 
 class DatasetConfig(BaseModel):
@@ -294,9 +295,13 @@ class ComputeParamNormCallback(Callback["AdapterLatentDiffusionTrainer"]):
 
 class SaveAdapterCallback(Callback["AdapterLatentDiffusionTrainer"]):
     """Callback to save the adapter when a checkpoint is saved."""
+    def __init__(self) -> None:
+        self.global_step = 0
+        super().__init__()
 
     def on_backward_end(self, trainer: "AdapterLatentDiffusionTrainer") -> None:
-        if trainer.clock.is_evaluation_step:
+        self.global_step += 1
+        if self.global_step % trainer.config.adapter.checkpoint_steps == 0:
             os.makedirs(trainer.config.adapter.save_folder, exist_ok=True)
             cross_attention_adapters = trainer.adapter.sub_adapters
             image_proj = trainer.adapter.image_proj

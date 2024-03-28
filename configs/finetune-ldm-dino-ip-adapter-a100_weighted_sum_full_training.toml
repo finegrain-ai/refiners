@@ -44,6 +44,7 @@ image_embedding_div_factor = 1
 pooled_text_div_factor = 10
 layernorm_dino = false
 weighted_sum = true
+checkpoint_steps = 2000
 
 [training]
 duration = {"number" = 1000000000, "unit" = "step"}
