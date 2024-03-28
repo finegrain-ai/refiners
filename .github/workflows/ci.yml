@@ -24,6 +24,7 @@ jobs:
               - src/**
               - tests/**
               - scripts/**
+              - .github/workflows/ci.yml
 
       - name: Install Rye
         if: steps.changes.outputs.sources == 'true'
