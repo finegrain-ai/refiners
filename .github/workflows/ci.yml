@@ -36,6 +36,10 @@ jobs:
         if: steps.changes.outputs.sources == 'true'
         run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
 
+      - name: use uv
+        if: steps.changes.outputs.sources == 'true'
+        run: rye config --set-bool behavior.use-uv=true
+
       - name: pin python
         if: steps.changes.outputs.sources == 'true'
         run: rye pin 3.10
