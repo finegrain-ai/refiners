@@ -16,15 +16,26 @@ class Interpolate(Module):
     This layer wraps [`torch.nn.functional.interpolate`][torch.nn.functional.interpolate].
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        mode: str = "nearest",
+        antialias: bool = False,
+    ) -> None:
         super().__init__()
+        self.mode = mode
+        self.antialias = antialias
 
     def forward(
         self,
         x: Tensor,
         shape: Size,
     ) -> Tensor:
-        return interpolate(x, shape)
+        return interpolate(
+            x=x,
+            size=shape,
+            mode=self.mode,
+            antialias=self.antialias,
+        )
 
 
 class Downsample(Chain):

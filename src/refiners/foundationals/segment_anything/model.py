@@ -232,9 +232,9 @@ class SegmentAnything(fl.Chain):
         Returns:
             The postprocessed masks.
         """
-        masks = interpolate(masks, factor=torch.Size((self.image_size, self.image_size)), mode="bilinear")
+        masks = interpolate(masks, size=torch.Size((self.image_size, self.image_size)), mode="bilinear")
         masks = masks[..., : target_size[0], : target_size[1]]  # remove padding added at `preprocess_image` time
-        masks = interpolate(masks, factor=torch.Size(original_size), mode="bilinear")
+        masks = interpolate(masks, size=torch.Size(original_size), mode="bilinear")
         return masks
 
 
