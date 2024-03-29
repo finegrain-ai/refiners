@@ -144,7 +144,7 @@ exclude_also = [
 
 [tool.typos.default]
 extend-words = { adaptee = "adaptee" }
-extend-ignore-identifiers-re = ["NDArray*", "interm"]
+extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
 
 [tool.pytest.ini_options]
 filterwarnings = [

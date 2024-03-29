@@ -146,6 +146,7 @@ class DINOv2_small_reg(ViT):
         num_layers (int): 12
         num_heads (int): 6
         num_registers (int): 4
+        interpolate_antialias (bool): True
     """
 
     def __init__(
@@ -166,6 +167,7 @@ class DINOv2_small_reg(ViT):
             num_layers=12,
             num_heads=6,
             num_registers=4,
+            interpolate_antialias=True,
             device=device,
             dtype=dtype,
         )
@@ -185,6 +187,7 @@ class DINOv2_base_reg(ViT):
         num_layers (int): 12
         num_heads (int): 12
         num_registers (int): 4
+        interpolate_antialias (bool): True
     """
 
     def __init__(
@@ -205,6 +208,7 @@ class DINOv2_base_reg(ViT):
             num_layers=12,
             num_heads=12,
             num_registers=4,
+            interpolate_antialias=True,
             device=device,
             dtype=dtype,
         )
@@ -224,6 +228,7 @@ class DINOv2_large_reg(ViT):
         num_layers (int): 24
         num_heads (int): 16
         num_registers (int): 4
+        interpolate_antialias (bool): True
     """
 
     def __init__(
@@ -244,6 +249,7 @@ class DINOv2_large_reg(ViT):
             num_layers=24,
             num_heads=16,
             num_registers=4,
+            interpolate_antialias=True,
             device=device,
             dtype=dtype,
         )
@@ -263,6 +269,7 @@ class DINOv2_large_reg(ViT):
 #             num_layers=40,
 #             num_heads=24,
 #             num_registers=4,
+#             interpolate_antialias=True,
 #             device=device,
 #             dtype=dtype,
 #         )

@@ -20,7 +20,7 @@ def convert_dinov2_facebook(weights: dict[str, torch.Tensor]) -> None:
 
     rename_keys: list[tuple[str, str]] = [
         ("cls_token", "Concatenate.ClassToken.Parameter.weight"),
-        ("pos_embed", "PositionalEncoder.Parameter.weight"),
+        ("pos_embed", "PositionalEncoder.PositionalEmbedding.Parameter.weight"),
         ("patch_embed.proj.weight", "Concatenate.PatchEncoder.Conv2d.weight"),
         ("patch_embed.proj.bias", "Concatenate.PatchEncoder.Conv2d.bias"),
         ("norm.weight", "LayerNorm.weight"),
