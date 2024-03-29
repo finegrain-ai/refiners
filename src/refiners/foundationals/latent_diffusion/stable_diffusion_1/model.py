@@ -228,7 +228,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
 
         mask_tensor = torch.tensor(data=np.array(object=mask).astype(dtype=np.float32) / 255.0).to(device=self.device)
         mask_tensor = (mask_tensor > 0.5).unsqueeze(dim=0).unsqueeze(dim=0).to(dtype=self.dtype)
-        self.mask_latents = interpolate(x=mask_tensor, factor=torch.Size(latents_size))
+        self.mask_latents = interpolate(x=mask_tensor, size=torch.Size(latents_size))
 
         init_image_tensor = image_to_tensor(image=target_image, device=self.device, dtype=self.dtype) * 2 - 1
         masked_init_image = init_image_tensor * (1 - mask_tensor)
