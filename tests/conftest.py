@@ -22,6 +22,12 @@ def test_weights_path() -> Path:
 
 
 @fixture(scope="session")
+def test_repos_path() -> Path:
+    from_env = os.getenv("REFINERS_TEST_REPOS_DIR")
+    return Path(from_env) if from_env else PARENT_PATH / "repos"
+
+
+@fixture(scope="session")
 def test_e2e_path() -> Path:
     return PARENT_PATH / "e2e"
 

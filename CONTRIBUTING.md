@@ -52,6 +52,12 @@ Then, download and convert all the necessary weights. Be aware that this will us
 python scripts/prepare_test_weights.py
 ```
 
+Some tests require cloning the original implementation of the model as they use `torch.hub.load`:
+
+```bash
+git clone git@github.com:facebookresearch/dinov2.git tests/repos/dinov2
+```
+
 Finally, run the tests:
 
 ```bash
