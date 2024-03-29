@@ -388,16 +388,6 @@ def download_dinov2():
     ]
     download_files(urls, weights_folder)
 
-    # For testing (note: versions with registers are not available yet on HuggingFace)
-    for repo in ["dinov2-small", "dinov2-base", "dinov2-large"]:
-        base_folder = os.path.join(test_weights_dir, "facebook", repo)
-        urls = [
-            f"https://huggingface.co/facebook/{repo}/raw/main/config.json",
-            f"https://huggingface.co/facebook/{repo}/raw/main/preprocessor_config.json",
-            f"https://huggingface.co/facebook/{repo}/resolve/main/pytorch_model.bin",
-        ]
-        download_files(urls, base_folder)
-
 
 def download_lcm_base():
     base_folder = os.path.join(test_weights_dir, "latent-consistency/lcm-sdxl")
