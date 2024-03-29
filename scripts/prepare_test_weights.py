@@ -688,37 +688,37 @@ def convert_dinov2():
         "convert_dinov2.py",
         "tests/weights/dinov2_vits14_pretrain.pth",
         "tests/weights/dinov2_vits14_pretrain.safetensors",
-        expected_hash="b7f9b294",
+        expected_hash="af000ded",
     )
     run_conversion_script(
         "convert_dinov2.py",
         "tests/weights/dinov2_vitb14_pretrain.pth",
         "tests/weights/dinov2_vitb14_pretrain.safetensors",
-        expected_hash="d72c767b",
+        expected_hash="d6294087",
     )
     run_conversion_script(
         "convert_dinov2.py",
         "tests/weights/dinov2_vitl14_pretrain.pth",
         "tests/weights/dinov2_vitl14_pretrain.safetensors",
-        expected_hash="71eb98d1",
+        expected_hash="ddd4819f",
     )
     run_conversion_script(
         "convert_dinov2.py",
         "tests/weights/dinov2_vits14_reg4_pretrain.pth",
         "tests/weights/dinov2_vits14_reg4_pretrain.safetensors",
-        expected_hash="89118b46",
+        expected_hash="080247c7",
     )
     run_conversion_script(
         "convert_dinov2.py",
         "tests/weights/dinov2_vitb14_reg4_pretrain.pth",
         "tests/weights/dinov2_vitb14_reg4_pretrain.safetensors",
-        expected_hash="b0296f77",
+        expected_hash="5cd4d408",
     )
     run_conversion_script(
         "convert_dinov2.py",
         "tests/weights/dinov2_vitl14_reg4_pretrain.pth",
         "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors",
-        expected_hash="b3d877dc",
+        expected_hash="b1221702",
     )
 
 
