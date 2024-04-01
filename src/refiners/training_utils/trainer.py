@@ -364,7 +364,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.optimizer.step()
             return
         self.scaler.step(self.optimizer)  # type: ignore
-        self.scaler.update()  # type: ignore
+        self.scaler.update()  #
 
     def backward(self) -> None:
         """Backward pass on the loss."""
@@ -375,7 +375,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
             self.optimizer_step()
-            self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:
