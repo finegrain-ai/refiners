@@ -32,19 +32,17 @@ class FacebookSAM(nn.Module):
     prompt_encoder: nn.Module
     mask_decoder: nn.Module
 
-    def __call__(self, batched_input: list[SAMInput], multimask_output: bool) -> list[SAMOutput]:
-        ...
+    def __call__(self, batched_input: list[SAMInput], multimask_output: bool) -> list[SAMOutput]: ...
 
     @property
-    def device(self) -> Any:
-        ...
+    def device(self) -> Any: ...
 
 
 class FacebookSAMPredictor:
     model: FacebookSAM
+    features: Tensor
 
-    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None:
-        ...
+    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None: ...
 
     def predict(
         self,
@@ -54,8 +52,26 @@ class FacebookSAMPredictor:
         mask_input: NDArray | None = None,
         multimask_output: bool = True,
         return_logits: bool = False,
-    ) -> tuple[NDArray, NDArray, NDArray]:
-        ...
+    ) -> tuple[NDArray, NDArray, NDArray]: ...
+
+
+class FacebookSAMPredictorHQ:
+    model: FacebookSAM
+    features: Tensor
+    interm_features: Tensor
+
+    def set_image(self, image: NDArrayUInt8, image_format: str = "RGB") -> None: ...
+
+    def predict(
+        self,
+        point_coords: NDArray | None = None,
+        point_labels: NDArray | None = None,
+        box: NDArray | None = None,
+        mask_input: NDArray | None = None,
+        multimask_output: bool = True,
+        return_logits: bool = False,
+        hq_token_only: bool = False,
+    ) -> tuple[NDArray, NDArray, NDArray]: ...
 
 
 @dataclass

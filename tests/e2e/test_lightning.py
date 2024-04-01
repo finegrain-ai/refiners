@@ -127,7 +127,7 @@ def test_lightning_base_4step(
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
 
-    clip_text_embedding, pooled_text_embedding = sdxl.clip_text_encoder(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
 
     manual_seed(0)
@@ -178,7 +178,7 @@ def test_lightning_base_1step(
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
 
-    clip_text_embedding, pooled_text_embedding = sdxl.clip_text_encoder(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
 
     manual_seed(0)
@@ -232,7 +232,7 @@ def test_lightning_lora_4step(
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
 
-    clip_text_embedding, pooled_text_embedding = sdxl.clip_text_encoder(prompt)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(prompt)
     time_ids = sdxl.default_time_ids
 
     manual_seed(0)

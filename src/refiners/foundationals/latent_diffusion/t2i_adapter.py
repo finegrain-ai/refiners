@@ -204,9 +204,14 @@ class T2IAdapter(Generic[T], fl.Chain, Adapter[T]):
     def set_condition_features(self, features: tuple[Tensor, ...]) -> None:
         self.set_context("t2iadapter", {f"condition_features_{self.name}": features})
 
-    def set_scale(self, scale: float) -> None:
+    @property
+    def scale(self) -> float:
+        return self._features[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
         for f in self._features:
-            f.scale = scale
+            f.scale = value
 
     def init_context(self) -> Contexts:
         return {"t2iadapter": {f"condition_features_{self.name}": None}}

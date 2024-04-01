@@ -335,7 +335,6 @@ def lora_sliders(test_weights_path: Path) -> tuple[dict[str, dict[str, torch.Ten
     }, {
         "age": 0.3,
         "cartoon_style": -0.2,
-        "dpo": 1.4,
         "eyesize": -0.2,
     }
 
@@ -1395,7 +1394,7 @@ def test_diffusion_sdxl_lora(
     prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
     negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
 
-    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale)
+    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale, unet_inclusions=["CrossAttentionBlock"])
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt, negative_text=negative_prompt
@@ -1431,11 +1430,18 @@ def test_diffusion_sdxl_multiple_loras(
 ) -> None:
     sdxl = sdxl_ddim
     expected_image = expected_sdxl_multi_loras
-    _, dpo = lora_data_dpo
-    loras, scales = lora_sliders
-    loras["dpo"] = dpo
+    _, dpo_weights = lora_data_dpo
+    slider_loras, slider_scales = lora_sliders
 
-    SDLoraManager(sdxl).add_multiple_loras(loras, scales)
+    manager = SDLoraManager(sdxl)
+    for lora_name, lora_weights in slider_loras.items():
+        manager.add_loras(
+            lora_name,
+            lora_weights,
+            slider_scales[lora_name],
+            unet_inclusions=["SelfAttention", "ResidualBlock", "Downsample", "Upsample"],
+        )
+    manager.add_loras("dpo", dpo_weights, 1.4, unet_inclusions=["CrossAttentionBlock"])
 
     # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
     # except that we are using DDIM instead of sde-dpmsolver++
@@ -2109,7 +2115,7 @@ def test_t2i_adapter_xl_canny(
     sdxl.set_inference_steps(30)
 
     t2i_adapter = SDXLT2IAdapter(target=sdxl.unet, name=name, weights=load_from_safetensors(weights_path)).inject()
-    t2i_adapter.set_scale(0.8)
+    t2i_adapter.scale = 0.8
 
     condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
@@ -2238,8 +2244,8 @@ def test_hello_world(
     condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
-    ip_adapter.set_scale(0.85)
-    t2i_adapter.set_scale(0.8)
+    ip_adapter.scale = 0.85
+    t2i_adapter.scale = 0.8
     sdxl.set_inference_steps(50, first_step=1)
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 

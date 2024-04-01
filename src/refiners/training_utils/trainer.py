@@ -38,7 +38,6 @@ from refiners.training_utils.common import (
     scoped_seed,
 )
 from refiners.training_utils.config import BaseConfig, LRSchedulerType, ModelConfig
-from refiners.training_utils.gradient_clipping import GradientClipping, GradientClippingConfig
 
 
 class WarmupScheduler(LRScheduler):
@@ -104,12 +103,15 @@ def register_model():
             model = func(self, config)
             model = model.to(self.device, dtype=self.dtype)
             if config.requires_grad is not None:
+                logger.info(f"Setting requires_grad to {config.requires_grad} for model: {name}")
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
             if self.config.training.automatic_mixed_precision:
                 # For all parameters we train in automatic mixed precision we want them to be in float32.
                 for learnable_parameter in learnable_parameters:
                     learnable_parameter.to(dtype=float32)
+            numel = sum(param.numel() for param in learnable_parameters)
+            logger.info(f"Number of learnable parameters in {name}: {human_readable_number(numel)}")
             self.models[name] = ModelItem(
                 name=name, config=config, model=model, learnable_parameters=learnable_parameters
             )
@@ -162,10 +164,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
-
-    @register_callback()
-    def gradient_clipping(self, config: GradientClippingConfig) -> GradientClipping:
-        return GradientClipping(config)
 
     @property
     def models(self) -> ModelRegistry:
@@ -249,7 +247,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @cached_property
     def lr_scheduler(self) -> LRScheduler:
         config = self.config.lr_scheduler
-        scheduler_step_size = config.update_interval["number"]
+        scheduler_step_size = config.update_interval.number
 
         match config.type:
             case LRSchedulerType.CONSTANT_LR:
@@ -294,7 +292,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case _:
                 raise ValueError(f"Unknown scheduler type: {config.type}")
 
-        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval["unit"])
+        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval.unit)
         if warmup_scheduler_steps > 0:
             lr_scheduler = WarmupScheduler(
                 optimizer=self.optimizer,
@@ -346,8 +344,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         )
 
     @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor:
-        ...
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
     def compute_evaluation(self) -> None:
         pass
@@ -359,6 +356,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.scaler.scale(scaled_loss).backward()  # type: ignore
 
     def optimizer_step(self) -> None:
+        if self.scaler is not None:
+            self.scaler.unscale_(self.optimizer)
+        max_norm = self.config.training.gradient_clipping_max_norm or float("inf")
+        self.grad_norm = nn.utils.clip_grad.clip_grad_norm_(self.learnable_parameters, max_norm=max_norm).item()
         if self.scaler is None:
             self.optimizer.step()
             return
@@ -374,6 +375,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         if self.clock.is_optimizer_step:
             self._call_callbacks(event_name="on_optimizer_step_begin")
             self.optimizer_step()
+            self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
         if self.clock.is_lr_scheduler_step:

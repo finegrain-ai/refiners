@@ -9,13 +9,11 @@ from refiners.foundationals.latent_diffusion.t2i_adapter import T2IFeatures
 
 
 @overload
-def new_adapter(target: SD1UNet, name: str) -> SD1T2IAdapter:
-    ...
+def new_adapter(target: SD1UNet, name: str) -> SD1T2IAdapter: ...
 
 
 @overload
-def new_adapter(target: SDXLUNet, name: str) -> SDXLT2IAdapter:
-    ...
+def new_adapter(target: SDXLUNet, name: str) -> SDXLT2IAdapter: ...
 
 
 def new_adapter(target: SD1UNet | SDXLUNet, name: str) -> SD1T2IAdapter | SDXLT2IAdapter:

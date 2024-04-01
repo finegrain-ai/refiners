@@ -185,17 +185,16 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
 
     mapping = converter.map_state_dicts(source_args=inputs, target_args={})
     assert mapping is not None
-    mapping["IOUMaskEncoder"] = "iou_token"
+    mapping["MaskDecoderTokens.Parameter"] = "iou_token"
 
     state_dict = converter._convert_state_dict(  # type: ignore
         source_state_dict=mask_decoder.state_dict(),
         target_state_dict=refiners_mask_decoder.state_dict(),
         state_dict_mapping=mapping,
     )
-    state_dict["IOUMaskEncoder.weight"] = torch.cat(
+    state_dict["MaskDecoderTokens.Parameter.weight"] = torch.cat(
         tensors=[mask_decoder.iou_token.weight, mask_decoder.mask_tokens.weight], dim=0
     )  # type: ignore
-
     refiners_mask_decoder.load_state_dict(state_dict=state_dict)
 
     refiners_mask_decoder.set_image_embedding(image_embedding)
@@ -254,10 +253,10 @@ def main() -> None:
     mask_encoder_state_dict = convert_mask_encoder(prompt_encoder=sam_h.prompt_encoder)
 
     output_state_dict = {
-        **{".".join(("image_encoder", key)): value for key, value in vit_state_dict.items()},
-        **{".".join(("mask_decoder", key)): value for key, value in mask_decoder_state_dict.items()},
-        **{".".join(("point_encoder", key)): value for key, value in point_encoder_state_dict.items()},
-        **{".".join(("mask_encoder", key)): value for key, value in mask_encoder_state_dict.items()},
+        **{f"SAMViTH.{key}": value for key, value in vit_state_dict.items()},
+        **{f"MaskDecoder.{key}": value for key, value in mask_decoder_state_dict.items()},
+        **{f"PointEncoder.{key}": value for key, value in point_encoder_state_dict.items()},
+        **{f"MaskEncoder.{key}": value for key, value in mask_encoder_state_dict.items()},
     }
     if args.half:
         output_state_dict = {key: value.half() for key, value in output_state_dict.items()}

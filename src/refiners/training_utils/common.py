@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Iterable
@@ -6,20 +7,18 @@ from typing import Any, Callable, Iterable
 import numpy as np
 import torch
 from loguru import logger
-from torch import Tensor, cuda, nn
-from typing_extensions import TypedDict
+from torch import cuda, nn
 
 from refiners.fluxion.utils import manual_seed
 
 
 def compute_grad_norm(parameters: Iterable[nn.Parameter]) -> float:
     """
-    Computes the gradient norm of the parameters of a given model similar to `clip_grad_norm_` returned value.
+    Computes the gradient norm of the parameters in the given iterable.
+
+    We use the `torch.nn.utils.clip_grad_norm_` function to process the gradients efficiently on the GPU or CPU.
     """
-    gradients: list[Tensor] = [p.grad.detach() for p in parameters if p.grad is not None]
-    assert gradients, "The model has no gradients to compute the norm."
-    total_norm = torch.stack(tensors=[gradient.norm() for gradient in gradients]).norm().item()  # type: ignore
-    return total_norm  # type: ignore
+    return nn.utils.clip_grad.clip_grad_norm_(parameters, float("inf")).item()
 
 
 def count_learnable_parameters(parameters: Iterable[nn.Parameter]) -> int:
@@ -38,7 +37,7 @@ def human_readable_number(number: int) -> str:
 def seed_everything(seed: int | None = None) -> None:
     if seed is None:
         seed = random.randint(0, 2**32 - 1)
-        logger.info(f"Using random seed: {seed}")
+    logger.info(f"Using random seed: {seed}")
     random.seed(a=seed)
     np.random.seed(seed=seed)
     manual_seed(seed=seed)
@@ -67,6 +66,7 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
             actual_seed = seed(*args) if callable(seed) else seed
             seed_everything(seed=actual_seed)
             result = func(*args, **kwargs)
+            logger.debug(f"Restoring previous seed state")
             random.setstate(random_state)
             np.random.set_state(numpy_state)
             torch.set_rng_state(torch_state)
@@ -78,26 +78,32 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
     return decorator
 
 
-class TimeUnit(Enum):
+class TimeUnit(str, Enum):
     STEP = "step"
     EPOCH = "epoch"
     ITERATION = "iteration"
     DEFAULT = "step"
 
 
-class TimeValue(TypedDict):
+@dataclass
+class TimeValue:
     number: int
     unit: TimeUnit
 
 
-def parse_number_unit_field(value: str | int | dict[str, str | int]) -> TimeValue:
+TimeValueInput = str | int | dict[str, str | int] | TimeValue
+
+
+def parse_number_unit_field(value: TimeValueInput) -> TimeValue:
     match value:
         case str(value_str):
             number, unit = value_str.split(sep=":")
-            return {"number": int(number.strip()), "unit": TimeUnit(value=unit.strip().lower())}
+            return TimeValue(number=int(number.strip()), unit=TimeUnit(value=unit.strip().lower()))
         case int(number):
-            return {"number": number, "unit": TimeUnit.DEFAULT}
+            return TimeValue(number=number, unit=TimeUnit.DEFAULT)
         case {"number": int(number), "unit": str(unit)}:
-            return {"number": number, "unit": TimeUnit(value=unit.lower())}
+            return TimeValue(number=number, unit=TimeUnit(value=unit.lower()))
+        case TimeValue(number, unit):
+            return TimeValue(number=number, unit=unit)
         case _:
             raise ValueError(f"Unsupported value format: {value}")

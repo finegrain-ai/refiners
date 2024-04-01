@@ -152,7 +152,7 @@ from PIL import Image
 from refiners.fluxion.utils import image_to_tensor
 
 def generate_mask(size: int, seed: int | None = None) -> Generator[torch.Tensor, None, None]:
-    """Generate a tensor of a grayscale mask of size `size` using random rectangles."""
+    """Generate a tensor of a binary mask of size `size` using random rectangles."""
     if seed is None:
         seed = random.randint(0, 2**32 - 1)
     random.seed(seed)
@@ -186,10 +186,9 @@ mask = next(generate_mask(64, seed=42))
 tensor_to_image(mask).save("mask.png")
 ```
 
-Here are a few examples of generated images:
+Here are a two examples of generated masks:
 ![alt text](sample-0.png)
 ![alt text](sample-1.png)
-![alt text](sample-2.png)
 
 ## Trainer
 
@@ -221,13 +220,14 @@ Example:
 
 ```python
 from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulers
+from refiners.training_utils.common import TimeUnit, TimeValue
 
 class AutoencoderConfig(BaseConfig):
     # Since we are using a synthetic dataset, we will use a arbitrary fixed epoch size.
     epoch_size: int = 2048
 
 training = TrainingConfig(
-    duration="1000:epoch",
+    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32"
@@ -336,11 +336,11 @@ We can also evaluate the model using the `compute_evaluation` method.
 
 ```python
 training = TrainingConfig(
-    duration="1000:epoch",
+    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32",
-    evaluation_interval="50:epoch" # We set the evaluation to be done every 10 epochs
+    evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
 )
 
 class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
@@ -445,6 +445,10 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
 
 ![alt text](loss-logging.png)
 
+## Wrap up
+
+You can train this toy model using the code below:
+
 ??? complete end-to-end code "Expand to see the full code."
 
     ```py
@@ -456,6 +460,8 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
     import torch
     from loguru import logger
     from PIL import Image
+    from torch.nn import functional as F
+
     from refiners.fluxion import layers as fl
     from refiners.fluxion.utils import image_to_tensor, tensor_to_image
     from refiners.training_utils import (
@@ -473,7 +479,7 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
         register_callback,
         register_model,
     )
-    from torch.nn import functional as F
+    from refiners.training_utils.common import TimeUnit, TimeValue
 
 
     class ConvBlock(fl.Chain):
@@ -484,7 +490,7 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
                     out_channels=out_channels,
                     kernel_size=3,
                     padding=1,
-                    groups=min(in_channels, out_channels)
+                    groups=min(in_channels, out_channels),
                 ),
                 fl.LayerNorm2d(out_channels),
                 fl.SiLU(),
@@ -573,9 +579,7 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
         random.seed(seed)
 
         while True:
-            rectangle = Image.new(
-                "L", (random.randint(1, size), random.randint(1, size)), color=255
-            )
+            rectangle = Image.new("L", (random.randint(1, size), random.randint(1, size)), color=255)
             mask = Image.new("L", (size, size))
             mask.paste(
                 rectangle,
@@ -624,11 +628,11 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
     )
 
     training = TrainingConfig(
-        duration="1000:epoch",  # type: ignore
+        duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
         batch_size=32,
         device="cuda" if torch.cuda.is_available() else "cpu",
         dtype="float32",
-        evaluation_interval="50:epoch",  # type: ignore
+        evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
     )
 
     optimizer = OptimizerConfig(
@@ -636,9 +640,7 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
         learning_rate=1e-4,
     )
 
-    lr_scheduler = LRSchedulerConfig(
-        type=LRSchedulerType.CONSTANT_LR
-    )
+    lr_scheduler = LRSchedulerConfig(type=LRSchedulerType.CONSTANT_LR)
 
     config = AutoencoderConfig(
         training=training,
@@ -669,9 +671,7 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
             return Autoencoder()
 
         def compute_loss(self, batch: Batch) -> torch.Tensor:
-            x_reconstructed = self.autoencoder.decoder(
-                self.autoencoder.encoder(batch.image)
-            )
+            x_reconstructed = self.autoencoder.decoder(self.autoencoder.encoder(batch.image))
             return F.binary_cross_entropy(x_reconstructed, batch.image)
 
         def compute_evaluation(self) -> None:
@@ -684,14 +684,14 @@ class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
                 x_reconstructed = self.autoencoder.decoder(self.autoencoder.encoder(mask))
                 loss = F.mse_loss(x_reconstructed, mask)
                 validation_losses.append(loss.detach().cpu().item())
-                grid.append((tensor_to_image(mask), tensor_to_image((x_reconstructed>0.5).float())))
+                grid.append((tensor_to_image(mask), tensor_to_image((x_reconstructed > 0.5).float())))
 
             mean_loss = sum(validation_losses) / len(validation_losses)
             logger.info(f"Mean validation loss: {mean_loss}, epoch: {self.clock.epoch}")
 
             import matplotlib.pyplot as plt
 
-            _, axes = plt.subplots(4, 2, figsize=(8, 16)) # type: ignore
+            _, axes = plt.subplots(4, 2, figsize=(8, 16))  # type: ignore
 
             for i, (mask, reconstructed) in enumerate(grid):
                 axes[i, 0].imshow(mask, cmap="gray")

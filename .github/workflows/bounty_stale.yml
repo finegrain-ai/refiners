@@ -1,0 +1,21 @@
+name: Close inactive bounties
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+
+permissions:
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9.0.0
+        with: # https://github.com/actions/stale?tab=readme-ov-file#all-options
+          days-before-pr-stale: 7
+          days-before-pr-close: 7
+          only-labels: "bounty"
+          stale-pr-message: "This bounty is stale because it has been opened for 7 days with no activity."
+          close-pr-message: "This bounty was closed because it has been inactive for 7 days since being marked as stale."
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

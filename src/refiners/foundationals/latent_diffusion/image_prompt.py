@@ -235,7 +235,7 @@ class PerceiverResampler(fl.Chain):
 
 class ImageCrossAttention(fl.Chain):
     def __init__(self, text_cross_attention: fl.Attention, scale: float = 1.0) -> None:
-        self._scale = scale
+        self._multiply = [fl.Multiply(scale)]
         super().__init__(
             fl.Distribute(
                 fl.Identity(),
@@ -263,17 +263,20 @@ class ImageCrossAttention(fl.Chain):
             ScaledDotProductAttention(
                 num_heads=text_cross_attention.num_heads, is_causal=text_cross_attention.is_causal
             ),
-            fl.Multiply(self.scale),
+            self.multiply,
         )
 
     @property
+    def multiply(self) -> fl.Multiply:
+        return self._multiply[0]
+
+    @property
     def scale(self) -> float:
-        return self._scale
+        return self.multiply.scale
 
     @scale.setter
     def scale(self, value: float) -> None:
-        self._scale = value
-        self.ensure_find(fl.Multiply).scale = value
+        self.multiply.scale = value
 
 
 class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
@@ -282,28 +285,44 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
         target: fl.Attention,
         scale: float = 1.0,
     ) -> None:
-        self._scale = scale
         with self.setup_adapter(target):
-            clone = target.structural_copy()
-            scaled_dot_product = clone.ensure_find(ScaledDotProductAttention)
-            image_cross_attention = ImageCrossAttention(
-                text_cross_attention=clone,
-                scale=self.scale,
+            super().__init__(target)
+
+        self._image_cross_attention = [
+            ImageCrossAttention(
+                text_cross_attention=target,
+                scale=scale,
             )
-            clone.replace(
-                old_module=scaled_dot_product,
-                new_module=fl.Sum(
-                    scaled_dot_product,
-                    image_cross_attention,
-                ),
-            )
-            super().__init__(
-                clone,
-            )
+        ]
+
+    def inject(self, parent: fl.Chain | None = None) -> "CrossAttentionAdapter":
+        sdpa = self.target.ensure_find(ScaledDotProductAttention)
+        # replace the spda by a Sum of itself and the ImageCrossAttention
+        self.target.replace(
+            old_module=sdpa,
+            new_module=fl.Sum(
+                sdpa,
+                self.image_cross_attention,
+            ),
+        )
+        return super().inject(parent)
+
+    def eject(self) -> None:
+        # find the parent of the ImageCrossAttention (Sum)
+        parent = self.target.ensure_find_parent(self.image_cross_attention)
+        # unlink the ImageCrossAttention from its parent
+        parent.remove(self.image_cross_attention)
+        # replace the Sum by the original ScaledDotProductAttention
+        sdpa = parent.layer("ScaledDotProductAttention", ScaledDotProductAttention)
+        self.target.replace(
+            old_module=parent,
+            new_module=sdpa,
+        )
+        super().eject()
 
     @property
     def image_cross_attention(self) -> ImageCrossAttention:
-        return self.ensure_find(ImageCrossAttention)
+        return self._image_cross_attention[0]
 
     @property
     def image_key_projection(self) -> fl.Linear:
@@ -315,11 +334,10 @@ class CrossAttentionAdapter(fl.Chain, Adapter[fl.Attention]):
 
     @property
     def scale(self) -> float:
-        return self._scale
+        return self.image_cross_attention.scale
 
     @scale.setter
     def scale(self, value: float) -> None:
-        self._scale = value
         self.image_cross_attention.scale = value
 
     def load_weights(self, key_tensor: Tensor, value_tensor: Tensor) -> None:
@@ -424,10 +442,6 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         for cross_attn in self.sub_adapters:
             cross_attn.scale = value
 
-    def set_scale(self, scale: float) -> None:
-        for cross_attn in self.sub_adapters:
-            cross_attn.scale = scale
-
     def set_clip_image_embedding(self, image_embedding: Tensor) -> None:
         """Set the CLIP image embedding context.
 
@@ -440,18 +454,15 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         self.set_context("ip_adapter", {"clip_image_embedding": image_embedding})
 
     @overload
-    def compute_clip_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor:
-        ...
+    def compute_clip_image_embedding(self, image_prompt: Tensor, weights: list[float] | None = None) -> Tensor: ...
 
     @overload
-    def compute_clip_image_embedding(self, image_prompt: Image.Image) -> Tensor:
-        ...
+    def compute_clip_image_embedding(self, image_prompt: Image.Image) -> Tensor: ...
 
     @overload
     def compute_clip_image_embedding(
         self, image_prompt: list[Image.Image], weights: list[float] | None = None
-    ) -> Tensor:
-        ...
+    ) -> Tensor: ...
 
     def compute_clip_image_embedding(
         self,

@@ -15,7 +15,6 @@ from refiners.training_utils.config import (
     Optimizers,
     TrainingConfig,
 )
-from refiners.training_utils.gradient_clipping import GradientClippingConfig
 from refiners.training_utils.trainer import Trainer, register_callback, register_model
 from refiners.training_utils.wandb import WandbConfig, WandbMixin
 
@@ -52,7 +51,6 @@ __all__ = [
     "OptimizerConfig",
     "TrainingConfig",
     "ClockConfig",
-    "GradientClippingConfig",
     "Optimizers",
     "LRSchedulerType",
 ]

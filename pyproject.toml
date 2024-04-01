@@ -44,6 +44,11 @@ test = [
     # An unofficial Python package for Meta AI's Segment Anything Model:
     # https://github.com/opengeos/segment-anything
     "segment-anything-py>=1.0",
+    # Official Python package for HQ-SAM
+    "segment-anything-hq>=0.3",
+    # HQ-SAM missing dependency:
+    # https://github.com/SysCV/sam-hq/pull/59
+    "timm>=0.5.0",
 ]
 conversion = [
     "diffusers>=0.26.1",
@@ -69,7 +74,6 @@ build-backend = "hatchling.build"
 managed = true
 dev-dependencies = [
     "pyright==1.1.349",
-    "ruff>=0.2.0",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
@@ -81,7 +85,6 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.rye.scripts]
-lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
 test-cov = "coverage run -m pytest"
 # Work around for "Couldn't parse" errors due to e.g. opencv-python:
@@ -141,4 +144,11 @@ exclude_also = [
 
 [tool.typos.default]
 extend-words = { adaptee = "adaptee" }
-extend-ignore-identifiers-re = ["NDArray*"]
+extend-ignore-identifiers-re = ["NDArray*", "interm"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::UserWarning:segment_anything_hq.modeling.tiny_vit_sam.*",
+    "ignore::DeprecationWarning:timm.models.layers.*",
+    "ignore::DeprecationWarning:timm.models.registry.*"
+]

@@ -4,6 +4,7 @@ Download and convert weights for testing
 To see what weights will be downloaded and converted, run:
 DRY_RUN=1 python scripts/prepare_test_weights.py
 """
+
 import hashlib
 import os
 import subprocess
@@ -95,8 +96,10 @@ def download_file(
             print(f"❌{skip_icon} {response.status_code} ERROR {readable_size:<8} {url}")
         return
 
-    if skip_existing and os.path.exists(dest_filename):
+    if skip_existing and is_downloaded:
         print(f"{skip_icon}️ Skipping previously downloaded {url}")
+        if expected_hash is not None:
+            check_hash(dest_filename, expected_hash)
         return
 
     os.makedirs(dest_folder, exist_ok=True)
@@ -252,6 +255,20 @@ def download_loras():
     )
     download_file("https://sliders.baulab.info/weights/xl_sliders/eyesize.pt", dest_folder, expected_hash="ee170e4d")
 
+    dest_folder = os.path.join(test_weights_dir, "loras")
+    download_file(
+        "https://civitai.com/api/download/models/140624",
+        filename="Sci-fi_Environments_sdxl.safetensors",
+        dest_folder=dest_folder,
+        expected_hash="6a4afda8",
+    )
+    download_file(
+        "https://civitai.com/api/download/models/135931",
+        filename="pixel-art-xl-v1.1.safetensors",
+        dest_folder=dest_folder,
+        expected_hash="71aaa6ca",
+    )
+
 
 def download_preprocessors():
     dest_folder = os.path.join(test_weights_dir, "carolineec", "informativedrawings")
@@ -288,13 +305,13 @@ def download_control_lora_fooocus():
     download_file(
         url=f"https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors",
         dest_folder=base_folder,
-        expected_hash="4d505134",
+        expected_hash="fec9e32b",
     )
 
     download_file(
         url=f"https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors",
         dest_folder=base_folder,
-        expected_hash="d81aa461",
+        expected_hash="fc04b120",
     )
 
 
@@ -348,6 +365,13 @@ def download_sam():
     weights_folder = os.path.join(test_weights_dir)
     download_file(
         "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth", weights_folder, expected_hash="06785e66"
+    )
+
+
+def download_hq_sam():
+    weights_folder = os.path.join(test_weights_dir)
+    download_file(
+        "https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_h.pth", weights_folder, expected_hash="66da2472"
     )
 
 
@@ -646,7 +670,16 @@ def convert_sam():
         "convert_segment_anything.py",
         "tests/weights/sam_vit_h_4b8939.pth",
         "tests/weights/segment-anything-h.safetensors",
-        expected_hash="b62ad5ed",
+        expected_hash="5ffb976f",
+    )
+
+
+def convert_hq_sam():
+    run_conversion_script(
+        "convert_hq_segment_anything.py",
+        "tests/weights/sam_hq_vit_h.pth",
+        "tests/weights/refiners-sam-hq-vit-h.safetensors",
+        expected_hash="b2f5e79f",
     )
 
 
@@ -754,6 +787,7 @@ def download_all():
     download_ip_adapter()
     download_t2i_adapter()
     download_sam()
+    download_hq_sam()
     download_dinov2()
     download_control_lora_fooocus()
     download_lcm_base()
@@ -774,6 +808,7 @@ def convert_all():
     convert_ip_adapter()
     convert_t2i_adapter()
     convert_sam()
+    convert_hq_sam()
     convert_dinov2()
     convert_control_lora_fooocus()
     convert_lcm_base()

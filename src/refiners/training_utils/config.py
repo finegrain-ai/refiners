@@ -12,7 +12,6 @@ from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.common import TimeUnit, TimeValue, parse_number_unit_field
-from refiners.training_utils.gradient_clipping import GradientClippingConfig
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
@@ -26,11 +25,12 @@ class TrainingConfig(BaseModel):
         True  # Enables automatic mixed precision which allows float32 gradients while working with lower precision. This only has effect when dtype is not float32
     )
     dtype: str = "float32"
-    duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    duration: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
     seed: int = 0
     batch_size: int = 1
-    gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
-    evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    gradient_accumulation: TimeValue = TimeValue(number=1, unit=TimeUnit.STEP)
+    evaluation_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    gradient_clipping_max_norm: float | None = None
     evaluation_seed: int = 0
 
     model_config = ConfigDict(extra="forbid")
@@ -66,8 +66,8 @@ class LRSchedulerType(str, Enum):
 
 class LRSchedulerConfig(BaseModel):
     type: LRSchedulerType = LRSchedulerType.DEFAULT
-    update_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
-    warmup: TimeValue = {"number": 0, "unit": TimeUnit.ITERATION}
+    update_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    warmup: TimeValue = TimeValue(number=0, unit=TimeUnit.ITERATION)
     gamma: float = 0.1
     lr_lambda: Callable[[int], float] | None = None
     mode: Literal["min", "max"] = "min"
@@ -93,7 +93,7 @@ class OptimizerConfig(BaseModel):
     learning_rate: float = 1e-4
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
-    weight_decay: float = 0.0
+    weight_decay: float = 1e-2
 
     model_config = ConfigDict(extra="forbid")
 
@@ -170,7 +170,6 @@ class BaseConfig(BaseModel):
     optimizer: OptimizerConfig
     lr_scheduler: LRSchedulerConfig
     clock: ClockConfig = ClockConfig()
-    gradient_clipping: GradientClippingConfig = GradientClippingConfig()
 
     model_config = ConfigDict(extra="forbid")
 

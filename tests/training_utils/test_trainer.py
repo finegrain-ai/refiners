@@ -10,7 +10,7 @@ from torch.optim import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
-from refiners.training_utils.common import TimeUnit, count_learnable_parameters, human_readable_number
+from refiners.training_utils.common import TimeUnit, TimeValue, count_learnable_parameters, human_readable_number
 from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.training_utils.trainer import (
     Trainer,
@@ -96,7 +96,7 @@ def mock_trainer(mock_config: MockConfig) -> MockTrainer:
 @pytest.fixture
 def mock_trainer_short(mock_config: MockConfig) -> MockTrainer:
     mock_config_short = mock_config.model_copy(deep=True)
-    mock_config_short.training.duration = {"number": 3, "unit": TimeUnit.STEP}
+    mock_config_short.training.duration = TimeValue(number=3, unit=TimeUnit.STEP)
     return MockTrainer(config=mock_config_short)
 
 
@@ -130,10 +130,10 @@ def training_clock() -> TrainingClock:
     return TrainingClock(
         dataset_length=100,
         batch_size=10,
-        training_duration={"number": 5, "unit": TimeUnit.EPOCH},
-        gradient_accumulation={"number": 1, "unit": TimeUnit.EPOCH},
-        evaluation_interval={"number": 1, "unit": TimeUnit.EPOCH},
-        lr_scheduler_interval={"number": 1, "unit": TimeUnit.EPOCH},
+        training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
+        gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
+        evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+        lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
     )
 
 
@@ -183,7 +183,7 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     clock = mock_trainer.clock
     config = mock_trainer.config
 
-    assert clock.num_step_per_iteration == config.training.gradient_accumulation["number"]
+    assert clock.num_step_per_iteration == config.training.gradient_accumulation.number
     assert clock.num_batches_per_epoch == mock_trainer.dataset_length // config.training.batch_size
 
     assert mock_trainer.step_counter == 0
@@ -191,8 +191,8 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
 
     mock_trainer.train()
 
-    assert clock.epoch == config.training.duration["number"]
-    assert clock.step == config.training.duration["number"] * clock.num_batches_per_epoch
+    assert clock.epoch == config.training.duration.number
+    assert clock.step == config.training.duration.number * clock.num_batches_per_epoch
 
     assert mock_trainer.step_counter == mock_trainer.clock.step
 
@@ -206,7 +206,7 @@ def test_training_short_cycle(mock_trainer_short: MockTrainer) -> None:
 
     mock_trainer_short.train()
 
-    assert clock.step == config.training.duration["number"]
+    assert clock.step == config.training.duration.number
 
 
 @pytest.fixture

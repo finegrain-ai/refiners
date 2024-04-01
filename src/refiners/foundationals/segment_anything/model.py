@@ -20,7 +20,7 @@ class ImageEmbedding:
     original_image_size: tuple[int, int]  # (height, width)
 
 
-class SegmentAnything(fl.Module):
+class SegmentAnything(fl.Chain):
     """SegmentAnything model.
 
     See [[arXiv:2304.02643] Segment Anything](https://arxiv.org/abs/2304.02643)
@@ -47,16 +47,30 @@ class SegmentAnything(fl.Module):
             point_encoder: The point encoder to use.
             mask_encoder: The mask encoder to use.
             mask_decoder: The mask decoder to use.
-            device: The PyTorch device to use.
-            dtype: The PyTorch data type to use.
         """
-        super().__init__()
-        self.device: Device = device if isinstance(device, Device) else Device(device=device)
-        self.dtype = dtype
-        self.image_encoder = image_encoder.to(device=self.device, dtype=self.dtype)
-        self.point_encoder = point_encoder.to(device=self.device, dtype=self.dtype)
-        self.mask_encoder = mask_encoder.to(device=self.device, dtype=self.dtype)
-        self.mask_decoder = mask_decoder.to(device=self.device, dtype=self.dtype)
+        super().__init__(image_encoder, point_encoder, mask_encoder, mask_decoder)
+
+        self.to(device=device, dtype=dtype)
+
+    @property
+    def image_encoder(self) -> SAMViT:
+        """The image encoder."""
+        return self.ensure_find(SAMViT)
+
+    @property
+    def point_encoder(self) -> PointEncoder:
+        """The point encoder."""
+        return self.ensure_find(PointEncoder)
+
+    @property
+    def mask_encoder(self) -> MaskEncoder:
+        """The mask encoder."""
+        return self.ensure_find(MaskEncoder)
+
+    @property
+    def mask_decoder(self) -> MaskDecoder:
+        """The mask decoder."""
+        return self.ensure_find(MaskDecoder)
 
     @no_grad()
     def compute_image_embedding(self, image: Image.Image) -> ImageEmbedding:
@@ -233,6 +247,7 @@ class SegmentAnythingH(SegmentAnything):
         point_encoder: PointEncoder | None = None,
         mask_encoder: MaskEncoder | None = None,
         mask_decoder: MaskDecoder | None = None,
+        multimask_output: bool | None = None,
         device: Device | str = "cpu",
         dtype: DType = torch.float32,
     ) -> None:
@@ -243,19 +258,26 @@ class SegmentAnythingH(SegmentAnything):
             point_encoder: The point encoder to use.
             mask_encoder: The mask encoder to use.
             mask_decoder: The mask decoder to use.
+            multimask_output: Whether to use multimask output.
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
         image_encoder = image_encoder or SAMViTH()
         point_encoder = point_encoder or PointEncoder()
         mask_encoder = mask_encoder or MaskEncoder()
-        mask_decoder = mask_decoder or MaskDecoder()
 
-        super().__init__(
-            image_encoder=image_encoder,
-            point_encoder=point_encoder,
-            mask_encoder=mask_encoder,
-            mask_decoder=mask_decoder,
-            device=device,
-            dtype=dtype,
-        )
+        if mask_decoder:
+            assert (
+                multimask_output is None or mask_decoder.multimask_output == multimask_output
+            ), f"mask_decoder.multimask_output {mask_decoder.multimask_output} should match multimask_output ({multimask_output})"
+        else:
+            mask_decoder = MaskDecoder(multimask_output) if multimask_output is not None else MaskDecoder()
+
+        super().__init__(image_encoder, point_encoder, mask_encoder, mask_decoder)
+
+        self.to(device=device, dtype=dtype)
+
+    @property
+    def image_encoder(self) -> SAMViTH:
+        """The image encoder."""
+        return self.ensure_find(SAMViTH)
