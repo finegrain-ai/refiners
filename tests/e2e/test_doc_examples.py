@@ -13,6 +13,10 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import St
 from tests.utils import ensure_similar_images
 
 
+def _img_open(path: Path) -> Image.Image:
+    return Image.open(path)  # type: ignore
+
+
 @pytest.fixture(autouse=True)
 def ensure_gc():
     # Avoid GPU OOMs
@@ -110,27 +114,27 @@ def sdxl(
 
 @pytest.fixture
 def image_prompt_german_castle(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "german-castle.jpg").convert("RGB")
+    return _img_open(ref_path / "german-castle.jpg").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_guide_adapting_sdxl_vanilla(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_guide_adapting_sdxl_vanilla.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_guide_adapting_sdxl_vanilla.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_guide_adapting_sdxl_single_lora(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_guide_adapting_sdxl_single_lora.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_guide_adapting_sdxl_single_lora.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_guide_adapting_sdxl_multiple_loras(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_guide_adapting_sdxl_multiple_loras.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_guide_adapting_sdxl_multiple_loras.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_guide_adapting_sdxl_loras_ip_adapter(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_guide_adapting_sdxl_loras_ip_adapter.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_guide_adapting_sdxl_loras_ip_adapter.png").convert("RGB")
 
 
 @no_grad()

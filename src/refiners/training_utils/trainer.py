@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property, wraps
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
@@ -300,7 +300,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         """
         ...
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def dataset_length(self) -> int:
         """
         Returns the length of the dataset.

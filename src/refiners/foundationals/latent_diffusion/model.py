@@ -52,7 +52,8 @@ class LatentDiffusionModel(fl.Module, ABC):
         if init_image is None:
             x = noise
         else:
-            encoded_image = self.lda.image_to_latents(image=init_image.resize(size=(width, height)))
+            resized = init_image.resize(size=(width, height))  # type: ignore
+            encoded_image = self.lda.image_to_latents(resized)
             x = self.solver.add_noise(
                 x=encoded_image,
                 noise=noise,

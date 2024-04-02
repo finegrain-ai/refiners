@@ -197,8 +197,9 @@ class SegmentAnything(fl.Chain):
         h, w = target_size
         padh = self.image_size - h
         padw = self.image_size - w
+        resized = image.resize((w, h), resample=Image.Resampling.BILINEAR)  # type: ignore
         image_tensor = torch.tensor(
-            np.array(image.resize((w, h), resample=Image.Resampling.BILINEAR)).astype(np.float32).transpose(2, 0, 1),
+            np.array(resized).astype(np.float32).transpose(2, 0, 1),
             device=self.device,
             dtype=self.dtype,
         ).unsqueeze(0)

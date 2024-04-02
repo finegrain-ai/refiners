@@ -70,10 +70,10 @@ def test_image_to_tensor() -> None:
 
 
 def test_tensor_to_image() -> None:
-    assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"
-    assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"
-    assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"
-    assert tensor_to_image(torch.zeros(1, 3, 512, 512, dtype=torch.bfloat16)).mode == "RGB"
+    assert tensor_to_image(torch.zeros(1, 3, 512, 512)).mode == "RGB"  # type: ignore
+    assert tensor_to_image(torch.zeros(1, 1, 512, 512)).mode == "L"  # type: ignore
+    assert tensor_to_image(torch.zeros(1, 4, 512, 512)).mode == "RGBA"  # type: ignore
+    assert tensor_to_image(torch.zeros(1, 3, 512, 512, dtype=torch.bfloat16)).mode == "RGB"  # type: ignore
 
 
 def test_summarize_tensor() -> None:
