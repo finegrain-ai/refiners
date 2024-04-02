@@ -33,7 +33,7 @@ def one_prompt() -> SAMPrompt:
 
 @pytest.fixture(scope="module")
 def tennis(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "tennis.png").convert("RGB")
+    return Image.open(ref_path / "tennis.png").convert("RGB")  # type: ignore
 
 
 @pytest.fixture(scope="module")
@@ -148,7 +148,7 @@ def test_early_vit_embedding(
 ) -> None:
     HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
 
-    image_tensor = image_to_tensor(image=tennis.resize(size=(1024, 1024)))
+    image_tensor = image_to_tensor(image=tennis.resize(size=(1024, 1024)))  # type: ignore
 
     _ = sam_h.image_encoder(image_tensor.to(sam_h.device))
     early_vit_embedding_refiners = sam_h.use_context(context_name="hq_sam")["early_vit_embedding"]
@@ -284,7 +284,7 @@ def test_predictor_equal(
     # and to use image_embedding as input
 
     size = (1024, 1024)
-    resized_tennis = tennis.resize(size)
+    resized_tennis = tennis.resize(size)  # type: ignore
 
     # Reference
     reference_sam_h_predictor.set_image(np.array(resized_tennis))

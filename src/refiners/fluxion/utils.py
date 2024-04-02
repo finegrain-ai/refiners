@@ -145,6 +145,7 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
     """
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 
+    assert isinstance(image.mode, str)  # type: ignore
     match image.mode:
         case "L":
             image_tensor = image_tensor.unsqueeze(0)
