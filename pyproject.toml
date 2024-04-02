@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
+    "numpy>=1.26.4",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
