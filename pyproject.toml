@@ -148,7 +148,6 @@ extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
 
 [tool.typos.default.extend-words]
 adaptee = "adaptee"  # Common name for an adapter's target
-arange = "arange"  # Commonly used via `from torch import arange`
 
 [tool.pytest.ini_options]
 filterwarnings = [
