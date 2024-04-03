@@ -5,6 +5,7 @@ from .dinov2 import (
     DINOv2_large_reg,
     DINOv2_small,
     DINOv2_small_reg,
+    preprocess,
 )
 from .vit import ViT
 
@@ -16,4 +17,5 @@ __all__ = [
     "DINOv2_small",
     "DINOv2_small_reg",
     "ViT",
+    "preprocess",
 ]

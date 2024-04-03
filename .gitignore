@@ -12,6 +12,7 @@ venv/
 # tests' model weights
 tests/weights/
 tests/repos/
+tests/datasets/
 
 # ruff
 .ruff_cache
