@@ -40,7 +40,6 @@ test = [
     "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
-    "invisible-watermark>=0.2.0",
     "torchvision>=0.16.1",
     # An unofficial Python package for Meta AI's Segment Anything Model:
     # https://github.com/opengeos/segment-anything

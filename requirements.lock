@@ -82,8 +82,6 @@ idna==3.6
     # via yarl
 importlib-metadata==7.1.0
     # via diffusers
-invisible-watermark==0.2.0
-    # via refiners
 jaxtyping==0.2.28
     # via refiners
 jinja2==3.1.3
@@ -139,12 +137,9 @@ numpy==1.26.4
     # via bitsandbytes
     # via datasets
     # via diffusers
-    # via invisible-watermark
     # via jaxtyping
-    # via opencv-python
     # via pandas
     # via pyarrow
-    # via pywavelets
     # via refiners
     # via torchvision
     # via transformers
@@ -176,8 +171,6 @@ nvidia-nvjitlink-cu12==12.4.99
     # via nvidia-cusparse-cu12
 nvidia-nvtx-cu12==12.1.105
     # via torch
-opencv-python==4.9.0.80
-    # via invisible-watermark
 packaging==24.0
     # via black
     # via datasets
@@ -194,7 +187,6 @@ pathspec==0.12.1
     # via mkdocs
 pillow==10.3.0
     # via diffusers
-    # via invisible-watermark
     # via refiners
     # via torchvision
 piq==0.8.0
@@ -227,8 +219,6 @@ python-dateutil==2.9.0.post0
     # via pandas
 pytz==2024.1
     # via pandas
-pywavelets==1.6.0
-    # via invisible-watermark
 pyyaml==6.0.1
     # via datasets
     # via huggingface-hub
@@ -283,7 +273,6 @@ tomli==2.0.1
     # via refiners
 torch==2.2.2
     # via bitsandbytes
-    # via invisible-watermark
     # via refiners
     # via segment-anything-hq
     # via segment-anything-py
