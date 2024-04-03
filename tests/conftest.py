@@ -6,6 +6,9 @@ from pytest import fixture
 
 PARENT_PATH = Path(__file__).parent
 
+collect_ignore = ["weights", "repos", "datasets"]
+collect_ignore_glob = ["*_ref"]
+
 
 @fixture(scope="session")
 def test_device() -> torch.device:
@@ -19,6 +22,12 @@ def test_device() -> torch.device:
 def test_weights_path() -> Path:
     from_env = os.getenv("REFINERS_TEST_WEIGHTS_DIR")
     return Path(from_env) if from_env else PARENT_PATH / "weights"
+
+
+@fixture(scope="session")
+def test_datasets_path() -> Path:
+    from_env = os.getenv("REFINERS_TEST_DATASETS_DIR")
+    return Path(from_env) if from_env else PARENT_PATH / "datasets"
 
 
 @fixture(scope="session")

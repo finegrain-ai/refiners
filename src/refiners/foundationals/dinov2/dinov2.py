@@ -1,9 +1,25 @@
 import torch
+from PIL import Image
 
+from refiners.fluxion.utils import image_to_tensor, normalize
 from refiners.foundationals.dinov2.vit import ViT
 
-# TODO: add preprocessing logic like
-# https://github.com/facebookresearch/dinov2/blob/2302b6b/dinov2/data/transforms.py#L77
+
+def preprocess(img: Image.Image, dim: int = 224) -> torch.Tensor:
+    """
+    Preprocess an image for use with DINOv2. Uses ImageNet mean and standard deviation.
+    Note that this only resizes and normalizes the image, there is no center crop.
+
+    Args:
+        img: The image.
+        dim: The square dimension to resize the image. Typically 224 or 518.
+
+    Returns:
+        A float32 tensor with shape (3, dim, dim).
+    """
+    img = img.convert("RGB").resize((dim, dim))  # type: ignore
+    t = image_to_tensor(img).squeeze()
+    return normalize(t, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
 
 class DINOv2_small(ViT):
