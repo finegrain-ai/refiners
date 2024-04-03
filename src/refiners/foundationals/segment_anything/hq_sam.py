@@ -291,6 +291,18 @@ class HQSAMAdapter(fl.Chain, Adapter[SegmentAnything]):
     """Adapter for SAM introducing HQ features.
 
     See [[arXiv:2306.01567] Segment Anything in High Quality](https://arxiv.org/abs/2306.01567) for details.
+
+    Example:
+        ```py
+        from refiners.fluxion.utils import load_from_safetensors
+
+        # Tips: run scripts/prepare_test_weights.py to download the weights
+        tensor_path = "./tests/weights/refiners-sam-hq-vit-h.safetensors"
+        weights = load_from_safetensors(tensor_path)
+
+        hq_sam_adapter = HQSAMAdapter(sam_h, weights=weights)
+        hq_sam_adapter.inject()  # then use SAM as usual
+        ```
     """
 
     _adapter_modules: dict[str, fl.Module] = {}
