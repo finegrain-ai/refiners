@@ -66,7 +66,7 @@ def scoped_seed(seed: int | Callable[..., int] | None = None) -> Callable[..., C
             actual_seed = seed(*args) if callable(seed) else seed
             seed_everything(seed=actual_seed)
             result = func(*args, **kwargs)
-            logger.debug(f"Restoring previous seed state")
+            logger.trace(f"Restoring previous seed state")
             random.setstate(random_state)
             np.random.set_state(numpy_state)
             torch.set_rng_state(torch_state)
