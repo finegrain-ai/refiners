@@ -18,6 +18,21 @@ def convert_dinov2_facebook(weights: dict[str, torch.Tensor]) -> None:
     weights["cls_token"] = weights["cls_token"].squeeze(0)
     weights["pos_embed"] = weights["pos_embed"].squeeze(0)
 
+    # rename "w12" to "fc1" and "w3" to "fc2", only for giant model
+    for key in list(weights.keys()):
+        if "w3" in key:
+            new_key = key.replace("w3", "fc2")
+            weights[new_key] = weights.pop(key)
+        elif "w12" in key:
+            # we swap w1 and w2 because of the difference between our GLU implementation and theirs
+            # see https://github.com/facebookresearch/dinov2/blob/e1277af2ba9496fbadf7aec6eba56e8d882d1e35/dinov2/layers/swiglu_ffn.py#L31-L34
+            # and https://github.com/finegrain-ai/refiners/blob/a2ee70578361e4d84a65a8708564480a9b0ec67e/src/refiners/fluxion/layers/activations.py#L158-L160
+            weight = weights.pop(key)
+            w1, w2 = weight.chunk(2, dim=0)
+            w21 = torch.cat([w2, w1], dim=0)
+            new_key = key.replace("w12", "fc1")
+            weights[new_key] = w21
+
     rename_keys: list[tuple[str, str]] = [
         ("cls_token", "Concatenate.ClassToken.Parameter.weight"),
         ("pos_embed", "PositionalEncoder.PositionalEmbedding.Parameter.weight"),

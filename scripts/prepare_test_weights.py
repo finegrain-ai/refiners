@@ -382,9 +382,11 @@ def download_dinov2():
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_pretrain.pth",
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_pretrain.pth",
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitl14/dinov2_vitl14_pretrain.pth",
+        "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitg14/dinov2_vitg14_pretrain.pth",
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_reg4_pretrain.pth",
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_reg4_pretrain.pth",
         "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitl14/dinov2_vitl14_reg4_pretrain.pth",
+        "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitg14/dinov2_vitg14_reg4_pretrain.pth",
     ]
     download_files(urls, weights_folder)
 
@@ -694,6 +696,12 @@ def convert_dinov2():
     )
     run_conversion_script(
         "convert_dinov2.py",
+        "tests/weights/dinov2_vitg14_pretrain.pth",
+        "tests/weights/dinov2_vitg14_pretrain.safetensors",
+        expected_hash="880c61f5",
+    )
+    run_conversion_script(
+        "convert_dinov2.py",
         "tests/weights/dinov2_vits14_reg4_pretrain.pth",
         "tests/weights/dinov2_vits14_reg4_pretrain.safetensors",
         expected_hash="080247c7",
@@ -709,6 +717,12 @@ def convert_dinov2():
         "tests/weights/dinov2_vitl14_reg4_pretrain.pth",
         "tests/weights/dinov2_vitl14_reg4_pretrain.safetensors",
         expected_hash="b1221702",
+    )
+    run_conversion_script(
+        "convert_dinov2.py",
+        "tests/weights/dinov2_vitg14_reg4_pretrain.pth",
+        "tests/weights/dinov2_vitg14_reg4_pretrain.safetensors",
+        expected_hash="639398eb",
     )
 
 

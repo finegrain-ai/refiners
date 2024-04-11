@@ -9,6 +9,8 @@ from refiners.fluxion.utils import load_from_safetensors, load_tensors, manual_s
 from refiners.foundationals.dinov2.dinov2 import (
     DINOv2_base,
     DINOv2_base_reg,
+    DINOv2_giant,
+    DINOv2_giant_reg,
     DINOv2_large,
     DINOv2_large_reg,
     DINOv2_small,
@@ -23,9 +25,8 @@ FLAVORS_MAP = {
     "dinov2_vitb14_reg": DINOv2_base_reg,
     "dinov2_vitl14": DINOv2_large,
     "dinov2_vitl14_reg": DINOv2_large_reg,
-    # TODO: support giant flavors
-    # "dinov2_vitg14": DINOv2_giant,
-    # "dinov2_vitg14_reg": DINOv2_giant_reg,
+    "dinov2_vitg14": DINOv2_giant,
+    "dinov2_vitg14_reg": DINOv2_giant_reg,
 }
 
 
