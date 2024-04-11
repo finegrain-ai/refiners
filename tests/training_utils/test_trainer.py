@@ -137,6 +137,30 @@ def training_clock() -> TrainingClock:
     )
 
 
+def test_small_dataset_error():
+    with pytest.raises(AssertionError):
+        TrainingClock(
+            dataset_length=3,
+            batch_size=10,
+            training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
+            gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+        )
+
+
+def test_zero_batch_size_error():
+    with pytest.raises(AssertionError):
+        TrainingClock(
+            dataset_length=3,
+            batch_size=0,
+            training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
+            gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+        )
+
+
 def test_time_unit_to_steps_conversion(training_clock: TrainingClock) -> None:
     assert training_clock.convert_time_unit_to_steps(1, TimeUnit.EPOCH) == 10
     assert training_clock.convert_time_unit_to_steps(2, TimeUnit.EPOCH) == 20

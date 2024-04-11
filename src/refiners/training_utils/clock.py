@@ -29,6 +29,10 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
+        assert batch_size > 0, "Batch size must be greater than 0."
+        assert (
+            dataset_length >= batch_size
+        ), f"Dataset length ({dataset_length}) must be greater than batch_size ({batch_size})."
         self.dataset_length = dataset_length
         self.batch_size = batch_size
         self.training_duration = training_duration
