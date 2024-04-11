@@ -2038,6 +2038,7 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
         size=(64, 64),
         offset=(0, 16),
         clip_text_embedding=clip_text_embedding,
+        condition_scale=3,
         start_step=0,
     )
     noise = torch.randn(1, 4, 64, 80, device=sd.device, dtype=sd.dtype)

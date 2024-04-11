@@ -65,6 +65,25 @@ class StableDiffusion_XL(LatentDiffusionModel):
             dtype=dtype,
         )
 
+    def __call__(
+        self,
+        x: Tensor,
+        step: int,
+        *,
+        clip_text_embedding: Tensor,
+        pooled_text_embedding: Tensor,
+        time_ids: Tensor,
+        condition_scale: float = 5.0,
+    ) -> Tensor:
+        return super().__call__(
+            x=x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            pooled_text_embedding=pooled_text_embedding,
+            time_ids=time_ids,
+            condition_scale=condition_scale,
+        )
+
     def compute_clip_text_embedding(
         self, text: str | list[str], negative_text: str | list[str] = ""
     ) -> tuple[Tensor, Tensor]:

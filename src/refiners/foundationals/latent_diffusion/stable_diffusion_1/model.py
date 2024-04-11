@@ -68,6 +68,14 @@ class StableDiffusion_1(LatentDiffusionModel):
             dtype=dtype,
         )
 
+    def __call__(self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5) -> Tensor:
+        return super().__call__(
+            x,
+            step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=condition_scale,
+        )
+
     def compute_clip_text_embedding(self, text: str | list[str], negative_text: str | list[str] = "") -> Tensor:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
