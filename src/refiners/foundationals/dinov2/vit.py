@@ -137,21 +137,22 @@ class FeedForward(fl.Chain):
         self,
         embedding_dim: int,
         feedforward_dim: int,
-        activation: Activation = fl.GeLU,  # type: ignore
+        activation: Activation,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
         self.embedding_dim = embedding_dim
         self.feedforward_dim = feedforward_dim
+        pre_activation_dim = feedforward_dim * 2 if isinstance(activation, fl.GLU) else feedforward_dim
 
         super().__init__(
             fl.Linear(
                 in_features=embedding_dim,
-                out_features=feedforward_dim,
+                out_features=pre_activation_dim,
                 device=device,
                 dtype=dtype,
             ),
-            activation(),
+            activation,
             fl.Linear(
                 in_features=feedforward_dim,
                 out_features=embedding_dim,
@@ -200,6 +201,8 @@ class TransformerLayer(fl.Chain):
         num_heads: int,
         norm_eps: float,
         mlp_ratio: int,
+        activation: Activation,
+        feedforward_dim: int | None = None,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -207,6 +210,7 @@ class TransformerLayer(fl.Chain):
         self.num_heads = num_heads
         self.norm_eps = norm_eps
         self.mlp_ratio = mlp_ratio
+        self.feedforward_dim = feedforward_dim if feedforward_dim is not None else embedding_dim * mlp_ratio
 
         super().__init__(
             fl.Residual(
@@ -237,7 +241,8 @@ class TransformerLayer(fl.Chain):
                 ),
                 FeedForward(
                     embedding_dim=embedding_dim,
-                    feedforward_dim=embedding_dim * mlp_ratio,
+                    feedforward_dim=self.feedforward_dim,
+                    activation=activation,
                     device=device,
                     dtype=dtype,
                 ),
@@ -300,6 +305,8 @@ class ViT(fl.Chain):
         norm_eps: float = 1e-6,
         mlp_ratio: int = 4,
         num_registers: int = 0,
+        activation: Activation = fl.GeLU(),
+        feedforward_dim: int | None = None,
         interpolate_antialias: bool = False,
         interpolate_mode: str = "bicubic",
         device: torch.device | str | None = None,
@@ -316,6 +323,8 @@ class ViT(fl.Chain):
             norm_eps: The epsilon value for normalization.
             mlp_ratio: The ratio for the multi-layer perceptron (MLP).
             num_registers: The number of registers.
+            activation: The activation function.
+            feedforward_dim: The dimension of the feedforward layer.
             interpolate_antialias: Whether to use antialiasing for interpolation.
             interpolate_mode: The interpolation mode.
             device: The PyTorch device to use.
@@ -330,6 +339,7 @@ class ViT(fl.Chain):
         self.norm_eps = norm_eps
         self.mlp_ratio = mlp_ratio
         self.num_registers = num_registers
+        self.feedforward_dim = feedforward_dim
 
         super().__init__(
             fl.Concatenate(
@@ -370,6 +380,8 @@ class ViT(fl.Chain):
             Transformer(
                 TransformerLayer(
                     embedding_dim=embedding_dim,
+                    feedforward_dim=feedforward_dim,
+                    activation=activation,
                     num_heads=num_heads,
                     mlp_ratio=mlp_ratio,
                     norm_eps=norm_eps,
