@@ -1,7 +1,6 @@
 import argparse
-import logging
-import os
 import gc
+import os
 
 import torch
 from tqdm import tqdm

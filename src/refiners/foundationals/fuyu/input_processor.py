@@ -1,14 +1,20 @@
 from typing import List, Tuple
 
 from torch import Tensor, bool as tbool, cat, device as Device, dtype as DType, ones, tensor, tril
+from torchvision.transforms.functional import resize
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import TokenEncoder
-from refiners.foundationals.fuyu.common import Padding
+from refiners.foundationals.fuyu.common import PatchPadding
 from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 
 
 class ImageEncoder(fl.Chain):
+    """
+    Image Encoding Layer.
+
+    This layer pad, normalize, patchify and project a given tensor of images
+    """
     def __init__(
         self,
         patch_size: int = 30,
@@ -25,7 +31,7 @@ class ImageEncoder(fl.Chain):
         self.padding_value=padding_value
 
         super().__init__(
-            Padding(  #Pad
+            PatchPadding(  #Pad
                 patch_size=self.patch_size,
                 padding_value=self.padding_value
             ),
@@ -54,6 +60,16 @@ class ImageEncoder(fl.Chain):
         return patched
 
 class InputEncoder(fl.ContextModule):
+    """
+    Input Encoding Layer.
+
+    This layer encode both the text and the image and set them 
+    in the right format as an input for the Fuyu model
+
+    Warning:
+        This layer doesn't handle yet batches
+
+    """
     def __init__(
         self,
         embedding_dim: int = 4096,
@@ -62,6 +78,7 @@ class InputEncoder(fl.ContextModule):
         tokenizer: FuyuTokenizer | None = None,
         patch_size: int = 30,
         padding_value: float = 1.,
+        max_size: Tuple[int] = (1920,1080),
         device: Device | str | None = None,
         dtype: DType | None = None
     ):
@@ -74,6 +91,7 @@ class InputEncoder(fl.ContextModule):
         self.padding_value = padding_value
         self.device=device
         self.dtype=dtype
+        self.max_size=max_size
 
         self.tokenizer = tokenizer or FuyuTokenizer()
 
@@ -92,10 +110,14 @@ class InputEncoder(fl.ContextModule):
             dtype=dtype
         )
 
-    def forward(self, image: Tensor, text: List[str]) -> Tuple[Tensor, Tensor]:
-        b, _, h, w = image.shape
-        assert len(text) == b, "Incoherent number of images compared to the number of prompt"
-        
+    def forward(self, image: Tensor, prompt: str, answer: str = None) -> Tuple[Tensor, Tensor]:
+        _, _, h, w = image.shape
+
+        if h > self.max_size[1] or w > self.max_size[0]:
+            scale_factor = min(self.max_size[0]/w, self.max_size[1]/h)
+            image = resize(image, [int(scale_factor*h), int(scale_factor*w)])
+            _, _, h, w = image.shape
+            
         # Encode Images
         image = image.to(device=self.device, dtype=self.dtype)
         patched_image = self.image_encoder(image)
@@ -108,42 +130,43 @@ class InputEncoder(fl.ContextModule):
         # Create linebreak embeddings
         linebreak = tensor([self.tokenizer.newline_token_id], device=self.device).long()
         linebreak_embedding = self.token_encoder(linebreak)
-        linebreak_embedding = linebreak_embedding.expand(b, n_linebreak, 1, self.embedding_dim)
+        linebreak_embedding = linebreak_embedding.expand(1, n_linebreak, 1, self.embedding_dim)
         # Reshape encoded_image to introduce a slot for linebreaks
-        encoded_image = patched_image.view(b, n_linebreak, f_linebreak, self.embedding_dim)
+        encoded_image = patched_image.view(1, n_linebreak, f_linebreak, self.embedding_dim)
         # Concatenate linebreak embeddings
         encoded_image = cat((encoded_image, linebreak_embedding), dim=2)
         # Reshape to final desired flat format [b seq_len embedding_dim]
-        encoded_image = encoded_image.view(b, -1, self.embedding_dim)
+        encoded_image = encoded_image.view(1, -1, self.embedding_dim)
+
+        if answer is not None:
+            token = cat(
+                [
+                    Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
+                    self.tokenizer(prompt).to(self.device),
+                    Tensor([[self.tokenizer.boa_token_id]]).to(self.device),
+                    self.tokenizer(answer).to(self.device)
+                ],
+                dim=1,
+            ).to(int)
+        else:
+            token = cat(
+                [
+                    Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
+                    self.tokenizer(prompt).to(self.device),
+                    Tensor([[self.tokenizer.boa_token_id]]).to(self.device)
+                ],
+                dim=1,
+            ).to(int)
 
         # Tokenize and encode text
-        tokens = [self.tokenizer(txt).to(self.device) for txt in text]
-        encoded_text = [self.token_encoder(token) for token in tokens]
-
-        # Initialize the 3D attention mask with ones
-        max_text_len = max(et.shape[1] for et in encoded_text)
-        max_len = max_text_len + encoded_image.shape[1]
-        attn_mask = ones(b, max_len, max_len, device=self.device, dtype=tbool)
-
-        padded_encoded_images = []
-        for i, et in enumerate(encoded_text):
-            padding_length = max_text_len - et.shape[1]
-            if padding_length > 0:
-                padding_tensor = tensor([self.tokenizer.pad_token['id']] * padding_length, device=self.device).long()
-                padding_encoding = self.token_encoder(padding_tensor).view(1, padding_length, -1)
-                # Concatenate the padding on the left of the encoded image
-                padded_encoded_image = cat((padding_encoding, encoded_image[i].unsqueeze(0)), dim=1)
-            else:
-                # No padding needed, use the encoded image as is
-                padded_encoded_image = encoded_image[i].unsqueeze(0)
-            padded_encoded_images.append(padded_encoded_image)
-            attn_mask[i, :padding_length, :] = 0
-            attn_mask[i, :, :padding_length] = 0
-
-        causal_mask = tril(ones((max_len, max_len), device=self.device, dtype=tbool))
-        attn_mask = attn_mask & causal_mask.unsqueeze(0)
+        encoded_text = self.token_encoder(token) 
+        padded_encoded_images = encoded_image
+        len_seq = encoded_text.shape[1] + encoded_image.shape[1]
+        attn_mask = ones(1, len_seq , len_seq, device=self.device, dtype=tbool)
+        causal_mask = tril(ones((1, len_seq, len_seq), device=self.device, dtype=tbool))
+        attn_mask = attn_mask & causal_mask
         context = self.use_context(context_name="attention")
         context.update({"mask": attn_mask})
 
-        encoded_inputs = cat([cat((pim, et), dim=1) for pim, et in zip(padded_encoded_images, encoded_text)], dim=0)
+        encoded_inputs = cat((padded_encoded_images, encoded_text), dim=1)
         return encoded_inputs

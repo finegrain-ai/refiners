@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List
 
-from torch import device as Device, dtype as DType, float16 as Tfloat16, float32 as Tfloat32
+import numpy as np
+from torch import Tensor, argmax, device as Device, dtype as DType, float16 as Tfloat16, no_grad
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.fuyu.input_processor import InputEncoder
@@ -10,6 +11,15 @@ from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransf
 
 
 def create_fuyu(config):
+    """
+    create a fuyu model based on the config provided
+
+    Example:
+        ```py
+        config = Fuyu8b
+        network = create_fuyu(config)
+        ```
+    """
     model = Fuyu(
         embedding_dim=config.embedding_dim,
         feedforward_dim=config.feedforward_dim,
@@ -32,6 +42,9 @@ def create_fuyu(config):
 
 @dataclass(frozen=True)
 class Fuyu8b:
+    """
+    config with the base argument for Fuyu8b
+    """
     embedding_dim: int = 4_096
     feedforward_dim: int = 16_384
     max_sequence_length: int = 16_384
@@ -50,6 +63,15 @@ class Fuyu8b:
     dtype: DType | None = Tfloat16
 
 class Fuyu(fl.Chain):
+    """
+    Implements the Fuyu model
+    see [https://www.adept.ai/blog/fuyu-8b]
+
+    Warning:
+        The forward model doesn't handle yet batched as the InputEncoder
+        is coded to handle one image and one text at a time to avoid changing 
+        the original dimension of the images. Use generate to handle multiple images/prompts
+    """
     def __init__(
         self,
         embedding_dim: int,
@@ -111,3 +133,39 @@ class Fuyu(fl.Chain):
         )
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
+    
+    def generate(self, images: List, prompts: List[str], max_len_generation=50):
+        """
+        Generate answers for a list of images and prompts
+
+        Receives:
+            images (List[PIL.Image, "batch"])
+            prompts (List[str, "batch"])
+            max_len_generation (int)
+
+        Returns:
+            (List[str, "batch"])
+        """
+        tokenizer = self.InputEncoder.tokenizer
+        final_answer = []
+        for image, prompt in zip(images, prompts):
+            image= (Tensor(np.array(image)/255)).permute(2,0,1).unsqueeze(0)
+            i = 0
+            answer = None
+            stop_token = False
+            while i<max_len_generation and not stop_token:
+                with no_grad():
+                    predictions = self.forward(image, prompt, answer)
+                next_token = argmax(predictions[:,-1,:], dim=-1)
+                if next_token.item() != tokenizer.eos_token['id']:
+                    next_token_text = tokenizer.id_to_token[next_token.item()].replace(tokenizer.replace_char, tokenizer.replace_pattern)
+                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
+                    if answer is None:
+                        answer = next_token_text
+                    else:
+                        answer += next_token_text
+                    i+=1
+                else :
+                    stop_token=True
+            final_answer.append(answer)
+        return final_answer

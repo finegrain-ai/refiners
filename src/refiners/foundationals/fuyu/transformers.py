@@ -8,6 +8,10 @@ from refiners.foundationals.fuyu.common import CustomReshape, ScaledDotProductAt
 
 
 class RotaryPositionalEmbedding(fl.Module):
+    """
+    This layer implements RoPE 
+    see [https://arxiv.org/pdf/2104.09864.pdf]
+    """
     def __init__(
         self,
         dim: int = 32,
@@ -65,6 +69,17 @@ class RotaryPositionalEmbedding(fl.Module):
 
 
 class QKVProjection(fl.Chain):
+    """
+    Apply query, key, value projection
+
+    Args:
+        embedding_dim: The embedding dimension of the input and output tensors.
+        num_heads: The number of heads of the attention mechanism.
+        use_bias: Whether to use bias in the linear layers.
+        norm_eps: epsilon for Layer Norm
+        device: The device to use.
+        dtype: The dtype to use
+    """
     def __init__(
             self,
             embedding_dim,

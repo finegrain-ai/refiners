@@ -9,21 +9,32 @@ import refiners.fluxion.layers as fl
 
 
 class SquaredReLU(fl.Activation):
+    """Squared Rectified Linear Unit activation function
+
+    See [Primer: Searching for Efficient Transformers for Language Modeling](https://arxiv.org/pdf/2109.08668v2.pdf)
+
+    Example:
+        ```py
+        squared_relu = SquaredReLU()
+
+        tensor = torch.tensor([[-2.0, 0.0, 2.0]])
+        output = squared_relu(tensor)
+
+        expected_output = torch.tensor([[0.0, 0.0, 4.0]])
+        assert torch.equal(output, expected_output)
+        ```
+    """
     def __init__(self) -> None:
         super().__init__()
 
     def forward(self, x: Tensor) -> Tensor:
         return torch.pow(relu(x), 2)
-    
-class Softmax(fl.Module):
-    def forward(self, x: Tensor) -> Tensor:
-        return softmax(x, dim=0)
 
 class CustomReshape(fl.Module):
     """Reshape operation layer.
 
     This layer reshapes the input tensor to a specific shape (which must be compatible with the original shape).
-    See also [torch.reshape][torch.reshape].
+    See also [torch.reshape].
 
     Warning:
         The first dimension and seconde dimension (batch dimension and 
@@ -31,7 +42,7 @@ class CustomReshape(fl.Module):
 
     Example:
         ```py
-        reshape = fl.Reshape(5, 2)
+        reshape = CustomReshape(5, 2)
 
         tensor = torch.randn(2, 6, 10, 1)
         output = reshape(tensor)
@@ -50,7 +61,26 @@ class CustomReshape(fl.Module):
             shape=(x.shape[0], x.shape[1], *self.shape),
         )
 
-class Padding(fl.Module):
+class PatchPadding(fl.Module):
+    """
+    Padding operation layer.
+    
+    This layer pad a given image tensor to make its height and width divisible by patch size
+
+    Warning:
+        Take a unique value for patch_size, the patch is assumed to be squared
+    
+    Example:
+        ```py
+        patch_padding = PatchPadding(30, 1.0)
+
+        tensor = torch.randn(2, 3, 470, 940)
+        output = patch_padding(tensor)
+
+        assert output.shape == (2, 3, 480, 960)
+
+
+    """
     def __init__(
         self,
         patch_size: int = 30,
@@ -127,13 +157,13 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
         ![](https://ar5iv.labs.arxiv.org/html/1706.03762/assets/Figures/ModalNet-19.png)
 
     Note:
-        This layer simply wraps `scaled_dot_product_attention` inside an `fl.Module`.
+        This layer simply wraps `scaled_dot_product_attention` inside an `fl.ContextModule` and retrieves the 
+        attn_mask in the context.
 
     Receives:
         Query (Float[Tensor, "batch num_queries embedding_dim"]):
         Key (Float[Tensor, "batch num_keys embedding_dim"]):
         Value (Float[Tensor, "batch num_values embedding_dim"]):
-        AttnMask (Float[Tensor, "batch target_sequence_length source_sequence_length"])
 
     Returns:
         (Float[Tensor, "batch num_queries embedding_dim"]):
