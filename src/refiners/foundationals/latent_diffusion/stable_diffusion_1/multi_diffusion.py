@@ -16,7 +16,7 @@ class SD1MultiDiffusion(MultiDiffusion[StableDiffusion_1, DiffusionTarget]):
             x=x,
             step=step,
             clip_text_embedding=target.clip_text_embedding,
-            scale=target.condition_scale,
+            condition_scale=target.condition_scale,
         )
 
 
@@ -37,5 +37,5 @@ class SD1InpaintingMultiDiffusion(MultiDiffusion[StableDiffusion_1_Inpainting, I
             x=x,
             step=step,
             clip_text_embedding=target.clip_text_embedding,
-            scale=target.condition_scale,
+            condition_scale=target.condition_scale,
         )
