@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 from torch import Tensor, bool as tbool, cat, device as Device, dtype as DType, ones, tensor, tril
-from torchvision.transforms.functional import resize
+from torchvision.transforms.functional import pad, resize
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import TokenEncoder
@@ -65,10 +65,6 @@ class InputEncoder(fl.ContextModule):
 
     This layer encode both the text and the image and set them 
     in the right format as an input for the Fuyu model
-
-    Warning:
-        This layer doesn't handle yet batches
-
     """
     def __init__(
         self,
@@ -78,7 +74,7 @@ class InputEncoder(fl.ContextModule):
         tokenizer: FuyuTokenizer | None = None,
         patch_size: int = 30,
         padding_value: float = 1.,
-        max_size: Tuple[int] = (1920,1080),
+        max_size: Tuple[int] = (1080, 1920), #h w
         device: Device | str | None = None,
         dtype: DType | None = None
     ):
@@ -110,17 +106,14 @@ class InputEncoder(fl.ContextModule):
             dtype=dtype
         )
 
-    def forward(self, image: Tensor, prompt: str, answer: str = None) -> Tuple[Tensor, Tensor]:
-        _, _, h, w = image.shape
-
-        if h > self.max_size[1] or w > self.max_size[0]:
-            scale_factor = min(self.max_size[0]/w, self.max_size[1]/h)
-            image = resize(image, [int(scale_factor*h), int(scale_factor*w)])
-            _, _, h, w = image.shape
-            
+    def forward(self, images: List[Tensor], prompts: list[str], answers: list[str] = None) -> Tensor:
+        # preprocess batch
+        images = self.process_batch_images(images)
+        images = images.to(device=self.device, dtype=self.dtype)
+        b, c, h, w = images.shape
+        
         # Encode Images
-        image = image.to(device=self.device, dtype=self.dtype)
-        patched_image = self.image_encoder(image)
+        patched_images = self.image_encoder(images)
 
         h += (self.patch_size - h % self.patch_size) % self.patch_size
         w += (self.patch_size - w % self.patch_size) % self.patch_size
@@ -130,43 +123,112 @@ class InputEncoder(fl.ContextModule):
         # Create linebreak embeddings
         linebreak = tensor([self.tokenizer.newline_token_id], device=self.device).long()
         linebreak_embedding = self.token_encoder(linebreak)
-        linebreak_embedding = linebreak_embedding.expand(1, n_linebreak, 1, self.embedding_dim)
+        linebreak_embedding = linebreak_embedding.expand(b, n_linebreak, 1, self.embedding_dim)
         # Reshape encoded_image to introduce a slot for linebreaks
-        encoded_image = patched_image.view(1, n_linebreak, f_linebreak, self.embedding_dim)
+        encoded_images = patched_images.view(b, n_linebreak, f_linebreak, self.embedding_dim)
         # Concatenate linebreak embeddings
-        encoded_image = cat((encoded_image, linebreak_embedding), dim=2)
+        encoded_images = cat((encoded_images, linebreak_embedding), dim=2)
         # Reshape to final desired flat format [b seq_len embedding_dim]
-        encoded_image = encoded_image.view(1, -1, self.embedding_dim)
-
-        if answer is not None:
-            token = cat(
-                [
-                    Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
-                    self.tokenizer(prompt).to(self.device),
-                    Tensor([[self.tokenizer.boa_token_id]]).to(self.device),
-                    self.tokenizer(answer).to(self.device)
-                ],
-                dim=1,
-            ).to(int)
+        encoded_images = encoded_images.view(b, -1, self.embedding_dim)
+        
+        tokens = []
+        if answers is not None:
+            for prompt, answer in zip(prompts, answers): 
+                token = cat(
+                    [
+                        Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
+                        self.tokenizer(prompt).to(self.device),
+                        Tensor([[self.tokenizer.boa_token_id]]).to(self.device),
+                        self.tokenizer(answer).to(self.device)
+                    ],
+                    dim=1,
+                ).to(int)
+                tokens.append(token)
         else:
-            token = cat(
-                [
-                    Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
-                    self.tokenizer(prompt).to(self.device),
-                    Tensor([[self.tokenizer.boa_token_id]]).to(self.device)
-                ],
-                dim=1,
-            ).to(int)
+            for prompt in prompts:
+                token = cat(
+                    [
+                        Tensor([[self.tokenizer.bos_token_id]]).to(self.device),
+                        self.tokenizer(prompt).to(self.device),
+                        Tensor([[self.tokenizer.boa_token_id]]).to(self.device)
+                    ],
+                    dim=1,
+                ).to(int)
+                tokens.append(token)
 
         # Tokenize and encode text
-        encoded_text = self.token_encoder(token) 
-        padded_encoded_images = encoded_image
-        len_seq = encoded_text.shape[1] + encoded_image.shape[1]
-        attn_mask = ones(1, len_seq , len_seq, device=self.device, dtype=tbool)
-        causal_mask = tril(ones((1, len_seq, len_seq), device=self.device, dtype=tbool))
+        encoded_texts = [self.token_encoder(token) for token in tokens]
+         # Initialize the 3D attention mask with ones
+        max_text_len = max(et.shape[1] for et in encoded_texts)
+        max_len = max_text_len + encoded_images.shape[1]
+        attn_mask = ones(b, max_len, max_len, device=self.device, dtype=tbool)
+
+        padded_encoded_images = []
+        for idx, encoded_text in enumerate(encoded_texts):
+            padding_length = max_text_len - encoded_text.shape[1]
+            if padding_length > 0:
+                padding_tensor = tensor([self.tokenizer.pad_token['id']] * padding_length, device=self.device).long()
+                padding_encoding = self.token_encoder(padding_tensor).view(1, padding_length, -1)
+                # Concatenate the padding on the left of the encoded image
+                padded_encoded_image = cat((padding_encoding, encoded_images[idx].unsqueeze(0)), dim=1)
+            else:
+                # No padding needed, use the encoded image as is
+                padded_encoded_image = encoded_images[idx].unsqueeze(0)
+            padded_encoded_images.append(padded_encoded_image)
+            attn_mask[idx, :padding_length, :] = 0
+            attn_mask[idx, :, :padding_length] = 0
+
+        causal_mask = tril(ones((b, max_len, max_len), device=self.device, dtype=tbool))
         attn_mask = attn_mask & causal_mask
+
         context = self.use_context(context_name="attention")
         context.update({"mask": attn_mask})
 
-        encoded_inputs = cat((padded_encoded_images, encoded_text), dim=1)
+        encoded_inputs = cat([cat((padded_encoded_image, encoded_text), dim=1) for padded_encoded_image, encoded_text in zip(padded_encoded_images, encoded_texts)], dim=0)
         return encoded_inputs
+    
+    def process_batch_images(self, images: List[Tensor]) -> List[Tensor]:
+        """
+        Processes a batch of image tensors: ensuring all images have three channels,
+        resizing images that exceed max dimensions, and padding all images to have uniform dimensions.
+
+        Args:
+            images (List[Tensor]): List of image tensors in the format [C, H, W].
+
+        Returns:
+            Tensor: A batch tensor with all processed images concatenated along the batch dimension.
+        """
+
+        max_h, max_w = 0, 0
+        for im_idx, image in enumerate(images):
+            _, c, h, w = image.shape
+            
+            # if images are b&w duplicate on rgb channels
+            if c == 1:
+                image = cat([image] * 3, dim=1)
+
+            # if images are above the max size limite rescale them
+            if h > self.max_size[0] or w > self.max_size[1]:
+                scale_factor = min(self.max_size[0]/h, self.max_size[1]/w)
+                image = resize(image, [int(scale_factor*h), int(scale_factor*w)])
+                _, _, h, w = image.shape
+
+            images[im_idx] = image
+            max_h = max(max_h, h)
+            max_w = max(max_w, w)
+        
+        # padd images to max width and height
+        for im_idx, image in enumerate(images):
+            _, _, h, w = image.shape
+            # Calculate padding
+            pad_top = (max_h - h) // 2
+            pad_bottom = max_h - h - pad_top
+            pad_left = (max_w - w) // 2
+            pad_right = max_w - w - pad_left
+
+            # Apply padding
+            image = pad(image, padding=(pad_left, pad_top, pad_right, pad_bottom), fill=self.padding_value, padding_mode="constant")
+            images[im_idx] = image
+        
+        images = cat(images, dim=0)
+        return images

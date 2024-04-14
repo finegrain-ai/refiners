@@ -38,6 +38,7 @@ def create_fuyu(config):
         device=config.device,
         dtype=config.dtype
     )
+    model.eval()
     return(model)
 
 @dataclass(frozen=True)
@@ -66,11 +67,6 @@ class Fuyu(fl.Chain):
     """
     Implements the Fuyu model
     see [https://www.adept.ai/blog/fuyu-8b]
-
-    Warning:
-        The forward model doesn't handle yet batched as the InputEncoder
-        is coded to handle one image and one text at a time to avoid changing 
-        the original dimension of the images. Use generate to handle multiple images/prompts
     """
     def __init__(
         self,
@@ -136,7 +132,8 @@ class Fuyu(fl.Chain):
     
     def generate(self, images: List, prompts: List[str], max_len_generation=50):
         """
-        Generate answers for a list of images and prompts
+        Generate answers for a list of images and prompts. Doesn't infer by batch 
+        to preserve the native resolution of each image
 
         Receives:
             images (List[PIL.Image, "batch"])
@@ -149,13 +146,13 @@ class Fuyu(fl.Chain):
         tokenizer = self.InputEncoder.tokenizer
         final_answer = []
         for image, prompt in zip(images, prompts):
-            image= (Tensor(np.array(image)/255)).permute(2,0,1).unsqueeze(0)
+            image=(Tensor(np.array(image)/255)).permute(2,0,1).unsqueeze(0)
             i = 0
             answer = None
             stop_token = False
             while i<max_len_generation and not stop_token:
                 with no_grad():
-                    predictions = self.forward(image, prompt, answer)
+                    predictions = self.forward([image], [prompt], [answer] if answer is not None else answer)
                 next_token = argmax(predictions[:,-1,:], dim=-1)
                 if next_token.item() != tokenizer.eos_token['id']:
                     next_token_text = tokenizer.id_to_token[next_token.item()].replace(tokenizer.replace_char, tokenizer.replace_pattern)
@@ -168,4 +165,60 @@ class Fuyu(fl.Chain):
                 else :
                     stop_token=True
             final_answer.append(answer)
+        return final_answer
+    
+    def batched_generate(self, images: List, prompts: list[str], max_len_generation=50):
+        """
+        Generate answers for a list of images and prompts. Inference by batch,
+        rescale image if they are over self.InputEncoder.max_size, pad other images 
+        to the largest image size
+
+        Receives:
+            images (List[PIL.Image, "batch"])
+            prompts (List[str, "batch"])
+            max_len_generation (int)
+
+        Returns:
+            (List[str, "batch"])
+        """
+        tokenizer = self.InputEncoder.tokenizer
+        tensor_images = [(Tensor(np.array(image)/255)).permute(2,0,1).unsqueeze(0) for image in images]
+
+        i = 0
+        answers = [None] * len(tensor_images)
+        final_answer = [''] * len(tensor_images)
+        active_indices = list(range(len(tensor_images)))
+        active_answers = None
+        while i<max_len_generation and len(active_indices)>0:
+            active_images = [tensor_images[idx] for idx in active_indices]
+            active_prompts = [prompts[idx] for idx in active_indices]
+
+            with no_grad():
+                predictions = self.forward(active_images, active_prompts, active_answers)
+            next_tokens = argmax(predictions[:,-1,:], dim=-1)
+
+            to_remove = []
+            for idx, next_token in enumerate(next_tokens):
+                if next_token.item() != tokenizer.eos_token['id']:
+                    next_token_text = tokenizer.id_to_token[next_token.item()].replace(tokenizer.replace_char, tokenizer.replace_pattern)
+                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
+                    if answers[active_indices[idx]] is None:
+                        answers[active_indices[idx]] = next_token_text
+                    else:
+                        answers[active_indices[idx]] += next_token_text
+                else:
+                    final_answer[active_indices[idx]] = answers[active_indices[idx]]
+                    to_remove.append(active_indices[idx])
+
+            # Remove the indices that have reached the EOS token.
+            for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
+                active_indices.remove(idx)
+            
+            active_answers = [answers[idx] for idx in active_indices]
+            i+=1
+
+        # For any prompts that did not reach EOS, set their final answer now.
+        for idx in active_indices:
+            final_answer[idx] = answers[idx]
+
         return final_answer
