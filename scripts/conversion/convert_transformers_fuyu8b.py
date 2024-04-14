@@ -145,7 +145,6 @@ def main() -> None:
             "Path to save the converted model"
         ),
     )
-    parser.add_argument("--half", action="store_true", dest="half")
     args = parser.parse_args()
     
     if args.source_path is not None:
@@ -159,15 +158,12 @@ def main() -> None:
         
 
     convert_fuyu_huggingface(weights)
-    if args.half:
-        weights = {key: value.half() for key, value in weights.items()}
-
     weights = {key: value for key, value in weights.items()}
     output_dir = os.path.split(args.output_path)[0]
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    torch.save(weights, args.output_path)
-    # save_to_safetensors(path=args.output_path, tensors=weights)
+    # torch.save(weights, args.output_path)
+    save_to_safetensors(path=args.output_path, tensors=weights)
     
     
 

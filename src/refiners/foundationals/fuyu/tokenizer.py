@@ -35,12 +35,12 @@ class FuyuTokenizer(fl.Module):
         self.unknown_token = config["added_tokens"][0]
         self.pad_token = self.unknown_token
         self.eos_token = config["added_tokens"][1]
-        self.newline_model_token = "<0x0A>"
+        self.newline_model_token = "<0x0A>" # \n
 
         self.boa_token_id = self.token_to_id["<0x04>"] #beginning of answer
         self.bos_token_id = self.token_to_id["<s>"] #beginning of sentence
         self.speaker_token_id = self.token_to_id["|SPEAKER|"]
-        self.newline_token_id = self.token_to_id["|NEWLINE|"] 
+        self.newline_token_id = self.token_to_id["|NEWLINE|"] # image new line
 
     def _calculate_best_segmentation(self, text: str) -> List[int]: 
         N = len(text)
@@ -76,7 +76,7 @@ class FuyuTokenizer(fl.Module):
     
     def encode(self, text: str) -> Tensor:
         normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
-        normalized_text.replace('\n', '|NEWLINE|')
+        normalized_text = normalized_text.replace('\n', '<0x0A>')
         tokens = self._calculate_best_segmentation(normalized_text)
         return tensor(tokens).unsqueeze(dim=0)
     

@@ -3,7 +3,7 @@ import math
 import torch
 from jaxtyping import Float
 from torch import Tensor
-from torch.nn.functional import relu, scaled_dot_product_attention as _scaled_dot_product_attention, softmax
+from torch.nn.functional import relu, scaled_dot_product_attention as _scaled_dot_product_attention
 
 import refiners.fluxion.layers as fl
 
@@ -123,7 +123,7 @@ def scaled_dot_product_attention(
         query=query.float(),
         key=key.float(),
         value=value.float(),
-        attn_mask=attn_mask
+        attn_mask=attn_mask.unsqueeze(1)
     )
 
 
@@ -143,11 +143,12 @@ def scaled_dot_product_attention_non_optimized(
         raise NotImplementedError(
             "attention masking for `scaled_dot_product_attention_non_optimized` is not yet implemented"
         )
-    dim = query.shape[-1]
-    attention = query @ key.permute(0, 1, 3, 2)
-    attention = attention / math.sqrt(dim)
-    attention = torch.softmax(input=attention.float(), dim=-1)
-    return attention @ value
+    else:
+        dim = query.shape[-1]
+        attention = query @ key.permute(0, 1, 3, 2)
+        attention = attention / math.sqrt(dim)
+        attention = torch.softmax(input=attention.float(), dim=-1)
+        return attention @ value
     
 class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
     """Scaled Dot Product Attention.
