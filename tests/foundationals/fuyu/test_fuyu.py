@@ -1,48 +1,75 @@
-from math import isclose
+import random
 from pathlib import Path
 from warnings import warn
 
 import pytest
 import torch
+from torchvision.transforms.functional import to_pil_image
+from transformers import FuyuForCausalLM, FuyuProcessor
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
-from refiners.foundationals.fuyu import Fuyu8b, create_fuyu
+from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b, create_fuyu
 
 
+@pytest.fixture(scope="module")
+def our_model(test_weights_path: Path, test_device: torch.device) -> Fuyu:
+    weights = test_weights_path / f"fuyu8b.safetensors"
 
+    if not weights.is_file():
+        warn(f"could not find weights at {weights}, skipping")
+        pytest.skip(allow_module_level=True)
 
-def test_encoder(
-    ref_backbone: Dinov2Model,
-    our_backbone: ViT,
-    test_device: torch.device,
+    config = Fuyu8b().with_device(test_device)
+    model = create_fuyu(config)
+    tensors = load_from_safetensors(weights)
+    model.load_state_dict(tensors)
+    return model
+
+@pytest.fixture(scope="module")
+def ref_processor() -> FuyuProcessor:
+    processor = FuyuProcessor.from_pretrained("adept/fuyu-8b")
+    return processor
+
+@pytest.fixture(scope="module")
+def ref_model(test_device) -> FuyuForCausalLM:
+    model = FuyuForCausalLM.from_pretrained("adept/fuyu-8b", torch_dtype=torch.float16).to(test_device)
+    return model
+
+def test_model(
+    ref_model: FuyuForCausalLM,
+    ref_processor: FuyuProcessor,
+    our_model: Fuyu,
+    test_device: torch.device
 ):
+    """
+    Tests the consistency of output features between the reference model and our model under random prompts.
+
+    Args:
+        ref_model (FuyuForCausalLM): The reference model.
+        ref_processor (FuyuProcessor): The processor used for preparing input data for ref_model.
+        our_model (Fuyu): Our model to be tested against ref_model.
+        test_device (torch.device): The device (e.g., CPU or GPU) to perform the test on.
+
+    Warning:
+        The ref model from transformers can't be put on the device without the installation of accelerate
+
+    Raises:
+        AssertionError: If the outputs of the models differ by a margin greater than 1e-3.
+    """
+
     manual_seed(42)
+    x = torch.rand(3, 512, 512)
+    x_pil = to_pil_image(x)
 
-    # Position encoding interpolation [1] at runtime is not supported yet. So stick to the default image resolution
-    # e.g. using (224, 224) pixels as input would give a runtime error (sequence size mismatch)
-    # [1]: https://github.com/facebookresearch/dinov2/blob/2302b6b/dinov2/models/vision_transformer.py#L179
-    assert our_backbone.image_size == 518
-
-    x = torch.randn(1, 3, 518, 518).to(test_device)
+    prompts = ["Describe this image. \n", "Is there a cat in the image? \n", "What is the emotion of the person? \n", "What is the main object in this image? \n"]
+    p = random.choice(prompts)
 
     with no_grad():
-        ref_features = ref_backbone(x).last_hidden_state
-        our_features = our_backbone(x)
+        ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(test_device)
+        ref_output = ref_model(**ref_input)['logits']
+        our_output = our_model([x.unsqueeze(0)], [p])
 
-    assert (our_features - ref_features).abs().max() < 1e-3
+    assert (our_output - ref_output).abs().max() < 1e-3
 
 
-# Mainly for DINOv2 + registers coverage (this test can be removed once `test_encoder` supports all flavors)
-def test_encoder_only(
-    our_backbone: ViT,
-    seed_expected_norm: tuple[int, float],
-    test_device: torch.device,
-):
-    seed, expected_norm = seed_expected_norm
-    manual_seed(seed)
 
-    x = torch.randn(1, 3, 518, 518).to(test_device)
-
-    our_features = our_backbone(x)
-
-    assert isclose(our_features.norm().item(), expected_norm, rel_tol=1e-04)
