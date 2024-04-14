@@ -11,9 +11,21 @@ from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 
 class ImageEncoder(fl.Chain):
     """
-    Image Encoding Layer.
+    Encodes an input tensor of images through padding, normalization, patchification, and projection.
 
-    This layer pad, normalize, patchify and project a given tensor of images
+    Prepares image tensors for further processing by padding them to ensure they are divisible by the patch size, 
+    normalizing them based on provided mean and standard deviation values, breaking them down into patches, and finally
+    projecting these patches into a specified embedding dimension.
+
+    Args:
+        patch_size (int): The size of the square patch to divide images into.
+        embedding_dim (int): The dimension of the output embeddings after projection.
+        padding_value (float): The value used for padding the images.
+        image_mean (float): The mean value used for normalizing the images.
+        image_std (float): The standard deviation used for normalizing the images.
+        use_bias (bool): Whether to use bias in the linear layers.
+        device (Device | str | None): The device on which the operations should be performed.
+        dtype (DType | None): The data type to use for the operations.
     """
     def __init__(
         self,
@@ -51,6 +63,9 @@ class ImageEncoder(fl.Chain):
         )
 
     def patchify(self, x: Tensor) -> Tensor:
+        """
+        Transforms an image tensor into a set of flattened, non-overlapping patches.
+        """
         _, c, _, _ = x.shape
         x_unfold = x.unfold(2, self.patch_size, self.patch_size).unfold(3, self.patch_size, self.patch_size)
         B, _, _, _, _, _ = x_unfold.shape
@@ -106,7 +121,41 @@ class InputEncoder(fl.ContextModule):
             dtype=dtype
         )
 
-    def forward(self, images: List[Tensor], prompts: list[str], answers: list[str] = None) -> Tensor:
+    def forward(self, images: List[Tensor], prompts: list[str], answers: list[str] | None = None) -> Tensor:
+        """
+        Processes and encodes image and text data to create model inputs for the Fuyu model.
+        
+        Takes a batch of images and corresponding text prompts, and optionally text answers, 
+        processes and encodes them into a uniform tensor format suitable for input to the Fuyu model. 
+        Handles image resizing, padding, tokenization and encoding of text. Additionally, 
+        it generates attention masks for handling variable sequence lengths in batch processing.
+
+        Receives:
+            images (List[Tensor]): A list of image tensors, each tensor should be in the format [C, H, W] 
+                where C is the number of channels, H is height, and W is width.
+            prompts (list[str]): A list of text strings, each corresponding to an image. These are prompts
+                that the model will use to generate responses.
+            answers (list[str] | None, optional): An optional list of text strings providing answers 
+                corresponding to each prompt for continuing the sequential process of generation. 
+                If provided, it is used along with the prompts for input encoding.
+                Defaults to None
+        Returns:
+            Returns:
+            (Float[Tensor, "batch seq_len embedding_dim"])
+            A tensor containing the encoded inputs for the model. This includes encoded image data and 
+            text data concatenated along the sequence dimension, suitable for input into the Fuyu model. 
+
+        Raises:
+            ValueError: If the lengths of the images and prompts lists do not match, if answers are provided
+                and their length does not match the length of the prompts or if the sequence length of the input
+                is over  the max_sequence_length defined.
+        """
+
+        if len(images) != len(prompts):
+            raise ValueError("The number of images must be equal to the number of prompts.")
+        if answers is not None and len(answers) != len(prompts):
+            raise ValueError("The number of answers must be equal to the number of prompts if answers are provided.")
+
         # preprocess batch
         images = self.process_batch_images(images)
         images = images.to(device=self.device, dtype=self.dtype)
@@ -185,6 +234,9 @@ class InputEncoder(fl.ContextModule):
         context.update({"mask": attn_mask})
 
         encoded_inputs = cat([cat((padded_encoded_image, encoded_text), dim=1) for padded_encoded_image, encoded_text in zip(padded_encoded_images, encoded_texts)], dim=0)
+
+        if encoded_inputs.shape[1] > self.max_sequence_length:
+            raise ValueError("The max sequence length is reached.")
         return encoded_inputs
     
     def process_batch_images(self, images: List[Tensor]) -> List[Tensor]:
@@ -192,11 +244,12 @@ class InputEncoder(fl.ContextModule):
         Processes a batch of image tensors: ensuring all images have three channels,
         resizing images that exceed max dimensions, and padding all images to have uniform dimensions.
 
-        Args:
+        Receives:
             images (List[Tensor]): List of image tensors in the format [C, H, W].
 
         Returns:
-            Tensor: A batch tensor with all processed images concatenated along the batch dimension.
+            (Float[Tensor, "batch C H W"])
+            A batch tensor with all processed images concatenated along the batch dimension.
         """
 
         max_h, max_w = 0, 0

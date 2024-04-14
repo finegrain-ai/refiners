@@ -173,7 +173,7 @@ class FuyuSelfAttention(fl.Chain):
         Args:
             embedding_dim: The embedding dimension of the input and output tensors.
             num_heads: The number of heads to use.
-            base: constant used to compute theta in the Rotary Positional Embedding
+            base: constant used to compute the rotations in the Rotary Positional Embedding
             norm_eps: epsilon for Layer Norm
             use_bias: Whether to use bias in the linear layers.
             is_optimized: Whether to use optimized attention.

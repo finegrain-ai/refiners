@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from typing import Any, List
+from dataclasses import dataclass, replace
+from typing import Any, List, Union
 
 import numpy as np
-from torch import Tensor, argmax, device as Device, dtype as DType, float16 as Tfloat16, no_grad
+from torch import Tensor, argmax, device as Device, dtype as DType, float16 as torchf16
 
 import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import no_grad
 from refiners.foundationals.fuyu.input_processor import InputEncoder
 from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
@@ -38,7 +39,6 @@ def create_fuyu(config):
         device=config.device,
         dtype=config.dtype
     )
-    model.eval()
     return(model)
 
 @dataclass(frozen=True)
@@ -61,7 +61,19 @@ class Fuyu8b:
     use_bias: bool = True
     is_optimized: bool = True
     device: Device | str | None = 'cuda'
-    dtype: DType | None = Tfloat16
+    dtype: DType | None = torchf16
+
+    def with_device(self, new_device: Union[Device, str]) -> 'Fuyu8b':
+        """
+        Returns a new instance of Fuyu8b with a specified device.
+
+        Args:
+            new_device (Union['Device', str]): The device to set for the new instance.
+
+        Returns:
+            Fuyu8b: New instance with updated device.
+        """
+        return replace(self, device=new_device)
 
 class Fuyu(fl.Chain):
     """

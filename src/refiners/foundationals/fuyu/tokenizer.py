@@ -35,14 +35,23 @@ class FuyuTokenizer(fl.Module):
         self.unknown_token = config["added_tokens"][0]
         self.pad_token = self.unknown_token
         self.eos_token = config["added_tokens"][1]
-        self.newline_model_token = "<0x0A>" # \n
+        self.newline_model_token = "<0x0A>" # \n token
 
         self.boa_token_id = self.token_to_id["<0x04>"] #beginning of answer
         self.bos_token_id = self.token_to_id["<s>"] #beginning of sentence
         self.speaker_token_id = self.token_to_id["|SPEAKER|"]
         self.newline_token_id = self.token_to_id["|NEWLINE|"] # image new line
 
-    def _calculate_best_segmentation(self, text: str) -> List[int]: 
+    def _calculate_best_segmentation(self, text: str) -> List[int]:
+        """
+        Calculates the best segmentation of the input text based on the maximum log probabilities.
+
+        Receives:
+            text (str): The input text to tokenize.
+
+        Returns:
+            List[int]: A list of token IDs representing the best segmentation of the input text.
+        """ 
         N = len(text)
         dp = [float('-inf')] * (N + 1)
         backpointer = [-1] * (N + 1)
@@ -75,6 +84,19 @@ class FuyuTokenizer(fl.Module):
         return tokens
     
     def encode(self, text: str) -> Tensor:
+        """
+        Encodes a string of text into a tensor of token IDs.
+
+        This method applies text normalization and then tokenizes the text using the best segmentation
+        strategy based on unigram probabilities. The resulting tokens are converted into their corresponding
+        token IDs and returned as a tensor.
+
+        Receives:
+            text (str): The text to encode.
+
+        Returns:
+            Tensor: A tensor containing the encoded token IDs.
+        """
         normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
         normalized_text = normalized_text.replace('\n', '<0x0A>')
         tokens = self._calculate_best_segmentation(normalized_text)
