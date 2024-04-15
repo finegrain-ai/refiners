@@ -118,3 +118,93 @@ class LLamaDecoderLayer(fl.Chain):
                 LLamaMLP(dim=dim, feedforward_dim=feedforward_dim, activation=activation, device=device, dtype=dtype),
             ),
         )
+
+
+class LlamaTransformer(fl.Chain):
+    """Alias for a Chain of LLamaDecoderLayer."""
+
+
+class LlamaModelWoEmbedding(fl.Chain):
+    """
+    Llama Model without an embedding layer.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        n_layers: int,
+        max_position_embeddings: int,
+        feedforward_dim: int,
+        n_att_heads: int,
+        n_kv_heads: int,
+        vocab_size: int,
+        norm_eps: float = 1e-6,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        self.embedding_dim = dim
+        self.vocab_size = vocab_size
+        self.num_layers = n_layers
+        self.num_attention_heads = n_att_heads
+        self.num_kv_heads = n_kv_heads
+        self.feedforward_dim = feedforward_dim
+        self.layer_norm_eps = norm_eps
+        super().__init__(
+            LlamaTransformer(
+                LLamaDecoderLayer(
+                    dim=dim,
+                    n_att_heads=self.num_attention_heads,
+                    n_kv_heads=self.num_kv_heads,
+                    max_position_embeddings=max_position_embeddings,
+                    feedforward_dim=feedforward_dim,
+                    device=device,
+                    dtype=dtype,
+                )
+                for _ in range(n_layers)
+            ),
+            LlamaRMSNorm(hidden_size=dim, eps=norm_eps, device=device, dtype=dtype),
+        )
+
+
+class LlamaModel(fl.Chain):
+    """
+    Llama Model
+    See [[arXiv:2302.13971] LLaMA: Open and Efficient Foundation Language
+      Models](https://arxiv.org/pdf/2302.13971.pdf) for more details.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        n_layers: int,
+        max_position_embeddings: int,
+        feedforward_dim: int,
+        n_att_heads: int,
+        n_kv_heads: int,
+        vocab_size: int,
+        norm_eps: float = 1e-6,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        self.embedding_dim = dim
+        self.vocab_size = vocab_size
+        self.num_layers = n_layers
+        self.num_attention_heads = n_att_heads
+        self.num_kv_heads = n_kv_heads
+        self.feedforward_dim = feedforward_dim
+        self.layer_norm_eps = norm_eps
+        super().__init__(
+            fl.Embedding(vocab_size, dim),
+            LlamaModelWoEmbedding(
+                dim,
+                n_layers,
+                max_position_embeddings,
+                feedforward_dim,
+                n_att_heads,
+                n_kv_heads,
+                vocab_size,
+                norm_eps,
+                device,
+                dtype,
+            ),
+        )
