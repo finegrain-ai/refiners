@@ -5,6 +5,8 @@ import refiners.fluxion.layers as fl
 from refiners.fluxion.layers.activations import Activation, SiLU
 from refiners.fluxion.layers.module import WeightedModule
 
+from .attention import LLamaSdpaAttention
+
 
 class LlamaRMSNorm(WeightedModule):
     """LlamaRMSNorm is equivalent to T5LayerNorm"""
@@ -80,5 +82,39 @@ class LLamaMLP(fl.Chain):
                 bias=False,
                 device=device,
                 dtype=dtype,
+            ),
+        )
+
+
+class LLamaDecoderLayer(fl.Chain):
+    """LLama Transformer main layer block"""
+
+    def __init__(
+        self,
+        dim: int,
+        n_att_heads: int,
+        n_kv_heads: int,
+        max_position_embeddings: int,
+        feedforward_dim: int,
+        norm_eps: float = 1e-6,
+        activation: Activation = SiLU,  # type: ignore
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        super().__init__(
+            fl.Residual(
+                LlamaRMSNorm(hidden_size=dim, eps=norm_eps, device=device, dtype=dtype),
+                LLamaSdpaAttention(
+                    embedding_dim=dim,
+                    num_att_heads=n_att_heads,
+                    num_kv_heads=n_kv_heads,
+                    max_position_embeddings=max_position_embeddings,
+                    device=device,
+                    dtype=dtype,
+                ),
+            ),
+            fl.Residual(
+                LlamaRMSNorm(hidden_size=dim, eps=norm_eps, device=device, dtype=dtype),
+                LLamaMLP(dim=dim, feedforward_dim=feedforward_dim, activation=activation, device=device, dtype=dtype),
             ),
         )
