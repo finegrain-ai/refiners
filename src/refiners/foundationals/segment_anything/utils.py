@@ -1,8 +1,7 @@
-import numpy as np
 from PIL import Image
-from torch import Size, Tensor, device as Device, dtype as DType, tensor
+from torch import Size, Tensor, device as Device, dtype as DType
 
-from refiners.fluxion.utils import interpolate, normalize, pad
+from refiners.fluxion.utils import image_to_tensor, interpolate, normalize, pad
 
 
 def compute_scaled_size(size: tuple[int, int], image_encoder_resolution: int) -> tuple[int, int]:
@@ -40,11 +39,8 @@ def image_to_scaled_tensor(
     """
     h, w = scaled_size
     resized = image.resize((w, h), resample=Image.Resampling.BILINEAR)  # type: ignore
-    return tensor(
-        np.array(resized).astype(np.float32).transpose(2, 0, 1),
-        device=device,
-        dtype=dtype,
-    ).unsqueeze(0)
+
+    return image_to_tensor(resized, device=device, dtype=dtype) * 255.0
 
 
 def preprocess_image(
@@ -61,9 +57,10 @@ def preprocess_image(
     Returns:
         The preprocessed image.
     """
+
     scaled_size = compute_scaled_size((image.height, image.width), image_encoder_resolution)
 
-    image_tensor = image_to_scaled_tensor(image, scaled_size, device, dtype)
+    image_tensor = image_to_scaled_tensor(image, scaled_size, device=device, dtype=dtype)
 
     return pad_image_tensor(
         normalize(image_tensor, mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375]),

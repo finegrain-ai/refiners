@@ -22,11 +22,16 @@ def test_compute_scaled_size(image_encoder_resolution: int) -> None:
     assert scaled_size == (512, 1024)
 
 
-def test_image_to_scaled_tensor() -> None:
+def test_rgb_image_to_scaled_tensor() -> None:
     image = Image.new("RGB", (1536, 768))
     tensor = image_to_scaled_tensor(image, (512, 1024))
-
     assert tensor.shape == (1, 3, 512, 1024)
+
+
+def test_grayscale_image_to_scaled_tensor() -> None:
+    image = Image.new("L", (1536, 768))
+    tensor = image_to_scaled_tensor(image, (512, 1024))
+    assert tensor.shape == (1, 1, 512, 1024)
 
 
 def test_preprocess_image(image_encoder_resolution: int) -> None:
