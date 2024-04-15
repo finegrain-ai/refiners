@@ -329,8 +329,17 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     @cached_property
     def dataloader(self) -> DataLoader[Any]:
+        config = self.config.dataloader
         return DataLoader(
-            dataset=self.dataset, batch_size=self.config.training.batch_size, shuffle=True, collate_fn=self.collate_fn
+            dataset=self.dataset,
+            batch_size=self.config.training.batch_size,
+            collate_fn=self.collate_fn,
+            num_workers=config.num_workers,
+            prefetch_factor=config.prefetch_factor,
+            persistent_workers=config.persistent_workers,
+            pin_memory=config.pin_memory,
+            shuffle=config.shuffle,
+            drop_last=config.drop_last,
         )
 
     @abstractmethod
