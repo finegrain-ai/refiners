@@ -146,6 +146,17 @@ class OptimizerConfig(BaseModel):
                 )
 
 
+class DataloaderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    num_workers: int = 0
+    pin_memory: bool = False
+    prefetch_factor: int | None = None
+    persistent_workers: bool = False
+    drop_last: bool = False
+    shuffle: bool = True
+
+
 class ModelConfig(BaseModel):
     # If None, then requires_grad will NOT be changed when loading the model
     # this can be useful if you want to train only a part of the model
@@ -167,6 +178,7 @@ class BaseConfig(BaseModel):
     optimizer: OptimizerConfig
     lr_scheduler: LRSchedulerConfig
     clock: ClockConfig = ClockConfig()
+    dataloader: DataloaderConfig = DataloaderConfig()
 
     model_config = ConfigDict(extra="forbid")
 
