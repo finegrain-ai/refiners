@@ -141,7 +141,7 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
         If the image is in mode `RGB` the tensor will have shape `[3, H, W]`,
         otherwise `[1, H, W]` for mode `L` (grayscale) or `[4, H, W]` for mode `RGBA`.
 
-        Values are clamped to the range `[0, 1]`.
+        Values are normalized to the range `[0, 1]`.
     """
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 
