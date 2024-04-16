@@ -37,10 +37,10 @@ class Module(TorchModule):
         # Because PyTorch assumes its users write highly dynamic code,
         # it returns Python's top type `Any`. In Refiners, static type
         # checking is a core design value, hence we return `object` instead.
-        return super().__getattr__(name=name)
+        return super().__getattr__(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        return super().__setattr__(name=name, value=value)
+        return super().__setattr__(name, value)
 
     def load_from_safetensors(self, tensors_path: str | Path, strict: bool = True) -> "Module":
         """Load the module's state from a SafeTensors file.

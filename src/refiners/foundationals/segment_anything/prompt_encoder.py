@@ -98,7 +98,7 @@ class PointEncoder(fl.Chain):
     ) -> Float[Tensor, "num_positional_features height width"]:
         coordinate_encoder = self.ensure_find(layer_type=CoordinateEncoder)
         height, width = image_embedding_size
-        grid = torch.ones((height, width), device=self.device, dtype=torch.float32)
+        grid = torch.ones((height, width), device=self.device, dtype=self.dtype)
         y_embedding = grid.cumsum(dim=0) - 0.5
         x_embedding = grid.cumsum(dim=1) - 0.5
         y_embedding = y_embedding / height

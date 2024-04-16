@@ -33,7 +33,7 @@ def sample_image(ref_path: Path) -> Image.Image:
     if not test_image.is_file():
         warn(f"could not reference image at {test_image}, skipping")
         pytest.skip(allow_module_level=True)
-    img = Image.open(test_image)
+    img = Image.open(test_image)  # type: ignore
     assert img.size == (512, 512)
     return img
 
@@ -43,7 +43,7 @@ def test_encode_decode_image(encoder: LatentDiffusionAutoencoder, sample_image: 
     encoded = encoder.image_to_latents(sample_image)
     decoded = encoder.latents_to_image(encoded)
 
-    assert decoded.mode == "RGB"
+    assert decoded.mode == "RGB"  # type: ignore
 
     # Ensure no saturation. The green channel (band = 1) must not max out.
     assert max(iter(decoded.getdata(band=1))) < 255  # type: ignore

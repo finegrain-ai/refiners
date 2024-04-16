@@ -24,7 +24,7 @@ Behind the figure was a vague suggestion of a Cyclopean architectural background
 PROMPTS = [
     "",  # empty
     "a cute cat",  # padded
-    long_prompt,  # truncated
+    "<long prompt>",  # see above, truncated
     "64k",  # FG-362 - encoded as 3 tokens
 ]
 
@@ -67,7 +67,7 @@ def test_basics(ref_tokenizer: transformers.CLIPTokenizer, our_encoder: CLIPText
 
 @pytest.fixture(params=PROMPTS)
 def prompt(request: pytest.FixtureRequest):
-    return request.param
+    return long_prompt if request.param == "<long prompt>" else request.param
 
 
 def test_encoder(

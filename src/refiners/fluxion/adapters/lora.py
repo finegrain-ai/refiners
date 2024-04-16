@@ -14,10 +14,9 @@ T = TypeVar("T", bound=fl.WeightedModule)
 class Lora(Generic[T], fl.Chain, ABC):
     """Low-Rank Adaptation (LoRA) layer.
 
-    This layer is composed of two [`WeightedModule`][refiners.fluxion.layers.WeightedModule]:
-
-    - `down`: initialized with a random normal distribution
-    - `up`: initialized with zeros
+    This layer's purpose is to approximate a given layer by two smaller layers:
+    the [`down`][refiners.fluxion.adapters.lora.Lora.down] layer (aka A) and the [`up`][refiners.fluxion.adapters.lora.Lora.up] layer (aka B).
+    See [[ arXiv:2106.09685] LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685) for more details.
 
     Note:
         This layer is not meant to be used directly.
@@ -53,7 +52,10 @@ class Lora(Generic[T], fl.Chain, ABC):
             *self.lora_layers(device=device, dtype=dtype),
             fl.Multiply(scale),
         )
+        self.reset_parameters()
 
+    def reset_parameters(self) -> None:
+        """Reset the parameters of up and down layers."""
         normal_(tensor=self.down.weight, std=1 / self.rank)
         zeros_(tensor=self.up.weight)
 
@@ -129,19 +131,26 @@ class Lora(Generic[T], fl.Chain, ABC):
         return loras
 
     @abstractmethod
-    def is_compatible(self, layer: fl.WeightedModule, /) -> bool:
-        ...
+    def is_compatible(self, layer: fl.WeightedModule, /) -> bool: ...
 
     def auto_attach(
-        self, target: fl.Chain, exclude: list[str] | None = None
+        self,
+        target: fl.Chain,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
     ) -> "tuple[LoraAdapter, fl.Chain | None] | None":
         for layer, parent in target.walk(self.up.__class__):
             if isinstance(parent, Lora):
                 continue
 
-            if exclude is not None and any(
-                [any([p.__class__.__name__ == e for p in parent.get_parents() + [parent]]) for e in exclude]
-            ):
+            all_parents = []
+            if include is not None or exclude is not None:
+                all_parents = parent.get_parents() + [parent]
+
+            if include is not None and all((p.__class__.__name__ not in include) for p in all_parents):
+                continue
+
+            if exclude is not None and any((p.__class__.__name__ in exclude) for p in all_parents):
                 continue
 
             if not self.is_compatible(layer):
@@ -439,30 +448,76 @@ class LoraAdapter(fl.Sum, Adapter[fl.WeightedModule]):
             return lora
 
 
-def auto_attach_loras(
+def _auto_attach_loras(
     loras: dict[str, Lora[Any]],
     target: fl.Chain,
     /,
+    include: list[str] | None = None,
     exclude: list[str] | None = None,
+    debug_map: list[tuple[str, str]] | None = None,
 ) -> list[str]:
-    """Auto-attach several LoRA layers to a Chain.
-
-    Args:
-        loras: A dictionary of LoRA layers associated to their respective key.
-        target: The target Chain.
-
-    Returns:
-        A list of keys of LoRA layers which failed to attach.
-    """
     failed_keys: list[str] = []
     for key, lora in loras.items():
-        if attached := lora.auto_attach(target, exclude=exclude):
+        if attached := lora.auto_attach(target, include=include, exclude=exclude):
             adapter, parent = attached
             if parent is None:
                 # `adapter` is already attached and `lora` has been added to it
+                if debug_map is not None:
+                    path = adapter.get_path()
+                    debug_map.append((key, path))
                 continue
+            if debug_map is not None:
+                path = adapter.target.get_path(parent)
+                debug_map.append((key, path))
             adapter.inject(parent)
         else:
             failed_keys.append(key)
 
     return failed_keys
+
+
+def auto_attach_loras(
+    loras: dict[str, Lora[Any]],
+    target: fl.Chain,
+    /,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+    sanity_check: bool = True,
+    debug_map: list[tuple[str, str]] | None = None,
+) -> list[str]:
+    """Auto-attach several LoRA layers to a Chain.
+
+    Args:
+        loras: A dictionary of LoRA layers associated to their respective key. The keys are typically
+            derived from the state dict and only used for `debug_map` and the return value.
+        target: The target Chain.
+        include: A list of layer names, only layers with such a layer in their ancestors will be considered.
+        exclude: A list of layer names, layers with such a layer in their ancestors will not be considered.
+        sanity_check: Check that LoRAs passed are correctly attached.
+        debug_map: Pass a list to get a debug mapping of key - path pairs of attached points.
+    Returns:
+        A list of keys of LoRA layers which failed to attach.
+    """
+
+    if not sanity_check:
+        return _auto_attach_loras(loras, target, include=include, exclude=exclude, debug_map=debug_map)
+
+    loras_copy = {key: Lora.from_weights(lora.name, lora.down.weight, lora.up.weight) for key, lora in loras.items()}
+    debug_map_1: list[tuple[str, str]] = []
+    failed_keys_1 = _auto_attach_loras(loras, target, include=include, exclude=exclude, debug_map=debug_map_1)
+    if debug_map is not None:
+        debug_map += debug_map_1
+    if len(debug_map_1) != len(loras) or failed_keys_1:
+        raise ValueError(
+            f"sanity check failed: {len(debug_map_1)} / {len(loras)} LoRA layers attached, {len(failed_keys_1)} failed"
+        )
+
+    # Extra sanity check: if we re-run the attach, all layers should fail.
+    debug_map_2: list[tuple[str, str]] = []
+    failed_keys_2 = _auto_attach_loras(loras_copy, target, include=include, exclude=exclude, debug_map=debug_map_2)
+    if debug_map_2 or len(failed_keys_2) != len(loras):
+        raise ValueError(
+            f"sanity check failed: {len(debug_map_2)} / {len(loras)} LoRA layers attached twice, {len(failed_keys_2)} skipped"
+        )
+
+    return failed_keys_1

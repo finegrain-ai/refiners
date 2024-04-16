@@ -23,10 +23,11 @@ Once Rye is installed, you can clone the repository and run `rye sync` to instal
 
 ## Linting
 
-We use [ruff](https://docs.astral.sh/ruff/) to lint our code. You can lint your code by running.
+We use the standard integration of [ruff](https://docs.astral.sh/ruff/) in Rye to lint and format our code. You can lint your code by running:
 
 ```bash
-rye run lint
+rye fmt
+rye lint --fix
 ```
 
 We also enforce strict type checking with [pyright](https://github.com/microsoft/pyright). You can run the type checker with:
@@ -45,10 +46,16 @@ First, install test dependencies with:
 rye sync --all-features
 ```
 
-Then, download and convert all the necessary weights. Be aware that this will use around 50 GB of disk space:
+Then, download and convert all the necessary weights. Be aware that this will use around 100 GB of disk space:
 
 ```bash
 python scripts/prepare_test_weights.py
+```
+
+Some tests require cloning the original implementation of the model as they use `torch.hub.load`:
+
+```bash
+git clone git@github.com:facebookresearch/dinov2.git tests/repos/dinov2
 ```
 
 Finally, run the tests:

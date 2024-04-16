@@ -10,13 +10,11 @@ from refiners.foundationals.latent_diffusion.image_prompt import ImageCrossAtten
 
 
 @overload
-def new_adapter(target: SD1UNet) -> SD1IPAdapter:
-    ...
+def new_adapter(target: SD1UNet) -> SD1IPAdapter: ...
 
 
 @overload
-def new_adapter(target: SDXLUNet) -> SDXLIPAdapter:
-    ...
+def new_adapter(target: SDXLUNet) -> SDXLIPAdapter: ...
 
 
 def new_adapter(target: SD1UNet | SDXLUNet) -> SD1IPAdapter | SDXLIPAdapter:
@@ -32,6 +30,10 @@ def test_inject_eject(k_unet: type[SD1UNet] | type[SDXLUNet], test_device: torch
     unet = k_unet(in_channels=4, device=test_device, dtype=torch.float16)
     initial_repr = repr(unet)
     adapter = new_adapter(unet)
+    assert repr(unet) == initial_repr
+    adapter.inject()
+    assert repr(unet) != initial_repr
+    adapter.eject()
     assert repr(unet) == initial_repr
     adapter.inject()
     assert repr(unet) != initial_repr

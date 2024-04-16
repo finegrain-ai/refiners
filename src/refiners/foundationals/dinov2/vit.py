@@ -1,10 +1,13 @@
+from math import sqrt
 from typing import cast
 
 import torch
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
+from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers.activations import Activation
+from refiners.fluxion.utils import interpolate
 
 
 class ClassToken(fl.Chain):
@@ -27,18 +30,20 @@ class ClassToken(fl.Chain):
         )
 
 
-class PositionalEncoder(fl.Residual):
-    """Encode the position of each patch in the input."""
+class PositionalEmbedding(fl.Chain):
+    """Learnable positional embedding."""
 
     def __init__(
         self,
         sequence_length: int,
         embedding_dim: int,
+        patch_size: int,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
-        self.num_patches = sequence_length
+        self.sequence_length = sequence_length
         self.embedding_dim = embedding_dim
+        self.patch_size = patch_size
 
         super().__init__(
             fl.Parameter(
@@ -47,6 +52,53 @@ class PositionalEncoder(fl.Residual):
                 dtype=dtype,
             ),
         )
+
+
+class InterpolateEmbedding(fl.Module):
+    """Interpolate the positional embeddings to match the input shape."""
+
+    def __init__(
+        self,
+        mode: str,
+        antialias: bool,
+        patch_size: int,
+    ) -> None:
+        super().__init__()
+        self.mode = mode
+        self.antialias = antialias
+        self.patch_size = patch_size
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        input: torch.Tensor,
+    ) -> torch.Tensor:
+        cls_embed = x[:, :1, :]  # -> (B, 1, D)
+        patch_embed = x[:, 1:, :]  # -> (B, N, D)
+
+        B = patch_embed.shape[0]
+        N = patch_embed.shape[1]
+        D = patch_embed.shape[2]
+        M = int(sqrt(N))
+        W = input.shape[2]
+        H = input.shape[3]
+        w = W // self.patch_size
+        h = H // self.patch_size
+        assert M * M == N, "The sequence length must be a square number."
+
+        patch_embed = patch_embed.reshape(B, M, M, D)  # -> (B, M, M, D)
+        patch_embed = patch_embed.permute(0, 3, 1, 2)  # -> (B, D, M, M)
+        patch_embed = interpolate(
+            x=patch_embed.to(dtype=torch.float32),
+            mode=self.mode,
+            antialias=self.antialias,
+            size=torch.Size((w, h)),
+        ).to(dtype=cls_embed.dtype)  # -> (B, D, w, h)
+        patch_embed = patch_embed.permute(0, 2, 3, 1)  # -> (B, w, h, D)
+        patch_embed = patch_embed.reshape(B, -1, D)  # -> (B, w*h, D)
+
+        x = torch.cat((cls_embed, patch_embed), dim=1)  # -> (B, w*h+1, D)
+        return x
 
 
 class LayerScale(fl.WeightedModule):
@@ -85,21 +137,22 @@ class FeedForward(fl.Chain):
         self,
         embedding_dim: int,
         feedforward_dim: int,
-        activation: Activation = fl.GeLU,  # type: ignore
+        activation: Activation,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
         self.embedding_dim = embedding_dim
         self.feedforward_dim = feedforward_dim
+        pre_activation_dim = feedforward_dim * 2 if isinstance(activation, fl.GLU) else feedforward_dim
 
         super().__init__(
             fl.Linear(
                 in_features=embedding_dim,
-                out_features=feedforward_dim,
+                out_features=pre_activation_dim,
                 device=device,
                 dtype=dtype,
             ),
-            activation(),
+            activation,
             fl.Linear(
                 in_features=feedforward_dim,
                 out_features=embedding_dim,
@@ -125,6 +178,7 @@ class PatchEncoder(fl.Chain):
         self.patch_size = patch_size
 
         super().__init__(
+            fl.SetContext(context="dinov2_vit", key="input"),  # save the original input
             fl.Conv2d(
                 in_channels=in_channels,
                 out_channels=out_channels,
@@ -147,6 +201,8 @@ class TransformerLayer(fl.Chain):
         num_heads: int,
         norm_eps: float,
         mlp_ratio: int,
+        activation: Activation,
+        feedforward_dim: int | None = None,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -154,6 +210,7 @@ class TransformerLayer(fl.Chain):
         self.num_heads = num_heads
         self.norm_eps = norm_eps
         self.mlp_ratio = mlp_ratio
+        self.feedforward_dim = feedforward_dim if feedforward_dim is not None else embedding_dim * mlp_ratio
 
         super().__init__(
             fl.Residual(
@@ -184,7 +241,8 @@ class TransformerLayer(fl.Chain):
                 ),
                 FeedForward(
                     embedding_dim=embedding_dim,
-                    feedforward_dim=embedding_dim * mlp_ratio,
+                    feedforward_dim=self.feedforward_dim,
+                    activation=activation,
                     device=device,
                     dtype=dtype,
                 ),
@@ -199,6 +257,10 @@ class TransformerLayer(fl.Chain):
 
 class Transformer(fl.Chain):
     """Alias for a Chain of TransformerLayer."""
+
+
+class PositionalEncoder(fl.Residual):
+    """Alias for a Residual."""
 
 
 class Registers(fl.Concatenate):
@@ -243,6 +305,10 @@ class ViT(fl.Chain):
         norm_eps: float = 1e-6,
         mlp_ratio: int = 4,
         num_registers: int = 0,
+        activation: Activation = fl.GeLU(),
+        feedforward_dim: int | None = None,
+        interpolate_antialias: bool = False,
+        interpolate_mode: str = "bicubic",
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -257,6 +323,10 @@ class ViT(fl.Chain):
             norm_eps: The epsilon value for normalization.
             mlp_ratio: The ratio for the multi-layer perceptron (MLP).
             num_registers: The number of registers.
+            activation: The activation function.
+            feedforward_dim: The dimension of the feedforward layer.
+            interpolate_antialias: Whether to use antialiasing for interpolation.
+            interpolate_mode: The interpolation mode.
             device: The PyTorch device to use.
             dtype: The PyTorch data type to use.
         """
@@ -269,6 +339,7 @@ class ViT(fl.Chain):
         self.norm_eps = norm_eps
         self.mlp_ratio = mlp_ratio
         self.num_registers = num_registers
+        self.feedforward_dim = feedforward_dim
 
         super().__init__(
             fl.Concatenate(
@@ -286,19 +357,34 @@ class ViT(fl.Chain):
                 ),
                 dim=1,
             ),
-            # TODO: support https://github.com/facebookresearch/dinov2/blob/2302b6b/dinov2/models/vision_transformer.py#L179
             PositionalEncoder(
-                sequence_length=num_patches**2 + 1,
-                embedding_dim=embedding_dim,
-                device=device,
-                dtype=dtype,
+                PositionalEmbedding(
+                    sequence_length=num_patches**2 + 1,
+                    embedding_dim=embedding_dim,
+                    patch_size=patch_size,
+                    device=device,
+                    dtype=dtype,
+                ),
+                fl.Chain(
+                    fl.Parallel(
+                        fl.Identity(),
+                        fl.UseContext(context="dinov2_vit", key="input"),
+                    ),
+                    InterpolateEmbedding(
+                        mode=interpolate_mode,
+                        antialias=interpolate_antialias,
+                        patch_size=patch_size,
+                    ),
+                ),
             ),
             Transformer(
                 TransformerLayer(
                     embedding_dim=embedding_dim,
+                    feedforward_dim=feedforward_dim,
+                    activation=activation,
                     num_heads=num_heads,
-                    norm_eps=norm_eps,
                     mlp_ratio=mlp_ratio,
+                    norm_eps=norm_eps,
                     device=device,
                     dtype=dtype,
                 )
@@ -320,3 +406,10 @@ class ViT(fl.Chain):
                 dtype=dtype,
             )
             self.insert_before_type(Transformer, registers)
+
+    def init_context(self) -> Contexts:
+        return {
+            "dinov2_vit": {
+                "input": None,
+            },
+        }

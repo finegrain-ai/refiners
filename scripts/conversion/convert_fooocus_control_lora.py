@@ -82,8 +82,7 @@ def load_lora_layers(
     }
 
     # auto-attach the LoRA layers to the U-Net
-    failed_keys = auto_attach_loras(lora_layers, control_lora, exclude=["ZeroConvolution", "ConditionEncoder"])
-    assert not failed_keys, f"Failed to auto-attach {len(failed_keys)}/{len(lora_layers)} LoRA layers."
+    auto_attach_loras(lora_layers, control_lora, exclude=["ZeroConvolution", "ConditionEncoder"])
 
     # eject all the LoRA adapters from the U-Net
     # because we need each target path as if the adapter wasn't injected

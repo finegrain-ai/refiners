@@ -24,17 +24,22 @@ jobs:
               - src/**
               - tests/**
               - scripts/**
+              - .github/workflows/ci.yml
 
       - name: Install Rye
         if: steps.changes.outputs.sources == 'true'
-        uses: eifinger/setup-rye@v1
+        uses: eifinger/setup-rye@v2
         with:
           enable-cache: true
           cache-prefix: "refiners-rye-cache"
 
-      - name: add home shims dir to PATH
+      - name: add Rye shims dir to PATH
         if: steps.changes.outputs.sources == 'true'
-        run: echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        run: echo "$RYE_HOME/shims" >> $GITHUB_PATH
+
+      - name: use uv
+        if: steps.changes.outputs.sources == 'true'
+        run: rye config --set-bool behavior.use-uv=true
 
       - name: pin python
         if: steps.changes.outputs.sources == 'true'
@@ -44,13 +49,13 @@ jobs:
         if: steps.changes.outputs.sources == 'true'
         run: rye sync --all-features
 
-      - name: ruff format
+      - name: rye fmt
         if: steps.changes.outputs.sources == 'true'
-        run: rye run ruff format --check .
+        run: rye fmt --check
 
-      - name: ruff check
+      - name: rye lint
         if: steps.changes.outputs.sources == 'true'
-        run: rye run ruff check .
+        run: rye lint
 
       - name: typecheck
         if: steps.changes.outputs.sources == 'true'

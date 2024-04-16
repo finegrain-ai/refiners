@@ -106,4 +106,4 @@ A popular example of adaptation is [LoRA](https://arxiv.org/abs/2106.09685). You
 
 If you use Refiners, you will find Adapters that go beyond the simple definition given at the top of this page. Some adapters inject multiple smaller adapters in models, others implement helper methods to be used by their caller...
 
-From a bird's eye view, you can just consider Adapters as things you inject models to adapt them, and that can be ejected to return the model to its original state. You will get a better feel for what is an adapter and how to leverage them by actually using the framework.
+From a bird's eye view, you can just consider Adapters as things you inject into models to adapt them, and that can be ejected to return the model to its original state. You will get a better feel for what is an adapter and how to leverage them by actually using the framework.

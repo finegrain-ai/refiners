@@ -68,7 +68,15 @@ class StableDiffusion_1(LatentDiffusionModel):
             dtype=dtype,
         )
 
-    def compute_clip_text_embedding(self, text: str, negative_text: str = "") -> Tensor:
+    def __call__(self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5) -> Tensor:
+        return super().__call__(
+            x,
+            step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=condition_scale,
+        )
+
+    def compute_clip_text_embedding(self, text: str | list[str], negative_text: str | list[str] = "") -> Tensor:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
         Args:
@@ -76,12 +84,18 @@ class StableDiffusion_1(LatentDiffusionModel):
             negative_text: The negative prompt to compute the CLIP text embedding of.
                 If not provided, the negative prompt is assumed to be empty (i.e., `""`).
         """
-        conditional_embedding = self.clip_text_encoder(text)
-        if text == negative_text:
-            return torch.cat(tensors=(conditional_embedding, conditional_embedding), dim=0)
+        text = [text] if isinstance(text, str) else text
 
-        negative_embedding = self.clip_text_encoder(negative_text or "")
-        return torch.cat(tensors=(negative_embedding, conditional_embedding), dim=0)
+        if not self.classifier_free_guidance:
+            return self.clip_text_encoder(text)
+
+        negative_text = [negative_text] if isinstance(negative_text, str) else negative_text
+        assert len(text) == len(negative_text), "The length of the text list and negative_text should be the same"
+
+        conditional_embedding = self.clip_text_encoder(text)
+        negative_embedding = self.clip_text_encoder(negative_text)
+
+        return torch.cat((negative_embedding, conditional_embedding))
 
     def set_unet_context(self, *, timestep: Tensor, clip_text_embedding: Tensor, **_: Tensor) -> None:
         """Set the various context parameters required by the U-Net model.
@@ -222,7 +236,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
 
         mask_tensor = torch.tensor(data=np.array(object=mask).astype(dtype=np.float32) / 255.0).to(device=self.device)
         mask_tensor = (mask_tensor > 0.5).unsqueeze(dim=0).unsqueeze(dim=0).to(dtype=self.dtype)
-        self.mask_latents = interpolate(x=mask_tensor, factor=torch.Size(latents_size))
+        self.mask_latents = interpolate(x=mask_tensor, size=torch.Size(latents_size))
 
         init_image_tensor = image_to_tensor(image=target_image, device=self.device, dtype=self.dtype) * 2 - 1
         masked_init_image = init_image_tensor * (1 - mask_tensor)

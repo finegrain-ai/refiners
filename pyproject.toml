@@ -1,6 +1,6 @@
 [project]
 name = "refiners"
-version = "0.3.1"
+version = "0.4.0"
 description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
+    "numpy>=1.26.4",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -39,11 +40,15 @@ test = [
     "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
-    "invisible-watermark>=0.2.0",
     "torchvision>=0.16.1",
     # An unofficial Python package for Meta AI's Segment Anything Model:
     # https://github.com/opengeos/segment-anything
     "segment-anything-py>=1.0",
+    # Official Python package for HQ-SAM
+    "segment-anything-hq>=0.3",
+    # HQ-SAM missing dependency:
+    # https://github.com/SysCV/sam-hq/pull/59
+    "timm>=0.5.0",
 ]
 conversion = [
     "diffusers>=0.26.1",
@@ -68,8 +73,7 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright==1.1.349",
-    "ruff>=0.2.0",
+    "pyright==1.1.356",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
@@ -81,7 +85,6 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.rye.scripts]
-lint = { chain = ["ruff format .", "ruff --fix ."] }
 serve-docs = "mkdocs serve"
 test-cov = "coverage run -m pytest"
 # Work around for "Couldn't parse" errors due to e.g. opencv-python:
@@ -140,5 +143,14 @@ exclude_also = [
 ]
 
 [tool.typos.default]
-extend-words = { adaptee = "adaptee" }
-extend-ignore-identifiers-re = ["NDArray*"]
+extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
+
+[tool.typos.default.extend-words]
+adaptee = "adaptee"  # Common name for an adapter's target
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::UserWarning:segment_anything_hq.modeling.tiny_vit_sam.*",
+    "ignore::DeprecationWarning:timm.models.layers.*",
+    "ignore::DeprecationWarning:timm.models.registry.*"
+]

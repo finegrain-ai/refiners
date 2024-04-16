@@ -174,8 +174,13 @@ class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
     def init_context(self) -> Contexts:
         return {"controlnet": {f"condition_{self.name}": None}}
 
-    def set_scale(self, scale: float) -> None:
-        self._controlnet[0].scale = scale
+    @property
+    def scale(self) -> float:
+        return self._controlnet[0].scale
+
+    @scale.setter
+    def scale(self, value: float) -> None:
+        self._controlnet[0].scale = value
 
     def set_controlnet_condition(self, condition: Tensor) -> None:
         self.set_context("controlnet", {f"condition_{self.name}": condition})

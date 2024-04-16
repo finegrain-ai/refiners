@@ -140,10 +140,10 @@ class GLU(Activation):
 
     Example:
         ```py
-        glu = fl.GLU()
-
-        tensor = torch.tensor([[-1.0, 0.0, 1.0]])
+        glu = fl.GLU(fl.ReLU())
+        tensor = torch.tensor([[1.0, 0.0, -1.0, 1.0]])
         output = glu(tensor)
+        assert torch.allclose(output, torch.tensor([0.0, 0.0]))
         ```
     """
 

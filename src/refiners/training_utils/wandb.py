@@ -130,6 +130,7 @@ class WandbCallback(Callback["TrainerWithWandb"]):
         trainer.wandb_log(data={"step_loss": loss_value})
 
     def on_optimizer_step_end(self, trainer: "TrainerWithWandb") -> None:
+        trainer.wandb_log(data={"total_grad_norm": trainer.grad_norm})
         avg_iteration_loss = sum(self.iteration_losses) / len(self.iteration_losses)
         trainer.wandb_log(data={"average_iteration_loss": avg_iteration_loss})
         self.iteration_losses = []
@@ -141,9 +142,6 @@ class WandbCallback(Callback["TrainerWithWandb"]):
 
     def on_lr_scheduler_step_end(self, trainer: "TrainerWithWandb") -> None:
         trainer.wandb_log(data={"learning_rate": trainer.optimizer.param_groups[0]["lr"]})
-
-    def on_backward_end(self, trainer: "TrainerWithWandb") -> None:
-        trainer.wandb_log(data={"total_grad_norm": trainer.total_gradient_norm})
 
 
 class WandbMixin(ABC):

@@ -12,8 +12,6 @@ from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.common import TimeUnit, TimeValue, parse_number_unit_field
-from refiners.training_utils.gradient_clipping import GradientClippingConfig
-from refiners.training_utils.callback import CallbackConfig
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
@@ -24,11 +22,12 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 class TrainingConfig(BaseModel):
     device: str = "cpu"
     dtype: str = "float32"
-    duration: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    duration: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
     seed: int = 0
     batch_size: int = 1
-    gradient_accumulation: TimeValue = {"number": 1, "unit": TimeUnit.STEP}
-    evaluation_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
+    gradient_accumulation: TimeValue = TimeValue(number=1, unit=TimeUnit.STEP)
+    evaluation_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    gradient_clipping_max_norm: float | None = None
     evaluation_seed: int = 0
 
     model_config = ConfigDict(extra="forbid")
@@ -64,8 +63,8 @@ class LRSchedulerType(str, Enum):
 
 class LRSchedulerConfig(BaseModel):
     type: LRSchedulerType = LRSchedulerType.DEFAULT
-    update_interval: TimeValue = {"number": 1, "unit": TimeUnit.ITERATION}
-    warmup: TimeValue = {"number": 0, "unit": TimeUnit.ITERATION}
+    update_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    warmup: TimeValue = TimeValue(number=0, unit=TimeUnit.ITERATION)
     gamma: float = 0.1
     lr_lambda: Callable[[int], float] | None = None
     mode: Literal["min", "max"] = "min"
@@ -91,7 +90,7 @@ class OptimizerConfig(BaseModel):
     learning_rate: float = 1e-4
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
-    weight_decay: float = 0.0
+    weight_decay: float = 1e-2
 
     model_config = ConfigDict(extra="forbid")
 
@@ -147,6 +146,17 @@ class OptimizerConfig(BaseModel):
                 )
 
 
+class DataloaderConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    num_workers: int = 0
+    pin_memory: bool = False
+    prefetch_factor: int | None = None
+    persistent_workers: bool = False
+    drop_last: bool = False
+    shuffle: bool = True
+
+
 class ModelConfig(BaseModel):
     # If None, then requires_grad will NOT be changed when loading the model
     # this can be useful if you want to train only a part of the model
@@ -168,7 +178,7 @@ class BaseConfig(BaseModel):
     optimizer: OptimizerConfig
     lr_scheduler: LRSchedulerConfig
     clock: ClockConfig = ClockConfig()
-    gradient_clipping: GradientClippingConfig = GradientClippingConfig()
+    dataloader: DataloaderConfig = DataloaderConfig()
 
     model_config = ConfigDict(extra="forbid")
 

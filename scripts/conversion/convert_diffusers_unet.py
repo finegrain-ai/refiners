@@ -1,12 +1,15 @@
 import argparse
 from pathlib import Path
+from typing import Any
 
 import torch
 from diffusers import UNet2DConditionModel  # type: ignore
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
+from refiners.fluxion.utils import load_from_safetensors, load_tensors
 from refiners.foundationals.latent_diffusion import SD1UNet, SDXLUNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm import SDXLLcmAdapter
 
 
 class Args(argparse.Namespace):
@@ -25,12 +28,27 @@ def setup_converter(args: Args) -> ModelConverter:
         subfolder=args.subfolder,
         low_cpu_mem_usage=False,
     )
+    if args.override_weights is not None:
+        if args.override_weights.endswith(".pth"):
+            sd = load_tensors(args.override_weights)
+        elif args.override_weights.endswith(".safetensors"):
+            sd = load_from_safetensors(args.override_weights)
+        else:
+            raise ValueError(f"Unsupported file format: {args.override_weights}")
+        source.load_state_dict(sd)
     source_in_channels: int = source.config.in_channels  # type: ignore
     source_clip_embedding_dim: int = source.config.cross_attention_dim  # type: ignore
     source_has_time_ids: bool = source.config.addition_embed_type == "text_time"  # type: ignore
-    target = (
-        SDXLUNet(in_channels=source_in_channels) if source_has_time_ids else SD1UNet(in_channels=source_in_channels)
-    )
+    source_is_lcm: bool = source.config.time_cond_proj_dim is not None
+
+    if source_has_time_ids:
+        target = SDXLUNet(in_channels=source_in_channels)
+    else:
+        target = SD1UNet(in_channels=source_in_channels)
+
+    if source_is_lcm:
+        assert isinstance(target, SDXLUNet)
+        SDXLLcmAdapter(target=target).inject()
 
     x = torch.randn(1, source_in_channels, 32, 32)
     timestep = torch.tensor(data=[0])
@@ -45,9 +63,16 @@ def setup_converter(args: Args) -> ModelConverter:
         target.set_pooled_text_embedding(pooled_text_embedding=added_cond_kwargs["text_embeds"])
 
     target_args = (x,)
+
+    source_kwargs: dict[str, Any] = {}
+    if source_has_time_ids:
+        source_kwargs["added_cond_kwargs"] = added_cond_kwargs
+    if source_is_lcm:
+        source_kwargs["timestep_cond"] = torch.randn(1, source.config.time_cond_proj_dim)
+
     source_args = {
         "positional": (x, timestep, clip_text_embeddings),
-        "keyword": {"added_cond_kwargs": added_cond_kwargs} if source_has_time_ids else {},
+        "keyword": source_kwargs,
     }
 
     converter = ModelConverter(
@@ -77,6 +102,15 @@ def main() -> None:
         help=(
             "Can be a path to a .bin file, a .safetensors file or a model name from the HuggingFace Hub. Default:"
             " runwayml/stable-diffusion-v1-5"
+        ),
+    )
+    parser.add_argument(
+        "--override-weights",
+        type=str,
+        default=None,
+        help=(
+            "Path to a weights file to override the source model (keeping its config). "
+            "This is useful for models distributed as .pth files."
         ),
     )
     parser.add_argument(

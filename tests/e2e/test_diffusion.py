@@ -12,6 +12,7 @@ from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
 from refiners.foundationals.latent_diffusion import (
+    ControlLoraAdapter,
     SD1ControlnetAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
@@ -26,12 +27,15 @@ from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
-from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule
+from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule, SolverParams
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
-from refiners.foundationals.latent_diffusion.stable_diffusion_xl.control_lora import ControlLoraAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 from tests.utils import ensure_similar_images
+
+
+def _img_open(path: Path) -> Image.Image:
+    return Image.open(path)  # type: ignore
 
 
 @pytest.fixture(autouse=True)
@@ -48,112 +52,112 @@ def ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture(scope="module")
 def cutecat_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "cutecat_init.png").convert("RGB")
+    return _img_open(ref_path / "cutecat_init.png").convert("RGB")
 
 
 @pytest.fixture(scope="module")
 def kitchen_dog(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "kitchen_dog.png").convert("RGB")
+    return _img_open(ref_path / "kitchen_dog.png").convert("RGB")
 
 
 @pytest.fixture(scope="module")
 def kitchen_dog_mask(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "kitchen_dog_mask.png").convert("RGB")
+    return _img_open(ref_path / "kitchen_dog_mask.png").convert("RGB")
 
 
 @pytest.fixture(scope="module")
 def woman_image(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "woman.png").convert("RGB")
+    return _img_open(ref_path / "woman.png").convert("RGB")
 
 
 @pytest.fixture(scope="module")
 def statue_image(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "statue.png").convert("RGB")
+    return _img_open(ref_path / "statue.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_std_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_std_random_init.png").convert("RGB")
+    return _img_open(ref_path / "expected_std_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_std_random_init_euler(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_std_random_init_euler.png").convert("RGB")
+    return _img_open(ref_path / "expected_std_random_init_euler.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_karras_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_karras_random_init.png").convert("RGB")
+    return _img_open(ref_path / "expected_karras_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_std_random_init_sag(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_std_random_init_sag.png").convert("RGB")
+    return _img_open(ref_path / "expected_std_random_init_sag.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_std_init_image(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_std_init_image.png").convert("RGB")
+    return _img_open(ref_path / "expected_std_init_image.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_std_inpainting(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_std_inpainting.png").convert("RGB")
+    return _img_open(ref_path / "expected_std_inpainting.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_controlnet_stack(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_controlnet_stack.png").convert("RGB")
+    return _img_open(ref_path / "expected_controlnet_stack.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_ip_adapter_woman(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_ip_adapter_woman.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_ip_adapter_woman.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_ip_adapter_multi(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_ip_adapter_multi.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_ip_adapter_multi.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_ip_adapter_plus_statue(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_ip_adapter_plus_statue.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_ip_adapter_plus_statue.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_sdxl_ip_adapter_woman(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_sdxl_ip_adapter_woman.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_sdxl_ip_adapter_woman.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_sdxl_ip_adapter_plus_woman(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_image_sdxl_ip_adapter_plus_woman.png").convert("RGB")
+    return _img_open(ref_path / "expected_image_sdxl_ip_adapter_plus_woman.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_ip_adapter_controlnet(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_ip_adapter_controlnet.png").convert("RGB")
+    return _img_open(ref_path / "expected_ip_adapter_controlnet.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert("RGB")
+    return _img_open(ref_path / "expected_cutecat_sdxl_ddim_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_sdxl_ddim_random_init_sag(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert("RGB")
+    return _img_open(ref_path / "expected_cutecat_sdxl_ddim_random_init_sag.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_sdxl_euler_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_cutecat_sdxl_euler_random_init.png").convert("RGB")
+    return _img_open(ref_path / "expected_cutecat_sdxl_euler_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_style_aligned(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_style_aligned.png").convert(mode="RGB")
+    return _img_open(ref_path / "expected_style_aligned.png").convert(mode="RGB")
 
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
@@ -161,8 +165,8 @@ def controlnet_data(
     ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
 ) -> Iterator[tuple[str, Image.Image, Image.Image, Path]]:
     cn_name: str = request.param
-    condition_image = Image.open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
-    expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
+    condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
     weights_fn = {
         "depth": "lllyasviel_control_v11f1p_sd15_depth",
         "canny": "lllyasviel_control_v11p_sd15_canny",
@@ -178,8 +182,8 @@ def controlnet_data(
 @pytest.fixture(scope="module")
 def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "canny"
-    condition_image = Image.open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
-    expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
+    condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
     weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11p_sd15_canny.safetensors"
     return cn_name, condition_image, expected_image, weights_path
 
@@ -187,8 +191,8 @@ def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str,
 @pytest.fixture(scope="module")
 def controlnet_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "depth"
-    condition_image = Image.open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
-    expected_image = Image.open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
+    condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
     weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1p_sd15_depth.safetensors"
     return cn_name, condition_image, expected_image, weights_path
 
@@ -257,12 +261,12 @@ def controllora_sdxl_config(
 ) -> tuple[Image.Image, dict[str, ControlLoraResolvedConfig]]:
     name: str = request.param[0]
     configs: dict[str, ControlLoraConfig] = request.param[1]
-    expected_image = Image.open(ref_path / name).convert("RGB")
+    expected_image = _img_open(ref_path / name).convert("RGB")
 
     loaded_configs = {
         config_name: ControlLoraResolvedConfig(
             scale=config.scale,
-            condition_image=Image.open(ref_path / config.condition_path).convert("RGB"),
+            condition_image=_img_open(ref_path / config.condition_path).convert("RGB"),
             weights_path=test_weights_path / "control-loras" / config.weights_path,
         )
         for config_name, config in configs.items()
@@ -274,8 +278,8 @@ def controllora_sdxl_config(
 @pytest.fixture(scope="module")
 def t2i_adapter_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     name = "depth"
-    condition_image = Image.open(ref_path / f"cutecat_guide_{name}.png").convert("RGB")
-    expected_image = Image.open(ref_path / f"expected_t2i_adapter_{name}.png").convert("RGB")
+    condition_image = _img_open(ref_path / f"cutecat_guide_{name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_t2i_adapter_{name}.png").convert("RGB")
     weights_path = test_weights_path / "T2I-Adapter" / "t2iadapter_depth_sd15v2.safetensors"
     return name, condition_image, expected_image, weights_path
 
@@ -283,8 +287,8 @@ def t2i_adapter_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str
 @pytest.fixture(scope="module")
 def t2i_adapter_xl_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     name = "canny"
-    condition_image = Image.open(ref_path / f"fairy_guide_{name}.png").convert("RGB")
-    expected_image = Image.open(ref_path / f"expected_t2i_adapter_xl_{name}.png").convert("RGB")
+    condition_image = _img_open(ref_path / f"fairy_guide_{name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_t2i_adapter_xl_{name}.png").convert("RGB")
     weights_path = test_weights_path / "T2I-Adapter" / "t2i-adapter-canny-sdxl-1.0.safetensors"
 
     if not weights_path.is_file():
@@ -296,7 +300,7 @@ def t2i_adapter_xl_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[
 
 @pytest.fixture(scope="module")
 def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
-    expected_image = Image.open(ref_path / "expected_lora_pokemon.png").convert("RGB")
+    expected_image = _img_open(ref_path / "expected_lora_pokemon.png").convert("RGB")
     weights_path = test_weights_path / "loras" / "pokemon-lora" / "pytorch_lora_weights.bin"
 
     if not weights_path.is_file():
@@ -309,7 +313,7 @@ def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Im
 
 @pytest.fixture(scope="module")
 def lora_data_dpo(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
-    expected_image = Image.open(ref_path / "expected_sdxl_dpo_lora.png").convert("RGB")
+    expected_image = _img_open(ref_path / "expected_sdxl_dpo_lora.png").convert("RGB")
     weights_path = test_weights_path / "loras" / "dpo-lora" / "pytorch_lora_weights.safetensors"
 
     if not weights_path.is_file():
@@ -335,64 +339,63 @@ def lora_sliders(test_weights_path: Path) -> tuple[dict[str, dict[str, torch.Ten
     }, {
         "age": 0.3,
         "cartoon_style": -0.2,
-        "dpo": 1.4,
         "eyesize": -0.2,
     }
 
 
 @pytest.fixture
 def scene_image_inpainting_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "inpainting-scene.png").convert("RGB")
+    return _img_open(ref_path / "inpainting-scene.png").convert("RGB")
 
 
 @pytest.fixture
 def mask_image_inpainting_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "inpainting-mask.png").convert("RGB")
+    return _img_open(ref_path / "inpainting-mask.png").convert("RGB")
 
 
 @pytest.fixture
 def target_image_inpainting_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "inpainting-target.png").convert("RGB")
+    return _img_open(ref_path / "inpainting-target.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_inpainting_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_inpainting_refonly.png").convert("RGB")
+    return _img_open(ref_path / "expected_inpainting_refonly.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_refonly.png").convert("RGB")
+    return _img_open(ref_path / "expected_refonly.png").convert("RGB")
 
 
 @pytest.fixture
 def condition_image_refonly(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "cyberpunk_guide.png").convert("RGB")
+    return _img_open(ref_path / "cyberpunk_guide.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_textual_inversion_random_init(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_textual_inversion_random_init.png").convert("RGB")
+    return _img_open(ref_path / "expected_textual_inversion_random_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_multi_diffusion(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_multi_diffusion.png").convert(mode="RGB")
+    return _img_open(ref_path / "expected_multi_diffusion.png").convert(mode="RGB")
 
 
 @pytest.fixture
 def expected_restart(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_restart.png").convert(mode="RGB")
+    return _img_open(ref_path / "expected_restart.png").convert(mode="RGB")
 
 
 @pytest.fixture
 def expected_freeu(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_freeu.png").convert(mode="RGB")
+    return _img_open(ref_path / "expected_freeu.png").convert(mode="RGB")
 
 
 @pytest.fixture
 def expected_sdxl_multi_loras(ref_path: Path) -> Image.Image:
-    return Image.open(fp=ref_path / "expected_sdxl_multi_loras.png").convert(mode="RGB")
+    return _img_open(ref_path / "expected_sdxl_multi_loras.png").convert(mode="RGB")
 
 
 @pytest.fixture
@@ -402,10 +405,10 @@ def hello_world_assets(ref_path: Path) -> tuple[Image.Image, Image.Image, Image.
     image_prompt = assets / "dragon_quest_slime.jpg"
     condition_image = assets / "dropy_canny.png"
     return (
-        Image.open(fp=dropy).convert(mode="RGB"),
-        Image.open(fp=image_prompt).convert(mode="RGB"),
-        Image.open(fp=condition_image).convert(mode="RGB"),
-        Image.open(fp=ref_path / "expected_dropy_slime_9752.png").convert(mode="RGB"),
+        _img_open(dropy).convert(mode="RGB"),
+        _img_open(image_prompt).convert(mode="RGB"),
+        _img_open(condition_image).convert(mode="RGB"),
+        _img_open(ref_path / "expected_dropy_slime_9752.png").convert(mode="RGB"),
     )
 
 
@@ -600,7 +603,7 @@ def sd15_ddim_karras(
         warn("not running on CPU, skipping")
         pytest.skip()
 
-    ddim_solver = DDIM(num_inference_steps=20, noise_schedule=NoiseSchedule.KARRAS)
+    ddim_solver = DDIM(num_inference_steps=20, params=SolverParams(noise_schedule=NoiseSchedule.KARRAS))
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
     sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
@@ -758,6 +761,60 @@ def test_diffusion_std_random_init(
 
 
 @no_grad()
+def test_diffusion_batch2(sd15_std: StableDiffusion_1):
+    sd15 = sd15_std
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2 = sd15.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    step = sd15.steps[0]
+
+    manual_seed(2)
+    rand_b2 = torch.randn(2, 4, 64, 64, device=sd15.device)
+
+    x_b2 = sd15(
+        rand_b2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_b2,
+        condition_scale=7.5,
+    )
+
+    assert x_b2.shape == (2, 4, 64, 64)
+
+    rand_1 = rand_b2[0:1]
+    clip_text_embedding_1 = sd15.compute_clip_text_embedding(text=[prompt1], negative_text=[negative_prompt1])
+    x_1 = sd15(
+        rand_1,
+        step=step,
+        clip_text_embedding=clip_text_embedding_1,
+        condition_scale=7.5,
+    )
+
+    rand_2 = rand_b2[1:2]
+    clip_text_embedding_2 = sd15.compute_clip_text_embedding(text=[prompt2], negative_text=[negative_prompt2])
+    x_2 = sd15(
+        rand_2,
+        step=step,
+        clip_text_embedding=clip_text_embedding_2,
+        condition_scale=7.5,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
+
+
+@no_grad()
 def test_diffusion_std_random_init_euler(
     sd15_euler: StableDiffusion_1, expected_image_std_random_init_euler: Image.Image, test_device: torch.device
 ):
@@ -772,8 +829,7 @@ def test_diffusion_std_random_init_euler(
     sd15.set_inference_steps(30)
 
     manual_seed(2)
-    x = torch.randn(1, 4, 64, 64, device=test_device)
-    x = x * euler_solver.init_noise_sigma
+    x = sd15.init_latents((512, 512)).to(sd15.device, sd15.dtype)
 
     for step in sd15.steps:
         x = sd15(
@@ -836,7 +892,6 @@ def test_diffusion_std_random_init_float16(
             condition_scale=7.5,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-
     ensure_similar_images(predicted_image, expected_image_std_random_init, min_psnr=35, min_ssim=0.98)
 
 
@@ -1266,6 +1321,68 @@ def test_diffusion_lora(
 
 
 @no_grad()
+def test_diffusion_sdxl_batch2(sdxl_ddim: StableDiffusion_XL) -> None:
+    sdxl = sdxl_ddim
+
+    prompt1 = "a cute cat, detailed high-quality professional image"
+    negative_prompt1 = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    prompt2 = "a cute dog"
+    negative_prompt2 = "lowres, bad anatomy, bad hands"
+
+    clip_text_embedding_b2, pooled_text_embedding_b2 = sdxl.compute_clip_text_embedding(
+        text=[prompt1, prompt2], negative_text=[negative_prompt1, negative_prompt2]
+    )
+
+    time_ids = sdxl.default_time_ids
+    time_ids_b2 = sdxl.default_time_ids.repeat(2, 1)
+
+    manual_seed(seed=2)
+    x_b2 = torch.randn(2, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
+    x_1 = x_b2[0:1]
+    x_2 = x_b2[1:2]
+
+    x_b2 = sdxl(
+        x_b2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_b2,
+        pooled_text_embedding=pooled_text_embedding_b2,
+        time_ids=time_ids_b2,
+    )
+
+    clip_text_embedding_1, pooled_text_embedding_1 = sdxl.compute_clip_text_embedding(
+        text=prompt1, negative_text=negative_prompt1
+    )
+
+    x_1 = sdxl(
+        x_1,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_1,
+        pooled_text_embedding=pooled_text_embedding_1,
+        time_ids=time_ids,
+    )
+
+    clip_text_embedding_2, pooled_text_embedding_2 = sdxl.compute_clip_text_embedding(
+        text=prompt2, negative_text=negative_prompt2
+    )
+
+    x_2 = sdxl(
+        x_2,
+        step=sdxl.steps[0],
+        clip_text_embedding=clip_text_embedding_2,
+        pooled_text_embedding=pooled_text_embedding_2,
+        time_ids=time_ids,
+    )
+
+    # The 5e-3 tolerance is detailed in https://github.com/finegrain-ai/refiners/pull/263#issuecomment-1956404911
+    assert torch.allclose(
+        x_b2[0], x_1[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[0] - x_1[0]).abs()).item()}"
+    assert torch.allclose(
+        x_b2[1], x_2[0], atol=5e-3, rtol=0
+    ), f"Batch 2 and batch1 output should be the same and are distant of {torch.max((x_b2[1] - x_2[0]).abs()).item()}"
+
+
+@no_grad()
 def test_diffusion_sdxl_lora(
     sdxl_ddim: StableDiffusion_XL,
     lora_data_dpo: tuple[Image.Image, dict[str, torch.Tensor]],
@@ -1281,7 +1398,7 @@ def test_diffusion_sdxl_lora(
     prompt = "professional portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
     negative_prompt = "3d render, cartoon, drawing, art, low light, blur, pixelated, low resolution, black and white"
 
-    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale)
+    SDLoraManager(sdxl).add_loras("dpo", lora_weights, scale=lora_scale, unet_inclusions=["CrossAttentionBlock"])
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt, negative_text=negative_prompt
@@ -1317,11 +1434,18 @@ def test_diffusion_sdxl_multiple_loras(
 ) -> None:
     sdxl = sdxl_ddim
     expected_image = expected_sdxl_multi_loras
-    _, dpo = lora_data_dpo
-    loras, scales = lora_sliders
-    loras["dpo"] = dpo
+    _, dpo_weights = lora_data_dpo
+    slider_loras, slider_scales = lora_sliders
 
-    SDLoraManager(sdxl).add_multiple_loras(loras, scales)
+    manager = SDLoraManager(sdxl)
+    for lora_name, lora_weights in slider_loras.items():
+        manager.add_loras(
+            lora_name,
+            lora_weights,
+            slider_scales[lora_name],
+            unet_inclusions=["SelfAttention", "ResidualBlock", "Downsample", "Upsample"],
+        )
+    manager.add_loras("dpo", dpo_weights, 1.4, unet_inclusions=["CrossAttentionBlock"])
 
     # parameters are the same as https://huggingface.co/radames/sdxl-DPO-LoRA
     # except that we are using DDIM instead of sde-dpmsolver++
@@ -1882,11 +2006,7 @@ def test_diffusion_sdxl_euler_deterministic(
     time_ids = sdxl.default_time_ids
     sdxl.set_inference_steps(30)
     manual_seed(2)
-    x = torch.randn(1, 4, 128, 128, device=sdxl.device, dtype=sdxl.dtype)
-
-    # init latents must be scaled for Euler
-    # TODO make init_latents work
-    x = x * sdxl.solver.init_noise_sigma
+    x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
 
     for step in sdxl.steps:
         x = sdxl(
@@ -1918,6 +2038,7 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
         size=(64, 64),
         offset=(0, 16),
         clip_text_embedding=clip_text_embedding,
+        condition_scale=3,
         start_step=0,
     )
     noise = torch.randn(1, 4, 64, 80, device=sd.device, dtype=sd.dtype)
@@ -1999,7 +2120,7 @@ def test_t2i_adapter_xl_canny(
     sdxl.set_inference_steps(30)
 
     t2i_adapter = SDXLT2IAdapter(target=sdxl.unet, name=name, weights=load_from_safetensors(weights_path)).inject()
-    t2i_adapter.set_scale(0.8)
+    t2i_adapter.scale = 0.8
 
     condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
@@ -2128,8 +2249,8 @@ def test_hello_world(
     condition = image_to_tensor(condition_image.convert("RGB"), device=sdxl.device, dtype=sdxl.dtype)
     t2i_adapter.set_condition_features(features=t2i_adapter.compute_condition_features(condition))
 
-    ip_adapter.set_scale(0.85)
-    t2i_adapter.set_scale(0.8)
+    ip_adapter.scale = 0.85
+    t2i_adapter.scale = 0.8
     sdxl.set_inference_steps(50, first_step=1)
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
@@ -2168,29 +2289,9 @@ def test_style_aligned(
     ]
 
     # create (context) embeddings from prompts
-    # TODO: replace this logic with https://github.com/finegrain-ai/refiners/pull/263 when it gets merged
-    unconds: list[torch.Tensor] = []
-    conds: list[torch.Tensor] = []
-    pooled_unconds: list[torch.Tensor] = []
-    pooled_conds: list[torch.Tensor] = []
-    for prompt in set_of_prompts:
-        clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(text=prompt)
-
-        uncond, cond = clip_text_embedding.chunk(2)
-        pooled_uncond, pooled_cond = pooled_text_embedding.chunk(2)
-
-        unconds.append(uncond)
-        conds.append(cond)
-        pooled_unconds.append(pooled_uncond)
-        pooled_conds.append(pooled_cond)
-
-    uncond = torch.cat(unconds, dim=0)
-    cond = torch.cat(conds, dim=0)
-    pooled_uncond = torch.cat(pooled_unconds, dim=0)
-    pooled_cond = torch.cat(pooled_conds, dim=0)
-
-    clip_text_embedding = torch.cat((uncond, cond), dim=0)
-    pooled_text_embedding = torch.cat((pooled_uncond, pooled_cond), dim=0)
+    clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
+        text=set_of_prompts, negative_text=[""] * len(set_of_prompts)
+    )
 
     time_ids = sdxl.default_time_ids.repeat(len(set_of_prompts), 1)
 
@@ -2218,7 +2319,7 @@ def test_style_aligned(
     # tile all images horizontally
     merged_image = Image.new("RGB", (1024 * len(predicted_images), 1024))
     for i in range(len(predicted_images)):
-        merged_image.paste(predicted_images[i], (i * 1024, 0))
+        merged_image.paste(predicted_images[i], (i * 1024, 0))  # type: ignore
 
     # compare against reference image
     ensure_similar_images(merged_image, expected_style_aligned, min_psnr=35, min_ssim=0.99)
