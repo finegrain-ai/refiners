@@ -68,6 +68,7 @@ ghp-import==2.1.0
 gitdb==4.0.11
     # via gitpython
 gitpython==3.1.43
+    # via refiners
     # via wandb
 griffe==0.42.1
     # via mkdocstrings-python
