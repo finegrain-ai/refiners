@@ -258,8 +258,6 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
 
     from segment_anything.modeling.common import LayerNorm2d  # type: ignore
 
-    import refiners.fluxion.layers as fl
-
     assert issubclass(LayerNorm2d, nn.Module)
     custom_layers = {LayerNorm2d: fl.LayerNorm2d}
 
