@@ -93,3 +93,12 @@ def test_scoped_seed_restore_state() -> None:
     with scoped_seed(42):
         random.randint(0, 100)
     assert random.randint(0, 100) == 87
+
+
+def test_import_training_utils() -> None:
+    try:
+        import refiners.training_utils
+    except ImportError:
+        pytest.fail("Failed to import refiners.training_utils")
+
+    assert refiners.training_utils is not None
