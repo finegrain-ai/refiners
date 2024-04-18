@@ -219,7 +219,7 @@ We will now define the configuration for the autoencoder. It holds the configura
 Example:
 
 ```python
-from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulers, Epoch
+from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulerType, Epoch
 
 class AutoencoderConfig(BaseConfig):
     # Since we are using a synthetic dataset, we will use a arbitrary fixed epoch size.
@@ -238,7 +238,7 @@ optimizer = OptimizerConfig(
 )
 
 lr_scheduler = LRSchedulerConfig(
-    type=LRSchedulers.ConstantLR
+    type=LRSchedulerType.ConstantLR
 )
 
 config = AutoencoderConfig(
