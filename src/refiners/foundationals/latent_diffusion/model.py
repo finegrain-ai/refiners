@@ -35,32 +35,68 @@ class LatentDiffusionModel(fl.Module, ABC):
     def set_inference_steps(self, num_steps: int, first_step: int = 0) -> None:
         self.solver = self.solver.rebuild(num_inference_steps=num_steps, first_inference_step=first_step)
 
+    @staticmethod
+    def sample_noise(
+        size: tuple[int, ...],
+        device: Device | None = None,
+        dtype: DType | None = None,
+        offset_noise: float | None = None,
+    ) -> torch.Tensor:
+        """Sample noise from a normal distribution with an optional offset.
+
+        Args:
+            size: The size of the noise tensor.
+            device: The device to put the noise tensor on.
+            dtype: The data type of the noise tensor.
+            offset_noise: The offset of the noise tensor.
+                Useful at training time, see https://www.crosslabs.org/blog/diffusion-with-offset-noise.
+        """
+        noise = torch.randn(size=size, device=device, dtype=dtype)
+        if offset_noise is not None:
+            noise += offset_noise * torch.randn(size=(size[0], size[1], 1, 1), device=device, dtype=dtype)
+        return noise
+
     def init_latents(
         self,
         size: tuple[int, int],
         init_image: Image.Image | None = None,
         noise: Tensor | None = None,
     ) -> Tensor:
+        """Initialize the latents for the diffusion process.
+
+        Args:
+            size: The size of the latent (in pixel space).
+            init_image: The image to use as initialization for the latents.
+            noise: The noise to add to the latents.
+        """
         height, width = size
+        latent_height = height // 8
+        latent_width = width // 8
+
         if noise is None:
-            noise = torch.randn(1, 4, height // 8, width // 8, device=self.device)
+            noise = LatentDiffusionModel.sample_noise(
+                size=(1, 4, latent_height, latent_width),
+                device=self.device,
+                dtype=self.dtype,
+            )
+
         assert list(noise.shape[2:]) == [
-            height // 8,
-            width // 8,
+            latent_height,
+            latent_width,
         ], f"noise shape is not compatible: {noise.shape}, with size: {size}"
 
         if init_image is None:
-            x = noise
+            latent = noise
         else:
             resized = init_image.resize(size=(width, height))  # type: ignore
             encoded_image = self.lda.image_to_latents(resized)
-            x = self.solver.add_noise(
+            latent = self.solver.add_noise(
                 x=encoded_image,
                 noise=noise,
                 step=self.solver.first_inference_step,
             )
 
-        return self.solver.scale_model_input(x, step=-1)
+        return self.solver.scale_model_input(latent, step=-1)
 
     @property
     def steps(self) -> list[int]:
