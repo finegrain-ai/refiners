@@ -4,7 +4,19 @@ from enum import Enum
 from typing import TypeVar
 
 import numpy as np
-from torch import Generator, Tensor, arange, device as Device, dtype as DType, float32, linspace, log, sqrt, tensor
+from torch import (
+    Generator,
+    Tensor,
+    arange,
+    device as Device,
+    dtype as DType,
+    float32,
+    linspace,
+    log,
+    sqrt,
+    stack,
+    tensor,
+)
 
 from refiners.fluxion import layers as fl
 
@@ -208,7 +220,7 @@ class Solver(fl.Module, ABC):
             offset=self.params.timesteps_offset,
         )
 
-    def add_noise(
+    def _add_noise(
         self,
         x: Tensor,
         noise: Tensor,
@@ -227,8 +239,42 @@ class Solver(fl.Module, ABC):
         timestep = self.timesteps[step]
         cumulative_scale_factors = self.cumulative_scale_factors[timestep]
         noise_stds = self.noise_std[timestep]
+
+        # noisify the latents, arXiv:2006.11239 Eq. 4
         noised_x = cumulative_scale_factors * x + noise_stds * noise
         return noised_x
+
+    def add_noise(
+        self,
+        x: Tensor,
+        noise: Tensor,
+        step: int | list[int],
+    ) -> Tensor:
+        """Add noise to the input tensor using the solver's parameters.
+
+        Args:
+            x: The input tensor to add noise to.
+            noise: The noise tensor to add to the input tensor.
+            step: The current step(s) of the diffusion process.
+
+        Returns:
+            The input tensor with added noise.
+        """
+        if isinstance(step, list):
+            assert len(x) == len(noise) == len(step), "x, noise, and step must have the same length"
+            return stack(
+                tensors=[
+                    self._add_noise(
+                        x=x[i],
+                        noise=noise[i],
+                        step=step[i],
+                    )
+                    for i in range(x.shape[0])
+                ],
+                dim=0,
+            )
+
+        return self._add_noise(x=x, noise=noise, step=step)
 
     def remove_noise(self, x: Tensor, noise: Tensor, step: int) -> Tensor:
         """Remove noise from the input tensor using the current step of the diffusion process.

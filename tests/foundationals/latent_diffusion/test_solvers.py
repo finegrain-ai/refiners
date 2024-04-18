@@ -198,6 +198,24 @@ def test_solver_device(test_device: Device):
     assert noised.device == test_device
 
 
+def test_solver_add_noise(test_device: Device):
+    scheduler = DDIM(num_inference_steps=30, device=test_device)
+    latent = randn(1, 4, 32, 32, device=test_device)
+    noise = randn(1, 4, 32, 32, device=test_device)
+    noised = scheduler.add_noise(
+        x=latent,
+        noise=noise,
+        step=0,
+    )
+    noised_double = scheduler.add_noise(
+        x=latent.repeat(2, 1, 1, 1),
+        noise=noise.repeat(2, 1, 1, 1),
+        step=[0, 0],
+    )
+    assert allclose(noised, noised_double[0])
+    assert allclose(noised, noised_double[1])
+
+
 @pytest.mark.parametrize("noise_schedule", [NoiseSchedule.UNIFORM, NoiseSchedule.QUADRATIC, NoiseSchedule.KARRAS])
 def test_solver_noise_schedules(noise_schedule: NoiseSchedule, test_device: Device):
     scheduler = DDIM(
