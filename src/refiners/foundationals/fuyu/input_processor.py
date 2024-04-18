@@ -88,7 +88,7 @@ class InputEncoder(fl.ContextModule):
         vocabulary_size: int = 262_144,
         tokenizer: FuyuTokenizer | None = None,
         patch_size: int = 30,
-        padding_value: float = 1.,
+        padding_value: float = 1.0/255,
         max_size: Tuple[int] = (1080, 1920), #h w
         device: Device | str | None = None,
         dtype: DType | None = None
@@ -232,7 +232,7 @@ class InputEncoder(fl.ContextModule):
 
         context = self.use_context(context_name="attention")
         context.update({"mask": attn_mask})
-
+        
         encoded_inputs = cat([cat((padded_encoded_image, encoded_text), dim=1) for padded_encoded_image, encoded_text in zip(padded_encoded_images, encoded_texts)], dim=0)
 
         if encoded_inputs.shape[1] > self.max_sequence_length:

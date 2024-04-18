@@ -2,7 +2,7 @@ from dataclasses import dataclass, replace
 from typing import Any, List, Union
 
 import numpy as np
-from torch import Tensor, argmax, device as Device, dtype as DType, float16 as torchf16
+from torch import Tensor, argmax, device as Device, dtype as DType, float16 as torchf16, float32 as torchf32
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import no_grad
@@ -60,8 +60,8 @@ class Fuyu8b:
     partial_rotary_factor: float = 0.5
     use_bias: bool = True
     is_optimized: bool = True
-    device: Device | str | None = 'cuda'
-    dtype: DType | None = torchf16
+    device: Device | str | None = 'cuda:0'
+    dtype: DType | None = torchf32
 
     def with_device(self, new_device: Union[Device, str]) -> 'Fuyu8b':
         """
