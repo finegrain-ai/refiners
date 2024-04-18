@@ -23,4 +23,4 @@ learning_rate = 1
 
 [lr_scheduler]
 type = "ConstantLR"
-update_interval = "1:step"
+update_interval = "1:iteration"

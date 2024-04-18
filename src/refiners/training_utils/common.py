@@ -1,7 +1,6 @@
 import random
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
 import numpy as np
 import torch
@@ -83,32 +82,67 @@ class scoped_seed:
         cuda.set_rng_state(self.cuda_torch_state)
 
 
-class TimeUnit(str, Enum):
-    STEP = "step"
-    EPOCH = "epoch"
-    ITERATION = "iteration"
-    DEFAULT = "step"
+@dataclass
+@runtime_checkable
+class TimeValue(Protocol):
+    number: int
+
+    @property
+    def unit(self) -> "TimeUnit":
+        match self.__class__.__name__:
+            case "Step":
+                return Step
+            case "Epoch":
+                return Epoch
+            case "Iteration":
+                return Iteration
+            case _:
+                raise ValueError(f"Unsupported time unit: {self.__class__.__name__}")
+
+    @classmethod
+    def from_str(cls, value: str) -> "TimeValue":
+        match cls.extract_number_unit(value):
+            case number, "step":
+                return Step(number)
+            case number, "epoch":
+                return Epoch(number)
+            case number, "iteration":
+                return Iteration(number)
+            case _:
+                raise ValueError(f"Incorrect time value format: {value}")
+
+    @staticmethod
+    def extract_number_unit(value: str) -> tuple[int, str]:
+        number, unit = value.lower().split(":")
+        return int(number.strip()), unit.strip()
 
 
 @dataclass
-class TimeValue:
+class Step(TimeValue):
     number: int
-    unit: TimeUnit
 
 
+@dataclass
+class Epoch(TimeValue):
+    number: int
+
+
+@dataclass
+class Iteration(TimeValue):
+    number: int
+
+
+TimeUnit = type[Step] | type[Epoch] | type[Iteration]
 TimeValueInput = str | int | dict[str, str | int] | TimeValue
 
 
 def parse_number_unit_field(value: TimeValueInput) -> TimeValue:
     match value:
         case str(value_str):
-            number, unit = value_str.split(sep=":")
-            return TimeValue(number=int(number.strip()), unit=TimeUnit(value=unit.strip().lower()))
+            return TimeValue.from_str(value_str)
         case int(number):
-            return TimeValue(number=number, unit=TimeUnit.DEFAULT)
-        case {"number": int(number), "unit": str(unit)}:
-            return TimeValue(number=number, unit=TimeUnit(value=unit.lower()))
-        case TimeValue(number, unit):
-            return TimeValue(number=number, unit=unit)
+            return Step(number=number)
+        case TimeValue(number):
+            return value
         case _:
             raise ValueError(f"Unsupported value format: {value}")

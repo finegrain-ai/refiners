@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from refiners.training_utils.clock import ClockConfig
-from refiners.training_utils.common import TimeUnit, TimeValue, parse_number_unit_field
+from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, TimeValueInput, parse_number_unit_field
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
@@ -22,18 +22,18 @@ ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 class TrainingConfig(BaseModel):
     device: str = "cpu"
     dtype: str = "float32"
-    duration: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    duration: TimeValue = Iteration(1)  # TimeValue(number=1, unit=TimeUnit.ITERATION)
     seed: int = 0
     batch_size: int = 1
-    gradient_accumulation: TimeValue = TimeValue(number=1, unit=TimeUnit.STEP)
-    evaluation_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
+    gradient_accumulation: Step | Epoch = Step(1)
+    evaluation_interval: Iteration | Epoch = Iteration(1)
     gradient_clipping_max_norm: float | None = None
     evaluation_seed: int = 0
 
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("duration", "gradient_accumulation", "evaluation_interval", mode="before")
-    def parse_field(cls, value: Any) -> TimeValue:
+    def parse_field(cls, value: TimeValueInput) -> TimeValue:
         return parse_number_unit_field(value)
 
 
@@ -63,8 +63,8 @@ class LRSchedulerType(str, Enum):
 
 class LRSchedulerConfig(BaseModel):
     type: LRSchedulerType = LRSchedulerType.DEFAULT
-    update_interval: TimeValue = TimeValue(number=1, unit=TimeUnit.ITERATION)
-    warmup: TimeValue = TimeValue(number=0, unit=TimeUnit.ITERATION)
+    update_interval: Iteration | Epoch = Iteration(1)
+    warmup: TimeValue = Iteration(0)
     gamma: float = 0.1
     lr_lambda: Callable[[int], float] | None = None
     mode: Literal["min", "max"] = "min"
