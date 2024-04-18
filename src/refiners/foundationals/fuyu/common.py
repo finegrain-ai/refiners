@@ -149,7 +149,7 @@ def scaled_dot_product_attention_non_optimized(
     attention = attention / math.sqrt(dim)
     if attn_mask is not None:
         attention = attention + attn_bias
-    attention = torch.softmax(input=attention.float(), dim=-1)
+    attention = torch.softmax(input=attention.float(), dim=-1).to(value.dtype)
     return attention @ value
     
 class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
