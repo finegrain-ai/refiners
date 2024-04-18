@@ -3,21 +3,41 @@ import random
 import pytest
 import torch
 
-from refiners.training_utils.common import TimeUnit, TimeValue, TimeValueInput, parse_number_unit_field, scoped_seed
+from refiners.training_utils.common import (
+    Epoch,
+    Iteration,
+    Step,
+    TimeValue,
+    TimeValueInput,
+    parse_number_unit_field,
+    scoped_seed,
+)
 
 
 @pytest.mark.parametrize(
     "input_value, expected_output",
     [
-        ("10: step", TimeValue(number=10, unit=TimeUnit.STEP)),
-        ("20 :epoch", TimeValue(number=20, unit=TimeUnit.EPOCH)),
-        ("30: Iteration", TimeValue(number=30, unit=TimeUnit.ITERATION)),
-        (50, TimeValue(number=50, unit=TimeUnit.DEFAULT)),
-        ({"number": 100, "unit": "STEP"}, TimeValue(number=100, unit=TimeUnit.STEP)),
-        (TimeValue(number=200, unit=TimeUnit.EPOCH), TimeValue(number=200, unit=TimeUnit.EPOCH)),
+        ("3 : steP", Step(3)),
+        ("5: epoch", Epoch(5)),
+        (" 7:Iteration", Iteration(7)),
     ],
 )
-def test_parse_number_unit_field(input_value: TimeValueInput, expected_output: TimeValue):
+def test_time_value_from_str(input_value: str, expected_output: TimeValue) -> None:
+    result = TimeValue.from_str(input_value)
+    assert result == expected_output
+
+
+@pytest.mark.parametrize(
+    "input_value, expected_output",
+    [
+        ("10: step", Step(10)),
+        ("20 :epoch", Epoch(20)),
+        ("30: Iteration", Iteration(30)),
+        (50, Step(50)),
+        (Epoch(200), Epoch(200)),
+    ],
+)
+def test_parse_number_unit_field(input_value: TimeValueInput, expected_output: TimeValue) -> None:
     result = parse_number_unit_field(input_value)
     assert result == expected_output
 
@@ -26,8 +46,8 @@ def test_parse_number_unit_field(input_value: TimeValueInput, expected_output: T
     "invalid_input",
     [
         "invalid:input",
-        {"number": "not_a_number", "unit": "step"},
-        {"invalid_key": 10},
+        "10: invalid",
+        "10",
         None,
     ],
 )

@@ -10,7 +10,13 @@ from torch.optim import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
-from refiners.training_utils.common import TimeUnit, TimeValue, count_learnable_parameters, human_readable_number
+from refiners.training_utils.common import (
+    Epoch,
+    Iteration,
+    Step,
+    count_learnable_parameters,
+    human_readable_number,
+)
 from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.training_utils.trainer import (
     Trainer,
@@ -96,7 +102,7 @@ def mock_trainer(mock_config: MockConfig) -> MockTrainer:
 @pytest.fixture
 def mock_trainer_short(mock_config: MockConfig) -> MockTrainer:
     mock_config_short = mock_config.model_copy(deep=True)
-    mock_config_short.training.duration = TimeValue(number=3, unit=TimeUnit.STEP)
+    mock_config_short.training.duration = Step(3)
     return MockTrainer(config=mock_config_short)
 
 
@@ -130,10 +136,10 @@ def training_clock() -> TrainingClock:
     return TrainingClock(
         dataset_length=100,
         batch_size=10,
-        training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
-        gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
-        evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
-        lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+        training_duration=Epoch(5),
+        gradient_accumulation=Epoch(1),
+        evaluation_interval=Epoch(1),
+        lr_scheduler_interval=Epoch(1),
     )
 
 
@@ -142,10 +148,10 @@ def test_small_dataset_error():
         TrainingClock(
             dataset_length=3,
             batch_size=10,
-            training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
-            gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
-            evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
-            lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            training_duration=Epoch(5),
+            gradient_accumulation=Epoch(1),
+            evaluation_interval=Epoch(1),
+            lr_scheduler_interval=Epoch(1),
         )
 
 
@@ -154,23 +160,25 @@ def test_zero_batch_size_error():
         TrainingClock(
             dataset_length=3,
             batch_size=0,
-            training_duration=TimeValue(number=5, unit=TimeUnit.EPOCH),
-            gradient_accumulation=TimeValue(number=1, unit=TimeUnit.EPOCH),
-            evaluation_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
-            lr_scheduler_interval=TimeValue(number=1, unit=TimeUnit.EPOCH),
+            training_duration=Epoch(5),
+            gradient_accumulation=Epoch(1),
+            evaluation_interval=Epoch(1),
+            lr_scheduler_interval=Epoch(1),
         )
 
 
 def test_time_unit_to_steps_conversion(training_clock: TrainingClock) -> None:
-    assert training_clock.convert_time_unit_to_steps(1, TimeUnit.EPOCH) == 10
-    assert training_clock.convert_time_unit_to_steps(2, TimeUnit.EPOCH) == 20
-    assert training_clock.convert_time_unit_to_steps(1, TimeUnit.STEP) == 1
+    assert training_clock.convert_time_value_to_steps(Epoch(1)) == 10
+    assert training_clock.convert_time_value_to_steps(Epoch(2)) == 20
+    assert training_clock.convert_time_value_to_steps(Step(1)) == 1
+    assert training_clock.convert_time_value_to_steps(Iteration(1)) == 10
 
 
 def test_steps_to_time_unit_conversion(training_clock: TrainingClock) -> None:
-    assert training_clock.convert_steps_to_time_unit(10, TimeUnit.EPOCH) == 1
-    assert training_clock.convert_steps_to_time_unit(20, TimeUnit.EPOCH) == 2
-    assert training_clock.convert_steps_to_time_unit(1, TimeUnit.STEP) == 1
+    assert training_clock.convert_steps_to_time_unit(10, Epoch) == 1
+    assert training_clock.convert_steps_to_time_unit(20, Epoch) == 2
+    assert training_clock.convert_steps_to_time_unit(1, Step) == 1
+    assert training_clock.convert_steps_to_time_unit(10, Iteration) == 1
 
 
 def test_clock_properties(training_clock: TrainingClock) -> None:
