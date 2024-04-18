@@ -1,8 +1,10 @@
 import gzip
 import json
+import re
 from pathlib import Path
 from typing import List
 
+from numpy import round
 from torch import Tensor, tensor
 
 import refiners.fluxion.layers as fl
@@ -10,7 +12,7 @@ import refiners.fluxion.layers as fl
 
 class FuyuTokenizer(fl.Module):
     """
-    Implement a Unigram Tokenizer based on a vocabulary file
+    Implement a Unigram Tokenizer based on a vocabulary file for Fuyu
     """
     def __init__(
             self, 
@@ -36,6 +38,16 @@ class FuyuTokenizer(fl.Module):
         self.pad_token = self.unknown_token
         self.eos_token = config["added_tokens"][1]
         self.newline_model_token = "<0x0A>" # \n token
+        
+        self.text_bbox_open = "<box>"
+        self.text_bbox_close = "</box>"
+        self.text_point_open = "<point>"
+        self.text_point_close = "</point>"
+
+        self.token_bbox_open = "<0x00>"  # <bbox>
+        self.token_bbox_close = "<0x01>"  # </bbox>
+        self.token_point_open = "<0x02>"  # <point>
+        self.token_point_close = "<0x03>"  # </point>
 
         self.boa_token_id = self.token_to_id["<0x04>"] #beginning of answer
         self.bos_token_id = self.token_to_id["<s>"] #beginning of sentence
@@ -83,24 +95,78 @@ class FuyuTokenizer(fl.Module):
         tokens.reverse()
         return tokens
     
-    def encode(self, text: str) -> Tensor:
+    def process_text(self, text):
+        normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
+        normalized_text = normalized_text.replace('\n', '<0x0A>')
+        tokens = self._calculate_best_segmentation(normalized_text)
+        return tokens
+    
+    def process_points_coordinates(self, points_coordinates, scale_factor):
+        points_coordinates = points_coordinates.split(',')
+        assert len(points_coordinates) in [2, 4], "A bounding box needs to contain 4 values, a point 2"
+
+        points_coordinates = [float(point_coordinate.strip()) for point_coordinate in points_coordinates]
+        for i in range(len(points_coordinates)):
+            points_coordinates[i] = str(round((points_coordinates[i] / 2)*scale_factor).astype(int))
+
+        tokens = [self.token_to_id[self.token_bbox_open if len(points_coordinates)==4 else self.token_point_open]] + \
+            [self.token_to_id[point_coordinate] for point_coordinate in points_coordinates] + \
+            [self.token_to_id[self.token_bbox_close if len(points_coordinates)==4 else self.token_point_close]]
+        
+        return tokens
+
+    def encode(self, text: str, scale_factor: float = 1) -> Tensor:
         """
         Encodes a string of text into a tensor of token IDs.
 
-        This method applies text normalization and then tokenizes the text using the best segmentation
+        This method applies text normalization, handles special tokens and then tokenizes the text using the best segmentation
         strategy based on unigram probabilities. The resulting tokens are converted into their corresponding
         token IDs and returned as a tensor.
 
         Receives:
             text (str): The text to encode.
+            scale_factor (float): for eventually rescale coordinates of bbox or points in the text
 
         Returns:
             Tensor: A tensor containing the encoded token IDs.
         """
-        normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
-        normalized_text = normalized_text.replace('\n', '<0x0A>')
-        tokens = self._calculate_best_segmentation(normalized_text)
+
+        text = text.replace(self.text_bbox_open, self.token_bbox_open)
+        text = text.replace(self.text_bbox_close, self.token_bbox_close)
+        text = text.replace(self.text_point_open, self.token_point_open)
+        text = text.replace(self.text_point_close, self.token_point_close)
+
+        regex_pattern = re.compile(
+        f"({self.token_bbox_open}|{self.token_bbox_close}|{self.token_point_open}|{self.token_point_close})"
+        )
+        text_split = regex_pattern.split(text)
+        
+        list_points_coordinates = []
+        list_text = []
+
+        for i, elem in enumerate(text_split):
+            if len(elem)==0 or elem in [self.token_bbox_open, self.token_bbox_close, self.token_point_open, self.token_point_close]:
+                continue
+            elif i > 0 and text_split[i-1] in [self.token_bbox_open, self.token_point_open]:
+                list_points_coordinates.append([elem, i])
+            else:
+                list_text.append([elem, i])
+            
+        tokens_text = []
+        for text, i in list_text:
+            tokens = self.process_text(text)
+            tokens_text.append([tokens, i])
+        
+        tokens_points_coordinates = []
+        for points_coordinates, i in list_points_coordinates:
+            tokens = self.process_points_coordinates(points_coordinates, scale_factor)
+            tokens_points_coordinates.append([tokens, i])
+
+        tokens = tokens_text + tokens_points_coordinates
+        tokens = sorted(tokens, key=lambda x: x[1])
+        tokens = [token[0] for token in tokens]
+        tokens = [token for list_token in tokens for token in list_token]
         return tensor(tokens).unsqueeze(dim=0)
     
-    def forward(self, text: str) -> Tensor:
-        return self.encode(text)
+    def forward(self, text: str, scale_factor: float = 1) -> Tensor:
+        return self.encode(text, scale_factor)
