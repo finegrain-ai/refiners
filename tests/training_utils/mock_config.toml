@@ -1,3 +1,12 @@
+[mock_callback.on_optimizer_step_begin]
+interval = "2:iteration"
+seed = 42
+
+
+[mock_callback.on_batch_end]
+interval = "3:step"
+
+
 [mock_model]
 requires_grad = true
 use_activation = true
