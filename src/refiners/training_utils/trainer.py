@@ -361,11 +361,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
-        if self.clock.is_lr_scheduler_step:
+        if self.clock.is_due(self.config.lr_scheduler.update_interval):
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
             self.lr_scheduler.step()
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        if self.clock.is_evaluation_step:
+        if self.clock.is_due(self.config.training.evaluation_interval):
             self.evaluate()
 
     def step(self, batch: Batch) -> None:
@@ -424,8 +424,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 item.model.eval()
 
     def _call_callbacks(self, event_name: str) -> None:
-        for callback in self.callbacks.values():
-            getattr(callback, event_name)(self)
+        for name, callback in self.callbacks.items():
+            callback.run_event(trainer=self, callback_name=name, event_name=event_name)
 
     def _load_callbacks(self) -> None:
         for name, config in self.config:

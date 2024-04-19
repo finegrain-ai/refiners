@@ -89,6 +89,9 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     def num_step_per_evaluation(self) -> int:
         return self.convert_time_value_to_steps(self.evaluation_interval)
 
+    def is_due(self, interval: TimeValue) -> bool:
+        return self.step % self.convert_time_value_to_steps(interval) == 0
+
     def reset(self) -> None:
         self.start_time = None
         self.end_time = None
@@ -109,29 +112,13 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         assert self.start_time is not None, "Timer has not been started yet."
         return int(time.time() - self.start_time)
 
-    @cached_property
-    def evaluation_interval_steps(self) -> int:
-        return self.convert_time_value_to_steps(self.evaluation_interval)
-
-    @cached_property
-    def lr_scheduler_interval_steps(self) -> int:
-        return self.convert_time_value_to_steps(self.lr_scheduler_interval)
-
     @property
     def is_optimizer_step(self) -> bool:
         return self.num_minibatches_processed == self.num_step_per_iteration
 
     @property
-    def is_lr_scheduler_step(self) -> bool:
-        return self.step % self.lr_scheduler_interval_steps == 0
-
-    @property
     def done(self) -> bool:
         return self.step >= self.num_steps
-
-    @property
-    def is_evaluation_step(self) -> bool:
-        return self.step % self.evaluation_interval_steps == 0
 
     def log(self, message: str, /) -> None:
         if self.verbose:

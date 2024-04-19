@@ -1,3 +1,4 @@
+import random
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,7 @@ from torch.optim import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
+from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.common import (
     Epoch,
     Iteration,
@@ -24,6 +26,7 @@ from refiners.training_utils.trainer import (
     WarmupScheduler,
     count_learnable_parameters,
     human_readable_number,
+    register_callback,
     register_model,
 )
 
@@ -40,6 +43,7 @@ class MockModelConfig(ModelConfig):
 
 class MockConfig(BaseConfig):
     mock_model: MockModelConfig
+    mock_callback: CallbackConfig
 
 
 class MockModel(fl.Chain):
@@ -53,6 +57,25 @@ class MockModel(fl.Chain):
     def add_activation(self) -> None:
         self.insert(1, fl.SiLU())
         self.insert(3, fl.SiLU())
+
+
+class MockCallback(Callback["MockTrainer"]):
+    def __init__(self) -> None:
+        self.optimizer_step_count = 0
+        self.batch_end_count = 0
+        self.optimizer_step_random_int: int | None = None
+        self.batch_end_random_int: int | None = None
+
+    def on_init_begin(self, trainer: "MockTrainer") -> None:
+        pass
+
+    def on_optimizer_step_begin(self, trainer: "MockTrainer") -> None:
+        self.optimizer_step_count += 1
+        self.optimizer_step_random_int = random.randint(0, 100)
+
+    def on_batch_end(self, trainer: "MockTrainer") -> None:
+        self.batch_end_count += 1
+        self.batch_end_random_int = random.randint(0, 100)
 
 
 class MockTrainer(Trainer[MockConfig, MockBatch]):
@@ -71,6 +94,10 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
             inputs=torch.cat([b.inputs for b in batch]),
             targets=torch.cat([b.targets for b in batch]),
         )
+
+    @register_callback()
+    def mock_callback(self, config: CallbackConfig) -> MockCallback:
+        return MockCallback()
 
     @register_model()
     def mock_model(self, config: MockModelConfig) -> MockModel:
@@ -198,9 +225,9 @@ def test_timer_functionality(training_clock: TrainingClock) -> None:
 
 def test_state_based_properties(training_clock: TrainingClock) -> None:
     training_clock.step = 5  # Halfway through the first epoch
-    assert not training_clock.is_evaluation_step  # Assuming evaluation every epoch
+    assert not training_clock.is_due(training_clock.evaluation_interval)  # Assuming evaluation every epoch
     training_clock.step = 10  # End of the first epoch
-    assert training_clock.is_evaluation_step
+    assert training_clock.is_due(training_clock.evaluation_interval)
 
 
 def test_mock_trainer_initialization(mock_config: MockConfig, mock_trainer: MockTrainer) -> None:
@@ -219,7 +246,7 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     assert clock.num_batches_per_epoch == mock_trainer.dataset_length // config.training.batch_size
 
     assert mock_trainer.step_counter == 0
-    assert mock_trainer.clock.epoch == 0
+    assert clock.epoch == 0
 
     mock_trainer.train()
 
@@ -227,6 +254,18 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     assert clock.step == config.training.duration.number * clock.num_batches_per_epoch
 
     assert mock_trainer.step_counter == mock_trainer.clock.step
+
+
+def test_callback_registration(mock_trainer: MockTrainer) -> None:
+    mock_trainer.train()
+
+    # Check that the callback skips every other iteration
+    assert mock_trainer.mock_callback.optimizer_step_count == mock_trainer.clock.iteration // 2
+    assert mock_trainer.mock_callback.batch_end_count == mock_trainer.clock.step // 3
+
+    # Check that the random seed was set
+    assert mock_trainer.mock_callback.optimizer_step_random_int == 81
+    assert mock_trainer.mock_callback.batch_end_random_int == 72
 
 
 def test_training_short_cycle(mock_trainer_short: MockTrainer) -> None:
