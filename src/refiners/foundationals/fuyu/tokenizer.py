@@ -14,37 +14,38 @@ class FuyuTokenizer(fl.Module):
     """
     Implement a Unigram Tokenizer based on a vocabulary file for Fuyu
     """
+
     def __init__(
-            self, 
-            vocabulary_path: str | Path = Path(__file__).resolve().parent / "tokenizer.json.gz",
-        ):
+        self,
+        vocabulary_path: str | Path = Path(__file__).resolve().parent / "tokenizer.json.gz",
+    ):
         super().__init__()
 
-        with gzip.open(vocabulary_path, 'rt', encoding='utf-8') as f:
+        with gzip.open(vocabulary_path, "rt", encoding="utf-8") as f:
             config = json.load(f)
-        
-        self.vocabulary_path=vocabulary_path
+
+        self.vocabulary_path = vocabulary_path
 
         # for normalization
-        self.prepend_char = config['normalizer']['normalizers'][0]['prepend']
-        self.replace_pattern = config['normalizer']['normalizers'][1]['pattern']['String']
-        self.replace_char = config['normalizer']['normalizers'][1]['content']
+        self.prepend_char = config["normalizer"]["normalizers"][0]["prepend"]
+        self.replace_pattern = config["normalizer"]["normalizers"][1]["pattern"]["String"]
+        self.replace_char = config["normalizer"]["normalizers"][1]["content"]
 
-        # dict for tokenization 
-        self.token_to_log_proba = {token: log_proba for token, log_proba in config['model']['vocab']}
-        self.token_to_id = {token: i for i, (token, _) in enumerate(config['model']['vocab'])}
+        # dict for tokenization
+        self.token_to_log_proba = {token: log_proba for token, log_proba in config["model"]["vocab"]}
+        self.token_to_id = {token: i for i, (token, _) in enumerate(config["model"]["vocab"])}
         self.id_to_token = {i: token for token, i in self.token_to_id.items()}
 
         # special tokens
         self.unknown_token = config["added_tokens"][0]
         self.pad_token = self.unknown_token
         self.eos_token = config["added_tokens"][1]
-        self.newline_model_token = "<0x0A>" # \n token
-        self.boa_token = "<0x04>" # beginning of answer
-        self.bos_token = "<s>" #beginning of sentence
-        self.speaker_token = "|SPEAKER|" 
-        self.newline_token = "|NEWLINE|" # image new line
-        
+        self.newline_model_token = "<0x0A>"  # \n token
+        self.boa_token = "<0x04>"  # beginning of answer
+        self.bos_token = "<s>"  # beginning of sentence
+        self.speaker_token = "|SPEAKER|"
+        self.newline_token = "|NEWLINE|"  # image new line
+
         # special text and tokens for position handling
         self.text_bbox_open = "<box>"
         self.text_bbox_close = "</box>"
@@ -54,18 +55,18 @@ class FuyuTokenizer(fl.Module):
         self.token_bbox_close = "<0x01>"  # </bbox>
         self.token_point_open = "<0x02>"  # <point>
         self.token_point_close = "<0x03>"  # </point>
-        
+
         # special token ids
-        self.boa_token_id = self.token_to_id[self.boa_token] 
-        self.bos_token_id = self.token_to_id[self.bos_token] 
+        self.boa_token_id = self.token_to_id[self.boa_token]
+        self.bos_token_id = self.token_to_id[self.bos_token]
         self.speaker_token_id = self.token_to_id[self.speaker_token]
         self.newline_token_id = self.token_to_id[self.newline_token]
         # special token ids for position handling
         self.token_bbox_open_id = self.token_to_id[self.token_bbox_open]
         self.token_bbox_close_id = self.token_to_id[self.token_bbox_close]
         self.token_point_open_id = self.token_to_id[self.token_point_open]
-        self.token_point_close_id = self.token_to_id[self.token_point_close] 
-        
+        self.token_point_close_id = self.token_to_id[self.token_point_close]
+
     def _calculate_best_segmentation(self, text: str) -> List[int]:
         """
         Calculates the best segmentation of the input text based on the maximum log probabilities.
@@ -75,9 +76,9 @@ class FuyuTokenizer(fl.Module):
 
         Returns:
             List[int]: A list of token IDs representing the best segmentation of the input text.
-        """ 
+        """
         N = len(text)
-        dp = [float('-inf')] * (N + 1)
+        dp = [float("-inf")] * (N + 1)
         backpointer = [-1] * (N + 1)
         dp[0] = 0
 
@@ -89,8 +90,8 @@ class FuyuTokenizer(fl.Module):
                     if prob > dp[i]:
                         dp[i] = prob
                         backpointer[i] = j
-                elif j == i-1:  # Single character not in vocab, consider it as unk
-                    prob = self.token_to_log_proba.get(self.unknown_token['content'], 0) + dp[j]
+                elif j == i - 1:  # Single character not in vocab, consider it as unk
+                    prob = self.token_to_log_proba.get(self.unknown_token["content"], 0) + dp[j]
                     if prob > dp[i]:
                         dp[i] = prob
                         backpointer[i] = j
@@ -99,36 +100,43 @@ class FuyuTokenizer(fl.Module):
         i = N
         while i > 0:
             j = backpointer[i]
-            token = text[j:i] if text[j:i] in self.token_to_id else self.unknown_token['content']
-            tokens.append(self.token_to_id.get(token, self.unknown_token['id']))
+            token = text[j:i] if text[j:i] in self.token_to_id else self.unknown_token["content"]
+            tokens.append(self.token_to_id.get(token, self.unknown_token["id"]))
             i = j
 
         tokens.reverse()
         return tokens
-    
+
     def process_text(self, text: str):
         """
         preprocess and tokenize text
         """
         normalized_text = (self.prepend_char + text).replace(self.replace_pattern, self.replace_char)
-        normalized_text = normalized_text.replace('\n', '<0x0A>')
+        normalized_text = normalized_text.replace("\n", "<0x0A>")
         tokens = self._calculate_best_segmentation(normalized_text)
         return tokens
-    
+
     def process_points_coordinates(self, points_coordinates: str, scale_factor: float):
         """
         preprocess and tokenize coordinates and points
         """
-        points_coordinates = points_coordinates.split(',')
-        points_coordinates = [float(point_coordinate.strip()) for point_coordinate in points_coordinates if point_coordinate.strip() != '']
-        assert len(points_coordinates) in [2, 4], "A bounding box needs to contain 4 values, a point 2 and each value needs to be separated by a comma"
+        points_coordinates = points_coordinates.split(",")
+        points_coordinates = [
+            float(point_coordinate.strip()) for point_coordinate in points_coordinates if point_coordinate.strip() != ""
+        ]
+        assert len(points_coordinates) in [
+            2,
+            4,
+        ], "A bounding box needs to contain 4 values, a point 2 and each value needs to be separated by a comma"
 
         for i in range(len(points_coordinates)):
-            points_coordinates[i] = str(round((points_coordinates[i] / 2)*scale_factor).astype(int))
+            points_coordinates[i] = str(round((points_coordinates[i] / 2) * scale_factor).astype(int))
 
-        tokens = [self.token_to_id[self.token_bbox_open if len(points_coordinates)==4 else self.token_point_open]] + \
-            [self.token_to_id[point_coordinate] for point_coordinate in points_coordinates] + \
-            [self.token_to_id[self.token_bbox_close if len(points_coordinates)==4 else self.token_point_close]]
+        tokens = (
+            [self.token_to_id[self.token_bbox_open if len(points_coordinates) == 4 else self.token_point_open]]
+            + [self.token_to_id[point_coordinate] for point_coordinate in points_coordinates]
+            + [self.token_to_id[self.token_bbox_close if len(points_coordinates) == 4 else self.token_point_close]]
+        )
 
         return tokens
 
@@ -154,21 +162,26 @@ class FuyuTokenizer(fl.Module):
         text = text.replace(self.text_point_close, self.token_point_close)
 
         regex_pattern = re.compile(
-        f"({self.token_bbox_open}|{self.token_bbox_close}|{self.token_point_open}|{self.token_point_close})"
+            f"({self.token_bbox_open}|{self.token_bbox_close}|{self.token_point_open}|{self.token_point_close})"
         )
         text_split = regex_pattern.split(text)
-        
+
         tokens = []
 
         for i, elem in enumerate(text_split):
-            if len(elem)==0 or elem in [self.token_bbox_open, self.token_bbox_close, self.token_point_open, self.token_point_close]:
+            if len(elem) == 0 or elem in [
+                self.token_bbox_open,
+                self.token_bbox_close,
+                self.token_point_open,
+                self.token_point_close,
+            ]:
                 continue
-            elif i > 0 and text_split[i-1] in [self.token_bbox_open, self.token_point_open]:
+            elif i > 0 and text_split[i - 1] in [self.token_bbox_open, self.token_point_open]:
                 tokens += self.process_points_coordinates(elem, scale_factor=scale_factor)
             else:
                 tokens += self.process_text(elem)
-            
+
         return tensor(tokens).unsqueeze(dim=0)
-    
+
     def forward(self, text: str, scale_factor: float = 1) -> Tensor:
         return self.encode(text, scale_factor)
