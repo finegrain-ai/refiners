@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, replace
 from typing import Any, List, Union
 
@@ -59,7 +60,7 @@ class Fuyu8b:
     base: int = 25_000
     partial_rotary_factor: float = 0.5
     use_bias: bool = True
-    is_optimized: bool = True
+    is_optimized: bool = False
     device: Device | str | None = 'cuda:0'
     dtype: DType | None = torchf32
 
@@ -141,49 +142,11 @@ class Fuyu(fl.Chain):
         )
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
-    
-    def generate(self, images: List, prompts: List[str], max_len_generation=50):
-        """
-        Generate answers for a list of images and prompts. Doesn't infer by batch 
-        to preserve the native resolution of each image
 
-        Receives:
-            images (List[PIL.Image, "batch"])
-            prompts (List[str, "batch"])
-            max_len_generation (int)
-
-        Returns:
-            (List[str, "batch"])
-        """
-        tokenizer = self.InputEncoder.tokenizer
-        final_answer = []
-        for image, prompt in zip(images, prompts):
-            image=(Tensor(np.array(image)/255)).permute(2,0,1).unsqueeze(0)
-            i = 0
-            answer = None
-            stop_token = False
-            while i<max_len_generation and not stop_token:
-                with no_grad():
-                    predictions = self.forward([image], [prompt], [answer] if answer is not None else answer)
-                next_token = argmax(predictions[:,-1,:], dim=-1)
-                if next_token.item() != tokenizer.eos_token['id']:
-                    next_token_text = tokenizer.id_to_token[next_token.item()].replace(tokenizer.replace_char, tokenizer.replace_pattern)
-                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
-                    if answer is None:
-                        answer = next_token_text
-                    else:
-                        answer += next_token_text
-                    i+=1
-                else :
-                    stop_token=True
-            final_answer.append(answer)
-        return final_answer
-    
-    def batched_generate(self, images: List, prompts: list[str], max_len_generation=50):
+    def generate(self, images: List, prompts: list[str], max_len_generation=50):
         """
         Generate answers for a list of images and prompts. Inference by batch,
-        rescale image if they are over self.InputEncoder.max_size, pad other images 
-        to the largest image size
+        rescale image if they are over self.InputEncoder.max_size
 
         Receives:
             images (List[PIL.Image, "batch"])
@@ -198,39 +161,90 @@ class Fuyu(fl.Chain):
 
         i = 0
         answers = [None] * len(tensor_images)
-        final_answer = [''] * len(tensor_images)
+        final_answers = [""] * len(tensor_images)
+
         active_indices = list(range(len(tensor_images)))
         active_answers = None
-        while i<max_len_generation and len(active_indices)>0:
-            active_images = [tensor_images[idx] for idx in active_indices]
-            active_prompts = [prompts[idx] for idx in active_indices]
+        active_in_coords = [False] * len(tensor_images)
 
-            with no_grad():
+        with no_grad():
+            while i<max_len_generation and len(active_indices)>0:
+                active_images = [tensor_images[idx] for idx in active_indices]
+                active_prompts = [prompts[idx] for idx in active_indices]
                 predictions = self.forward(active_images, active_prompts, active_answers)
-            next_tokens = argmax(predictions[:,-1,:], dim=-1)
 
-            to_remove = []
-            for idx, next_token in enumerate(next_tokens):
-                if next_token.item() != tokenizer.eos_token['id']:
-                    next_token_text = tokenizer.id_to_token[next_token.item()].replace(tokenizer.replace_char, tokenizer.replace_pattern)
-                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
+                if i==0:
+                    scales_list = self.InputEncoder.scales_list
+                    
+                next_tokens = argmax(predictions[:,-1,:], dim=-1)
+
+                to_remove = []
+                for idx, next_token in enumerate(next_tokens):
+                    token_id = next_token.item()
+                    # end of generation
+                    if token_id == tokenizer.eos_token['id']:
+                        final_answers[active_indices[idx]] = answers[active_indices[idx]]
+                        to_remove.append(active_indices[idx])
+                        next_token_text = ""
+
+                    # the model begins to generate coordinates
+                    elif token_id in [tokenizer.token_bbox_open_id, tokenizer.token_point_open_id]:
+                        next_token_text = tokenizer.id_to_token[token_id]
+                        next_token_text = next_token_text.replace(tokenizer.token_bbox_open, tokenizer.text_bbox_open)
+                        next_token_text = next_token_text.replace(tokenizer.token_point_open, tokenizer.text_point_open)
+                        active_in_coords[active_indices[idx]] = True
+
+                    # the model ends coordinates generation
+                    elif token_id in [tokenizer.token_bbox_close_id, tokenizer.token_point_close_id]:
+                        next_token_text = tokenizer.id_to_token[token_id]
+                        next_token_text = next_token_text.replace(tokenizer.token_bbox_close, tokenizer.text_bbox_close)
+                        next_token_text = next_token_text.replace(tokenizer.token_point_close, tokenizer.text_point_close)
+                        # remove last comma
+                        answers[active_indices[idx]] = answers[active_indices[idx]][:-1]
+                        active_in_coords[active_indices[idx]] = False
+
+                    else:
+                        # basic processing
+                        if not active_in_coords[active_indices[idx]]:
+                            next_token_text = tokenizer.id_to_token[token_id].replace(tokenizer.replace_char, tokenizer.replace_pattern)
+                            next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
+                        # coordinates processing
+                        else:
+                            next_token_text = tokenizer.id_to_token[token_id]
+                            next_token_text += ','
+
                     if answers[active_indices[idx]] is None:
                         answers[active_indices[idx]] = next_token_text
                     else:
                         answers[active_indices[idx]] += next_token_text
-                else:
-                    final_answer[active_indices[idx]] = answers[active_indices[idx]]
-                    to_remove.append(active_indices[idx])
 
-            # Remove the indices that have reached the EOS token.
-            for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
-                active_indices.remove(idx)
+                # Remove the indices that have reached the EOS token.
+                for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
+                    active_indices.remove(idx)
+                
+                active_answers = [answers[idx] for idx in active_indices]
+                i+=1
+
+            # For any prompts that did not reach EOS, set their final answer now.
+            for idx in active_indices:
+                final_answers[idx] = answers[idx]
+
+            regex_pattern = re.compile(
+                f"({tokenizer.text_bbox_open}|{tokenizer.text_bbox_close}|{tokenizer.text_point_open}|{tokenizer.text_point_close})"
+                )
             
-            active_answers = [answers[idx] for idx in active_indices]
-            i+=1
-
-        # For any prompts that did not reach EOS, set their final answer now.
-        for idx in active_indices:
-            final_answer[idx] = answers[idx]
-
-        return final_answer
+        # Rescale answers coordinates to the original image size
+        for idx, answer in enumerate(final_answers):
+            answer_split = regex_pattern.split(answer)
+            final_answer = ""
+            for i, elem in enumerate(answer_split):
+                if i > 0 and answer_split[i-1] in [tokenizer.text_bbox_open, tokenizer.text_point_open]:
+                    points_coordinates = elem.split(',')
+                    points_coordinates = [float(point_coordinate.strip()) for point_coordinate in points_coordinates if point_coordinate.strip() != '']
+                    for i in range(len(points_coordinates)):
+                        points_coordinates[i] = str(round((points_coordinates[i] / scales_list[idx])*2).astype(int))
+                    final_answer += ",".join(points_coordinates)
+                else:
+                    final_answer += elem
+            final_answers[idx] = final_answer
+        return final_answers
