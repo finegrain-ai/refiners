@@ -140,7 +140,7 @@ def scaled_dot_product_attention_non_optimized(
     if attn_mask is not None:
         attn_bias = torch.zeros_like(attn_mask, dtype=query.dtype, device=query.device)
         if attn_mask.dtype == torch.bool:
-            attn_bias.masked_fill_(attn_mask.logical_not(), float("-inf"))
+            attn_bias.masked_fill_(attn_mask.logical_not(), torch.finfo(query.dtype).min)
         else:
             attn_bias += attn_mask
 
@@ -212,8 +212,7 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
         value: Float[Tensor, "batch num_values embedding_dim"],
     ) -> Float[Tensor, "batch num_queries embedding_dim"]:
         
-        attn_mask = self.use_context(context_name="attention")["mask"].unsqueeze(1)
-        
+        attn_mask = self.use_context(context_name="attention")["mask"]
         if self.slice_size:
             return self._sliced_attention(
                 query=query,
