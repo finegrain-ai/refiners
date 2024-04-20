@@ -103,7 +103,6 @@ class FuyuTokenizer(fl.Module):
             tokens.append(self.token_to_id.get(token, self.unknown_token['id']))
             i = j
 
-        # Append bos token
         tokens.reverse()
         return tokens
     

@@ -208,6 +208,9 @@ class Fuyu(fl.Chain):
                         if not active_in_coords[active_indices[idx]]:
                             next_token_text = tokenizer.id_to_token[token_id].replace(tokenizer.replace_char, tokenizer.replace_pattern)
                             next_token_text = next_token_text.replace(tokenizer.newline_model_token, '\n')
+                            # avoid starting the sentence with a space
+                            if i == 0 and next_token_text[0]==" ":
+                                next_token_text = next_token_text[1:]
                         # coordinates processing
                         else:
                             next_token_text = tokenizer.id_to_token[token_id]
