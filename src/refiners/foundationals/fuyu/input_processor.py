@@ -104,6 +104,9 @@ class InputEncoder(fl.ContextModule):
         self.device = device
         self.dtype = dtype
         self.max_size = max_size
+
+        # store scales of the different images during rescaling of a given batch for bounding box coordinates handling
+        # at generation time. Purpose: rescaling the coordinates at the original image size once the generation is over.
         self.scales_list = None
 
         self.tokenizer = tokenizer or FuyuTokenizer()

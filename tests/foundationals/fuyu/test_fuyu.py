@@ -25,22 +25,20 @@ def our_model(test_weights_path: Path, test_device: torch.device) -> Fuyu:
     model.load_state_dict(tensors)
     return model
 
+
 @pytest.fixture(scope="module")
 def ref_processor() -> FuyuProcessor:
     processor = FuyuProcessor.from_pretrained("adept/fuyu-8b")
     return processor
+
 
 @pytest.fixture(scope="module")
 def ref_model(test_device) -> FuyuForCausalLM:
     model = FuyuForCausalLM.from_pretrained("adept/fuyu-8b", torch_dtype=torch.float16).to(test_device)
     return model
 
-def test_model(
-    ref_model: FuyuForCausalLM,
-    ref_processor: FuyuProcessor,
-    our_model: Fuyu,
-    test_device: torch.device
-):
+
+def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: torch.device):
     """
     Tests the consistency of output features between the reference model and our model under random prompts.
 
@@ -61,15 +59,17 @@ def test_model(
     x = torch.rand(3, 512, 512)
     x_pil = to_pil_image(x)
 
-    prompts = ["Describe this image. \n", "Is there a cat in the image? \n", "What is the emotion of the person? \n", "What is the main object in this image? \n"]
+    prompts = [
+        "Describe this image. \n",
+        "Is there a cat in the image? \n",
+        "What is the emotion of the person? \n",
+        "What is the main object in this image? \n",
+    ]
     p = random.choice(prompts)
 
     with no_grad():
         ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(test_device)
-        ref_output = ref_model(**ref_input)['logits']
+        ref_output = ref_model(**ref_input)["logits"]
         our_output = our_model([x.unsqueeze(0)], [p])
 
     assert (our_output - ref_output).abs().max() < 1e-3
-
-
-

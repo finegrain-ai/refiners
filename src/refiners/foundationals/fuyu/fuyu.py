@@ -167,6 +167,7 @@ class Fuyu(fl.Chain):
                 active_prompts = [prompts[idx] for idx in active_indices]
                 predictions = self.forward(active_images, active_prompts, active_answers)
 
+                # Get scales of all the images of the initial batch
                 if i == 0:
                     scales_list = self.InputEncoder.scales_list
 
