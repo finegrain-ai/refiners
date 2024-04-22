@@ -35,7 +35,6 @@ def human_readable_number(number: int) -> str:
 def seed_everything(seed: int | None = None) -> None:
     if seed is None:
         seed = random.randint(0, 2**32 - 1)
-    logger.info(f"Using random seed: {seed}")
     random.seed(a=seed)
     np.random.seed(seed=seed)
     manual_seed(seed=seed)
