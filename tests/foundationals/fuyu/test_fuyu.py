@@ -4,15 +4,19 @@ from warnings import warn
 
 import pytest
 import torch
-from torchvision.transforms.functional import to_pil_image
-from transformers import FuyuForCausalLM, FuyuProcessor
+from PIL import Image
+from torch import device as Device
+from torchvision.transforms.functional import (  # type: ignore[reportMissingTypeStubs]
+    to_pil_image,  # type: ignore[reportUnknownVariableType]
+)
+from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
 from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b, create_fuyu
 
 
 @pytest.fixture(scope="module")
-def our_model(test_weights_path: Path, test_device: torch.device) -> Fuyu:
+def our_model(test_weights_path: Path, test_device: Device) -> Fuyu:
     weights = test_weights_path / f"fuyu8b.safetensors"
 
     if not weights.is_file():
@@ -28,17 +32,19 @@ def our_model(test_weights_path: Path, test_device: torch.device) -> Fuyu:
 
 @pytest.fixture(scope="module")
 def ref_processor() -> FuyuProcessor:
-    processor = FuyuProcessor.from_pretrained("adept/fuyu-8b")
+    processor: FuyuProcessor = FuyuProcessor.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b")  # type: ignore[reportUnknownMemberType, reportAssignmentType]
     return processor
 
 
 @pytest.fixture(scope="module")
-def ref_model(test_device) -> FuyuForCausalLM:
-    model = FuyuForCausalLM.from_pretrained("adept/fuyu-8b", torch_dtype=torch.float16).to(test_device)
-    return model
+def ref_model(test_device: Device) -> FuyuForCausalLM:
+    model: FuyuForCausalLM = FuyuForCausalLM.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b").to(  # type: ignore
+        device=test_device
+    )
+    return model  # type: ignore[reportUnknownVariableType]
 
 
-def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: torch.device):
+def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device):
     """
     Tests the consistency of output features between the reference model and our model under random prompts.
 
@@ -57,7 +63,7 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
 
     manual_seed(42)
     x = torch.rand(3, 512, 512)
-    x_pil = to_pil_image(x)
+    x_pil: Image.Image = to_pil_image(x)  # type: ignore[reportUnknownVariableType]
 
     prompts = [
         "Describe this image. \n",
@@ -68,7 +74,7 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
     p = random.choice(prompts)
 
     with no_grad():
-        ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(test_device)
+        ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
         ref_output = ref_model(**ref_input)["logits"]
         our_output = our_model([x.unsqueeze(0)], [p])
 

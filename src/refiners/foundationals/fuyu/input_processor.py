@@ -1,8 +1,9 @@
 from typing import List, Tuple
 
+import torch
 from PIL import Image
-from torch import Tensor, bool as tbool, cat, device as Device, dtype as DType, int64 as tint64, ones, tensor, tril
-from torchvision.transforms.functional import pad, resize, to_tensor
+from torch import Tensor, device as Device, dtype as DType, tensor
+from torchvision.transforms.functional import to_tensor  # type: ignore[reportUnknownVariableType]
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.clip.text_encoder import TokenEncoder
@@ -43,15 +44,13 @@ class ImageEncoder(fl.Chain):
         self.patch_size = patch_size
         self.embedding_dim = embedding_dim
         self.padding_value = padding_value
+        self.image_mean = image_mean
+        self.image_std = image_std
 
         super().__init__(
-            PatchPadding(  # Pad
-                patch_size=self.patch_size, padding_value=self.padding_value
-            ),
-            fl.Lambda(  # Normalize
-                lambda x: (x - image_mean) / image_std
-            ),
-            fl.Lambda(lambda x: self.patchify(x)),
+            PatchPadding(patch_size=self.patch_size, padding_value=self.padding_value),
+            fl.Lambda(func=self.normalize),
+            fl.Lambda(func=self.patchify),
             fl.Linear(
                 in_features=3 * self.patch_size**2,
                 out_features=self.embedding_dim,
@@ -73,6 +72,9 @@ class ImageEncoder(fl.Chain):
         patched = x_unfold.permute(0, 2, 3, 4, 1).reshape(B, -1, c * self.patch_size**2)
         return patched
 
+    def normalize(self, x: Tensor) -> Tensor:
+        return (x - self.image_mean) / self.image_std
+
 
 class InputEncoder(fl.ContextModule):
     """
@@ -90,10 +92,10 @@ class InputEncoder(fl.ContextModule):
         tokenizer: FuyuTokenizer | None = None,
         patch_size: int = 30,
         padding_value: float = 1.0 / 255,
-        max_size: Tuple[int] = (1080, 1920),  # h w
+        max_size: Tuple[int, int] = (1080, 1920),  # h w
         device: Device | str | None = None,
         dtype: DType | None = None,
-    ):
+    ) -> None:
         super().__init__()
 
         self.max_sequence_length = max_sequence_length
@@ -107,7 +109,7 @@ class InputEncoder(fl.ContextModule):
 
         # store scales of the different images during rescaling of a given batch for bounding box coordinates handling
         # at generation time. Purpose: rescaling the coordinates at the original image size once the generation is over.
-        self.scales_list = None
+        self.scales_list: List[float] = []
 
         self.tokenizer = tokenizer or FuyuTokenizer()
 
@@ -163,9 +165,9 @@ class InputEncoder(fl.ContextModule):
         images = self.process_batch_images(images)
 
         # encode images
-        encoded_images = []
+        encoded_images: List[Tensor] = []
         for image in images:
-            _, c, h, w = image.shape
+            _, _, h, w = image.shape
             patched_image = self.image_encoder(image.to(device=self.device, dtype=self.dtype))
 
             h += (self.patch_size - h % self.patch_size) % self.patch_size
@@ -180,38 +182,38 @@ class InputEncoder(fl.ContextModule):
             # Reshape encoded_image to introduce a slot for linebreaks
             encoded_image = patched_image.view(1, n_linebreak, f_linebreak, self.embedding_dim)
             # Concatenate linebreak embeddings
-            encoded_image = cat((encoded_image, linebreak_embedding), dim=2)
+            encoded_image = torch.cat((encoded_image, linebreak_embedding), dim=2)
             # Reshape to final desired flat format [1 seq_len embedding_dim]
             encoded_image = encoded_image.view(1, -1, self.embedding_dim)
             encoded_images.append(encoded_image)
 
         # encode texts
-        encoded_texts = []
+        encoded_texts: List[Tensor] = []
         for idx, prompt in enumerate(prompts):
             prompt_token = self.tokenizer(prompt, scale_factor=self.scales_list[idx])
-            token = cat(
+            token = torch.cat(
                 [Tensor([[self.tokenizer.bos_token_id]]), prompt_token, Tensor([[self.tokenizer.boa_token_id]])], dim=1
             )
             if answers is not None:
                 answer_token = self.tokenizer(answers[idx])
-                token = cat([token, answer_token], dim=1)
-            encoded_text = self.token_encoder(token.to(device=self.device, dtype=tint64))
+                token = torch.cat([token, answer_token], dim=1)
+            encoded_text = self.token_encoder(token.to(device=self.device, dtype=torch.int64))
             encoded_texts.append(encoded_text)
 
         # Initialize the 3D attention mask with ones
         max_text_len = max(et.shape[1] for et in encoded_texts)
         max_img_len = max(im.shape[1] for im in encoded_images)
         max_len = max_text_len + max_img_len
-        attn_mask = ones(b, 1, max_len, max_len, device=self.device, dtype=tbool)
+        attn_mask = torch.ones(b, 1, max_len, max_len, device=self.device, dtype=torch.bool)
 
-        padded_encoded_images = []
+        padded_encoded_images: List[Tensor] = []
         for idx, (encoded_text, encoded_image) in enumerate(zip(encoded_texts, encoded_images)):
             padding_length = (max_text_len - encoded_text.shape[1]) + (max_img_len - encoded_image.shape[1])
             if padding_length > 0:
                 padding_tensor = tensor([self.tokenizer.pad_token["id"]] * padding_length, device=self.device).long()
                 padding_encoding = self.token_encoder(padding_tensor).unsqueeze(0)
                 # Concatenate the padding on the left of the encoded image
-                padded_encoded_image = cat((padding_encoding, encoded_image), dim=1)
+                padded_encoded_image = torch.cat((padding_encoding, encoded_image), dim=1)
             else:
                 # No padding needed, use the encoded image as is
                 padded_encoded_image = encoded_image
@@ -219,15 +221,15 @@ class InputEncoder(fl.ContextModule):
             attn_mask[idx, :, :padding_length, :] = 0
             attn_mask[idx, :, :, :padding_length] = 0
 
-        causal_mask = tril(ones((b, 1, max_len, max_len), device=self.device, dtype=tbool))
+        causal_mask = torch.tril(torch.ones((b, 1, max_len, max_len), device=self.device, dtype=torch.bool))
         attn_mask = attn_mask & causal_mask
 
         context = self.use_context(context_name="attention")
         context.update({"mask": attn_mask})
 
-        encoded_inputs = cat(
+        encoded_inputs = torch.cat(
             [
-                cat((padded_encoded_image, encoded_text), dim=1)
+                torch.cat((padded_encoded_image, encoded_text), dim=1)
                 for padded_encoded_image, encoded_text in zip(padded_encoded_images, encoded_texts)
             ],
             dim=0,
@@ -250,20 +252,20 @@ class InputEncoder(fl.ContextModule):
             A batch tensor with all processed images concatenated along the batch dimension.
         """
         # for bboxs and points handling these information need to be saved
-        scales_list = []
+        scales_list: List[float] = []
         for im_idx, image in enumerate(images):
             _, c, h, w = image.shape
 
             # if images are b&w duplicate on rgb channels
             if c == 1:
-                image = cat([image] * 3, dim=1)
+                image = torch.cat([image] * 3, dim=1)
 
             scale_factor = 1
             # if images are above the max size limit rescale them
             if h > self.max_size[0] or w > self.max_size[1]:
                 scale_factor = min(self.max_size[0] / h, self.max_size[1] / w)
-                image = Image.fromarray((image.squeeze(0) * 255).byte().numpy().transpose(1, 2, 0), "RGB")
-                image = image.resize((int(scale_factor * w), int(scale_factor * h)), Image.Resampling.BILINEAR)
+                image = Image.fromarray((image.squeeze(0) * 255).byte().numpy().transpose(1, 2, 0), "RGB")  # type: ignore[reportUnknownType]
+                image = image.resize((int(scale_factor * w), int(scale_factor * h)), Image.Resampling.BILINEAR)  # type: ignore[reportUnknownType]
                 image = to_tensor(image).unsqueeze(0)
                 _, _, h, w = image.shape
             scales_list.append(scale_factor)

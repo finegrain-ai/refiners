@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Tuple
 
-from torch import Tensor, arange, cat, device as Device, dtype as DType, int64 as tint64, outer
+import torch
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.dinov2.vit import FeedForward
@@ -22,23 +23,25 @@ class RotaryPositionalEmbedding(fl.Module):
         self.device = device
         self.dtype = dtype
         # Create positional encodings
-        self.theta = 1.0 / (self.base ** (arange(0, self.dim, 2, dtype=tint64).float() / self.dim)).to(self.device)
-        self.cos = None
-        self.sin = None
+        self.theta = 1.0 / (self.base ** (torch.arange(0, self.dim, 2, dtype=torch.int64).float() / self.dim)).to(
+            self.device
+        )
+        self.cos: Tensor = torch.empty(0, device=self.device, dtype=self.dtype)
+        self.sin: Tensor = torch.empty(0, device=self.device, dtype=self.dtype)
 
     def _cache(self, seq_len: int) -> None:
-        if (self.cos is not None and self.sin is not None) and seq_len < self.cos.shape[0]:
+        if seq_len < self.cos.shape[0]:
             return
-        t = arange(seq_len, device=self.device, dtype=tint64).float()
-        freqs = outer(t, self.theta)
-        embs = cat([freqs, freqs], dim=-1)
+        t = torch.arange(seq_len, device=self.device, dtype=torch.int64).float()
+        freqs = torch.outer(t, self.theta)
+        embs = torch.cat([freqs, freqs], dim=-1)
         self.cos = embs.cos().to(self.dtype)
         self.sin = embs.sin().to(self.dtype)
 
     def _neg_half(self, x: Tensor) -> Tensor:
-        return cat([-x[:, :, :, self.dim // 2 :], x[:, :, :, : self.dim // 2]], dim=-1)
+        return torch.cat([-x[:, :, :, self.dim // 2 :], x[:, :, :, : self.dim // 2]], dim=-1)
 
-    def forward(self, q, k, v):
+    def forward(self, q: Tensor, k: Tensor, v: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         seq_len = q.shape[1]
         self._cache(seq_len)
 
@@ -50,13 +53,13 @@ class RotaryPositionalEmbedding(fl.Module):
         q_rope, q_pass = q[..., : self.dim], q[..., self.dim :]
         q_neg_half = self._neg_half(q_rope)
         q_rope = (q_rope * self.cos[:seq_len]) + (q_neg_half * self.sin[:seq_len])
-        q_rot = cat((q_rope, q_pass), dim=-1)
+        q_rot = torch.cat((q_rope, q_pass), dim=-1)
 
         # K rotation
         k_rope, k_pass = k[..., : self.dim], k[..., self.dim :]
         k_neg_half = self._neg_half(k_rope)
         k_rope = (k_rope * self.cos[:seq_len]) + (k_neg_half * self.sin[:seq_len])
-        k_rot = cat((k_rope, k_pass), dim=-1)
+        k_rot = torch.cat((k_rope, k_pass), dim=-1)
 
         # [batch_size, num_heads, seq_length, head_dim] -> [batch_size, seq_length, num_heads, head_dim]
         q_rot = q_rot.transpose(1, 2)
@@ -70,7 +73,7 @@ class QKVProjection(fl.Chain):
     Apply query, key, value projection
 
     Args:
-        embedding_dim: The embedding dimension of the input and output tensors.
+        embedding_dim: The embedding dimension of the input and output Tensor.
         num_heads: The number of heads of the attention mechanism.
         use_bias: Whether to use bias in the linear layers.
         norm_eps: epsilon for Layer Norm
@@ -78,7 +81,15 @@ class QKVProjection(fl.Chain):
         dtype: The dtype to use
     """
 
-    def __init__(self, embedding_dim, num_heads, use_bias, norm_eps, device, dtype):
+    def __init__(
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        use_bias: bool,
+        norm_eps: float,
+        device: Device | str | None,
+        dtype: DType | None,
+    ) -> None:
         self.embedding_dim = embedding_dim
         self.num_heads = num_heads
         self.heads_dim = embedding_dim // num_heads
@@ -143,7 +154,7 @@ class FuyuSelfAttention(fl.Chain):
         """Initialize the Attention layer.
 
         Args:
-            embedding_dim: The embedding dimension of the input and output tensors.
+            embedding_dim: The embedding dimension of the input and output Tensor.
             num_heads: The number of heads to use.
             base: constant used to compute the rotations in the Rotary Positional Embedding
             norm_eps: epsilon for Layer Norm
@@ -193,7 +204,7 @@ class FuyuSelfAttention(fl.Chain):
 
 
 class FuyuTransformerLayer(fl.Chain):
-    """Apply a multi-head self-attention mechanism to the input tensor."""
+    """Apply a multi-head self-attention mechanism to the input Tensor."""
 
     def __init__(
         self,
@@ -235,7 +246,7 @@ class FuyuTransformerLayer(fl.Chain):
                 FeedForward(
                     embedding_dim=embedding_dim,
                     feedforward_dim=feedforward_dim,
-                    activation=SquaredReLU,
+                    activation=SquaredReLU(),
                     device=device,
                     dtype=dtype,
                 ),

@@ -3,8 +3,9 @@ from dataclasses import dataclass, replace
 from typing import Any, List, Union
 
 import numpy as np
+import torch
 from PIL import Image
-from torch import Tensor, argmax, device as Device, dtype as DType, float16 as torchf16, float32 as torchf32
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.utils import no_grad
@@ -13,7 +14,43 @@ from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
 
 
-def create_fuyu(config):
+@dataclass(frozen=True)
+class Fuyu8b:
+    """
+    config with the base argument for Fuyu8b
+    """
+
+    embedding_dim: int = 4_096
+    feedforward_dim: int = 16_384
+    max_sequence_length: int = 16_384
+    vocabulary_size: int = 262_144
+    tokenizer: FuyuTokenizer = FuyuTokenizer()
+    patch_size: int = 30
+    padding_value: float = 1.0 / 255
+    num_layers: int = 36
+    num_heads: int = 64
+    norm_eps: float = 1e-5
+    base: int = 25_000
+    partial_rotary_factor: float = 0.5
+    use_bias: bool = True
+    is_optimized: bool = False
+    device: Device | str | None = "cuda:0"
+    dtype: DType | None = torch.float32
+
+    def with_device(self, new_device: Union[Device, str]) -> "Fuyu8b":
+        """
+        Returns a new instance of Fuyu8b with a specified device.
+
+        Args:
+            new_device (Union['Device', str]): The device to set for the new instance.
+
+        Returns:
+            Fuyu8b: New instance with updated device.
+        """
+        return replace(self, device=new_device)
+
+
+def create_fuyu(config: Fuyu8b):
     """
     create a fuyu model based on the config provided
 
@@ -44,42 +81,6 @@ def create_fuyu(config):
     return model
 
 
-@dataclass(frozen=True)
-class Fuyu8b:
-    """
-    config with the base argument for Fuyu8b
-    """
-
-    embedding_dim: int = 4_096
-    feedforward_dim: int = 16_384
-    max_sequence_length: int = 16_384
-    vocabulary_size: int = 262_144
-    tokenizer: FuyuTokenizer | None = FuyuTokenizer()
-    patch_size: int = 30
-    padding_value: float = 1.0 / 255
-    num_layers: int = 36
-    num_heads: int = 64
-    norm_eps: float = 1e-5
-    base: int = 25_000
-    partial_rotary_factor: float = 0.5
-    use_bias: bool = True
-    is_optimized: bool = False
-    device: Device | str | None = "cuda:0"
-    dtype: DType | None = torchf32
-
-    def with_device(self, new_device: Union[Device, str]) -> "Fuyu8b":
-        """
-        Returns a new instance of Fuyu8b with a specified device.
-
-        Args:
-            new_device (Union['Device', str]): The device to set for the new instance.
-
-        Returns:
-            Fuyu8b: New instance with updated device.
-        """
-        return replace(self, device=new_device)
-
-
 class Fuyu(fl.Chain):
     """
     Implements the Fuyu model
@@ -92,9 +93,9 @@ class Fuyu(fl.Chain):
         feedforward_dim: int,
         max_sequence_length: int,
         vocabulary_size: int,
-        tokenizer: FuyuTokenizer | None,
+        tokenizer: FuyuTokenizer,
         patch_size: int,
-        padding_value: int,
+        padding_value: float,
         num_layers: int,
         num_heads: int,
         norm_eps: float,
@@ -105,17 +106,22 @@ class Fuyu(fl.Chain):
         device: Device | str | None,
         dtype: DType | None,
     ) -> None:
-        super().__init__(
+        self.tokenizer = [tokenizer]
+        self.input_encoder = [
             InputEncoder(
                 embedding_dim=embedding_dim,
                 max_sequence_length=max_sequence_length,
                 vocabulary_size=vocabulary_size,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer[0],
                 patch_size=patch_size,
                 padding_value=padding_value,
                 device=device,
                 dtype=dtype,
-            ),
+            )
+        ]
+
+        super().__init__(
+            self.input_encoder[0],
             FuyuTransformer(
                 FuyuTransformerLayer(
                     embedding_dim=embedding_dim,
@@ -138,7 +144,7 @@ class Fuyu(fl.Chain):
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
 
-    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation=50):
+    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation: int = 50):
         """
         Generate answers for a list of images and prompts. Inference by batch,
         rescale image if they are over self.InputEncoder.max_size
@@ -151,16 +157,18 @@ class Fuyu(fl.Chain):
         Returns:
             (List[str, "batch"])
         """
-        tokenizer = self.InputEncoder.tokenizer
         tensor_images = [(Tensor(np.array(image) / 255)).permute(2, 0, 1).unsqueeze(0) for image in images]
 
         i = 0
-        answers = [None] * len(tensor_images)
+        answers = [""] * len(tensor_images)
         final_answers = [""] * len(tensor_images)
 
         active_indices = list(range(len(tensor_images)))
         active_answers = None
         active_in_coords = [False] * len(tensor_images)
+        scales_list = [1] * len(tensor_images)
+
+        tokenizer = self.tokenizer[0]
 
         with no_grad():
             while i < max_len_generation and len(active_indices) > 0:
@@ -170,13 +178,13 @@ class Fuyu(fl.Chain):
 
                 # Get scales of all the images of the initial batch
                 if i == 0:
-                    scales_list = self.InputEncoder.scales_list
+                    scales_list = self.input_encoder[0].scales_list
 
-                next_tokens = argmax(predictions[:, -1, :], dim=-1)
+                next_tokens = torch.argmax(predictions[:, -1, :], dim=-1)
 
-                to_remove = []
+                to_remove: List[int] = []
                 for idx, next_token in enumerate(next_tokens):
-                    token_id = next_token.item()
+                    token_id = int(next_token.item())
                     # end of generation
                     if token_id == tokenizer.eos_token["id"]:
                         final_answers[active_indices[idx]] = answers[active_indices[idx]]
@@ -216,7 +224,7 @@ class Fuyu(fl.Chain):
                             next_token_text = tokenizer.id_to_token[token_id]
                             next_token_text += ","
 
-                    if answers[active_indices[idx]] is None:
+                    if answers[active_indices[idx]] == "":
                         answers[active_indices[idx]] = next_token_text
                     else:
                         answers[active_indices[idx]] += next_token_text
@@ -248,8 +256,10 @@ class Fuyu(fl.Chain):
                         for point_coordinate in points_coordinates
                         if point_coordinate.strip() != ""
                     ]
-                    for i in range(len(points_coordinates)):
-                        points_coordinates[i] = str(round((points_coordinates[i] / scales_list[idx]) * 2).astype(int))
+                    points_coordinates = [
+                        str(np.round((point_coordinate / scales_list[idx]) * 2).astype(int))
+                        for point_coordinate in points_coordinates
+                    ]
                     final_answer += ",".join(points_coordinates)
                 else:
                     final_answer += elem

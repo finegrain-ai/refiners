@@ -89,7 +89,7 @@ class PatchPadding(fl.Module):
         self,
         patch_size: int = 30,
         padding_value: float = 1.0,
-    ):
+    ) -> None:
         super().__init__()
         self.patch_size = patch_size
         self.padding_value = padding_value
@@ -110,11 +110,11 @@ class PatchPadding(fl.Module):
 
 
 def scaled_dot_product_attention(
-    query: Float[Tensor, "batch num_queries embedding_dim"],
-    key: Float[Tensor, "batch num_keys embedding_dim"],
-    value: Float[Tensor, "batch num_values embedding_dim"],
-    attn_mask: Float[Tensor, "batch num_queries num_keys"] = None,
-) -> Float[Tensor, "batch num_queries embedding_dim"]:
+    query: Float[Tensor, "batch_size num_heads num_queries (embedding_dim//num_heads)"],
+    key: Float[Tensor, "batch_size num_heads num_keys (embedding_dim//num_heads)"],
+    value: Float[Tensor, "batch_size num_heads num_values (embedding_dim//num_heads)"],
+    attn_mask: Float[Tensor, "batch_size 1 num_queries num_keys"] | None = None,
+) -> Float[Tensor, "batch_size num_heads num_queries heads_dim"]:
     """Scaled Dot Product Attention.
 
     Note:
@@ -124,21 +124,21 @@ def scaled_dot_product_attention(
     See also [torch.nn.functional.scaled_dot_product_attention](https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html).
     """
     # upcast attention to float32
-    return _scaled_dot_product_attention(query=query.float(), key=key.float(), value=value.float(), attn_mask=attn_mask)
+    return _scaled_dot_product_attention(query=query, key=key, value=value, attn_mask=attn_mask)
 
 
 def scaled_dot_product_attention_non_optimized(
-    query: Float[Tensor, "batch num_queries embedding_dim"],
-    key: Float[Tensor, "batch num_keys embedding_dim"],
-    value: Float[Tensor, "batch num_values embedding_dim"],
-    attn_mask: Float[Tensor, "batch num_queries num_keys"] = None,
-) -> Float[Tensor, "batch num_queries embedding_dim"]:
+    query: Float[Tensor, "batch_size num_heads num_queries (embedding_dim//num_heads)"],
+    key: Float[Tensor, "batch_size num_heads num_keys (embedding_dim//num_heads)"],
+    value: Float[Tensor, "batch_size num_heads num_values (embedding_dim//num_heads)"],
+    attn_mask: Float[Tensor, "batch_size 1 num_queries num_keys"] | None = None,
+) -> Float[Tensor, "batch_size num_heads num_queries heads_dim"]:
     """Non-optimized Scaled Dot Product Attention.
 
     See [[arXiv:1706.03762] Attention Is All You Need (Equation 1)](https://arxiv.org/abs/1706.03762) for more details.
     """
+    attn_bias = torch.zeros((query.shape[0], 1, query.shape[2], key.shape[2]), dtype=query.dtype, device=query.device)
     if attn_mask is not None:
-        attn_bias = torch.zeros_like(attn_mask, dtype=query.dtype, device=query.device)
         if attn_mask.dtype == torch.bool:
             attn_bias.masked_fill_(attn_mask.logical_not(), torch.finfo(query.dtype).min)
         else:
@@ -147,9 +147,8 @@ def scaled_dot_product_attention_non_optimized(
     dim = query.shape[-1]
     attention = query @ key.permute(0, 1, 3, 2)
     attention = attention / math.sqrt(dim)
-    if attn_mask is not None:
-        attention = attention + attn_bias
-    attention = torch.softmax(input=attention.float(), dim=-1).to(value.dtype)
+    attention = attention + attn_bias
+    attention = torch.softmax(input=attention, dim=-1)
     return attention @ value
 
 
@@ -208,10 +207,10 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
 
     def forward(
         self,
-        query: Float[Tensor, "batch num_queries embedding_dim"],
-        key: Float[Tensor, "batch num_keys embedding_dim"],
-        value: Float[Tensor, "batch num_values embedding_dim"],
-    ) -> Float[Tensor, "batch num_queries embedding_dim"]:
+        query: Float[Tensor, "batch_size num_queries embedding_dim"],
+        key: Float[Tensor, "batch_size num_keys embedding_dim"],
+        value: Float[Tensor, "batch_size num_values embedding_dim"],
+    ) -> Float[Tensor, "batch_size num_queries embedding_dim"]:
         attn_mask = self.use_context(context_name="attention")["mask"]
         if self.slice_size:
             return self._sliced_attention(
@@ -226,12 +225,12 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
 
     def _sliced_attention(
         self,
-        query: Float[Tensor, "batch num_queries embedding_dim"],
-        key: Float[Tensor, "batch num_keys embedding_dim"],
-        value: Float[Tensor, "batch num_values embedding_dim"],
+        query: Float[Tensor, "batch_size num_queries embedding_dim"],
+        key: Float[Tensor, "batch_size num_keys embedding_dim"],
+        value: Float[Tensor, "batch_size num_values embedding_dim"],
         slice_size: int,
-        attn_mask: Float[Tensor, "batch target_sequence_length source_sequence_length"] = None,
-    ) -> Float[Tensor, "batch num_queries embedding_dim"]:
+        attn_mask: Float[Tensor, "batch_size 1 num_queries num_keys"] | None = None,
+    ) -> Float[Tensor, "batch_size num_queries embedding_dim"]:
         """Compute the scaled dot product attention in slices.
 
         This is useful when the input tensors are too large to be processed in one go.
@@ -241,29 +240,32 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
         for start_idx in range(0, num_queries, slice_size):
             end_idx = min(start_idx + slice_size, num_queries)
             output[:, start_idx:end_idx, :] = self._process_attention(
-                query=query[:, start_idx:end_idx, :], key=key, value=value, attn_mask=attn_mask[:, start_idx:end_idx, :]
+                query=query[:, start_idx:end_idx, :],
+                key=key,
+                value=value,
+                attn_mask=attn_mask[:, start_idx:end_idx, :] if attn_mask is not None else None,
             )
         return output
 
     def _process_attention(
         self,
-        query: Float[Tensor, "batch num_queries embedding_dim"],
-        key: Float[Tensor, "batch num_keys embedding_dim"],
-        value: Float[Tensor, "batch num_values embedding_dim"],
-        attn_mask: Float[Tensor, "batch target_sequence_length source_sequence_length"] = None,
-    ) -> Float[Tensor, "batch num_queries embedding_dim"]:
+        query: Float[Tensor, "batch_size num_queries embedding_dim"],
+        key: Float[Tensor, "batch_size num_keys embedding_dim"],
+        value: Float[Tensor, "batch_size num_values embedding_dim"],
+        attn_mask: Float[Tensor, "batch_size 1 num_queries num_keys"] | None = None,
+    ) -> Float[Tensor, "batch_size num_queries embedding_dim"]:
         """Compute the scaled dot product attention.
 
         Split the input tensors (query, key, value) into multiple heads along the embedding dimension,
         then compute the scaled dot product attention for each head, and finally merge the heads back.
         """
-        # the attention is cast in float32
+        # the attention is upcast to float32
         dtype = query.dtype
         return self._merge_multi_head(
             x=self.dot_product(
-                query=self._split_to_multi_head(query),
-                key=self._split_to_multi_head(key),
-                value=self._split_to_multi_head(value),
+                query=self._split_to_multi_head(query.float()),
+                key=self._split_to_multi_head(key.float()),
+                value=self._split_to_multi_head(value.float()),
                 attn_mask=attn_mask,
             ).to(dtype)
         )

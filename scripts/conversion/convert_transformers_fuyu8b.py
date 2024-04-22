@@ -2,14 +2,14 @@ import argparse
 import gc
 import os
 
-import torch
+from torch import Tensor
 from tqdm import tqdm
-from transformers import FuyuForCausalLM
+from transformers import FuyuForCausalLM  # type: ignore[reportMissingTypeStubs]
 
 from refiners.fluxion.utils import load_tensors, save_to_safetensors
 
 
-def convert_fuyu_huggingface(weights: dict[str, torch.Tensor]) -> None:
+def convert_fuyu_huggingface(weights: dict[str, Tensor]) -> None:
     """Convert a fuyu8b weights from HuggingFace to refiners."""
     # get depth from "blocks" keys
     depth = max([int(k.split(".")[3]) for k in weights.keys() if k.startswith("language_model.model.layers.")]) + 1
@@ -152,7 +152,7 @@ def main() -> None:
         weights = load_tensors(args.source_path)
     else:
         model_id = "adept/fuyu-8b"
-        source = FuyuForCausalLM.from_pretrained(model_id)
+        source: FuyuForCausalLM = FuyuForCausalLM.from_pretrained(pretrained_model_name_or_path=model_id)  # type: ignore[reportUnknownMemberType, reportAssignmentType]
         weights = source.state_dict()
         del source
         gc.collect()
