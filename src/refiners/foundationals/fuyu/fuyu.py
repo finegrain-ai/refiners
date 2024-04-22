@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from typing import Any, List, Union
 
 import numpy as np
+from PIL import Image
 from torch import Tensor, argmax, device as Device, dtype as DType, float16 as torchf16, float32 as torchf32
 
 import refiners.fluxion.layers as fl
@@ -137,13 +138,13 @@ class Fuyu(fl.Chain):
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
 
-    def generate(self, images: List, prompts: list[str], max_len_generation=50):
+    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation=50):
         """
         Generate answers for a list of images and prompts. Inference by batch,
         rescale image if they are over self.InputEncoder.max_size
 
         Receives:
-            images (List[PIL.Image, "batch"])
+            images (List[Image.Image, "batch"])
             prompts (List[str, "batch"])
             max_len_generation (int)
 

@@ -123,7 +123,7 @@ class InputEncoder(fl.ContextModule):
             dtype=dtype,
         )
 
-    def forward(self, images: List[Tensor], prompts: list[str], answers: list[str] | None = None) -> Tensor:
+    def forward(self, images: List[Tensor], prompts: List[str], answers: List[str] | None = None) -> Tensor:
         """
         Processes and encodes image and text data to create model inputs for the Fuyu model.
 
@@ -135,9 +135,9 @@ class InputEncoder(fl.ContextModule):
         Receives:
             images (List[Tensor]): A list of image tensors, each tensor should be in the format [1, C, H, W]
                 where C is the number of channels, H is height, and W is width.
-            prompts (list[str]): A list of text strings, each corresponding to an image. These are prompts
+            prompts (List[str]): A list of text strings, each corresponding to an image. These are prompts
                 that the model will use to generate responses.
-            answers (list[str] | None, optional): An optional list of text strings providing answers
+            answers (List[str] | None, optional): An optional list of text strings providing answers
                 corresponding to each prompt for continuing the sequential process of generation.
                 If provided, it is used along with the prompts for input encoding.
                 Defaults to None
@@ -259,7 +259,7 @@ class InputEncoder(fl.ContextModule):
                 image = cat([image] * 3, dim=1)
 
             scale_factor = 1
-            # if images are above the max size limite rescale them
+            # if images are above the max size limit rescale them
             if h > self.max_size[0] or w > self.max_size[1]:
                 scale_factor = min(self.max_size[0] / h, self.max_size[1] / w)
                 image = Image.fromarray((image.squeeze(0) * 255).byte().numpy().transpose(1, 2, 0), "RGB")
