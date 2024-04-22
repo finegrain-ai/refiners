@@ -1,10 +1,13 @@
 import argparse
 import gc
+import gzip
 import os
+import shutil
+from pathlib import Path
 
 from torch import Tensor
 from tqdm import tqdm
-from transformers import FuyuForCausalLM  # type: ignore[reportMissingTypeStubs]
+from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
 from refiners.fluxion.utils import load_tensors, save_to_safetensors
 
@@ -147,6 +150,21 @@ def main() -> None:
     )
     parser.add_argument("--half", action="store_true", dest="half")
     args = parser.parse_args()
+
+    # extract the json vocabulary file from .cache
+    processor: FuyuProcessor = FuyuProcessor.from_pretrained("adept/fuyu-8b")  # type: ignore[reportUnknownMemberType, reportAssignmentType]
+    vocabulary_file_path: str = Path(processor.tokenizer.vocab_file).absolute().parent / "tokenizer.json"  # type: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    save_path = Path(__file__).resolve().parents[2] / "src/refiners/foundationals/fuyu/tokenizer.json"
+    shutil.copy(vocabulary_file_path, save_path)
+
+    # compress the json vocabulary file
+    compressed_save_path = save_path.with_suffix(".json.gz")
+    with open(save_path, "rb") as original_file:
+        with gzip.open(compressed_save_path, "wb") as compressed_file:
+            shutil.copyfileobj(original_file, compressed_file)
+
+    # remove the uncompressed file
+    save_path.unlink()
 
     if args.source_path is not None:
         weights = load_tensors(args.source_path)
