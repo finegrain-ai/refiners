@@ -27,9 +27,14 @@ class FuyuTokenizer(fl.Module):
 
     def __init__(
         self,
-        vocabulary_path: str | Path = Path(__file__).resolve().parent / "tokenizer.json.gz",
-    ):
+        vocabulary_path: str | Path | None = None,
+    ) -> None:
         super().__init__()
+
+        if vocabulary_path is None:
+            vocabulary_path = Path.home() / ".cache/refiners/fuyu-8b/tokenizer.json.gz"
+            if not vocabulary_path.exists():
+                raise FileNotFoundError(f"Vocabulary file not found at {vocabulary_path}")
 
         with gzip.open(vocabulary_path, "rt", encoding="utf-8") as f:
             config = json.load(f)
