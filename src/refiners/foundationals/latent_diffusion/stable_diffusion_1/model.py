@@ -198,8 +198,14 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
     ) -> None:
         self.mask_latents: Tensor | None = None
         self.target_image_latents: Tensor | None = None
+        unet = unet or SD1UNet(in_channels=9)
         super().__init__(
-            unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, solver=solver, device=device, dtype=dtype
+            unet=unet,
+            lda=lda,
+            clip_text_encoder=clip_text_encoder,
+            solver=solver,
+            device=device,
+            dtype=dtype,
         )
 
     def forward(
