@@ -21,24 +21,18 @@ class ClockConfig(CallbackConfig):
 class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     def __init__(
         self,
-        dataset_length: int,
         batch_size: int,
         training_duration: TimeValue,
-        gradient_accumulation: TimeValue,
+        gradient_accumulation: int,
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
         assert batch_size > 0, "Batch size must be greater than 0."
-        assert (
-            dataset_length >= batch_size
-        ), f"Dataset length ({dataset_length}) must be greater than batch_size ({batch_size})."
-        self.dataset_length = dataset_length
         self.batch_size = batch_size
         self.training_duration = training_duration
         self.gradient_accumulation = gradient_accumulation
         self.lr_scheduler_interval = lr_scheduler_interval
         self.verbose = verbose
-        self.num_batches_per_epoch = dataset_length // batch_size
         self.start_time = None
         self.end_time = None
         self.step = 0
@@ -48,43 +42,16 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.num_minibatches_processed = 0
         self.loss: Tensor | None = None
 
-    @cached_property
-    def unit_to_steps(self) -> dict[TimeUnit, int]:
-        iteration_factor = self.num_batches_per_epoch if isinstance(self.gradient_accumulation, Epoch) else 1
-        return {
-            Step: 1,
-            Epoch: self.num_batches_per_epoch,
-            Iteration: self.gradient_accumulation.number * iteration_factor,
-        }
-
-    def convert_time_value_to_steps(self, time_value: TimeValue) -> int:
-        return time_value.number * self.unit_to_steps[time_value.unit]
-
-    def convert_steps_to_time_unit(self, steps: int, unit: TimeUnit) -> int:
-        return steps // self.unit_to_steps[unit]
-
-    def convert_time_value(self, time_value: TimeValue, target_unit: TimeUnit) -> int:
-        steps = self.convert_time_value_to_steps(time_value=time_value)
-        return self.convert_steps_to_time_unit(steps=steps, unit=target_unit)
-
-    @cached_property
-    def num_epochs(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=Epoch)
-
-    @cached_property
-    def num_iterations(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=Iteration)
-
-    @cached_property
-    def num_steps(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=Step)
-
-    @cached_property
-    def num_step_per_iteration(self) -> int:
-        return self.convert_time_value_to_steps(self.gradient_accumulation)
-
     def is_due(self, interval: TimeValue) -> bool:
-        return self.step % self.convert_time_value_to_steps(interval) == 0
+        match interval:
+            case Step(number):
+                return self.step % number == 0
+            case Iteration(number):
+                return self.iteration % number == 0
+            case Epoch(number):
+                return self.epoch % number == 0
+            case _:
+                raise ValueError(f"Unsupported TimeValue: {interval}")
 
     def reset(self) -> None:
         self.start_time = None
@@ -108,11 +75,19 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     @property
     def is_optimizer_step(self) -> bool:
-        return self.num_minibatches_processed == self.num_step_per_iteration
+        return self.num_minibatches_processed == self.gradient_accumulation
 
     @property
     def done(self) -> bool:
-        return self.step >= self.num_steps
+        match self.training_duration:
+            case Step(number):
+                return self.step >= number
+            case Iteration(number):
+                return self.iteration >= number
+            case Epoch(number):
+                return self.epoch >= number
+            case _:
+                raise ValueError(f"Unsupported TimeValue: {self.training_duration}")
 
     def log(self, message: str, /) -> None:
         if self.verbose:
@@ -120,14 +95,6 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     def on_train_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         trainer.clock.reset()
-        self.log(
-            (
-                "Starting training for a total of: "
-                f"{trainer.clock.num_steps} steps, "
-                f"{trainer.clock.num_epochs} epochs, "
-                f"{trainer.clock.num_iterations} iterations."
-            )
-        )
         trainer.clock.start_timer()
 
     def on_train_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:

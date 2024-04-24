@@ -204,10 +204,9 @@ def test_human_readable_number() -> None:
 @pytest.fixture
 def training_clock() -> TrainingClock:
     return TrainingClock(
-        dataset_length=100,
         batch_size=10,
         training_duration=Epoch(5),
-        gradient_accumulation=Epoch(1),
+        gradient_accumulation=1,
         lr_scheduler_interval=Epoch(1),
     )
 
@@ -215,10 +214,9 @@ def training_clock() -> TrainingClock:
 def test_small_dataset_error():
     with pytest.raises(AssertionError):
         TrainingClock(
-            dataset_length=3,
             batch_size=10,
             training_duration=Epoch(5),
-            gradient_accumulation=Epoch(1),
+            gradient_accumulation=1,
             lr_scheduler_interval=Epoch(1),
         )
 
@@ -226,33 +224,11 @@ def test_small_dataset_error():
 def test_zero_batch_size_error():
     with pytest.raises(AssertionError):
         TrainingClock(
-            dataset_length=3,
             batch_size=0,
             training_duration=Epoch(5),
-            gradient_accumulation=Epoch(1),
+            gradient_accumulation=1,
             lr_scheduler_interval=Epoch(1),
         )
-
-
-def test_time_unit_to_steps_conversion(training_clock: TrainingClock) -> None:
-    assert training_clock.convert_time_value_to_steps(Epoch(1)) == 10
-    assert training_clock.convert_time_value_to_steps(Epoch(2)) == 20
-    assert training_clock.convert_time_value_to_steps(Step(1)) == 1
-    assert training_clock.convert_time_value_to_steps(Iteration(1)) == 10
-
-
-def test_steps_to_time_unit_conversion(training_clock: TrainingClock) -> None:
-    assert training_clock.convert_steps_to_time_unit(10, Epoch) == 1
-    assert training_clock.convert_steps_to_time_unit(20, Epoch) == 2
-    assert training_clock.convert_steps_to_time_unit(1, Step) == 1
-    assert training_clock.convert_steps_to_time_unit(10, Iteration) == 1
-
-
-def test_clock_properties(training_clock: TrainingClock) -> None:
-    assert training_clock.num_batches_per_epoch == 10
-    assert training_clock.num_epochs == 5
-    assert training_clock.num_iterations == 5
-    assert training_clock.num_steps == 50
 
 
 def test_timer_functionality(training_clock: TrainingClock) -> None:
@@ -275,17 +251,12 @@ def test_training_cycle(mock_trainer: MockTrainer) -> None:
     clock = mock_trainer.clock
     config = mock_trainer.config
 
-    assert clock.num_step_per_iteration == config.training.gradient_accumulation.number
-    assert clock.num_batches_per_epoch == mock_trainer.dataset_length // config.training.batch_size
-
     assert mock_trainer.step_counter == 0
     assert clock.epoch == 0
 
     mock_trainer.train()
 
     assert clock.epoch == config.training.duration.number
-    assert clock.step == config.training.duration.number * clock.num_batches_per_epoch
-
     assert mock_trainer.step_counter == mock_trainer.clock.step
 
 
