@@ -1,22 +1,34 @@
 from typing import Callable, TypeVar
 
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from pydantic import BaseModel, ConfigDict, NonNegativeInt, PositiveInt, model_validator
 from torch.utils.data import DataLoader, Dataset
+from typing_extensions import Self
 
 BatchT = TypeVar("BatchT")
 
 
 class DataLoaderConfig(BaseModel):
     batch_size: PositiveInt = 1
-    num_workers: int = 0
+    num_workers: NonNegativeInt = 0
     pin_memory: bool = False
-    prefetch_factor: int | None = None
+    prefetch_factor: PositiveInt | None = None
     persistent_workers: bool = False
     drop_last: bool = False
     shuffle: bool = True
 
     model_config = ConfigDict(extra="forbid")
-    # TODO: Add more validation to the config
+
+    @model_validator(mode="after")
+    def check_prefetch_factor(self) -> Self:
+        if self.prefetch_factor is not None and self.num_workers == 0:
+            raise ValueError(f"prefetch_factor={self.prefetch_factor} requires num_workers > 0")
+        return self
+
+    @model_validator(mode="after")
+    def check_num_workers(self) -> Self:
+        if self.num_workers == 0 and self.persistent_workers is True:
+            raise ValueError(f"persistent_workers={self.persistent_workers} option needs num_workers > 0")
+        return self
 
 
 class DatasetFromCallable(Dataset[BatchT]):
