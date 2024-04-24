@@ -4,14 +4,10 @@ from warnings import warn
 
 import pytest
 import torch
-from PIL import Image
 from torch import device as Device
-from torchvision.transforms.functional import (  # type: ignore[reportMissingTypeStubs]
-    to_pil_image,  # type: ignore[reportUnknownVariableType]
-)
 from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
-from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
+from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, tensor_to_image
 from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b, create_fuyu
 
 
@@ -32,16 +28,14 @@ def our_model(test_weights_path: Path, test_device: Device) -> Fuyu:
 
 @pytest.fixture(scope="module")
 def ref_processor() -> FuyuProcessor:
-    processor: FuyuProcessor = FuyuProcessor.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b")  # type: ignore[reportUnknownMemberType, reportAssignmentType]
-    return processor
+    return FuyuProcessor.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b")  # type: ignore
 
 
 @pytest.fixture(scope="module")
 def ref_model(test_device: Device) -> FuyuForCausalLM:
-    model: FuyuForCausalLM = FuyuForCausalLM.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b").to(  # type: ignore
+    return FuyuForCausalLM.from_pretrained(pretrained_model_name_or_path="adept/fuyu-8b").to(  # type: ignore
         device=test_device
     )
-    return model  # type: ignore[reportUnknownVariableType]
 
 
 def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device):
@@ -62,8 +56,8 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
     """
 
     manual_seed(42)
-    x = torch.rand(3, 512, 512)
-    x_pil: Image.Image = to_pil_image(x)  # type: ignore[reportUnknownVariableType]
+    x = torch.rand(1, 3, 512, 512)
+    x_pil = tensor_to_image(x)
 
     prompts = [
         "Describe this image. \n",
@@ -76,6 +70,6 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
     with no_grad():
         ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
         ref_output = ref_model(**ref_input)["logits"]
-        our_output = our_model([x.unsqueeze(0)], [p])
+        our_output = our_model([x], [p])
 
     assert (our_output - ref_output).abs().max() < 1e-3
