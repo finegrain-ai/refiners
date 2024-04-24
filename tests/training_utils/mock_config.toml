@@ -4,7 +4,6 @@ on_batch_end_seed = 42
 on_optimizer_step_interval = "2:iteration"
 
 
-
 [mock_model]
 requires_grad = true
 use_activation = true
@@ -19,8 +18,6 @@ device = "cpu"
 dtype = "float32"
 batch_size = 4
 gradient_accumulation = "4:step"
-evaluation_interval = "5:epoch"
-evaluation_seed = 1
 gradient_clipping_max_norm = 1.0
 
 [optimizer]

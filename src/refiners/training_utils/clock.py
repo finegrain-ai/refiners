@@ -25,7 +25,6 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         batch_size: int,
         training_duration: TimeValue,
         gradient_accumulation: TimeValue,
-        evaluation_interval: TimeValue,
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
@@ -37,7 +36,6 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.batch_size = batch_size
         self.training_duration = training_duration
         self.gradient_accumulation = gradient_accumulation
-        self.evaluation_interval = evaluation_interval
         self.lr_scheduler_interval = lr_scheduler_interval
         self.verbose = verbose
         self.num_batches_per_epoch = dataset_length // batch_size
@@ -84,10 +82,6 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     @cached_property
     def num_step_per_iteration(self) -> int:
         return self.convert_time_value_to_steps(self.gradient_accumulation)
-
-    @cached_property
-    def num_step_per_evaluation(self) -> int:
-        return self.convert_time_value_to_steps(self.evaluation_interval)
 
     def is_due(self, interval: TimeValue) -> bool:
         return self.step % self.convert_time_value_to_steps(interval) == 0
@@ -171,9 +165,3 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self.log(f"Iteration {trainer.clock.iteration} ended.")
         trainer.clock.iteration += 1
         trainer.clock.num_minibatches_processed = 0
-
-    def on_evaluate_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log("Evaluation started.")
-
-    def on_evaluate_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log("Evaluation ended.")

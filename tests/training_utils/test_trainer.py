@@ -186,7 +186,6 @@ def training_clock() -> TrainingClock:
         batch_size=10,
         training_duration=Epoch(5),
         gradient_accumulation=Epoch(1),
-        evaluation_interval=Epoch(1),
         lr_scheduler_interval=Epoch(1),
     )
 
@@ -198,7 +197,6 @@ def test_small_dataset_error():
             batch_size=10,
             training_duration=Epoch(5),
             gradient_accumulation=Epoch(1),
-            evaluation_interval=Epoch(1),
             lr_scheduler_interval=Epoch(1),
         )
 
@@ -210,7 +208,6 @@ def test_zero_batch_size_error():
             batch_size=0,
             training_duration=Epoch(5),
             gradient_accumulation=Epoch(1),
-            evaluation_interval=Epoch(1),
             lr_scheduler_interval=Epoch(1),
         )
 
@@ -242,13 +239,6 @@ def test_timer_functionality(training_clock: TrainingClock) -> None:
     training_clock.stop_timer()
     assert training_clock.end_time is not None
     assert training_clock.time_elapsed >= 0
-
-
-def test_state_based_properties(training_clock: TrainingClock) -> None:
-    training_clock.step = 5  # Halfway through the first epoch
-    assert not training_clock.is_due(training_clock.evaluation_interval)  # Assuming evaluation every epoch
-    training_clock.step = 10  # End of the first epoch
-    assert training_clock.is_due(training_clock.evaluation_interval)
 
 
 def test_mock_trainer_initialization(mock_config: MockConfig, mock_trainer: MockTrainer) -> None:
