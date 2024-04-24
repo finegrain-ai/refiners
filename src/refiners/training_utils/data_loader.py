@@ -39,7 +39,7 @@ class DatasetFromCallable(Dataset[BatchT]):
 def create_data_loader(
     get_item: Callable[[int], BatchT],
     length: int,
-    config: DataloaderConfig,
+    config: DataLoaderConfig,
     collate_fn: Callable[[list[BatchT]], BatchT] | None = None,
 ) -> DataLoader[BatchT]:
     return DataLoader(
