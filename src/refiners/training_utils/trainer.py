@@ -24,7 +24,6 @@ from torch.optim.lr_scheduler import (
 from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
-from refiners.fluxion.utils import no_grad
 from refiners.training_utils.callback import (
     Callback,
     CallbackConfig,
@@ -154,7 +153,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             dataset_length=self.dataset_length,
             batch_size=self.config.training.batch_size,
             training_duration=self.config.training.duration,
-            evaluation_interval=self.config.training.evaluation_interval,
             gradient_accumulation=self.config.training.gradient_accumulation,
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
@@ -345,9 +343,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @abstractmethod
     def compute_loss(self, batch: Batch) -> Tensor: ...
 
-    def compute_evaluation(self) -> None:
-        pass
-
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
@@ -365,8 +360,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self._call_callbacks(event_name="on_lr_scheduler_step_begin")
             self.lr_scheduler.step()
             self._call_callbacks(event_name="on_lr_scheduler_step_end")
-        if self.clock.is_due(self.config.training.evaluation_interval):
-            self.evaluate()
 
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""
@@ -395,26 +388,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self.set_models_to_mode("train")
         self._call_callbacks(event_name="on_train_begin")
         assert self.learnable_parameters, "There are no learnable parameters in the models."
-        self.evaluate()
         while not self.clock.done:
             self._call_callbacks(event_name="on_epoch_begin")
             self.epoch()
             self._call_callbacks(event_name="on_epoch_end")
         self._call_callbacks(event_name="on_train_end")
-
-    @staticmethod
-    def get_evaluation_seed(instance: "Trainer[BaseConfig, Any]") -> int:
-        return instance.config.training.evaluation_seed
-
-    @no_grad()
-    @scoped_seed(seed=get_evaluation_seed)
-    def evaluate(self) -> None:
-        """Evaluate the model."""
-        self.set_models_to_mode(mode="eval")
-        self._call_callbacks(event_name="on_evaluate_begin")
-        self.compute_evaluation()
-        self._call_callbacks(event_name="on_evaluate_end")
-        self.set_models_to_mode(mode="train")
 
     def set_models_to_mode(self, mode: Literal["train", "eval"]) -> None:
         for item in self.models.values():

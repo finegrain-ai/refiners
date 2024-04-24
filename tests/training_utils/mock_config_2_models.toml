@@ -13,8 +13,6 @@ duration = "100:epoch"
 seed = 0
 batch_size = 4
 gradient_accumulation = "4:step"
-evaluation_interval = "5:epoch"
-evaluation_seed = 1
 gradient_clipping_max_norm = 1.0
 
 [optimizer]

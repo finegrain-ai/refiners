@@ -26,13 +26,11 @@ class TrainingConfig(BaseModel):
     seed: int = 0
     batch_size: int = 1
     gradient_accumulation: Step | Epoch = Step(1)
-    evaluation_interval: Iteration | Epoch = Iteration(1)
     gradient_clipping_max_norm: float | None = None
-    evaluation_seed: int = 0
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("duration", "gradient_accumulation", "evaluation_interval", mode="before")
+    @field_validator("duration", "gradient_accumulation", mode="before")
     def parse_field(cls, value: TimeValueInput) -> TimeValue:
         return parse_number_unit_field(value)
 
