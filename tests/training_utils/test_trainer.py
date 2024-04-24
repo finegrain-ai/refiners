@@ -6,6 +6,7 @@ from typing import cast
 
 import pytest
 import torch
+from pydantic import field_validator
 from torch import Tensor, nn
 from torch.optim import SGD
 
@@ -16,8 +17,12 @@ from refiners.training_utils.common import (
     Epoch,
     Iteration,
     Step,
+    TimeValue,
+    TimeValueInput,
     count_learnable_parameters,
     human_readable_number,
+    parse_number_unit_field,
+    scoped_seed,
 )
 from refiners.training_utils.config import BaseConfig, ModelConfig
 from refiners.training_utils.trainer import (
@@ -41,9 +46,19 @@ class MockModelConfig(ModelConfig):
     use_activation: bool
 
 
+class MockCallbackConfig(CallbackConfig):
+    on_batch_end_interval: Step | Iteration | Epoch
+    on_batch_end_seed: int
+    on_optimizer_step_interval: Iteration | Epoch
+
+    @field_validator("on_batch_end_interval", "on_optimizer_step_interval", mode="before")
+    def parse_field(cls, value: TimeValueInput) -> TimeValue:
+        return parse_number_unit_field(value)
+
+
 class MockConfig(BaseConfig):
     mock_model: MockModelConfig
-    mock_callback: CallbackConfig
+    mock_callback: MockCallbackConfig
 
 
 class MockModel(fl.Chain):
@@ -60,7 +75,8 @@ class MockModel(fl.Chain):
 
 
 class MockCallback(Callback["MockTrainer"]):
-    def __init__(self) -> None:
+    def __init__(self, config: MockCallbackConfig) -> None:
+        self.config = config
         self.optimizer_step_count = 0
         self.batch_end_count = 0
         self.optimizer_step_random_int: int | None = None
@@ -70,12 +86,17 @@ class MockCallback(Callback["MockTrainer"]):
         pass
 
     def on_optimizer_step_begin(self, trainer: "MockTrainer") -> None:
+        if not trainer.clock.is_due(self.config.on_optimizer_step_interval):
+            return
         self.optimizer_step_count += 1
         self.optimizer_step_random_int = random.randint(0, 100)
 
     def on_batch_end(self, trainer: "MockTrainer") -> None:
+        if not trainer.clock.is_due(self.config.on_batch_end_interval):
+            return
         self.batch_end_count += 1
-        self.batch_end_random_int = random.randint(0, 100)
+        with scoped_seed(self.config.on_batch_end_seed):
+            self.batch_end_random_int = random.randint(0, 100)
 
 
 class MockTrainer(Trainer[MockConfig, MockBatch]):
@@ -96,8 +117,8 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
         )
 
     @register_callback()
-    def mock_callback(self, config: CallbackConfig) -> MockCallback:
-        return MockCallback()
+    def mock_callback(self, config: MockCallbackConfig) -> MockCallback:
+        return MockCallback(config)
 
     @register_model()
     def mock_model(self, config: MockModelConfig) -> MockModel:
@@ -264,8 +285,8 @@ def test_callback_registration(mock_trainer: MockTrainer) -> None:
     assert mock_trainer.mock_callback.batch_end_count == mock_trainer.clock.step // 3
 
     # Check that the random seed was set
-    assert mock_trainer.mock_callback.optimizer_step_random_int == 81
-    assert mock_trainer.mock_callback.batch_end_random_int == 72
+    assert mock_trainer.mock_callback.optimizer_step_random_int == 93
+    assert mock_trainer.mock_callback.batch_end_random_int == 81
 
 
 def test_training_short_cycle(mock_trainer_short: MockTrainer) -> None:

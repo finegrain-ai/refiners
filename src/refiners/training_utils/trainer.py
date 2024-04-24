@@ -424,8 +424,8 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 item.model.eval()
 
     def _call_callbacks(self, event_name: str) -> None:
-        for name, callback in self.callbacks.items():
-            callback.run_event(trainer=self, callback_name=name, event_name=event_name)
+        for callback in self.callbacks.values():
+            getattr(callback, event_name)(self)
 
     def _load_callbacks(self) -> None:
         for name, config in self.config:
