@@ -1,10 +1,8 @@
-[mock_callback.on_optimizer_step_begin]
-interval = "2:iteration"
-seed = 42
+[mock_callback]
+on_batch_end_interval = "3:step"
+on_batch_end_seed = 42
+on_optimizer_step_interval = "2:iteration"
 
-
-[mock_callback.on_batch_end]
-interval = "3:step"
 
 
 [mock_model]
