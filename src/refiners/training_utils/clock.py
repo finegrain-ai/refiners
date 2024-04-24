@@ -156,7 +156,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         trainer.clock.epoch += 1
         trainer.clock.num_batches_processed = 0
 
-    def on_batch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+    def on_step_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         if self.num_minibatches_processed == 0:
             self.log(f"Iteration {trainer.clock.iteration} started.")
         self.log(f"Step {trainer.clock.step} started.")

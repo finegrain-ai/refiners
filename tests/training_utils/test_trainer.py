@@ -78,9 +78,9 @@ class MockCallback(Callback["MockTrainer"]):
     def __init__(self, config: MockCallbackConfig) -> None:
         self.config = config
         self.optimizer_step_count = 0
-        self.batch_end_count = 0
+        self.step_end_count = 0
         self.optimizer_step_random_int: int | None = None
-        self.batch_end_random_int: int | None = None
+        self.step_end_random_int: int | None = None
 
     def on_init_begin(self, trainer: "MockTrainer") -> None:
         pass
@@ -91,12 +91,12 @@ class MockCallback(Callback["MockTrainer"]):
         self.optimizer_step_count += 1
         self.optimizer_step_random_int = random.randint(0, 100)
 
-    def on_batch_end(self, trainer: "MockTrainer") -> None:
+    def on_step_end(self, trainer: "MockTrainer") -> None:
         if not trainer.clock.is_due(self.config.on_batch_end_interval):
             return
-        self.batch_end_count += 1
+        self.step_end_count += 1
         with scoped_seed(self.config.on_batch_end_seed):
-            self.batch_end_random_int = random.randint(0, 100)
+            self.step_end_random_int = random.randint(0, 100)
 
 
 class MockTrainer(Trainer[MockConfig, MockBatch]):
@@ -282,11 +282,11 @@ def test_callback_registration(mock_trainer: MockTrainer) -> None:
 
     # Check that the callback skips every other iteration
     assert mock_trainer.mock_callback.optimizer_step_count == mock_trainer.clock.iteration // 2
-    assert mock_trainer.mock_callback.batch_end_count == mock_trainer.clock.step // 3
+    assert mock_trainer.mock_callback.step_end_count == mock_trainer.clock.step // 3
 
     # Check that the random seed was set
     assert mock_trainer.mock_callback.optimizer_step_random_int == 93
-    assert mock_trainer.mock_callback.batch_end_random_int == 81
+    assert mock_trainer.mock_callback.step_end_random_int == 81
 
 
 def test_training_short_cycle(mock_trainer_short: MockTrainer) -> None:

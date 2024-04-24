@@ -381,9 +381,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         for batch in self.dataloader:
             if self.clock.done:
                 break
-            self._call_callbacks(event_name="on_batch_begin")
+            self._call_callbacks(event_name="on_step_begin")
             self.step(batch=batch)
-            self._call_callbacks(event_name="on_batch_end")
+            self._call_callbacks(event_name="on_step_end")
 
     @staticmethod
     def get_training_seed(instance: "Trainer[BaseConfig, Any]") -> int:
