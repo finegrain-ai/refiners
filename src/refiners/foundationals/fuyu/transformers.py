@@ -107,31 +107,17 @@ class QKVProjection(fl.Chain):
             CustomReshape(self.num_heads, 3, self.heads_dim),
             fl.Parallel(
                 fl.Chain(  # Q projection
-                    fl.Slicing(
-                        dim=-2,
-                        start=0,
-                        end=1,
-                    ),
+                    fl.Slicing(dim=-2, start=0, end=1),
                     fl.Squeeze(dim=-2),
                     fl.LayerNorm(normalized_shape=self.heads_dim, eps=self.norm_eps, device=device, dtype=dtype),
                 ),
                 fl.Chain(  # K projection
-                    fl.Slicing(
-                        dim=-2,
-                        start=1,
-                        end=2,
-                    ),
-                    fl.Squeeze(
-                        dim=-2,
-                    ),
+                    fl.Slicing(dim=-2, start=1, end=2),
+                    fl.Squeeze(dim=-2),
                     fl.LayerNorm(normalized_shape=self.heads_dim, eps=self.norm_eps, device=device, dtype=dtype),
                 ),
-                fl.Chain(
-                    fl.Slicing(  # V projection
-                        dim=-2,
-                        start=2,
-                        end=3,
-                    ),
+                fl.Chain(  # V projection
+                    fl.Slicing(dim=-2, start=2, end=3),
                     fl.Squeeze(dim=-2),
                 ),
             ),
