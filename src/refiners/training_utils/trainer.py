@@ -282,7 +282,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         warmup_scheduler_steps = (
             config.warmup.number
             if isinstance(config.warmup, Step)
-            else config.warmup.number * self.clock.gradient_accumulation
+            else config.warmup.number * self.clock.gradient_accumulation.number
         )
         if warmup_scheduler_steps > 0:
             lr_scheduler = WarmupScheduler(
@@ -350,7 +350,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
-        scaled_loss = self.loss / self.config.training.gradient_accumulation
+        scaled_loss = self.loss / self.config.training.gradient_accumulation.number
         backward(tensors=scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:

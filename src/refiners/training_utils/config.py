@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from refiners.training_utils.clock import ClockConfig
-from refiners.training_utils.common import Epoch, Iteration, TimeValue, TimeValueInput, parse_number_unit_field
+from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, TimeValueInput, parse_number_unit_field
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
@@ -25,12 +25,12 @@ class TrainingConfig(BaseModel):
     duration: TimeValue = Iteration(1)  # TimeValue(number=1, unit=TimeUnit.ITERATION)
     seed: int = 0
     batch_size: int = 1
-    gradient_accumulation: int = 1
+    gradient_accumulation: Step = Step(1)
     gradient_clipping_max_norm: float | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("duration", mode="before")
+    @field_validator("duration", "gradient_accumulation", mode="before")
     def parse_field(cls, value: TimeValueInput) -> TimeValue:
         return parse_number_unit_field(value)
 
