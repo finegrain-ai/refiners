@@ -26,6 +26,7 @@ from refiners.training_utils.common import (
     scoped_seed,
 )
 from refiners.training_utils.config import BaseConfig, ModelConfig
+from refiners.training_utils.data_loader import DataloaderConfig, create_data_loader
 from refiners.training_utils.trainer import (
     Trainer,
     TrainingClock,
@@ -64,6 +65,7 @@ class MockConfig(BaseConfig):
 
     mock_model: MockModelConfig
     mock_callback: MockCallbackConfig
+    data_loader: DataloaderConfig
 
 
 class MockModel(fl.Chain):
@@ -132,6 +134,14 @@ class MockTrainer(Trainer[MockConfig, MockBatch]):
         return MockBatch(
             inputs=torch.cat([b.inputs for b in batch]),
             targets=torch.cat([b.targets for b in batch]),
+        )
+
+    def create_data_iterable(self):
+        return create_data_loader(
+            get_item=self.get_item,
+            length=self.dataset_length,
+            config=self.config.data_loader,
+            collate_fn=self.collate_fn,
         )
 
     @register_callback()
@@ -204,21 +214,10 @@ def test_human_readable_number() -> None:
 @pytest.fixture
 def training_clock() -> TrainingClock:
     return TrainingClock(
-        batch_size=10,
         training_duration=Epoch(5),
         gradient_accumulation=Step(1),
         lr_scheduler_interval=Epoch(1),
     )
-
-
-def test_zero_batch_size_error():
-    with pytest.raises(AssertionError):
-        TrainingClock(
-            batch_size=0,
-            training_duration=Epoch(5),
-            gradient_accumulation=Step(1),
-            lr_scheduler_interval=Epoch(1),
-        )
 
 
 def test_timer_functionality(training_clock: TrainingClock) -> None:

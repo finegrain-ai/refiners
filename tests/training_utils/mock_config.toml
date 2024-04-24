@@ -20,6 +20,9 @@ batch_size = 4
 gradient_accumulation = "4:step"
 gradient_clipping_max_norm = 1.0
 
+[data_loader]
+batch_size = 4
+
 [optimizer]
 optimizer = "SGD"
 learning_rate = 1
