@@ -280,7 +280,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @abstractmethod
     def create_data_iterable(self) -> Iterable[Batch]: ...
 
-    @property
+    @cached_property
     def data_iterable(self) -> Iterable[Batch]:
         return self.create_data_iterable()
 

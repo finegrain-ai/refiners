@@ -24,7 +24,6 @@ class TrainingConfig(BaseModel):
     dtype: str = "float32"
     duration: TimeValue = Iteration(1)
     seed: int = 0
-    batch_size: int = 1
     gradient_accumulation: Step = Step(1)
     gradient_clipping_max_norm: float | None = None
 

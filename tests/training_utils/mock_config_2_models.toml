@@ -11,7 +11,6 @@ verbose = false
 [training]
 duration = "100:epoch"
 seed = 0
-batch_size = 4
 gradient_accumulation = "4:step"
 gradient_clipping_max_norm = 1.0
 

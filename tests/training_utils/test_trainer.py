@@ -26,7 +26,7 @@ from refiners.training_utils.common import (
     scoped_seed,
 )
 from refiners.training_utils.config import BaseConfig, ModelConfig
-from refiners.training_utils.data_loader import DataloaderConfig, create_data_loader
+from refiners.training_utils.data_loader import DataLoaderConfig, create_data_loader
 from refiners.training_utils.trainer import (
     Trainer,
     TrainingClock,
@@ -65,7 +65,7 @@ class MockConfig(BaseConfig):
 
     mock_model: MockModelConfig
     mock_callback: MockCallbackConfig
-    data_loader: DataloaderConfig
+    data_loader: DataLoaderConfig
 
 
 class MockModel(fl.Chain):
@@ -334,3 +334,15 @@ def mock_trainer_2_models(mock_config_2_models: MockConfig) -> MockTrainerWith2M
 def test_optimizer_parameters(mock_trainer_2_models: MockTrainerWith2Models) -> None:
     assert len(mock_trainer_2_models.optimizer.param_groups) == 2
     assert mock_trainer_2_models.optimizer.param_groups[0]["lr"] == 1e-5
+
+
+class MockTrainerNoDataLoader(MockTrainer):
+    def create_data_iterable(self) -> list[MockBatch]:  # type: ignore
+        return [MockBatch(inputs=torch.randn(4, 10), targets=torch.randn(4, 10)) for _ in range(5)]
+
+
+def test_trainer_no_data_loader(mock_config: MockConfig) -> None:
+    trainer = MockTrainerNoDataLoader(config=mock_config)
+    trainer.train()
+    assert trainer.step_counter == 500
+    assert trainer.clock.epoch == 100
