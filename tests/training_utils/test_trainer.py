@@ -206,19 +206,9 @@ def training_clock() -> TrainingClock:
     return TrainingClock(
         batch_size=10,
         training_duration=Epoch(5),
-        gradient_accumulation=1,
+        gradient_accumulation=Step(1),
         lr_scheduler_interval=Epoch(1),
     )
-
-
-def test_small_dataset_error():
-    with pytest.raises(AssertionError):
-        TrainingClock(
-            batch_size=10,
-            training_duration=Epoch(5),
-            gradient_accumulation=1,
-            lr_scheduler_interval=Epoch(1),
-        )
 
 
 def test_zero_batch_size_error():
@@ -226,7 +216,7 @@ def test_zero_batch_size_error():
         TrainingClock(
             batch_size=0,
             training_duration=Epoch(5),
-            gradient_accumulation=1,
+            gradient_accumulation=Step(1),
             lr_scheduler_interval=Epoch(1),
         )
 

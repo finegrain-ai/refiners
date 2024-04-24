@@ -1,9 +1,8 @@
 import time
-from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from refiners.training_utils.callback import Callback, CallbackConfig
-from refiners.training_utils.common import Epoch, Iteration, Step, TimeUnit, TimeValue
+from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
@@ -23,7 +22,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self,
         batch_size: int,
         training_duration: TimeValue,
-        gradient_accumulation: int,
+        gradient_accumulation: Step,
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
@@ -75,7 +74,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     @property
     def is_optimizer_step(self) -> bool:
-        return self.num_minibatches_processed == self.gradient_accumulation
+        return self.num_minibatches_processed == self.gradient_accumulation.number
 
     @property
     def done(self) -> bool:
@@ -94,41 +93,42 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
             logger.info(message)
 
     def on_train_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.reset()
-        trainer.clock.start_timer()
+        self.log(f"Starting training for {self.training_duration}.")
+        self.reset()
+        self.start_timer()
 
     def on_train_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        trainer.clock.stop_timer()
+        self.stop_timer()
         self.log(
             (
                 "Training took: "
-                f"{trainer.clock.time_elapsed} seconds, "
-                f"{trainer.clock.iteration} iterations, "
-                f"{trainer.clock.epoch} epochs, "
-                f"{trainer.clock.step} steps."
+                f"{self.time_elapsed} seconds, "
+                f"{self.iteration} iterations, "
+                f"{self.epoch} epochs, "
+                f"{self.step} steps."
             )
         )
 
     def on_epoch_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Epoch {trainer.clock.epoch} started.")
+        self.log(f"Epoch {self.epoch} started.")
 
     def on_epoch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Epoch {trainer.clock.epoch} ended.")
-        trainer.clock.epoch += 1
-        trainer.clock.num_batches_processed = 0
+        self.log(f"Epoch {self.epoch} ended.")
+        self.epoch += 1
+        self.num_batches_processed = 0
 
     def on_step_begin(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         if self.num_minibatches_processed == 0:
-            self.log(f"Iteration {trainer.clock.iteration} started.")
-        self.log(f"Step {trainer.clock.step} started.")
+            self.log(f"Iteration {self.iteration} started.")
+        self.log(f"Step {self.step} started.")
 
     def on_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Step {trainer.clock.step} ended.")
-        trainer.clock.step += 1
-        trainer.clock.num_batches_processed += 1
-        trainer.clock.num_minibatches_processed += 1
+        self.log(f"Step {self.step} ended.")
+        self.step += 1
+        self.num_batches_processed += 1
+        self.num_minibatches_processed += 1
 
     def on_optimizer_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Iteration {trainer.clock.iteration} ended.")
-        trainer.clock.iteration += 1
-        trainer.clock.num_minibatches_processed = 0
+        self.log(f"Iteration {self.iteration} ended.")
+        self.iteration += 1
+        self.num_minibatches_processed = 0
