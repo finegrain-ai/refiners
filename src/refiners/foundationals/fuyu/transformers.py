@@ -160,6 +160,7 @@ class FuyuSelfAttention(fl.Chain):
         self.base = base
         self.norm_eps = norm_eps
         self.partial_rotary_factor = partial_rotary_factor
+        self.rotary_dim = int(self.heads_dim * self.partial_rotary_factor)
 
         super().__init__(
             QKVProjection(
@@ -171,8 +172,10 @@ class FuyuSelfAttention(fl.Chain):
                 dtype=dtype,
             ),
             RotaryPositionalEmbedding(
-                dim=int(self.heads_dim * self.partial_rotary_factor), base=self.base, device=device, dtype=dtype
-            ),
+                dim=self.rotary_dim,
+                base=self.base,
+                device=device,
+                dtype=dtype,
             fl.Distribute(  # B seq_len num_heads heads_dim => B seq_len embdedding_dim
                 CustomReshape(self.embedding_dim),  # Q
                 CustomReshape(self.embedding_dim),  # K
