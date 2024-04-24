@@ -155,7 +155,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
             self.log(f"Iteration {trainer.clock.iteration} started.")
         self.log(f"Step {trainer.clock.step} started.")
 
-    def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+    def on_step_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
         self.log(f"Step {trainer.clock.step} ended.")
         trainer.clock.step += 1
         trainer.clock.num_batches_processed += 1

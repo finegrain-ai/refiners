@@ -401,9 +401,20 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             elif mode == "eval":
                 item.model.eval()
 
+    def _run_event(self, callback: Callback[Any], event_name: str) -> None:
+        getattr(callback, event_name)(self)
+
     def _call_callbacks(self, event_name: str) -> None:
+        if event_name.endswith("_begin"):
+            self._run_event(self.clock, event_name)
+
         for callback in self.callbacks.values():
-            getattr(callback, event_name)(self)
+            if callback == self.clock:
+                continue
+            self._run_event(callback, event_name)
+
+        if event_name.endswith("_end"):
+            self._run_event(self.clock, event_name)
 
     def _load_callbacks(self) -> None:
         for name, config in self.config:
