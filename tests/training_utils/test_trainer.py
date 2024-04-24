@@ -94,6 +94,10 @@ class MockCallback(Callback["MockTrainer"]):
     def on_step_end(self, trainer: "MockTrainer") -> None:
         if not trainer.clock.is_due(self.config.on_batch_end_interval):
             return
+
+        # We verify that the callback is always called before the clock is updated
+        assert trainer.clock.step // 3 <= self.step_end_count
+
         self.step_end_count += 1
         with scoped_seed(self.config.on_batch_end_seed):
             self.step_end_random_int = random.randint(0, 100)
