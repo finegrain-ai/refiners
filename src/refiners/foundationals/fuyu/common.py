@@ -32,38 +32,6 @@ class SquaredReLU(fl.Activation):
         return torch.pow(relu(x), 2)
 
 
-class CustomReshape(fl.Module):
-    """Reshape operation layer.
-
-    This layer reshapes the input tensor to a specific shape (which must be compatible with the original shape).
-    See also [torch.reshape].
-
-    Warning:
-        The first dimension and seconde dimension (batch dimension and
-        sequence length) are forcefully preserved.
-
-    Example:
-        ```py
-        reshape = CustomReshape(5, 2)
-
-        tensor = torch.randn(2, 6, 10, 1)
-        output = reshape(tensor)
-
-        assert output.shape == (2, 6, 5, 2)
-        ```
-    """
-
-    def __init__(self, *shape: int) -> None:
-        super().__init__()
-        self.shape = shape
-
-    def forward(self, x: Tensor) -> Tensor:
-        return torch.reshape(
-            input=x,
-            shape=(x.shape[0], x.shape[1], *self.shape),
-        )
-
-
 class PatchPadding(fl.Module):
     """
     Padding operation layer.

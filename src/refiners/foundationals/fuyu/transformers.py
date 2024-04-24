@@ -5,7 +5,7 @@ from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.foundationals.dinov2.vit import FeedForward
-from refiners.foundationals.fuyu.common import CustomReshape, ScaledDotProductAttentionWithAttnMask, SquaredReLU
+from refiners.foundationals.fuyu.common import ScaledDotProductAttentionWithAttnMask, SquaredReLU
 
 
 class RotaryPositionalEmbedding(fl.Module):
@@ -104,7 +104,7 @@ class QKVProjection(fl.Chain):
                 device=device,
                 dtype=dtype,
             ),
-            CustomReshape(self.num_heads, 3, self.heads_dim),
+            fl.Reshape(-1, self.num_heads, 3, self.heads_dim),
             fl.Parallel(
                 fl.Chain(  # Q projection
                     fl.Slicing(dim=-2, start=0, end=1),
@@ -176,10 +176,11 @@ class FuyuSelfAttention(fl.Chain):
                 base=self.base,
                 device=device,
                 dtype=dtype,
+            ),
             fl.Distribute(  # B seq_len num_heads heads_dim => B seq_len embdedding_dim
-                CustomReshape(self.embedding_dim),  # Q
-                CustomReshape(self.embedding_dim),  # K
-                CustomReshape(self.embedding_dim),  # V
+                fl.Reshape(-1, self.embedding_dim),  # Q
+                fl.Reshape(-1, self.embedding_dim),  # K
+                fl.Reshape(-1, self.embedding_dim),  # V
             ),
             ScaledDotProductAttentionWithAttnMask(num_heads=self.num_heads, is_optimized=self.is_optimized),
             fl.Linear(  # Output projection [B seqlen embedding dim]
