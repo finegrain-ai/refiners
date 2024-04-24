@@ -201,14 +201,12 @@ class InputEncoder(fl.ContextModule):
             encoded_texts.append(encoded_text)
 
         # Initialize the 3D attention mask with ones
-        max_text_len = max(et.shape[1] for et in encoded_texts)
-        max_img_len = max(im.shape[1] for im in encoded_images)
-        max_len = max_text_len + max_img_len
+        max_len = max(et.shape[1] + im.shape[1] for et, im in zip(encoded_texts, encoded_images))
         attn_mask = torch.ones(b, 1, max_len, max_len, device=self.device, dtype=torch.bool)
 
         padded_encoded_images: List[Tensor] = []
         for idx, (encoded_text, encoded_image) in enumerate(zip(encoded_texts, encoded_images)):
-            padding_length = (max_text_len - encoded_text.shape[1]) + (max_img_len - encoded_image.shape[1])
+            padding_length = max_len - (encoded_text.shape[1] + encoded_image.shape[1])
             if padding_length > 0:
                 padding_tensor = tensor([self.tokenizer.pad_token["id"]] * padding_length, device=self.device).long()
                 padding_encoding = self.token_encoder(padding_tensor).unsqueeze(0)
