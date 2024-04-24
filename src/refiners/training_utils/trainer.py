@@ -30,6 +30,7 @@ from refiners.training_utils.callback import (
 )
 from refiners.training_utils.clock import ClockConfig, TrainingClock
 from refiners.training_utils.common import (
+    Step,
     compute_grad_norm,
     count_learnable_parameters,
     human_readable_number,
@@ -150,7 +151,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
-            dataset_length=self.dataset_length,
             batch_size=self.config.training.batch_size,
             training_duration=self.config.training.duration,
             gradient_accumulation=self.config.training.gradient_accumulation,
@@ -279,7 +279,11 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             case _:
                 raise ValueError(f"Unknown scheduler type: {config.type}")
 
-        warmup_scheduler_steps = self.clock.convert_time_value(config.warmup, config.update_interval.unit)
+        warmup_scheduler_steps = (
+            config.warmup.number
+            if isinstance(config.warmup, Step)
+            else config.warmup.number * self.clock.gradient_accumulation
+        )
         if warmup_scheduler_steps > 0:
             lr_scheduler = WarmupScheduler(
                 optimizer=self.optimizer,
@@ -346,7 +350,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     def backward(self) -> None:
         """Backward pass on the loss."""
         self._call_callbacks(event_name="on_backward_begin")
-        scaled_loss = self.loss / self.clock.num_step_per_iteration
+        scaled_loss = self.loss / self.config.training.gradient_accumulation
         backward(tensors=scaled_loss)
         self._call_callbacks(event_name="on_backward_end")
         if self.clock.is_optimizer_step:
