@@ -20,14 +20,11 @@ class ClockConfig(CallbackConfig):
 class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
     def __init__(
         self,
-        batch_size: int,
         training_duration: TimeValue,
         gradient_accumulation: Step,
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
-        assert batch_size > 0, "Batch size must be greater than 0."
-        self.batch_size = batch_size
         self.training_duration = training_duration
         self.gradient_accumulation = gradient_accumulation
         self.lr_scheduler_interval = lr_scheduler_interval

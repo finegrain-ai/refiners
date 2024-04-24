@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property, wraps
-from typing import Any, Callable, Generic, Literal, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, Literal, TypeVar, cast
 
 import torch
 from loguru import logger
@@ -21,7 +21,6 @@ from torch.optim.lr_scheduler import (
     ReduceLROnPlateau,
     StepLR,
 )
-from torch.utils.data import DataLoader, Dataset
 
 from refiners.fluxion import layers as fl
 from refiners.training_utils.callback import (
@@ -62,23 +61,6 @@ class WarmupScheduler(LRScheduler):
 
 Batch = TypeVar("Batch")
 ConfigType = TypeVar("ConfigType", bound=BaseConfig)
-
-
-class _Dataset(Dataset[Batch]):
-    """
-    A wrapper around the `get_item` method to create a [`torch.utils.data.Dataset`][torch.utils.data.Dataset].
-    """
-
-    def __init__(self, get_item: Callable[[int], Batch], length: int) -> None:
-        assert length > 0, "Dataset length must be greater than 0."
-        self.length = length
-        self.get_item = get_item
-
-    def __getitem__(self, index: int) -> Batch:
-        return self.get_item(index)
-
-    def __len__(self) -> int:
-        return self.length
 
 
 @dataclass
@@ -151,7 +133,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
-            batch_size=self.config.training.batch_size,
             training_duration=self.config.training.duration,
             gradient_accumulation=self.config.training.gradient_accumulation,
             lr_scheduler_interval=self.config.lr_scheduler.update_interval,
@@ -294,58 +275,14 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return lr_scheduler
 
     @abstractmethod
-    def get_item(self, index: int) -> Batch:
-        """
-        Returns a batch of data.
+    def compute_loss(self, batch: Batch) -> Tensor: ...
 
-        This function is used by the dataloader to fetch a batch of data.
-        """
-        ...
+    @abstractmethod
+    def create_data_iterable(self) -> Iterable[Batch]: ...
 
     @property
-    @abstractmethod
-    def dataset_length(self) -> int:
-        """
-        Returns the length of the dataset.
-
-        This is used to compute the number of batches per epoch.
-        """
-        ...
-
-    @abstractmethod
-    def collate_fn(self, batch: list[Batch]) -> Batch:
-        """
-        Collate function for the dataloader.
-
-        This function is used to tell the dataloader how to combine a list of
-        batches into a single batch.
-        """
-        ...
-
-    @cached_property
-    def dataset(self) -> Dataset[Batch]:
-        """
-        Returns the dataset constructed with the `get_item` method.
-        """
-        return _Dataset(get_item=self.get_item, length=self.dataset_length)
-
-    @cached_property
-    def dataloader(self) -> DataLoader[Any]:
-        config = self.config.dataloader
-        return DataLoader(
-            dataset=self.dataset,
-            batch_size=self.config.training.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=config.num_workers,
-            prefetch_factor=config.prefetch_factor,
-            persistent_workers=config.persistent_workers,
-            pin_memory=config.pin_memory,
-            shuffle=config.shuffle,
-            drop_last=config.drop_last,
-        )
-
-    @abstractmethod
-    def compute_loss(self, batch: Batch) -> Tensor: ...
+    def data_iterable(self) -> Iterable[Batch]:
+        return self.create_data_iterable()
 
     def backward(self) -> None:
         """Backward pass on the loss."""
@@ -375,7 +312,7 @@ class Trainer(Generic[ConfigType, Batch], ABC):
 
     def epoch(self) -> None:
         """Perform a single epoch."""
-        for batch in self.dataloader:
+        for batch in self.data_iterable:
             if self.clock.done:
                 break
             self._call_callbacks(event_name="on_step_begin")
