@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, Dataset
 BatchT = TypeVar("BatchT")
 
 
-class DataloaderConfig(BaseModel):
+class DataLoaderConfig(BaseModel):
     batch_size: PositiveInt = 1
     num_workers: int = 0
     pin_memory: bool = False
