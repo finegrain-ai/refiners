@@ -86,10 +86,10 @@ class InputEncoder(fl.ContextModule):
 
     def __init__(
         self,
+        tokenizer: FuyuTokenizer,
         embedding_dim: int = 4096,
         max_sequence_length: int = 16_384,
         vocabulary_size: int = 262_144,
-        tokenizer: FuyuTokenizer | None = None,
         patch_size: int = 30,
         padding_value: float = 1.0 / 255,
         max_size: Tuple[int, int] = (1080, 1920),  # h w
@@ -111,7 +111,7 @@ class InputEncoder(fl.ContextModule):
         # at generation time. Purpose: rescaling the coordinates at the original image size once the generation is over.
         self.scales_list: List[float] = []
 
-        self.tokenizer = tokenizer or FuyuTokenizer()
+        self.tokenizer = tokenizer
 
         self.token_encoder = TokenEncoder(
             vocabulary_size=self.vocabulary_size, embedding_dim=self.embedding_dim, device=self.device, dtype=self.dtype

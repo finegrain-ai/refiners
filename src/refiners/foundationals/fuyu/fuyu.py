@@ -1,6 +1,6 @@
 import re
-from dataclasses import dataclass, replace
-from typing import Any, List, Union
+from pathlib import Path
+from typing import Any, List
 
 import numpy as np
 import torch
@@ -14,77 +14,27 @@ from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
 
 
-@dataclass(frozen=True)
-class Fuyu8b:
-    """
-    config with the base argument for Fuyu8b
-    """
-
-    embedding_dim: int = 4_096
-    feedforward_dim: int = 16_384
-    max_sequence_length: int = 16_384
-    vocabulary_size: int = 262_144
-    tokenizer: FuyuTokenizer = FuyuTokenizer()
-    patch_size: int = 30
-    padding_value: float = 1.0 / 255
-    num_layers: int = 36
-    num_heads: int = 64
-    norm_eps: float = 1e-5
-    base: int = 25_000
-    partial_rotary_factor: float = 0.5
-    use_bias: bool = True
-    is_optimized: bool = False
-    device: Device | str | None = "cuda:0"
-    dtype: DType | None = torch.float32
-
-    def with_device(self, new_device: Union[Device, str]) -> "Fuyu8b":
-        """
-        Returns a new instance of Fuyu8b with a specified device.
-
-        Args:
-            new_device (Union['Device', str]): The device to set for the new instance.
-
-        Returns:
-            Fuyu8b: New instance with updated device.
-        """
-        return replace(self, device=new_device)
-
-
-def create_fuyu(config: Fuyu8b):
-    """
-    create a fuyu model based on the config provided
-
-    Example:
-        ```py
-        config = Fuyu8b
-        network = create_fuyu(config)
-        ```
-    """
-    model = Fuyu(
-        embedding_dim=config.embedding_dim,
-        feedforward_dim=config.feedforward_dim,
-        max_sequence_length=config.max_sequence_length,
-        vocabulary_size=config.vocabulary_size,
-        tokenizer=config.tokenizer,
-        patch_size=config.patch_size,
-        padding_value=config.padding_value,
-        num_layers=config.num_layers,
-        num_heads=config.num_heads,
-        norm_eps=config.norm_eps,
-        base=config.base,
-        partial_rotary_factor=config.partial_rotary_factor,
-        use_bias=config.use_bias,
-        is_optimized=config.is_optimized,
-        device=config.device,
-        dtype=config.dtype,
-    )
-    return model
-
-
 class Fuyu(fl.Chain):
     """
-    Implements the Fuyu model
-    see [https://www.adept.ai/blog/fuyu-8b]
+    Initialize a Fuyu model
+
+    Args:
+        embedding_dim: The dimension of the embedding.
+        feedforward_dim: The dimension of the feedforward layer.
+        max_sequence_length: The maximum length of the input sequences.
+        vocabulary_size: The size of the tokenizer vocabulary.
+        tokenizer: The tokenizer used.
+        patch_size: The size of the patches.
+        padding_value: The value used for padding inputs.
+        num_layers: The number of layers.
+        num_heads: The number of heads.
+        norm_eps: The epsilon used in Layer Norms.
+        base: The base used in RoPE.
+        partial_rotary_factor: The factor for partial rotary in RoPE.
+        use_bias: Whether to use bias in the linear layers.
+        is_optimized: Use of optimized attention.
+        device: The PyTorch device to use.
+        dtype: The PyTorch data type to use.
     """
 
     def __init__(
@@ -265,3 +215,50 @@ class Fuyu(fl.Chain):
                     final_answer += elem
             final_answers[idx] = final_answer
         return final_answers
+
+
+class Fuyu8b(Fuyu):
+    """
+    Fuyu base configuration with 8b parameters
+    see [https://www.adept.ai/blog/fuyu-8b]
+
+    Attributes:
+        embedding_dim (int): 4_096
+        feedforward_dim (int): 16_384
+        max_sequence_length (int): 16_384
+        vocabulary_size (int): 262_144
+        patch_size (int): 30
+        padding_value (float): 1.0 / 255
+        num_layers (int): 36
+        num_heads (int): 64
+        norm_eps (float): 1e-5
+        base (int): 25_000
+        partial_rotary_factor (float): 0.5
+        use_bias (bool): True
+        is_optimized (bool): False
+    """
+
+    def __init__(
+        self,
+        tokenizer_path: str | Path,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
+        super().__init__(
+            embedding_dim=4_096,
+            feedforward_dim=16_384,
+            max_sequence_length=16_384,
+            vocabulary_size=262_144,
+            tokenizer=FuyuTokenizer(tokenizer_path),
+            patch_size=30,
+            padding_value=1.0 / 255,
+            num_layers=36,
+            num_heads=64,
+            norm_eps=1e-5,
+            base=25_000,
+            partial_rotary_factor=0.5,
+            use_bias=True,
+            is_optimized=False,
+            device=device,
+            dtype=dtype,
+        )
