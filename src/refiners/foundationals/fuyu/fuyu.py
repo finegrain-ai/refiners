@@ -94,7 +94,7 @@ class Fuyu(fl.Chain):
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
 
-    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation: int = 50):
+    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation: int = 50) -> list[str]:
         """
         Generate answers for a list of images and prompts. Inference by batch,
         rescale image if they are over self.InputEncoder.max_size

@@ -8,19 +8,23 @@ from torch import device as Device
 from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, tensor_to_image
-from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b, create_fuyu
+from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b
 
 
 @pytest.fixture(scope="module")
-def our_model(test_weights_path: Path, test_device: Device) -> Fuyu:
+def our_model(test_weights_path: Path, test_vocab_path: Path, test_device: Device) -> Fuyu:
     weights = test_weights_path / f"fuyu8b.safetensors"
+    vocab = test_vocab_path / f"tokenizer.json.gz"
 
     if not weights.is_file():
         warn(f"could not find weights at {weights}, skipping")
         pytest.skip(allow_module_level=True)
 
-    config = Fuyu8b().with_device(test_device)
-    model = create_fuyu(config)
+    if not vocab.is_file():
+        warn(f"could not find weights at {vocab}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    model = Fuyu8b(tokenizer_path=vocab, device=test_device)
     tensors = load_from_safetensors(weights)
     model.load_state_dict(tensors)
     return model
@@ -38,7 +42,7 @@ def ref_model(test_device: Device) -> FuyuForCausalLM:
     )
 
 
-def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device):
+def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device) -> None:
     """
     Tests the consistency of output features between the reference model and our model under random prompts.
 
@@ -56,14 +60,14 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
     """
 
     manual_seed(42)
-    x = torch.rand(1, 3, 512, 512)
+    x = (torch.randint(0, 256, size=(1, 3, 512, 512), dtype=torch.uint8) / 255).float()
     x_pil = tensor_to_image(x)
 
     prompts = [
-        "Describe this image. \n",
-        "Is there a cat in the image? \n",
-        "What is the emotion of the person? \n",
-        "What is the main object in this image? \n",
+        "Describe this image.\n",
+        "Is there a cat in the image?\n",
+        "What is the emotion of the person?\n",
+        "What is the main object in this image?\n",
     ]
     p = random.choice(prompts)
 
