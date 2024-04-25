@@ -23,16 +23,17 @@ class RotaryPositionalEmbedding(fl.Module):
         self.device = device
         self.dtype = dtype
         # Create positional encodings
-        self.theta = 1.0 / (self.base ** (torch.arange(0, self.dim, 2, dtype=torch.int64).float() / self.dim)).to(
-            self.device
-        )
+        self.theta = torch.pow(
+            base, torch.arange(0, self.dim, 2, device=device, dtype=torch.float32) / self.dim
+        ).reciprocal()
+
         self.cos: Tensor = torch.empty(0, device=self.device, dtype=self.dtype)
         self.sin: Tensor = torch.empty(0, device=self.device, dtype=self.dtype)
 
     def _cache(self, seq_len: int) -> None:
         if seq_len < self.cos.shape[0]:
             return
-        t = torch.arange(seq_len, device=self.device, dtype=torch.int64).float()
+        t = torch.arange(seq_len, device=self.device, dtype=torch.float32)
         freqs = torch.outer(t, self.theta)
         embs = torch.cat([freqs, freqs], dim=-1)
         self.cos = embs.cos().to(self.dtype)
@@ -143,6 +144,7 @@ class FuyuSelfAttention(fl.Chain):
             embedding_dim: The embedding dimension of the input and output Tensor.
             num_heads: The number of heads to use.
             base: constant used to compute the rotations in the Rotary Positional Embedding
+            partial_rotary_factor: factor for partial rotary in RoPE.
             norm_eps: epsilon for Layer Norm
             use_bias: Whether to use bias in the linear layers.
             is_optimized: Whether to use optimized attention.
