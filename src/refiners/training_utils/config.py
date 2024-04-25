@@ -1,17 +1,17 @@
 from enum import Enum
 from logging import warn
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Type, TypeVar
+from typing import Annotated, Any, Callable, Iterable, Literal, Type, TypeVar
 
 import tomli
 from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict
 from torch import Tensor
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from refiners.training_utils.clock import ClockConfig
-from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, TimeValueInput, parse_number_unit_field
+from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, parse_number_unit_field
 
 # PyTorch optimizer parameters type
 # TODO: replace with `from torch.optim.optimizer import ParamsT` when PyTorch 2.2+ is enforced
@@ -19,19 +19,20 @@ from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, Ti
 ParamsT = Iterable[Tensor] | Iterable[dict[str, Any]]
 
 
+TimeValueField = Annotated[TimeValue, BeforeValidator(parse_number_unit_field)]
+IterationOrEpochField = Annotated[Iteration | Epoch, BeforeValidator(parse_number_unit_field)]
+StepField = Annotated[Step, BeforeValidator(parse_number_unit_field)]
+
+
 class TrainingConfig(BaseModel):
     device: str = "cpu"
     dtype: str = "float32"
-    duration: TimeValue = Iteration(1)
+    duration: TimeValueField = Iteration(1)
     seed: int = 0
-    gradient_accumulation: Step = Step(1)
+    gradient_accumulation: StepField = Step(1)
     gradient_clipping_max_norm: float | None = None
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("duration", "gradient_accumulation", mode="before")
-    def parse_field(cls, value: TimeValueInput) -> TimeValue:
-        return parse_number_unit_field(value)
 
 
 class Optimizers(str, Enum):
@@ -60,8 +61,8 @@ class LRSchedulerType(str, Enum):
 
 class LRSchedulerConfig(BaseModel):
     type: LRSchedulerType = LRSchedulerType.DEFAULT
-    update_interval: Iteration | Epoch = Iteration(1)
-    warmup: TimeValue = Iteration(0)
+    update_interval: IterationOrEpochField = Iteration(1)
+    warmup: TimeValueField = Iteration(0)
     gamma: float = 0.1
     lr_lambda: Callable[[int], float] | None = None
     mode: Literal["min", "max"] = "min"
@@ -76,10 +77,6 @@ class LRSchedulerConfig(BaseModel):
     eta_min: float = 0
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("update_interval", "warmup", mode="before")
-    def parse_field(cls, value: Any) -> TimeValue:
-        return parse_number_unit_field(value)
 
 
 class OptimizerConfig(BaseModel):

@@ -6,7 +6,6 @@ from typing import cast
 
 import pytest
 import torch
-from pydantic import field_validator
 from torch import Tensor, nn
 from torch.optim import SGD
 
@@ -16,16 +15,12 @@ from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.common import (
     Epoch,
-    Iteration,
     Step,
-    TimeValue,
-    TimeValueInput,
     count_learnable_parameters,
     human_readable_number,
-    parse_number_unit_field,
     scoped_seed,
 )
-from refiners.training_utils.config import BaseConfig, ModelConfig
+from refiners.training_utils.config import BaseConfig, IterationOrEpochField, ModelConfig, TimeValueField
 from refiners.training_utils.data_loader import DataLoaderConfig, create_data_loader
 from refiners.training_utils.trainer import (
     Trainer,
@@ -49,13 +44,9 @@ class MockModelConfig(ModelConfig):
 
 
 class MockCallbackConfig(CallbackConfig):
-    on_batch_end_interval: Step | Iteration | Epoch
+    on_batch_end_interval: TimeValueField
     on_batch_end_seed: int
-    on_optimizer_step_interval: Iteration | Epoch
-
-    @field_validator("on_batch_end_interval", "on_optimizer_step_interval", mode="before")
-    def parse_field(cls, value: TimeValueInput) -> TimeValue:
-        return parse_number_unit_field(value)
+    on_optimizer_step_interval: IterationOrEpochField
 
 
 class MockConfig(BaseConfig):
