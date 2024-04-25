@@ -120,8 +120,8 @@ def scaled_dot_product_attention_non_optimized(
     return attention @ value
 
 
-class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
-    """Scaled Dot Product Attention.
+class ScaledDotProductAttentionWithAttnMask(fl.ScaledDotProductAttention, fl.ContextModule):
+    """Scaled Dot Product Attention with Attn Mask for eventual padding and causality.
 
     ??? note "See [[arXiv:1706.03762] Attention Is All You Need (Figure 2)](https://arxiv.org/abs/1706.03762) for more details"
 
@@ -165,10 +165,7 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
             is_optimized: Whether to use optimized attention.
             slice_size: The slice size to use for the optimized attention.
         """
-        super().__init__()
-        self.num_heads = num_heads
-        self.is_optimized = is_optimized
-        self.slice_size = slice_size
+        super().__init__(num_heads=num_heads, is_optimized=is_optimized, slice_size=slice_size)
         self.dot_product = (
             scaled_dot_product_attention if self.is_optimized else scaled_dot_product_attention_non_optimized
         )
@@ -237,30 +234,3 @@ class ScaledDotProductAttentionWithAttnMask(fl.ContextModule):
                 attn_mask=attn_mask,
             ).to(dtype)
         )
-
-    def _split_to_multi_head(
-        self,
-        x: Float[Tensor, "batch_size sequence_length embedding_dim"],
-    ) -> Float[Tensor, "batch_size num_heads sequence_length (embedding_dim//num_heads)"]:
-        """Split the input tensor into multiple heads along the embedding dimension.
-
-        See also `merge_multi_head`, which is the inverse operation.
-        """
-        assert (
-            x.ndim == 3
-        ), f"Expected input tensor with shape (batch_size sequence_length embedding_dim), got {x.shape}"
-        assert (
-            x.shape[-1] % self.num_heads == 0
-        ), f"Expected embedding_dim (x.shape[-1]={x.shape[-1]}) to be divisible by num_heads ({self.num_heads})"
-
-        return x.reshape(x.shape[0], x.shape[1], self.num_heads, x.shape[-1] // self.num_heads).transpose(1, 2)
-
-    def _merge_multi_head(
-        self,
-        x: Float[Tensor, "batch_size num_heads sequence_length heads_dim"],
-    ) -> Float[Tensor, "batch_size sequence_length heads_dim * num_heads"]:
-        """Merge the input tensor from multiple heads along the embedding dimension.
-
-        See also `split_to_multi_head`, which is the inverse operation.
-        """
-        return x.transpose(1, 2).reshape(x.shape[0], x.shape[2], self.num_heads * x.shape[-1])
