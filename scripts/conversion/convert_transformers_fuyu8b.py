@@ -1,14 +1,14 @@
 import argparse
-import gc
 import gzip
+import os
 import shutil
 from pathlib import Path
 
+from huggingface_hub import hf_hub_download  # type: ignore[reportMissingTypeStubs]
 from torch import Tensor
 from tqdm import tqdm
-from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
-from refiners.fluxion.utils import save_to_safetensors
+from refiners.fluxion.utils import load_from_safetensors, save_to_safetensors
 
 
 def convert_fuyu_huggingface(weights: dict[str, Tensor]) -> None:
@@ -140,41 +140,43 @@ def main() -> None:
     parser.add_argument("--half", action="store_true", dest="half")
     args = parser.parse_args()
 
-    # create refiners .cache folder
-    refiners_cache_path = Path.home() / ".cache/refiners/fuyu-8b/"
-    refiners_cache_path.mkdir(parents=True, exist_ok=True)
+    if args.output_path is not None:
+        output_path = Path(args.output_path)
+    else:
+        # create refiners .cache folder
+        output_path = Path.home() / ".cache/refiners/fuyu-8b/"
+    output_path.mkdir(parents=True, exist_ok=True)
 
-    model_id = "adept/fuyu-8b"
+    repo_id = "adept/fuyu-8b"
 
-    # extract the json vocabulary file from the hf .cache
-    processor: FuyuProcessor = FuyuProcessor.from_pretrained(pretrained_model_name_or_path=model_id)  # type: ignore[reportUnknownMemberType, reportAssignmentType]
-    vocabulary_file_path: str = Path(processor.tokenizer.vocab_file).absolute().parent / "tokenizer.json"  # type: ignore[reportUnknownMemberType, reportUnknownVariableType]
-    vocabulary_save_path = refiners_cache_path / "tokenizer.json.gz"
+    #  the json vocabulary file from the hf hub
+    hf_hub_download(repo_id=repo_id, filename="tokenizer.json", local_dir=output_path)
+    vocabulary_source_path = output_path / "tokenizer.json"
+    vocabulary_save_path = output_path / "tokenizer.json.gz"
 
     # compress the json vocabulary file
-    with open(vocabulary_file_path, "rb") as original_file:
+    with open(vocabulary_source_path, "rb") as original_file:
         with gzip.open(vocabulary_save_path, "wb") as compressed_file:
             shutil.copyfileobj(original_file, compressed_file)
+    # remove uncompressed file
+    os.remove(vocabulary_source_path)
 
-    # get hf fuyu weights
-    source: FuyuForCausalLM = FuyuForCausalLM.from_pretrained(pretrained_model_name_or_path=model_id)  # type: ignore[reportUnknownMemberType, reportAssignmentType]
-    weights = source.state_dict()
-    del source
-    gc.collect()
+    # extract hf fuyu weights from the hf hub
+    hf_hub_download(repo_id=repo_id, filename="model-00001-of-00002.safetensors", local_dir=output_path)
+    hf_hub_download(repo_id=repo_id, filename="model-00002-of-00002.safetensors", local_dir=output_path)
+    weights = load_from_safetensors(output_path / "model-00001-of-00002.safetensors")
+    weights.update(load_from_safetensors(output_path / "model-00002-of-00002.safetensors"))
+
+    # remove hf weights files
+    os.remove(output_path / "model-00001-of-00002.safetensors")
+    os.remove(output_path / "model-00002-of-00002.safetensors")
 
     # converts weights
     convert_fuyu_huggingface(weights)
     if args.half:
         weights = {key: value.half() for key, value in weights.items()}
 
-    # save to output path if specified, otherwise save to refiners .cache folder
-    if args.output_path is not None:
-        output_path = Path(args.output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-    else:
-        output_path = refiners_cache_path / "fuyu.safetensors"
-
-    save_to_safetensors(path=output_path, tensors=weights)
+    save_to_safetensors(path=output_path / "fuyu.safetensors", tensors=weights)
 
 
 if __name__ == "__main__":
