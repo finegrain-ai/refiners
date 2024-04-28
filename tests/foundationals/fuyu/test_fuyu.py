@@ -105,7 +105,7 @@ def test_generation(
     assets = Path(__file__).parent.parent.parent.parent / "assets"
     images = [
         _img_open(assets / "dragon_quest_slime.jpg"),
-        _img_open(assets / "dropy.png"),
+        _img_open(assets / "dropy_logo.png"),
         _img_open(assets / "pokemon_cat.png"),
         _img_open(assets / "logo_dark.png"),
     ]
