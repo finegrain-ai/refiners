@@ -121,7 +121,7 @@ def test_generation(
     ref_input: Dict[str, Tensor] = ref_processor(images=images, text=p, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
     # Get tokens of the answer generated
     ref_output: Tensor = ref_model.generate(**ref_input, max_new_tokens=100, use_cache=False)  # type: ignore[reportUnknownMemberType]
-    # Decodes tokens and get the element after the begining of answer token
+    # Decodes tokens and get the element after the beginning of answer token
     ref_generation: List[str] = ref_processor.batch_decode(ref_output, skip_special_tokens=True)  # type: ignore[reportUnknownMemberType]
     ref_generation = [answer.split("\x04")[1].strip() for answer in ref_generation]  # type: ignore[reportUnknownMemberType]
 
