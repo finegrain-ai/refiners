@@ -96,8 +96,7 @@ class Fuyu(fl.Chain):
 
     def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation: int = 50) -> list[str]:
         """
-        Generate answers for a list of images and prompts. Inference by batch,
-        rescale image if they are over self.InputEncoder.max_size
+        Generate answers for a list of images and prompts. Inference by batch.
 
         Receives:
             images (List[Image.Image, "batch"])
@@ -110,15 +109,17 @@ class Fuyu(fl.Chain):
         tensor_images = [(Tensor(np.array(image) / 255)).permute(2, 0, 1).unsqueeze(0) for image in images]
 
         i = 0
+        # Answers of the model for each prompt in the batch
         answers = [""] * len(tensor_images)
-        final_answers = [""] * len(tensor_images)
-
+        # Indices of the prompts that are still active i.e haven't reached end of sentence
         active_indices = list(range(len(tensor_images)))
+        # Incomplete answers to the currently active prompts, initialized to None
         active_answers = None
+        # Indicates if the model is in coordinates generation mode for the given answer
         active_in_coords = [False] * len(tensor_images)
-        scales_list = [1] * len(tensor_images)
-
-        tokenizer = self.tokenizer[0]
+        # Indicates the rescale factor for every image of the batch. Initialized to 0 and
+        # updated after the first forward call
+        scales_list = [1.0] * len(tensor_images)
 
         with no_grad():
             while i < max_len_generation and len(active_indices) > 0:
@@ -131,73 +132,103 @@ class Fuyu(fl.Chain):
                     scales_list = self.input_encoder[0].scales_list
 
                 next_tokens = torch.argmax(predictions[:, -1, :], dim=-1)
-
-                to_remove: List[int] = []
-                for idx, next_token in enumerate(next_tokens):
-                    token_id = int(next_token.item())
-                    # end of generation
-                    if token_id == tokenizer.eos_token["id"]:
-                        final_answers[active_indices[idx]] = answers[active_indices[idx]]
-                        to_remove.append(active_indices[idx])
-                        next_token_text = ""
-
-                    # the model begins to generate coordinates
-                    elif token_id in [tokenizer.token_bbox_open_id, tokenizer.token_point_open_id]:
-                        next_token_text = tokenizer.id_to_token[token_id]
-                        next_token_text = next_token_text.replace(tokenizer.token_bbox_open, tokenizer.text_bbox_open)
-                        next_token_text = next_token_text.replace(tokenizer.token_point_open, tokenizer.text_point_open)
-                        active_in_coords[active_indices[idx]] = True
-
-                    # the model ends coordinates generation
-                    elif token_id in [tokenizer.token_bbox_close_id, tokenizer.token_point_close_id]:
-                        next_token_text = tokenizer.id_to_token[token_id]
-                        next_token_text = next_token_text.replace(tokenizer.token_bbox_close, tokenizer.text_bbox_close)
-                        next_token_text = next_token_text.replace(
-                            tokenizer.token_point_close, tokenizer.text_point_close
-                        )
-                        # remove last comma
-                        answers[active_indices[idx]] = answers[active_indices[idx]][:-1]
-                        active_in_coords[active_indices[idx]] = False
-
-                    else:
-                        # basic processing
-                        if not active_in_coords[active_indices[idx]]:
-                            next_token_text = tokenizer.id_to_token[token_id].replace(
-                                tokenizer.replace_char, tokenizer.replace_pattern
-                            )
-                            next_token_text = next_token_text.replace(tokenizer.newline_model_token, "\n")
-                            # avoid starting the sentence with a space
-                            if i == 0 and next_token_text[0] == " ":
-                                next_token_text = next_token_text[1:]
-                        # coordinates processing
-                        else:
-                            next_token_text = tokenizer.id_to_token[token_id]
-                            next_token_text += ","
-
-                    if answers[active_indices[idx]] == "":
-                        answers[active_indices[idx]] = next_token_text
-                    else:
-                        answers[active_indices[idx]] += next_token_text
-
-                # Remove the indices that have reached the EOS token.
-                for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
-                    active_indices.remove(idx)
+                self.process_next_tokens(next_tokens, answers, active_indices, active_in_coords)
 
                 active_answers = [answers[idx] for idx in active_indices]
                 i += 1
 
-            # For any prompts that did not reach EOS, set their final answer now.
-            for idx in active_indices:
-                final_answers[idx] = answers[idx]
+        final_answers = self.rescale_answers(answers, scales_list)
 
-            regex_pattern = re.compile(
-                f"({tokenizer.text_bbox_open}|{tokenizer.text_bbox_close}|{tokenizer.text_point_open}|{tokenizer.text_point_close})"
-            )
+        return final_answers
 
-        # Rescale answers coordinates to the original image size
-        for idx, answer in enumerate(final_answers):
+    def process_next_tokens(
+        self,
+        next_tokens: Tensor,
+        answers: List[str],
+        active_indices: List[int],
+        active_in_coords: List[bool],
+    ) -> None:
+        """
+        Process a batch of token ids, update the current answers and active lists InPlace.
+
+        Receives:
+            next_tokens (Int[Tensor, "active_batch"])
+            answers (List[str, "batch"])
+            active_indices (List[int, "active_batch"])
+            active_in_coords (List[bool, "batch"])
+        """
+        tokenizer = self.tokenizer[0]
+
+        to_remove: List[int] = []
+        for idx, next_token in enumerate(next_tokens):
+            token_id = int(next_token.item())
+            # End of generation
+            if token_id == tokenizer.eos_token["id"]:
+                to_remove.append(active_indices[idx])
+                next_token_text = ""
+
+            # The model begins to generate coordinates
+            elif token_id in [tokenizer.token_bbox_open_id, tokenizer.token_point_open_id]:
+                next_token_text = tokenizer.id_to_token[token_id]
+                next_token_text = next_token_text.replace(tokenizer.token_bbox_open, tokenizer.text_bbox_open)
+                next_token_text = next_token_text.replace(tokenizer.token_point_open, tokenizer.text_point_open)
+                active_in_coords[active_indices[idx]] = True
+
+            # The model ends coordinates generation
+            elif token_id in [tokenizer.token_bbox_close_id, tokenizer.token_point_close_id]:
+                next_token_text = tokenizer.id_to_token[token_id]
+                next_token_text = next_token_text.replace(tokenizer.token_bbox_close, tokenizer.text_bbox_close)
+                next_token_text = next_token_text.replace(tokenizer.token_point_close, tokenizer.text_point_close)
+                # Remove last comma
+                answers[active_indices[idx]] = answers[active_indices[idx]][:-1]
+                active_in_coords[active_indices[idx]] = False
+
+            else:
+                # Basic processing
+                if not active_in_coords[active_indices[idx]]:
+                    next_token_text = tokenizer.id_to_token[token_id].replace(
+                        tokenizer.replace_char, tokenizer.replace_pattern
+                    )
+                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, "\n")
+
+                # Coordinates processing
+                else:
+                    next_token_text = tokenizer.id_to_token[token_id]
+                    next_token_text += ","
+
+            if answers[active_indices[idx]] == "":
+                answers[active_indices[idx]] = (
+                    next_token_text[1:] if next_token_text[0] == " " else next_token_text
+                )  # Avoid starting the sentence with a space
+            else:
+                answers[active_indices[idx]] += next_token_text
+
+        # Remove the indices that have reached the EOS token.
+        for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
+            active_indices.remove(idx)
+
+    def rescale_answers(self, answers: List[str], scales: List[float]) -> List[str]:
+        """
+        Rescale the coordinates within a list of model answers using the list of scales provided.
+
+        Receives:
+            answers (List[str, "batch"])
+            scales (List[float, "batch"])
+
+        Returns:
+            (List[str, "batch"])
+        """
+        tokenizer = self.tokenizer[0]
+
+        regex_pattern = re.compile(
+            f"({tokenizer.text_bbox_open}|{tokenizer.text_bbox_close}|{tokenizer.text_point_open}|{tokenizer.text_point_close})"
+        )
+
+        rescaled_answers: List[str] = []
+
+        for idx, answer in enumerate(answers):
             answer_split = regex_pattern.split(answer)
-            final_answer = ""
+            rescaled_answer = ""
             for i, elem in enumerate(answer_split):
                 if i > 0 and answer_split[i - 1] in [tokenizer.text_bbox_open, tokenizer.text_point_open]:
                     points_coordinates = elem.split(",")
@@ -207,14 +238,15 @@ class Fuyu(fl.Chain):
                         if point_coordinate.strip() != ""
                     ]
                     points_coordinates = [
-                        str(np.round((point_coordinate / scales_list[idx]) * 2).astype(int))
+                        str(np.round((point_coordinate / scales[idx]) * 2).astype(int))
                         for point_coordinate in points_coordinates
                     ]
-                    final_answer += ",".join(points_coordinates)
+                    rescaled_answer += ",".join(points_coordinates)
                 else:
-                    final_answer += elem
-            final_answers[idx] = final_answer
-        return final_answers
+                    rescaled_answer += elem
+            rescaled_answers.append(rescaled_answer)
+
+        return rescaled_answers
 
 
 class Fuyu8b(Fuyu):
