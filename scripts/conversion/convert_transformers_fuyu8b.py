@@ -134,17 +134,13 @@ def main() -> None:
         "--to",
         type=str,
         dest="output_path",
-        default=None,
-        help=("Path to save the converted model"),
+        required=True,
+        help=("Path to save the converted model and the vocab file"),
     )
     parser.add_argument("--half", action="store_true", dest="half")
     args = parser.parse_args()
 
-    if args.output_path is not None:
-        output_path = Path(args.output_path)
-    else:
-        # create refiners .cache folder
-        output_path = Path.home() / ".cache/refiners/fuyu-8b/"
+    output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
     repo_id = "adept/fuyu-8b"
