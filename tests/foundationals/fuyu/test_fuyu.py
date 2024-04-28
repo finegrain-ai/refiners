@@ -1,14 +1,20 @@
 import random
 from pathlib import Path
+from typing import List
 from warnings import warn
 
 import pytest
 import torch
-from torch import device as Device
+from PIL import Image
+from torch import Tensor, device as Device
 from transformers import FuyuForCausalLM, FuyuProcessor  # type: ignore[reportMissingTypeStubs]
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, tensor_to_image
 from refiners.foundationals.fuyu.fuyu import Fuyu, Fuyu8b
+
+
+def _img_open(path: Path) -> Image.Image:
+    return Image.open(path).convert("RGB")  # type: ignore
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +48,10 @@ def ref_model(test_device: Device) -> FuyuForCausalLM:
     )
 
 
-def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device) -> None:
+@no_grad()
+def test_forward(
+    ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device
+) -> None:
     """
     Tests the consistency of output features between the reference model and our model under random prompts.
 
@@ -51,9 +60,6 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
         ref_processor (FuyuProcessor): The processor used for preparing input data for ref_model.
         our_model (Fuyu): Our model to be tested against ref_model.
         test_device (torch.device): The device (e.g., CPU or GPU) to perform the test on.
-
-    Warning:
-        The ref model from transformers can't be put on the device without the installation of accelerate
 
     Raises:
         AssertionError: If the outputs of the models differ by a margin greater than 1e-3.
@@ -71,9 +77,54 @@ def test_model(ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_mod
     ]
     p = random.choice(prompts)
 
-    with no_grad():
-        ref_input = ref_processor(text=p, images=x_pil, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
-        ref_output = ref_model(**ref_input)["logits"]
-        our_output = our_model([x], [p])
+    ref_input = ref_processor(images=x_pil, text=p, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
+    ref_output = ref_model(**ref_input)["logits"]
+    our_output = our_model([x], [p])
 
     assert (our_output - ref_output).abs().max() < 1e-3
+
+
+@no_grad()
+def test_generation(
+    ref_model: FuyuForCausalLM, ref_processor: FuyuProcessor, our_model: Fuyu, test_device: Device
+) -> None:
+    """
+    Tests the consistency of generation between the reference model and our model for a given pair (prompt, image).
+
+    Args:
+        ref_model (FuyuForCausalLM): The reference model.
+        ref_processor (FuyuProcessor): The processor used for preparing input data for ref_model.
+        our_model (Fuyu): Our model to be tested against ref_model.
+        test_device (torch.device): The device (e.g., CPU or GPU) to perform the test on.
+
+    Raises:
+        AssertionError: If the generated answers of the models differ.
+    """
+    manual_seed(42)
+
+    assets = Path(__file__).parent.parent.parent.parent / "assets"
+    images = [
+        _img_open(assets / "dragon_quest_slime.jpg"),
+        _img_open(assets / "dropy.png"),
+        _img_open(assets / "pokemon_cat.png"),
+        _img_open(assets / "logo_dark.png"),
+    ]
+    prompts = [
+        "Describe this image.\n",
+        "What is the main object in this image?\n",
+        "Is there a cat in the image?\n",
+        "Generate a coco-style caption.\n",
+    ]
+    p = random.choices(prompts, k=len(images))
+
+    # Get inputs processed for our reference model
+    ref_input: Dict[str, Tensor] = ref_processor(images=images, text=p, return_tensors="pt").to(device=test_device)  # type: ignore[reportUnknownMemberType]
+    # Get tokens of the answer generated
+    ref_output: Tensor = ref_model.generate(**ref_input, max_new_tokens=100, use_cache=False)  # type: ignore[reportUnknownMemberType]
+    # Decodes tokens and get the element after the begining of answer token
+    ref_generation: List[str] = ref_processor.batch_decode(ref_output, skip_special_tokens=True)  # type: ignore[reportUnknownMemberType]
+    ref_generation = [answer.split("\x04")[1].strip() for answer in ref_generation]  # type: ignore[reportUnknownMemberType]
+
+    our_generation = our_model.generate(images=images, prompts=p, max_len_generation=100)
+
+    assert our_generation == ref_generation
