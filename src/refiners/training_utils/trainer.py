@@ -101,15 +101,13 @@ def register_model():
         def wrapper(self: Trainer[BaseConfig, Any], config: ModelConfigT) -> fl.Module:
             name = func.__name__
             model = func(self, config)
-            model = model.to(self.device, dtype=self.dtype)
+            model = model.to(self.device)
             if config.requires_grad is not None:
                 logger.info(f"Setting requires_grad to {config.requires_grad} for model: {name}")
                 model.requires_grad_(requires_grad=config.requires_grad)
             learnable_parameters = [param for param in model.parameters() if param.requires_grad]
-            if self.config.training.automatic_mixed_precision:
-                # For all parameters we train in automatic mixed precision we want them to be in float32.
-                for learnable_parameter in learnable_parameters:
-                    learnable_parameter.to(dtype=float32)
+            if not self.config.training.automatic_mixed_precision:
+                model.to(dtype=self.dtype)
             numel = sum(param.numel() for param in learnable_parameters)
             logger.info(f"Number of learnable parameters in {name}: {human_readable_number(numel)}")
             self.models[name] = ModelItem(
