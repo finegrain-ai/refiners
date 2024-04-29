@@ -14,6 +14,10 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import St
 from tests.utils import ensure_similar_images
 
 
+def _img_open(path: Path) -> Image.Image:
+    return Image.open(path)  # type: ignore
+
+
 @pytest.fixture(autouse=True)
 def ensure_gc():
     # Avoid GPU OOMs
@@ -82,17 +86,17 @@ def ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture
 def expected_lightning_base_4step(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_lightning_base_4step.png").convert("RGB")
+    return _img_open(ref_path / "expected_lightning_base_4step.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_lightning_base_1step(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_lightning_base_1step.png").convert("RGB")
+    return _img_open(ref_path / "expected_lightning_base_1step.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_lightning_lora_4step(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "expected_lightning_lora_4step.png").convert("RGB")
+    return _img_open(ref_path / "expected_lightning_lora_4step.png").convert("RGB")
 
 
 @no_grad()

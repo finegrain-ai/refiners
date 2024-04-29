@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from refiners.training_utils.callback import Callback, CallbackConfig
-from refiners.training_utils.common import TimeUnit, TimeValue
+from refiners.training_utils.common import Epoch, Iteration, Step, TimeUnit, TimeValue
 
 if TYPE_CHECKING:
     from refiners.training_utils.config import BaseConfig
@@ -29,6 +29,10 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         lr_scheduler_interval: TimeValue,
         verbose: bool = True,
     ) -> None:
+        assert batch_size > 0, "Batch size must be greater than 0."
+        assert (
+            dataset_length >= batch_size
+        ), f"Dataset length ({dataset_length}) must be greater than batch_size ({batch_size})."
         self.dataset_length = dataset_length
         self.batch_size = batch_size
         self.training_duration = training_duration
@@ -48,47 +52,45 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
 
     @cached_property
     def unit_to_steps(self) -> dict[TimeUnit, int]:
-        iteration_factor = self.num_batches_per_epoch if self.gradient_accumulation.unit == TimeUnit.EPOCH else 1
+        iteration_factor = self.num_batches_per_epoch if isinstance(self.gradient_accumulation, Epoch) else 1
         return {
-            TimeUnit.STEP: 1,
-            TimeUnit.EPOCH: self.num_batches_per_epoch,
-            TimeUnit.ITERATION: self.gradient_accumulation.number * iteration_factor,
+            Step: 1,
+            Epoch: self.num_batches_per_epoch,
+            Iteration: self.gradient_accumulation.number * iteration_factor,
         }
 
-    def convert_time_unit_to_steps(self, number: int, unit: TimeUnit) -> int:
-        return number * self.unit_to_steps[unit]
+    def convert_time_value_to_steps(self, time_value: TimeValue) -> int:
+        return time_value.number * self.unit_to_steps[time_value.unit]
 
     def convert_steps_to_time_unit(self, steps: int, unit: TimeUnit) -> int:
         return steps // self.unit_to_steps[unit]
 
     def convert_time_value(self, time_value: TimeValue, target_unit: TimeUnit) -> int:
-        number, unit = time_value.number, time_value.unit
-        steps = self.convert_time_unit_to_steps(number=number, unit=unit)
+        steps = self.convert_time_value_to_steps(time_value=time_value)
         return self.convert_steps_to_time_unit(steps=steps, unit=target_unit)
 
     @cached_property
     def num_epochs(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.EPOCH)
+        return self.convert_time_value(time_value=self.training_duration, target_unit=Epoch)
 
     @cached_property
     def num_iterations(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.ITERATION)
+        return self.convert_time_value(time_value=self.training_duration, target_unit=Iteration)
 
     @cached_property
     def num_steps(self) -> int:
-        return self.convert_time_value(time_value=self.training_duration, target_unit=TimeUnit.STEP)
+        return self.convert_time_value(time_value=self.training_duration, target_unit=Step)
 
     @cached_property
     def num_step_per_iteration(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.gradient_accumulation.number, unit=self.gradient_accumulation.unit
-        )
+        return self.convert_time_value_to_steps(self.gradient_accumulation)
 
     @cached_property
     def num_step_per_evaluation(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.evaluation_interval.number, unit=self.evaluation_interval.unit
-        )
+        return self.convert_time_value_to_steps(self.evaluation_interval)
+
+    def is_due(self, interval: TimeValue) -> bool:
+        return self.step % self.convert_time_value_to_steps(interval) == 0
 
     def reset(self) -> None:
         self.start_time = None
@@ -110,33 +112,13 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         assert self.start_time is not None, "Timer has not been started yet."
         return int(time.time() - self.start_time)
 
-    @cached_property
-    def evaluation_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.evaluation_interval.number, unit=self.evaluation_interval.unit
-        )
-
-    @cached_property
-    def lr_scheduler_interval_steps(self) -> int:
-        return self.convert_time_unit_to_steps(
-            number=self.lr_scheduler_interval.number, unit=self.lr_scheduler_interval.unit
-        )
-
     @property
     def is_optimizer_step(self) -> bool:
         return self.num_minibatches_processed == self.num_step_per_iteration
 
     @property
-    def is_lr_scheduler_step(self) -> bool:
-        return self.step % self.lr_scheduler_interval_steps == 0
-
-    @property
     def done(self) -> bool:
         return self.step >= self.num_steps
-
-    @property
-    def is_evaluation_step(self) -> bool:
-        return self.step % self.evaluation_interval_steps == 0
 
     def log(self, message: str, /) -> None:
         if self.verbose:
@@ -179,10 +161,8 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
             self.log(f"Iteration {trainer.clock.iteration} started.")
         self.log(f"Step {trainer.clock.step} started.")
 
-    def on_batch_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
-        self.log(f"Step {trainer.clock.step} ended.")
-
     def on_backward_end(self, trainer: "Trainer[BaseConfig, Any]") -> None:
+        self.log(f"Step {trainer.clock.step} ended.")
         trainer.clock.step += 1
         trainer.clock.num_batches_processed += 1
         trainer.clock.num_minibatches_processed += 1

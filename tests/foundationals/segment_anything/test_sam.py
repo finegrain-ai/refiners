@@ -91,7 +91,7 @@ def sam_h_single_output(sam_h_weights: Path, test_device: torch.device) -> Segme
 
 @pytest.fixture(scope="module")
 def truck(ref_path: Path) -> Image.Image:
-    return Image.open(ref_path / "truck.jpg").convert("RGB")
+    return Image.open(ref_path / "truck.jpg").convert("RGB")  # type: ignore
 
 
 @no_grad()
@@ -140,7 +140,8 @@ def test_multimask_output_error() -> None:
 
 @no_grad()
 def test_image_encoder(sam_h: SegmentAnythingH, facebook_sam_h: FacebookSAM, truck: Image.Image) -> None:
-    image_tensor = image_to_tensor(image=truck.resize(size=(1024, 1024)), device=facebook_sam_h.device)
+    resized = truck.resize(size=(1024, 1024))  # type: ignore
+    image_tensor = image_to_tensor(image=resized, device=facebook_sam_h.device)
     y_1 = facebook_sam_h.image_encoder(image_tensor)
     y_2 = sam_h.image_encoder(image_tensor)
 
@@ -256,8 +257,6 @@ def test_mask_decoder(facebook_sam_h: FacebookSAM, sam_h: SegmentAnythingH) -> N
     mask_embedding = torch.randn(1, 256, 64, 64, device=facebook_sam_h.device)
 
     from segment_anything.modeling.common import LayerNorm2d  # type: ignore
-
-    import refiners.fluxion.layers as fl
 
     assert issubclass(LayerNorm2d, nn.Module)
     custom_layers = {LayerNorm2d: fl.LayerNorm2d}
@@ -451,7 +450,7 @@ def test_predictor_resized_single_output(
 
     predictor = facebook_sam_h_predictor
     size = (1024, 1024)
-    resized_truck = truck.resize(size)
+    resized_truck = truck.resize(size)  # type: ignore
     predictor.set_image(np.array(resized_truck))
 
     _, _, facebook_low_res_masks = predictor.predict(  # type: ignore

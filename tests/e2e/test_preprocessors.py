@@ -10,6 +10,10 @@ from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings 
 from tests.utils import ensure_similar_images
 
 
+def _img_open(path: Path) -> Image.Image:
+    return Image.open(path)  # type: ignore
+
+
 @pytest.fixture(scope="module")
 def diffusion_ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_diffusion_ref"
@@ -17,12 +21,12 @@ def diffusion_ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture(scope="module")
 def cutecat_init(diffusion_ref_path: Path) -> Image.Image:
-    return Image.open(diffusion_ref_path / "cutecat_init.png").convert("RGB")
+    return _img_open(diffusion_ref_path / "cutecat_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_informative_drawings(diffusion_ref_path: Path) -> Image.Image:
-    return Image.open(diffusion_ref_path / "cutecat_guide_lineart.png").convert("RGB")
+    return _img_open(diffusion_ref_path / "cutecat_guide_lineart.png").convert("RGB")
 
 
 @pytest.fixture(scope="module")

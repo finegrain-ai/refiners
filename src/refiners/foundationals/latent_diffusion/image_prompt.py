@@ -537,8 +537,9 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             mean: The mean to use for normalization.
             std: The standard deviation to use for normalization.
         """
+        resized = image.resize(size)  # type: ignore
         return normalize(
-            image_to_tensor(image.resize(size), device=self.target.device, dtype=self.target.dtype),
+            image_to_tensor(resized, device=self.target.device, dtype=self.target.dtype),
             mean=[0.48145466, 0.4578275, 0.40821073] if mean is None else mean,
             std=[0.26862954, 0.26130258, 0.27577711] if std is None else std,
         )

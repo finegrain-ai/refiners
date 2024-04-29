@@ -68,6 +68,14 @@ class StableDiffusion_1(LatentDiffusionModel):
             dtype=dtype,
         )
 
+    def __call__(self, x: Tensor, step: int, *, clip_text_embedding: Tensor, condition_scale: float = 7.5) -> Tensor:
+        return super().__call__(
+            x,
+            step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=condition_scale,
+        )
+
     def compute_clip_text_embedding(self, text: str | list[str], negative_text: str | list[str] = "") -> Tensor:
         """Compute the CLIP text embedding associated with the given prompt and negative prompt.
 
@@ -190,8 +198,14 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
     ) -> None:
         self.mask_latents: Tensor | None = None
         self.target_image_latents: Tensor | None = None
+        unet = unet or SD1UNet(in_channels=9)
         super().__init__(
-            unet=unet, lda=lda, clip_text_encoder=clip_text_encoder, solver=solver, device=device, dtype=dtype
+            unet=unet,
+            lda=lda,
+            clip_text_encoder=clip_text_encoder,
+            solver=solver,
+            device=device,
+            dtype=dtype,
         )
 
     def forward(
@@ -228,7 +242,7 @@ class StableDiffusion_1_Inpainting(StableDiffusion_1):
 
         mask_tensor = torch.tensor(data=np.array(object=mask).astype(dtype=np.float32) / 255.0).to(device=self.device)
         mask_tensor = (mask_tensor > 0.5).unsqueeze(dim=0).unsqueeze(dim=0).to(dtype=self.dtype)
-        self.mask_latents = interpolate(x=mask_tensor, factor=torch.Size(latents_size))
+        self.mask_latents = interpolate(x=mask_tensor, size=torch.Size(latents_size))
 
         init_image_tensor = image_to_tensor(image=target_image, device=self.device, dtype=self.dtype) * 2 - 1
         masked_init_image = init_image_tensor * (1 - mask_tensor)

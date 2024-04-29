@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.1.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
+    "numpy>=1.26.4",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -34,12 +35,12 @@ training = [
     "wandb>=0.16.0",
     "datasets>=2.15.0",
     "tomli>=2.0.1",
+    "gitpython>=3.1.43",
 ]
 test = [
     "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "piq>=0.8.0",
-    "invisible-watermark>=0.2.0",
     "torchvision>=0.16.1",
     # An unofficial Python package for Meta AI's Segment Anything Model:
     # https://github.com/opengeos/segment-anything
@@ -73,7 +74,7 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright==1.1.349",
+    "pyright==1.1.356",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
@@ -143,8 +144,10 @@ exclude_also = [
 ]
 
 [tool.typos.default]
-extend-words = { adaptee = "adaptee" }
-extend-ignore-identifiers-re = ["NDArray*", "interm"]
+extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
+
+[tool.typos.default.extend-words]
+adaptee = "adaptee"  # Common name for an adapter's target
 
 [tool.pytest.ini_options]
 filterwarnings = [

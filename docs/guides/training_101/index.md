@@ -219,15 +219,14 @@ We will now define the configuration for the autoencoder. It holds the configura
 Example:
 
 ```python
-from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulers
-from refiners.training_utils.common import TimeUnit, TimeValue
+from refiners.training_utils import BaseConfig, TrainingConfig, OptimizerConfig, LRSchedulerConfig, Optimizers, LRSchedulerType, Epoch
 
 class AutoencoderConfig(BaseConfig):
     # Since we are using a synthetic dataset, we will use a arbitrary fixed epoch size.
     epoch_size: int = 2048
 
 training = TrainingConfig(
-    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
+    duration=Epoch(1000),
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32"
@@ -239,7 +238,7 @@ optimizer = OptimizerConfig(
 )
 
 lr_scheduler = LRSchedulerConfig(
-    type=LRSchedulers.ConstantLR
+    type=LRSchedulerType.ConstantLR
 )
 
 config = AutoencoderConfig(
@@ -336,11 +335,11 @@ We can also evaluate the model using the `compute_evaluation` method.
 
 ```python
 training = TrainingConfig(
-    duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
+    duration=Epoch(1000)
     batch_size=32,
     device="cuda" if torch.cuda.is_available() else "cpu",
     dtype="float32",
-    evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
+    evaluation_interval=Epoch(50),
 )
 
 class AutoencoderTrainer(Trainer[AutoencoderConfig, Batch]):
@@ -478,9 +477,8 @@ You can train this toy model using the code below:
         TrainingConfig,
         register_callback,
         register_model,
+        Epoch,
     )
-    from refiners.training_utils.common import TimeUnit, TimeValue
-
 
     class ConvBlock(fl.Chain):
         def __init__(self, in_channels: int, out_channels: int) -> None:
@@ -628,11 +626,11 @@ You can train this toy model using the code below:
     )
 
     training = TrainingConfig(
-        duration=TimeValue(number=1000, unit=TimeUnit.EPOCH),
+        duration=Epoch(1000),
         batch_size=32,
         device="cuda" if torch.cuda.is_available() else "cpu",
         dtype="float32",
-        evaluation_interval=TimeValue(number=50, unit=TimeUnit.EPOCH),
+        evaluation_interval=Epoch(50),
     )
 
     optimizer = OptimizerConfig(
@@ -702,9 +700,9 @@ You can train this toy model using the code below:
                 axes[i, 1].axis("off")
                 axes[i, 1].set_title("Reconstructed")
 
-            plt.tight_layout()
+            plt.tight_layout() # type: ignore
             plt.savefig(f"result_{trainer.clock.epoch}.png")  # type: ignore
-            plt.close()
+            plt.close() # type: ignore
 
         @register_callback()
         def logging(self, config: CallbackConfig) -> LoggingCallback:

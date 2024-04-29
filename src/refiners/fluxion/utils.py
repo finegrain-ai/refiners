@@ -40,12 +40,18 @@ def pad(x: Tensor, pad: Iterable[int], value: float = 0.0, mode: str = "constant
     return _pad(input=x, pad=pad, value=value, mode=mode)  # type: ignore
 
 
-def interpolate(x: Tensor, factor: float | torch.Size, mode: str = "nearest") -> Tensor:
-    return (
-        _interpolate(x, scale_factor=factor, mode=mode)
-        if isinstance(factor, float | int)
-        else _interpolate(x, size=factor, mode=mode)
-    )  # type: ignore
+def interpolate(
+    x: Tensor,
+    size: torch.Size,
+    mode: str = "nearest",
+    antialias: bool = False,
+) -> Tensor:
+    return _interpolate(  # type: ignore
+        input=x,
+        size=size,
+        mode=mode,
+        antialias=antialias,
+    )
 
 
 # Adapted from https://github.com/pytorch/vision/blob/main/torchvision/transforms/_functional_tensor.py
@@ -135,10 +141,11 @@ def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtyp
         If the image is in mode `RGB` the tensor will have shape `[3, H, W]`,
         otherwise `[1, H, W]` for mode `L` (grayscale) or `[4, H, W]` for mode `RGBA`.
 
-        Values are clamped to the range `[0, 1]`.
+        Values are normalized to the range `[0, 1]`.
     """
     image_tensor = torch.tensor(array(image).astype(float32) / 255.0, device=device, dtype=dtype)
 
+    assert isinstance(image.mode, str)  # type: ignore
     match image.mode:
         case "L":
             image_tensor = image_tensor.unsqueeze(0)
