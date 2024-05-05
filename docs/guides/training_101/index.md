@@ -375,7 +375,7 @@ class LoggingCallback(Callback[Any]):
         self.losses = []
 ```
 
-Exactly like models, we need to register the callback to the Trainer. We can do so by adding a CallbackConfig attribute to the Config named `logging` and adding a method to the Trainer class that returns the callback decorated with `@register_callback` decorator. 
+Exactly like models, we need to register the callback to the Trainer. We can do so by adding a `CallbackConfig` attribute to the config named `logging` and adding a method to the Trainer class that returns the callback decorated with `@register_callback` decorator. 
 
 ```python
 from refiners.training_utils import CallbackConfig, register_callback
@@ -447,7 +447,7 @@ class EvaluationConfig(CallbackConfig):
     seed: int
 ```
 
-The `TimeValueField` is a custom field that allow Pydantic to parse a string representing a time value (e.g., "50:epochs") into a `TimeValue` object. This is useful to specify the evaluation interval in the configuration file.
+The `TimeValueField` is a custom field that allow Pydantic to parse a string representing a time value (e.g., `"50:epochs"`) into a `TimeValue` object. This is useful to specify the evaluation interval in the configuration file.
 
 ```python
 from refiners.training_utils import scoped_seed, Callback
