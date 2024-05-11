@@ -158,7 +158,7 @@ class FuyuTokenizer(fl.Module):
 
         return tokens
 
-    def encode(self, text: str, scale_factor: float = 1) -> Tensor:
+    def forward(self, text: str, scale_factor: float = 1) -> Tensor:
         """
         Encodes a string of text into a tensor of token IDs.
 
@@ -200,6 +200,3 @@ class FuyuTokenizer(fl.Module):
                 tokens += self.process_text(elem)
 
         return tensor(tokens).unsqueeze(dim=0)
-
-    def forward(self, text: str, scale_factor: float = 1) -> Tensor:
-        return self.encode(text, scale_factor)
