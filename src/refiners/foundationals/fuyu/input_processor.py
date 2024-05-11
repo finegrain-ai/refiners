@@ -6,6 +6,7 @@ from torch import Tensor, device as Device, dtype as DType, tensor
 from torchvision.transforms.functional import to_tensor  # type: ignore[reportUnknownVariableType]
 
 import refiners.fluxion.layers as fl
+from refiners.fluxion.utils import tensor_to_image
 from refiners.foundationals.clip.text_encoder import TokenEncoder
 from refiners.foundationals.fuyu.common import PatchPadding
 from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
@@ -262,7 +263,7 @@ class InputEncoder(fl.ContextModule):
             # if images are above the max size limit rescale them
             if h > self.max_size[0] or w > self.max_size[1]:
                 scale_factor = min(self.max_size[0] / h, self.max_size[1] / w)
-                image = Image.fromarray((image.squeeze(0) * 255).byte().numpy().transpose(1, 2, 0), "RGB")  # type: ignore[reportUnknownType]
+                image = tensor_to_image(image)
                 image = image.resize((int(scale_factor * w), int(scale_factor * h)), Image.Resampling.BILINEAR)  # type: ignore[reportUnknownType]
                 image = to_tensor(image).unsqueeze(0)
                 _, _, h, w = image.shape

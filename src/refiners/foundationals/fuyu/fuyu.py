@@ -8,7 +8,7 @@ from PIL import Image
 from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.utils import no_grad
+from refiners.fluxion.utils import image_to_tensor, no_grad
 from refiners.foundationals.fuyu.input_processor import InputEncoder
 from refiners.foundationals.fuyu.tokenizer import FuyuTokenizer
 from refiners.foundationals.fuyu.transformers import FuyuTransformer, FuyuTransformerLayer
@@ -106,7 +106,7 @@ class Fuyu(fl.Chain):
         Returns:
             (list[str, "batch"])
         """
-        tensor_images = [(Tensor(np.array(image) / 255)).permute(2, 0, 1).unsqueeze(0) for image in images]
+        tensor_images = [image_to_tensor(image) for image in images]
 
         i = 0
         # Answers of the model for each prompt in the batch
