@@ -50,7 +50,7 @@ class ImageEncoder(fl.Chain):
 
         super().__init__(
             PatchPadding(patch_size=self.patch_size, padding_value=self.padding_value),
-            fl.Lambda(func=self.normalize),
+            fl.Multiply(scale=1.0 / image_std, bias=-image_mean / image_std),
             fl.Lambda(func=self.patchify),
             fl.Linear(
                 in_features=3 * self.patch_size**2,
@@ -65,16 +65,11 @@ class ImageEncoder(fl.Chain):
         """
         Transforms an image tensor into a set of flattened, non-overlapping patches.
         """
-        _, c, _, _ = x.shape
+        batch_size, c, _, _ = x.shape
         x_unfold = x.unfold(2, self.patch_size, self.patch_size).unfold(3, self.patch_size, self.patch_size)
-        B, _, _, _, _, _ = x_unfold.shape
-        x_unfold = x_unfold.contiguous()
-        x_unfold = x_unfold.view(B, c, -1, self.patch_size, self.patch_size)
-        patched = x_unfold.permute(0, 2, 3, 4, 1).reshape(B, -1, c * self.patch_size**2)
+        x_unfold = x_unfold.reshape(batch_size, c, -1, self.patch_size, self.patch_size)
+        patched = x_unfold.permute(0, 2, 3, 4, 1).reshape(batch_size, -1, c * self.patch_size**2)
         return patched
-
-    def normalize(self, x: Tensor) -> Tensor:
-        return (x - self.image_mean) / self.image_std
 
 
 class InputEncoder(fl.ContextModule):
