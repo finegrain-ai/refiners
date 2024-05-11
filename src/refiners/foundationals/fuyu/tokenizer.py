@@ -66,6 +66,8 @@ class FuyuTokenizer(fl.Module):
         self.token_point_open = "<0x02>"  # <point>
         self.token_point_close = "<0x03>"  # </point>
 
+        # normalization token ids
+        self.prepend_char_id = self.token_to_id[self.prepend_char]
         # special token ids
         self.boa_token_id = self.token_to_id[self.boa_token]
         self.bos_token_id = self.token_to_id[self.bos_token]

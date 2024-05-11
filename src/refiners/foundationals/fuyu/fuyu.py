@@ -218,7 +218,7 @@ class Fuyu(fl.Chain):
             if answers[active_indices[idx]] == "":
                 answers[active_indices[idx]] = (
                     next_token_text[1:] if next_token_text[0] == " " else next_token_text
-                )  # Avoid starting the sentence with a space
+                )  # Remove the space before the first word
             else:
                 answers[active_indices[idx]] += next_token_text
 

@@ -159,42 +159,10 @@ class InputEncoder(fl.ContextModule):
         b = len(images)
         # preprocess batch
         images = self.process_batch_images(images)
-
         # encode images
-        encoded_images: list[Tensor] = []
-        for image in images:
-            _, _, h, w = image.shape
-            patched_image = self.image_encoder(image.to(device=self.device, dtype=self.dtype))
-
-            h += (self.patch_size - h % self.patch_size) % self.patch_size
-            w += (self.patch_size - w % self.patch_size) % self.patch_size
-
-            f_linebreak = w // self.patch_size
-            n_linebreak = h // self.patch_size
-            # Create linebreak embeddings
-            linebreak = tensor([self.tokenizer.newline_token_id], device=self.device).long()
-            linebreak_embedding = self.token_encoder(linebreak)
-            linebreak_embedding = linebreak_embedding.expand(1, n_linebreak, 1, self.embedding_dim)
-            # Reshape encoded_image to introduce a slot for linebreaks
-            encoded_image = patched_image.view(1, n_linebreak, f_linebreak, self.embedding_dim)
-            # Concatenate linebreak embeddings
-            encoded_image = torch.cat((encoded_image, linebreak_embedding), dim=2)
-            # Reshape to final desired flat format [1 seq_len embedding_dim]
-            encoded_image = encoded_image.view(1, -1, self.embedding_dim)
-            encoded_images.append(encoded_image)
-
+        encoded_images = self.encode_images(images)
         # encode texts
-        encoded_texts: list[Tensor] = []
-        for idx, prompt in enumerate(prompts):
-            prompt_token = self.tokenizer(prompt, scale_factor=self.scales_list[idx])
-            token = torch.cat(
-                [Tensor([[self.tokenizer.bos_token_id]]), prompt_token, Tensor([[self.tokenizer.boa_token_id]])], dim=1
-            )
-            if answers is not None:
-                answer_token = self.tokenizer(answers[idx])
-                token = torch.cat([token, answer_token], dim=1)
-            encoded_text = self.token_encoder(token.to(device=self.device, dtype=torch.int64))
-            encoded_texts.append(encoded_text)
+        encoded_texts = self.encode_texts(prompts, answers)
 
         # Initialize the 3D attention mask with ones
         max_len = max(et.shape[1] + im.shape[1] for et, im in zip(encoded_texts, encoded_images))
@@ -242,8 +210,8 @@ class InputEncoder(fl.ContextModule):
             images (list[Tensor]): list of image tensors in the format [1, C, H, W].
 
         Returns:
-            (Float[Tensor, "batch C H W"])
-            A batch tensor with all processed images concatenated along the batch dimension.
+            (list[Tensor])
+            A list of processed images tensors
         """
         # for bboxs and points handling these information need to be saved
         scales_list: list[float] = []
@@ -269,3 +237,69 @@ class InputEncoder(fl.ContextModule):
         self.scales_list = scales_list
 
         return images
+
+    def encode_images(self, images: list[Tensor]) -> list[Tensor]:
+        """
+        Encode a batch of images using our image_encoder and add a linebreak embedding at the end
+        of every line of patch of the images
+
+        Receives:
+            images (list[Tensor]) : list of image tensors in the format [1, C, H, W]
+        Returns:
+            (list[Tensor])
+            A list of encoded images tensors
+        """
+        encoded_images: list[Tensor] = []
+        for image in images:
+            _, _, h, w = image.shape
+            patched_image = self.image_encoder(image.to(device=self.device, dtype=self.dtype))
+
+            h += (self.patch_size - h % self.patch_size) % self.patch_size
+            w += (self.patch_size - w % self.patch_size) % self.patch_size
+
+            f_linebreak = w // self.patch_size
+            n_linebreak = h // self.patch_size
+            # Create linebreak embeddings
+            linebreak = tensor([self.tokenizer.newline_token_id], device=self.device).long()
+            linebreak_embedding = self.token_encoder(linebreak)
+            linebreak_embedding = linebreak_embedding.expand(1, n_linebreak, 1, self.embedding_dim)
+            # Reshape encoded_image to introduce a slot for linebreaks
+            encoded_image = patched_image.view(1, n_linebreak, f_linebreak, self.embedding_dim)
+            # Concatenate linebreak embeddings
+            encoded_image = torch.cat((encoded_image, linebreak_embedding), dim=2)
+            # Reshape to final desired flat format [1 seq_len embedding_dim]
+            encoded_image = encoded_image.view(1, -1, self.embedding_dim)
+            encoded_images.append(encoded_image)
+        return encoded_images
+
+    def encode_texts(self, prompts: list[str], answers: list[str] | None) -> list[Tensor]:
+        """
+        Encode a batch of text using our tokenizer and our token encoder
+
+        Receives:
+            prompts (list[str]): A list of text strings, each corresponding to an image. These are prompts
+                that the model will use to generate responses.
+            answers (list[str] | None): A list of text strings providing answers
+                corresponding to each prompt for continuing the sequential process of generation.
+        Returns:
+            (list[Tensor])
+            A list of prompts and answers associated, tokenized and encoded
+        """
+        encoded_texts: list[Tensor] = []
+        for idx, prompt in enumerate(prompts):
+            prompt_token = self.tokenizer(prompt, scale_factor=self.scales_list[idx])
+            token = torch.cat(
+                [tensor([[self.tokenizer.bos_token_id]]), prompt_token, tensor([[self.tokenizer.boa_token_id]])], dim=1
+            )
+            if answers is not None:
+                # handle the case in which an empty answer is fed to the tokenizer.
+                # This is useful when the first token generated by our model is a space (corner case)
+                answer_token = (
+                    self.tokenizer(answers[idx])
+                    if answers[idx] != ""
+                    else tensor([self.tokenizer.prepend_char_id]).unsqueeze(dim=0)
+                )
+                token = torch.cat([token, answer_token], dim=1)
+            encoded_text = self.token_encoder(token.to(device=self.device, dtype=torch.int64))
+            encoded_texts.append(encoded_text)
+        return encoded_texts
