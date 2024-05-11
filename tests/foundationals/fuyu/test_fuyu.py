@@ -1,6 +1,5 @@
 import random
 from pathlib import Path
-from typing import List
 from warnings import warn
 
 import pytest
@@ -122,7 +121,7 @@ def test_generation(
     # Get tokens of the answer generated
     ref_output: Tensor = ref_model.generate(**ref_input, max_new_tokens=100, use_cache=False)  # type: ignore[reportUnknownMemberType]
     # Decodes tokens and get the element after the beginning of answer token
-    ref_generation: List[str] = ref_processor.batch_decode(ref_output, skip_special_tokens=True)  # type: ignore[reportUnknownMemberType]
+    ref_generation: list[str] = ref_processor.batch_decode(ref_output, skip_special_tokens=True)  # type: ignore[reportUnknownMemberType]
     ref_generation = [answer.split("\x04")[1].strip() for answer in ref_generation]  # type: ignore[reportUnknownMemberType]
 
     our_generation = our_model.generate(images=images, prompts=p, max_len_generation=100)

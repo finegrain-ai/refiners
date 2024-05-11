@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Tuple
 
 import torch
 from PIL import Image
@@ -109,7 +109,7 @@ class InputEncoder(fl.ContextModule):
 
         # store scales of the different images during rescaling of a given batch for bounding box coordinates handling
         # at generation time. Purpose: rescaling the coordinates at the original image size once the generation is over.
-        self.scales_list: List[float] = []
+        self.scales_list: list[float] = []
 
         self.tokenizer = tokenizer
 
@@ -125,7 +125,7 @@ class InputEncoder(fl.ContextModule):
             dtype=dtype,
         )
 
-    def forward(self, images: List[Tensor], prompts: List[str], answers: List[str] | None = None) -> Tensor:
+    def forward(self, images: list[Tensor], prompts: list[str], answers: list[str] | None = None) -> Tensor:
         """
         Processes and encodes image and text data to create model inputs for the Fuyu model.
 
@@ -135,11 +135,11 @@ class InputEncoder(fl.ContextModule):
         it generates attention masks for handling variable sequence lengths in batch processing.
 
         Receives:
-            images (List[Tensor]): A list of image tensors, each tensor should be in the format [1, C, H, W]
+            images (list[Tensor]): A list of image tensors, each tensor should be in the format [1, C, H, W]
                 where C is the number of channels, H is height, and W is width.
-            prompts (List[str]): A list of text strings, each corresponding to an image. These are prompts
+            prompts (list[str]): A list of text strings, each corresponding to an image. These are prompts
                 that the model will use to generate responses.
-            answers (List[str] | None, optional): An optional list of text strings providing answers
+            answers (list[str] | None, optional): An optional list of text strings providing answers
                 corresponding to each prompt for continuing the sequential process of generation.
                 If provided, it is used along with the prompts for input encoding.
                 Defaults to None
@@ -165,7 +165,7 @@ class InputEncoder(fl.ContextModule):
         images = self.process_batch_images(images)
 
         # encode images
-        encoded_images: List[Tensor] = []
+        encoded_images: list[Tensor] = []
         for image in images:
             _, _, h, w = image.shape
             patched_image = self.image_encoder(image.to(device=self.device, dtype=self.dtype))
@@ -188,7 +188,7 @@ class InputEncoder(fl.ContextModule):
             encoded_images.append(encoded_image)
 
         # encode texts
-        encoded_texts: List[Tensor] = []
+        encoded_texts: list[Tensor] = []
         for idx, prompt in enumerate(prompts):
             prompt_token = self.tokenizer(prompt, scale_factor=self.scales_list[idx])
             token = torch.cat(
@@ -204,7 +204,7 @@ class InputEncoder(fl.ContextModule):
         max_len = max(et.shape[1] + im.shape[1] for et, im in zip(encoded_texts, encoded_images))
         attn_mask = torch.ones(b, 1, max_len, max_len, device=self.device, dtype=torch.bool)
 
-        padded_encoded_images: List[Tensor] = []
+        padded_encoded_images: list[Tensor] = []
         for idx, (encoded_text, encoded_image) in enumerate(zip(encoded_texts, encoded_images)):
             padding_length = max_len - (encoded_text.shape[1] + encoded_image.shape[1])
             if padding_length > 0:
@@ -237,20 +237,20 @@ class InputEncoder(fl.ContextModule):
             raise ValueError("The max sequence length is reached.")
         return encoded_inputs
 
-    def process_batch_images(self, images: List[Tensor]) -> List[Tensor]:
+    def process_batch_images(self, images: list[Tensor]) -> list[Tensor]:
         """
         Processes a batch of image tensors: ensuring all images have three channels,
         resizing images that exceed max dimensions, and padding all images to have uniform dimensions.
 
         Receives:
-            images (List[Tensor]): List of image tensors in the format [1, C, H, W].
+            images (list[Tensor]): list of image tensors in the format [1, C, H, W].
 
         Returns:
             (Float[Tensor, "batch C H W"])
             A batch tensor with all processed images concatenated along the batch dimension.
         """
         # for bboxs and points handling these information need to be saved
-        scales_list: List[float] = []
+        scales_list: list[float] = []
         for im_idx, image in enumerate(images):
             _, c, h, w = image.shape
 

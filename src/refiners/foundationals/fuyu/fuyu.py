@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 import torch
@@ -94,17 +94,17 @@ class Fuyu(fl.Chain):
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
 
-    def generate(self, images: List[Image.Image], prompts: List[str], max_len_generation: int = 50) -> list[str]:
+    def generate(self, images: list[Image.Image], prompts: list[str], max_len_generation: int = 50) -> list[str]:
         """
         Generate answers for a list of images and prompts. Inference by batch.
 
         Receives:
-            images (List[Image.Image, "batch"])
-            prompts (List[str, "batch"])
+            images (list[Image.Image, "batch"])
+            prompts (list[str, "batch"])
             max_len_generation (int)
 
         Returns:
-            (List[str, "batch"])
+            (list[str, "batch"])
         """
         tensor_images = [(Tensor(np.array(image) / 255)).permute(2, 0, 1).unsqueeze(0) for image in images]
 
@@ -144,22 +144,22 @@ class Fuyu(fl.Chain):
     def process_next_tokens(
         self,
         next_tokens: Tensor,
-        answers: List[str],
-        active_indices: List[int],
-        active_in_coords: List[bool],
+        answers: list[str],
+        active_indices: list[int],
+        active_in_coords: list[bool],
     ) -> None:
         """
         Process a batch of token ids, update the current answers and active lists InPlace.
 
         Receives:
             next_tokens (Int[Tensor, "active_batch"])
-            answers (List[str, "batch"])
-            active_indices (List[int, "active_batch"])
-            active_in_coords (List[bool, "batch"])
+            answers (list[str, "batch"])
+            active_indices (list[int, "active_batch"])
+            active_in_coords (list[bool, "batch"])
         """
         tokenizer = self.tokenizer[0]
 
-        to_remove: List[int] = []
+        to_remove: list[int] = []
         for idx, next_token in enumerate(next_tokens):
             token_id = int(next_token.item())
             # End of generation
@@ -207,16 +207,16 @@ class Fuyu(fl.Chain):
         for idx in reversed(to_remove):  # Reverse to avoid index shifting issues.
             active_indices.remove(idx)
 
-    def rescale_answers(self, answers: List[str], scales: List[float]) -> List[str]:
+    def rescale_answers(self, answers: list[str], scales: list[float]) -> list[str]:
         """
         Rescale the coordinates within a list of model answers using the list of scales provided.
 
         Receives:
-            answers (List[str, "batch"])
-            scales (List[float, "batch"])
+            answers (list[str, "batch"])
+            scales (list[float, "batch"])
 
         Returns:
-            (List[str, "batch"])
+            (list[str, "batch"])
         """
         tokenizer = self.tokenizer[0]
 
@@ -224,7 +224,7 @@ class Fuyu(fl.Chain):
             f"({tokenizer.text_bbox_open}|{tokenizer.text_bbox_close}|{tokenizer.text_point_open}|{tokenizer.text_point_close})"
         )
 
-        rescaled_answers: List[str] = []
+        rescaled_answers: list[str] = []
 
         for idx, answer in enumerate(answers):
             answer_split = regex_pattern.split(answer)

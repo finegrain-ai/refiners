@@ -2,7 +2,7 @@ import gzip
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, TypedDict
+from typing import Dict, TypedDict
 
 from numpy import round
 from torch import Tensor, tensor
@@ -77,7 +77,7 @@ class FuyuTokenizer(fl.Module):
         self.token_point_open_id = self.token_to_id[self.token_point_open]
         self.token_point_close_id = self.token_to_id[self.token_point_close]
 
-    def _calculate_best_segmentation(self, text: str) -> List[int]:
+    def _calculate_best_segmentation(self, text: str) -> list[int]:
         """
         Calculates the best segmentation of the input text based on the maximum log probabilities.
 
@@ -85,7 +85,7 @@ class FuyuTokenizer(fl.Module):
             text (str): The input text to tokenize.
 
         Returns:
-            List[int]: A list of token IDs representing the best segmentation of the input text.
+            list[int]: A list of token IDs representing the best segmentation of the input text.
         """
         N = len(text)
         dp = [float("-inf")] * (N + 1)
@@ -106,7 +106,7 @@ class FuyuTokenizer(fl.Module):
                         dp[i] = prob
                         backpointer[i] = j
 
-        tokens: List[int] = []
+        tokens: list[int] = []
         i = N
         while i > 0:
             j = backpointer[i]
@@ -117,7 +117,7 @@ class FuyuTokenizer(fl.Module):
         tokens.reverse()
         return tokens
 
-    def process_text(self, text: str) -> List[int]:
+    def process_text(self, text: str) -> list[int]:
         """
         preprocess and tokenize text
         """
@@ -184,7 +184,7 @@ class FuyuTokenizer(fl.Module):
         )
         text_split = regex_pattern.split(text)
 
-        tokens: List[int] = []
+        tokens: list[int] = []
 
         for i, elem in enumerate(text_split):
             if len(elem) == 0 or elem in [
