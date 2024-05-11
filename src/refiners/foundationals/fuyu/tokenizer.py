@@ -187,16 +187,14 @@ class FuyuTokenizer(fl.Module):
         tokens: list[int] = []
 
         for i, elem in enumerate(text_split):
-            if len(elem) == 0 or elem in [
-                self.token_bbox_open,
-                self.token_bbox_close,
-                self.token_point_open,
-                self.token_point_close,
-            ]:
-                continue
-            elif i > 0 and text_split[i - 1] in [self.token_bbox_open, self.token_point_open]:
-                tokens += self.process_points_coordinates(elem, scale_factor=scale_factor)
-            else:
-                tokens += self.process_text(elem)
+            match elem:
+                case "" | self.token_bbox_open | self.token_bbox_close | self.token_point_open | self.token_point_close:
+                    continue
+
+                case _ if i > 0 and text_split[i - 1] in [self.token_bbox_open, self.token_point_open]:
+                    tokens += self.process_points_coordinates(elem, scale_factor=scale_factor)
+
+                case _:
+                    tokens += self.process_text(elem)
 
         return tensor(tokens).unsqueeze(dim=0)
