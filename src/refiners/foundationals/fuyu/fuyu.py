@@ -37,6 +37,10 @@ class Fuyu(fl.Chain):
         dtype: The PyTorch data type to use.
     """
 
+    # Prevent PyTorch module registration
+    _tokenizer: list[FuyuTokenizer]
+    _input_encoder: list[InputEncoder]
+
     def __init__(
         self,
         embedding_dim: int,
@@ -56,13 +60,13 @@ class Fuyu(fl.Chain):
         device: Device | str | None,
         dtype: DType | None,
     ) -> None:
-        self.tokenizer = [tokenizer]
-        self.input_encoder = [
+        self._tokenizer = [tokenizer]
+        self._input_encoder = [
             InputEncoder(
                 embedding_dim=embedding_dim,
                 max_sequence_length=max_sequence_length,
                 vocabulary_size=vocabulary_size,
-                tokenizer=self.tokenizer[0],
+                tokenizer=self.tokenizer,
                 patch_size=patch_size,
                 padding_value=padding_value,
                 device=device,
@@ -71,7 +75,7 @@ class Fuyu(fl.Chain):
         ]
 
         super().__init__(
-            self.input_encoder[0],
+            self.input_encoder,
             FuyuTransformer(
                 FuyuTransformerLayer(
                     embedding_dim=embedding_dim,
@@ -94,6 +98,15 @@ class Fuyu(fl.Chain):
     def init_context(self) -> dict[str, dict[str, Any]]:
         return {"attention": {"mask": None}}
 
+    @property
+    def tokenizer(self) -> FuyuTokenizer:
+        return self._tokenizer[0]
+
+    @property
+    def input_encoder(self) -> InputEncoder:
+        return self._input_encoder[0]
+
+    @no_grad()
     def generate(self, images: list[Image.Image], prompts: list[str], max_len_generation: int = 50) -> list[str]:
         """
         Generate answers for a list of images and prompts. Inference by batch.
@@ -121,21 +134,22 @@ class Fuyu(fl.Chain):
         # updated after the first forward call
         scales_list = [1.0] * len(tensor_images)
 
-        with no_grad():
-            while i < max_len_generation and len(active_indices) > 0:
-                active_images = [tensor_images[idx] for idx in active_indices]
-                active_prompts = [prompts[idx] for idx in active_indices]
-                predictions = self.forward(active_images, active_prompts, active_answers)
+        for i in range(max_len_generation):
+            if len(active_indices) == 0:
+                break
+            active_images = [tensor_images[idx] for idx in active_indices]
+            active_prompts = [prompts[idx] for idx in active_indices]
+            predictions = self(active_images, active_prompts, active_answers)
 
-                # Get scales of all the images of the initial batch
-                if i == 0:
-                    scales_list = self.input_encoder[0].scales_list
+            # Get scales of all the images of the initial batch
+            if i == 0:
+                scales_list = self.input_encoder.scales_list
 
-                next_tokens = torch.argmax(predictions[:, -1, :], dim=-1)
-                self.process_next_tokens(next_tokens, answers, active_indices, active_in_coords)
+            next_tokens = torch.argmax(predictions[:, -1, :], dim=-1)
+            self.process_next_tokens(next_tokens, answers, active_indices, active_in_coords)
 
-                active_answers = [answers[idx] for idx in active_indices]
-                i += 1
+            active_answers = [answers[idx] for idx in active_indices]
+            i += 1
 
         final_answers = self.rescale_answers(answers, scales_list)
 
@@ -157,28 +171,33 @@ class Fuyu(fl.Chain):
             active_indices (list[int, "active_batch"])
             active_in_coords (list[bool, "batch"])
         """
-        tokenizer = self.tokenizer[0]
 
         to_remove: list[int] = []
         for idx, next_token in enumerate(next_tokens):
             token_id = int(next_token.item())
             # End of generation
-            if token_id == tokenizer.eos_token["id"]:
+            if token_id == self.tokenizer.eos_token["id"]:
                 to_remove.append(active_indices[idx])
                 next_token_text = ""
 
             # The model begins to generate coordinates
-            elif token_id in [tokenizer.token_bbox_open_id, tokenizer.token_point_open_id]:
-                next_token_text = tokenizer.id_to_token[token_id]
-                next_token_text = next_token_text.replace(tokenizer.token_bbox_open, tokenizer.text_bbox_open)
-                next_token_text = next_token_text.replace(tokenizer.token_point_open, tokenizer.text_point_open)
+            elif token_id in [self.tokenizer.token_bbox_open_id, self.tokenizer.token_point_open_id]:
+                next_token_text = self.tokenizer.id_to_token[token_id]
+                next_token_text = next_token_text.replace(self.tokenizer.token_bbox_open, self.tokenizer.text_bbox_open)
+                next_token_text = next_token_text.replace(
+                    self.tokenizer.token_point_open, self.tokenizer.text_point_open
+                )
                 active_in_coords[active_indices[idx]] = True
 
             # The model ends coordinates generation
-            elif token_id in [tokenizer.token_bbox_close_id, tokenizer.token_point_close_id]:
-                next_token_text = tokenizer.id_to_token[token_id]
-                next_token_text = next_token_text.replace(tokenizer.token_bbox_close, tokenizer.text_bbox_close)
-                next_token_text = next_token_text.replace(tokenizer.token_point_close, tokenizer.text_point_close)
+            elif token_id in [self.tokenizer.token_bbox_close_id, self.tokenizer.token_point_close_id]:
+                next_token_text = self.tokenizer.id_to_token[token_id]
+                next_token_text = next_token_text.replace(
+                    self.tokenizer.token_bbox_close, self.tokenizer.text_bbox_close
+                )
+                next_token_text = next_token_text.replace(
+                    self.tokenizer.token_point_close, self.tokenizer.text_point_close
+                )
                 # Remove last comma
                 answers[active_indices[idx]] = answers[active_indices[idx]][:-1]
                 active_in_coords[active_indices[idx]] = False
@@ -186,14 +205,14 @@ class Fuyu(fl.Chain):
             else:
                 # Basic processing
                 if not active_in_coords[active_indices[idx]]:
-                    next_token_text = tokenizer.id_to_token[token_id].replace(
-                        tokenizer.replace_char, tokenizer.replace_pattern
+                    next_token_text = self.tokenizer.id_to_token[token_id].replace(
+                        self.tokenizer.replace_char, self.tokenizer.replace_pattern
                     )
-                    next_token_text = next_token_text.replace(tokenizer.newline_model_token, "\n")
+                    next_token_text = next_token_text.replace(self.tokenizer.newline_model_token, "\n")
 
                 # Coordinates processing
                 else:
-                    next_token_text = tokenizer.id_to_token[token_id]
+                    next_token_text = self.tokenizer.id_to_token[token_id]
                     next_token_text += ","
 
             if answers[active_indices[idx]] == "":
@@ -218,10 +237,9 @@ class Fuyu(fl.Chain):
         Returns:
             (list[str, "batch"])
         """
-        tokenizer = self.tokenizer[0]
 
         regex_pattern = re.compile(
-            f"({tokenizer.text_bbox_open}|{tokenizer.text_bbox_close}|{tokenizer.text_point_open}|{tokenizer.text_point_close})"
+            f"({self.tokenizer.text_bbox_open}|{self.tokenizer.text_bbox_close}|{self.tokenizer.text_point_open}|{self.tokenizer.text_point_close})"
         )
 
         rescaled_answers: list[str] = []
@@ -230,7 +248,7 @@ class Fuyu(fl.Chain):
             answer_split = regex_pattern.split(answer)
             rescaled_answer = ""
             for i, elem in enumerate(answer_split):
-                if i > 0 and answer_split[i - 1] in [tokenizer.text_bbox_open, tokenizer.text_point_open]:
+                if i > 0 and answer_split[i - 1] in [self.tokenizer.text_bbox_open, self.tokenizer.text_point_open]:
                     points_coordinates = elem.split(",")
                     points_coordinates = [
                         float(point_coordinate.strip())
