@@ -17,6 +17,11 @@ def _img_open(path: Path) -> Image.Image:
 
 
 @pytest.fixture(scope="module")
+def test_vocab_path() -> Path:
+    return Path(__file__).parent / "test_vocab"
+
+
+@pytest.fixture(scope="module")
 def our_model(test_weights_path: Path, test_vocab_path: Path, test_device: Device) -> Fuyu:
     weights = test_weights_path / f"fuyu8b.safetensors"
     vocab = test_vocab_path / f"tokenizer.json.gz"
