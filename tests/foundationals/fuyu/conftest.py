@@ -72,7 +72,7 @@ def setup_reference(test_ref_path: Path, test_device: Device, images: list[Image
     answers_path = test_ref_path / "generation.pkl"
     ref_output: Tensor = ref_model.generate(**ref_input, max_new_tokens=100, use_cache=False)  # type: ignore[reportUnknownMemberType]
     ref_generation: list[str] = ref_processor.batch_decode(ref_output, skip_special_tokens=True)  # type: ignore[reportUnknownMemberType]
-    # get elements after begining of answer token and strip
+    # get elements after beginning of answer token and strip
     ref_generation = [answer.split("\x04")[1].strip() for answer in ref_generation]  # type: ignore[reportUnknownMemberType]
     with answers_path.open("wb") as fp:
         pickle.dump(ref_generation, fp)
