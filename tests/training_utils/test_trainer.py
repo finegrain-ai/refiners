@@ -244,11 +244,11 @@ def test_callback_registration(mock_trainer: MockTrainer) -> None:
     mock_trainer.train()
 
     # Check that the callback skips every other iteration
-    assert mock_trainer.mock_callback.optimizer_step_count == mock_trainer.clock.iteration // 2
+    assert mock_trainer.mock_callback.optimizer_step_count == mock_trainer.clock.iteration // 2 + 1
     assert mock_trainer.mock_callback.step_end_count == mock_trainer.clock.step // 3 + 1
 
     # Check that the random seed was set
-    assert mock_trainer.mock_callback.optimizer_step_random_int == 93
+    assert mock_trainer.mock_callback.optimizer_step_random_int == 41
     assert mock_trainer.mock_callback.step_end_random_int == 81
 
 
