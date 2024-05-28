@@ -1,5 +1,5 @@
 from abc import ABC
-from os import PathLike
+from pathlib import Path
 from typing import Any, Literal
 
 from neptune import Run, init_run  # type: ignore
@@ -43,7 +43,7 @@ class NeptuneConfig(CallbackConfig):
     proxies: dict[str, str] | None = None
     capture_traceback: bool = True
     git_ref: GitRef | GitRefDisabled | None = None
-    dependencies: PathLike[str] | str | None = None
+    dependencies: Path | str | None = None
     async_lag_callback: NeptuneObjectCallback | None = None
     async_no_progress_callback: NeptuneObjectCallback | None = None
     async_lag_threshold: float = ASYNC_LAG_THRESHOLD
