@@ -41,6 +41,7 @@ from refiners.training_utils.config import (
     Optimizers,
     TrainingConfig,
 )
+from refiners.training_utils.neptune import NeptuneConfig, NeptuneMixin
 from refiners.training_utils.trainer import Trainer, register_callback, register_model
 from refiners.training_utils.wandb import WandbConfig, WandbMixin
 
@@ -54,6 +55,8 @@ __all__ = [
     "CallbackConfig",
     "WandbMixin",
     "WandbConfig",
+    "NeptuneMixin",
+    "NeptuneConfig",
     "LRSchedulerConfig",
     "OptimizerConfig",
     "TrainingConfig",
