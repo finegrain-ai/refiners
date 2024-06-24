@@ -5,9 +5,9 @@ import numpy as np
 from torch import Generator, Tensor, device as Device, dtype as Dtype, exp, float32, tensor
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
+    BaseSolverParams,
     ModelPredictionType,
     Solver,
-    SolverParams,
     TimestepSpacing,
 )
 
@@ -34,7 +34,7 @@ class DPMSolver(Solver):
         self,
         num_inference_steps: int,
         first_inference_step: int = 0,
-        params: SolverParams | None = None,
+        params: BaseSolverParams | None = None,
         last_step_first_order: bool = False,
         device: Device | str = "cpu",
         dtype: Dtype = float32,

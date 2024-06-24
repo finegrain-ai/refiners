@@ -1,5 +1,5 @@
 import argparse
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import torch
 from torch import nn
@@ -15,8 +15,6 @@ except ImportError:
         "Please download the model.py file from https://github.com/carolineec/informative-drawings and add it to your"
         " PYTHONPATH"
     )
-if TYPE_CHECKING:
-    Generator = cast(nn.Module, Generator)
 
 
 class Args(argparse.Namespace):
@@ -27,7 +25,7 @@ class Args(argparse.Namespace):
 
 
 def setup_converter(args: Args) -> ModelConverter:
-    source = Generator(3, 1, 3)
+    source = cast(nn.Module, Generator(3, 1, 3))
     source.load_state_dict(state_dict=load_tensors(args.source_path))
     source.eval()
     target = InformativeDrawings()

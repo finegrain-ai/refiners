@@ -4,6 +4,7 @@ import torch
 
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
 from refiners.foundationals.latent_diffusion.solvers.solver import (
+    BaseSolverParams,
     ModelPredictionType,
     Solver,
     SolverParams,
@@ -29,7 +30,7 @@ class LCMSolver(Solver):
         self,
         num_inference_steps: int,
         first_inference_step: int = 0,
-        params: SolverParams | None = None,
+        params: BaseSolverParams | None = None,
         num_orig_steps: int = 50,
         device: torch.device | str = "cpu",
         dtype: torch.dtype = torch.float32,
