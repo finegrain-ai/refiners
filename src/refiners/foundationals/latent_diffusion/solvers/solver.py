@@ -71,7 +71,18 @@ class ModelPredictionType(str, Enum):
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
-class SolverParams:
+class BaseSolverParams:
+    num_train_timesteps: int | None
+    timesteps_spacing: TimestepSpacing | None
+    timesteps_offset: int | None
+    initial_diffusion_rate: float | None
+    final_diffusion_rate: float | None
+    noise_schedule: NoiseSchedule | None
+    model_prediction_type: ModelPredictionType | None
+
+
+@dataclasses.dataclass(kw_only=True, frozen=True)
+class SolverParams(BaseSolverParams):
     """Common parameters for solvers.
 
     Args:
@@ -94,7 +105,7 @@ class SolverParams:
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
-class ResolvedSolverParams(SolverParams):
+class ResolvedSolverParams(BaseSolverParams):
     num_train_timesteps: int
     timesteps_spacing: TimestepSpacing
     timesteps_offset: int
@@ -131,7 +142,7 @@ class Solver(fl.Module, ABC):
         self,
         num_inference_steps: int,
         first_inference_step: int = 0,
-        params: SolverParams | None = None,
+        params: BaseSolverParams | None = None,
         device: Device | str = "cpu",
         dtype: DType = float32,
     ) -> None:
@@ -158,7 +169,7 @@ class Solver(fl.Module, ABC):
 
         self.to(device=device, dtype=dtype)
 
-    def resolve_params(self, params: SolverParams | None) -> ResolvedSolverParams:
+    def resolve_params(self, params: BaseSolverParams | None) -> ResolvedSolverParams:
         if params is None:
             return dataclasses.replace(self.default_params)
         return dataclasses.replace(

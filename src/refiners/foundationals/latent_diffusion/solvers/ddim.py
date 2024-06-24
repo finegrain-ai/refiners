@@ -3,9 +3,9 @@ import dataclasses
 from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, sqrt, tensor
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
+    BaseSolverParams,
     ModelPredictionType,
     Solver,
-    SolverParams,
     TimestepSpacing,
 )
 
@@ -26,7 +26,7 @@ class DDIM(Solver):
         self,
         num_inference_steps: int,
         first_inference_step: int = 0,
-        params: SolverParams | None = None,
+        params: BaseSolverParams | None = None,
         device: Device | str = "cpu",
         dtype: Dtype = float32,
     ) -> None:
