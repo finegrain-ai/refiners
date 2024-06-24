@@ -70,8 +70,15 @@ class ConditionEncoder(Chain):
 
 
 class Controlnet(Passthrough):
+    scale_decays: list[float]
+
     def __init__(
-        self, name: str, scale: float = 1.0, device: Device | str | None = None, dtype: DType | None = None
+        self,
+        name: str,
+        scale: float = 1.0,
+        scale_decay: float = 1.0,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
     ) -> None:
         """Controlnet is a Half-UNet that collects residuals from the UNet and uses them to condition the UNet.
 
@@ -79,9 +86,16 @@ class Controlnet(Passthrough):
         stored in the context.
 
         It has to use the same context as the UNet: `unet` and `sampling`.
+
+        Scale decay of 0.825 corresponds to the "Prompt is more important" Control Mode of sd-webui-controlnet plugin
+        https://github.com/Mikubill/sd-webui-controlnet/blob/8e143d3545140b8f0398dfbe1d95a0a766019283/scripts/hook.py#L472
+        See also the so-called "Guess Mode" in the official ControlNet demos which uses such scales:
+        https://github.com/lllyasviel/ControlNet#guess-mode--non-prompt-mode
         """
         self.name = name
         self.scale = scale
+        self._scale_decay = scale_decay
+        self.compute_scale_decays()
         super().__init__(
             TimestepEncoder(context_key=f"timestep_embedding_{name}", device=device, dtype=dtype),
             Slicing(dim=1, end=4),  # support inpainting
@@ -134,19 +148,38 @@ class Controlnet(Passthrough):
     def _store_nth_residual(self, n: int):
         def _store_residual(x: Tensor):
             residuals = self.use_context("unet")["residuals"]
-            residuals[n] = residuals[n] + x * self.scale
+            residuals[n] = residuals[n] + x * self.scale * self.scale_decays[n]
             return x
 
         return _store_residual
 
+    @property
+    def scale_decay(self) -> float:
+        return self._scale_decay
+
+    @scale_decay.setter
+    def scale_decay(self, value: float) -> None:
+        self._scale_decay = value
+        self.compute_scale_decays()
+
+    def compute_scale_decays(self) -> None:
+        self.scale_decays = [self.scale_decay ** float(12 - i) for i in range(13)]
+
 
 class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
     def __init__(
-        self, target: SD1UNet, name: str, scale: float = 1.0, weights: dict[str, Tensor] | None = None
+        self,
+        target: SD1UNet,
+        name: str,
+        scale: float = 1.0,
+        scale_decay: float = 1.0,
+        weights: dict[str, Tensor] | None = None,
     ) -> None:
         self.name = name
 
-        controlnet = Controlnet(name=name, scale=scale, device=target.device, dtype=target.dtype)
+        controlnet = Controlnet(
+            name=name, scale=scale, scale_decay=scale_decay, device=target.device, dtype=target.dtype
+        )
         if weights is not None:
             controlnet.load_state_dict(weights)
         self._controlnet: list[Controlnet] = [controlnet]  # not registered by PyTorch
@@ -176,11 +209,19 @@ class SD1ControlnetAdapter(Chain, Adapter[SD1UNet]):
 
     @property
     def scale(self) -> float:
-        return self._controlnet[0].scale
+        return self.controlnet.scale
 
     @scale.setter
     def scale(self, value: float) -> None:
-        self._controlnet[0].scale = value
+        self.controlnet.scale = value
+
+    @property
+    def scale_decay(self) -> float:
+        return self.controlnet.scale_decay
+
+    @scale_decay.setter
+    def scale_decay(self, value: float) -> None:
+        self.controlnet.scale_decay = value
 
     def set_controlnet_condition(self, condition: Tensor) -> None:
         self.set_context("controlnet", {f"condition_{self.name}": condition})

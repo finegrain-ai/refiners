@@ -179,6 +179,21 @@ def controlnet_data(
     yield (cn_name, condition_image, expected_image, weights_path)
 
 
+@pytest.fixture(scope="module", params=["canny"])
+def controlnet_data_scale_decay(
+    ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
+) -> Iterator[tuple[str, Image.Image, Image.Image, Path]]:
+    cn_name: str = request.param
+    condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
+    expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}_scale_decay.png").convert("RGB")
+    weights_fn = {
+        "canny": "lllyasviel_control_v11p_sd15_canny",
+    }
+
+    weights_path = test_weights_path / "controlnet" / f"{weights_fn[cn_name]}.safetensors"
+    yield (cn_name, condition_image, expected_image, weights_path)
+
+
 @pytest.fixture(scope="module")
 def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "canny"
@@ -1056,6 +1071,50 @@ def test_diffusion_controlnet(
 
     controlnet = SD1ControlnetAdapter(
         sd15.unet, name=cn_name, scale=0.5, weights=load_from_safetensors(cn_weights_path)
+    ).inject()
+
+    cn_condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
+
+    manual_seed(2)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+
+    for step in sd15.steps:
+        controlnet.set_controlnet_condition(cn_condition)
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.latents_to_image(x)
+
+    ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_controlnet_scale_decay(
+    sd15_std: StableDiffusion_1,
+    controlnet_data_scale_decay: tuple[str, Image.Image, Image.Image, Path],
+    test_device: torch.device,
+):
+    sd15 = sd15_std
+
+    cn_name, condition_image, expected_image, cn_weights_path = controlnet_data_scale_decay
+
+    if not cn_weights_path.is_file():
+        warn(f"could not find weights at {cn_weights_path}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.set_inference_steps(30)
+
+    # Using default value of 0.825 chosen by lvmin
+    # https://github.com/Mikubill/sd-webui-controlnet/blob/8e143d3545140b8f0398dfbe1d95a0a766019283/scripts/hook.py#L472
+    controlnet = SD1ControlnetAdapter(
+        sd15.unet, name=cn_name, scale=0.5, scale_decay=0.825, weights=load_from_safetensors(cn_weights_path)
     ).inject()
 
     cn_condition = image_to_tensor(condition_image.convert("RGB"), device=test_device)
