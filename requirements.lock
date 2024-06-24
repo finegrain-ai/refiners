@@ -9,15 +9,13 @@
 #   generate-hashes: false
 
 -e file:.
-aiohttp==3.9.3
+aiohttp==3.9.5
     # via datasets
     # via fsspec
 aiosignal==1.3.1
     # via aiohttp
-annotated-types==0.6.0
+annotated-types==0.7.0
     # via pydantic
-appdirs==1.4.4
-    # via wandb
 arrow==1.3.0
     # via isoduration
 async-timeout==4.0.3
@@ -26,22 +24,22 @@ attrs==23.2.0
     # via aiohttp
     # via jsonschema
     # via referencing
-babel==2.14.0
+babel==2.15.0
     # via mkdocs-material
-bitsandbytes==0.43.0
+bitsandbytes==0.43.1
     # via refiners
-black==24.3.0
+black==24.4.2
     # via refiners
-boto3==1.34.113
+boto3==1.34.131
     # via neptune
-botocore==1.34.113
+botocore==1.34.131
     # via boto3
     # via s3transfer
 bravado==11.0.3
     # via neptune
 bravado-core==6.1.1
     # via bravado
-certifi==2024.2.2
+certifi==2024.6.2
     # via requests
     # via sentry-sdk
 charset-normalizer==3.3.2
@@ -55,16 +53,16 @@ click==8.1.7
 colorama==0.4.6
     # via griffe
     # via mkdocs-material
-datasets==2.18.0
+datasets==2.20.0
     # via refiners
-diffusers==0.27.2
+diffusers==0.29.1
     # via refiners
 dill==0.3.8
     # via datasets
     # via multiprocess
 docker-pycreds==0.4.0
     # via wandb
-filelock==3.13.3
+filelock==3.15.4
     # via datasets
     # via diffusers
     # via huggingface-hub
@@ -76,7 +74,7 @@ fqdn==1.5.1
 frozenlist==1.4.1
     # via aiohttp
     # via aiosignal
-fsspec==2024.2.0
+fsspec==2024.5.0
     # via datasets
     # via huggingface-hub
     # via torch
@@ -90,25 +88,25 @@ gitpython==3.1.43
     # via neptune
     # via refiners
     # via wandb
-griffe==0.42.1
+griffe==0.47.0
     # via mkdocstrings-python
-huggingface-hub==0.22.2
+huggingface-hub==0.23.4
     # via datasets
     # via diffusers
     # via timm
     # via tokenizers
     # via transformers
-idna==3.6
+idna==3.7
     # via jsonschema
     # via requests
     # via yarl
-importlib-metadata==7.1.0
+importlib-metadata==7.2.1
     # via diffusers
 isoduration==20.11.0
     # via jsonschema
-jaxtyping==0.2.28
+jaxtyping==0.2.30
     # via refiners
-jinja2==3.1.3
+jinja2==3.1.4
     # via mkdocs
     # via mkdocs-material
     # via mkdocstrings
@@ -116,7 +114,7 @@ jinja2==3.1.3
 jmespath==1.0.1
     # via boto3
     # via botocore
-jsonpointer==2.4
+jsonpointer==3.0.0
     # via jsonschema
 jsonref==1.1.0
     # via bravado-core
@@ -140,23 +138,26 @@ markupsafe==2.1.5
     # via mkdocstrings
 mergedeep==1.3.4
     # via mkdocs
-mkdocs==1.5.3
+    # via mkdocs-get-deps
+mkdocs==1.6.0
     # via mkdocs-autorefs
     # via mkdocs-literate-nav
     # via mkdocs-material
     # via mkdocstrings
 mkdocs-autorefs==1.0.1
     # via mkdocstrings
+mkdocs-get-deps==0.2.0
+    # via mkdocs
 mkdocs-literate-nav==0.6.1
     # via refiners
-mkdocs-material==9.5.17
+mkdocs-material==9.5.27
     # via refiners
 mkdocs-material-extensions==1.3.1
     # via mkdocs-material
-mkdocstrings==0.24.1
+mkdocstrings==0.25.1
     # via mkdocstrings-python
     # via refiners
-mkdocstrings-python==1.8.0
+mkdocstrings-python==1.10.5
     # via mkdocstrings
 monotonic==1.6
     # via bravado
@@ -174,13 +175,12 @@ mypy-extensions==1.0.0
     # via black
 neptune==1.10.4
     # via refiners
-networkx==3.2.1
+networkx==3.3
     # via torch
-numpy==1.26.4
+numpy==2.0.0
     # via bitsandbytes
     # via datasets
     # via diffusers
-    # via jaxtyping
     # via pandas
     # via pyarrow
     # via refiners
@@ -207,9 +207,9 @@ nvidia-cusolver-cu12==11.4.5.107
 nvidia-cusparse-cu12==12.1.0.106
     # via nvidia-cusolver-cu12
     # via torch
-nvidia-nccl-cu12==2.19.3
+nvidia-nccl-cu12==2.20.5
     # via torch
-nvidia-nvjitlink-cu12==12.4.99
+nvidia-nvjitlink-cu12==12.5.40
     # via nvidia-cusolver-cu12
     # via nvidia-cusparse-cu12
 nvidia-nvtx-cu12==12.1.105
@@ -217,7 +217,7 @@ nvidia-nvtx-cu12==12.1.105
 oauthlib==3.2.2
     # via neptune
     # via requests-oauthlib
-packaging==24.0
+packaging==24.1
     # via black
     # via datasets
     # via huggingface-hub
@@ -227,7 +227,7 @@ packaging==24.0
     # via transformers
 paginate==0.5.6
     # via mkdocs-material
-pandas==2.2.1
+pandas==2.2.2
     # via datasets
     # via neptune
 pathspec==0.12.1
@@ -240,30 +240,31 @@ pillow==10.3.0
     # via torchvision
 piq==0.8.0
     # via refiners
-platformdirs==4.2.0
+platformdirs==4.2.2
     # via black
-    # via mkdocs
+    # via mkdocs-get-deps
     # via mkdocstrings
+    # via wandb
 prodigyopt==1.0
     # via refiners
-protobuf==4.25.3
+protobuf==5.27.1
     # via wandb
-psutil==5.9.8
+psutil==6.0.0
     # via neptune
     # via wandb
-pyarrow==15.0.2
+pyarrow==16.1.0
     # via datasets
 pyarrow-hotfix==0.6
     # via datasets
-pydantic==2.6.4
+pydantic==2.7.4
     # via refiners
-pydantic-core==2.16.3
+pydantic-core==2.18.4
     # via pydantic
-pygments==2.17.2
+pygments==2.18.0
     # via mkdocs-material
 pyjwt==2.8.0
     # via neptune
-pymdown-extensions==10.7.1
+pymdown-extensions==10.8.1
     # via mkdocs-material
     # via mkdocstrings
 python-dateutil==2.9.0.post0
@@ -282,6 +283,7 @@ pyyaml==6.0.1
     # via datasets
     # via huggingface-hub
     # via mkdocs
+    # via mkdocs-get-deps
     # via pymdown-extensions
     # via pyyaml-env-tag
     # via swagger-spec-validator
@@ -293,11 +295,11 @@ pyyaml-env-tag==0.1
 referencing==0.35.1
     # via jsonschema
     # via jsonschema-specifications
-regex==2023.12.25
+regex==2024.5.15
     # via diffusers
     # via mkdocs-material
     # via transformers
-requests==2.31.0
+requests==2.32.3
     # via bravado
     # via bravado-core
     # via datasets
@@ -320,7 +322,7 @@ rpds-py==0.18.1
     # via referencing
 s3transfer==0.10.1
     # via boto3
-safetensors==0.4.2
+safetensors==0.4.3
     # via diffusers
     # via refiners
     # via timm
@@ -329,11 +331,11 @@ segment-anything-hq==0.3
     # via refiners
 segment-anything-py==1.0
     # via refiners
-sentry-sdk==1.44.0
+sentry-sdk==2.6.0
     # via wandb
 setproctitle==1.3.3
     # via wandb
-setuptools==69.2.0
+setuptools==70.1.0
     # via wandb
 simplejson==3.19.2
     # via bravado
@@ -350,42 +352,42 @@ smmap==5.0.1
 swagger-spec-validator==3.0.3
     # via bravado-core
     # via neptune
-sympy==1.12
+sympy==1.12.1
     # via torch
-timm==0.9.16
+timm==1.0.7
     # via refiners
-tokenizers==0.15.2
+tokenizers==0.19.1
     # via transformers
 tomli==2.0.1
     # via black
     # via refiners
-torch==2.2.2
+torch==2.3.1
     # via bitsandbytes
     # via refiners
     # via segment-anything-hq
     # via segment-anything-py
     # via timm
     # via torchvision
-torchvision==0.17.2
+torchvision==0.18.1
     # via piq
     # via refiners
     # via segment-anything-hq
     # via segment-anything-py
     # via timm
-tqdm==4.66.2
+tqdm==4.66.4
     # via datasets
     # via huggingface-hub
     # via refiners
     # via transformers
-transformers==4.39.3
+transformers==4.41.2
     # via refiners
-triton==2.2.0
+triton==2.3.1
     # via torch
 typeguard==2.13.3
     # via jaxtyping
 types-python-dateutil==2.9.0.20240316
     # via arrow
-typing-extensions==4.10.0
+typing-extensions==4.12.2
     # via black
     # via bravado
     # via huggingface-hub
@@ -398,16 +400,16 @@ tzdata==2024.1
     # via pandas
 uri-template==1.3.0
     # via jsonschema
-urllib3==2.2.1
+urllib3==2.2.2
     # via botocore
     # via neptune
     # via requests
     # via sentry-sdk
-wandb==0.16.5
+wandb==0.17.2
     # via refiners
-watchdog==4.0.0
+watchdog==4.0.1
     # via mkdocs
-webcolors==1.13
+webcolors==24.6.0
     # via jsonschema
 websocket-client==1.8.0
     # via neptune
@@ -415,5 +417,5 @@ xxhash==3.4.1
     # via datasets
 yarl==1.9.4
     # via aiohttp
-zipp==3.18.1
+zipp==3.19.2
     # via importlib-metadata
