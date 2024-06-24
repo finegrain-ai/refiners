@@ -156,3 +156,4 @@ filterwarnings = [
     "ignore::DeprecationWarning:timm.models.layers.*",
     "ignore::DeprecationWarning:timm.models.registry.*"
 ]
+addopts = "--import-mode=importlib"
