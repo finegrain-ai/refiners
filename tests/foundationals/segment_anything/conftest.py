@@ -1,7 +1,15 @@
+import gc
 from pathlib import Path
 from warnings import warn
 
 from pytest import fixture, skip
+
+
+@fixture(autouse=True)
+def ensure_gc():
+    # Avoid GPU OOMs
+    # See https://github.com/pytest-dev/pytest/discussions/8153#discussioncomment-214812
+    gc.collect()
 
 
 @fixture(scope="package")
