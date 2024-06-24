@@ -57,6 +57,8 @@ Special cases:
     - `expected_controllora_PyraCanny+CPDS.png`
     - `expected_controllora_disabled.png`
     - `expected_style_aligned.png`
+    - `expected_controlnet_<name>.png` (canny|depth|lineart|normals|sam|stack)
+    - `expected_controlnet_<name>_scale_decay.png` (canny)
 
 ## Other images
 
