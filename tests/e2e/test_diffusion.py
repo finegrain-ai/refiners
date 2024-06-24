@@ -7,6 +7,7 @@ from warnings import warn
 import pytest
 import torch
 from PIL import Image
+from tests.utils import ensure_similar_images
 
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
@@ -31,7 +32,6 @@ from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSc
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
-from tests.utils import ensure_similar_images
 
 
 def _img_open(path: Path) -> Image.Image:

@@ -5,13 +5,13 @@ from warnings import warn
 import pytest
 import torch
 from PIL import Image
+from tests.utils import ensure_similar_images
 
 from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
 from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.solvers import Euler, ModelPredictionType, SolverParams, TimestepSpacing
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm_lora import add_lcm_lora
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
-from tests.utils import ensure_similar_images
 
 
 def _img_open(path: Path) -> Image.Image:

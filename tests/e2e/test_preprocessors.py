@@ -4,10 +4,10 @@ from warnings import warn
 import pytest
 import torch
 from PIL import Image
+from tests.utils import ensure_similar_images
 
 from refiners.fluxion.utils import image_to_tensor, no_grad, tensor_to_image
 from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings import InformativeDrawings
-from tests.utils import ensure_similar_images
 
 
 def _img_open(path: Path) -> Image.Image:
