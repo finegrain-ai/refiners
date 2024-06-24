@@ -195,6 +195,14 @@ def controlnet_data_scale_decay(
 
 
 @pytest.fixture(scope="module")
+def controlnet_data_tile(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, Image.Image, Path]:
+    condition_image = _img_open(ref_path / f"low_res_dog.png").convert("RGB").resize((1024, 1024))  # type: ignore
+    expected_image = _img_open(ref_path / f"expected_controlnet_tile.png").convert("RGB")
+    weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1e_sd15_tile.safetensors"
+    return condition_image, expected_image, weights_path
+
+
+@pytest.fixture(scope="module")
 def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "canny"
     condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
@@ -1089,6 +1097,43 @@ def test_diffusion_controlnet(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_controlnet_tile_upscale(
+    sd15_std: StableDiffusion_1,
+    controlnet_data_tile: tuple[Image.Image, Image.Image, Path],
+    test_device: torch.device,
+):
+    sd15 = sd15_std
+
+    condition_image, expected_image, cn_weights_path = controlnet_data_tile
+
+    controlnet: SD1ControlnetAdapter = SD1ControlnetAdapter(
+        sd15.unet, name="tile", scale=1.0, weights=load_from_safetensors(cn_weights_path)
+    ).inject()
+
+    cn_condition = image_to_tensor(condition_image, device=test_device)
+
+    prompt = "best quality"
+    negative_prompt = "blur, lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    manual_seed(0)
+    x = sd15.init_latents((1024, 1024), condition_image).to(test_device)
+
+    for step in sd15.steps:
+        controlnet.set_controlnet_condition(cn_condition)
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+    predicted_image = sd15.lda.latents_to_image(x)
+
+    # Note: rather large tolerances are used on purpose here (loose comparison with diffusers' output)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=24, min_ssim=0.75)
 
 
 @no_grad()

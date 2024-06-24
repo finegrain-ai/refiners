@@ -291,6 +291,13 @@ def download_controlnet():
         ]
         download_files(urls, net_folder)
 
+    tile_folder = os.path.join(base_folder, "control_v11f1e_sd15_tile")
+    urls = [
+        "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/raw/main/config.json",
+        "https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/resolve/main/diffusion_pytorch_model.bin",
+    ]
+    download_files(urls, tile_folder)
+
     mfidabel_folder = os.path.join(test_weights_dir, "mfidabel", "controlnet-segment-anything")
     urls = [
         "https://huggingface.co/mfidabel/controlnet-segment-anything/raw/main/config.json",
@@ -596,6 +603,12 @@ def convert_controlnet():
         "tests/weights/mfidabel/controlnet-segment-anything",
         "tests/weights/controlnet/mfidabel_controlnet-segment-anything.safetensors",
         expected_hash="d536eebb",
+    )
+    run_conversion_script(
+        "convert_diffusers_controlnet.py",
+        "tests/weights/lllyasviel/control_v11f1e_sd15_tile",
+        "tests/weights/controlnet/lllyasviel_control_v11f1e_sd15_tile.safetensors",
+        expected_hash="42463af8",
     )
 
 

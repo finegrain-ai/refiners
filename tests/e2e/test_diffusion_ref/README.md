@@ -57,8 +57,7 @@ Special cases:
     - `expected_controllora_PyraCanny+CPDS.png`
     - `expected_controllora_disabled.png`
     - `expected_style_aligned.png`
-    - `expected_controlnet_<name>.png` (canny|depth|lineart|normals|sam|stack)
-    - `expected_controlnet_<name>_scale_decay.png` (canny)
+    - `expected_controlnet_canny_scale_decay.png` 
 
 ## Other images
 
@@ -89,6 +88,9 @@ Special cases:
 - `statue.png` [comes from tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/assets/images/statue.png).
 
 - `cutecat_guide_PyraCanny.png` and `cutecat_guide_CPDS.png` were [generated inside Fooocus](https://github.com/lllyasviel/Fooocus/blob/e8d88d3e250e541c6daf99d6ef734e8dc3cfdc7f/extras/preprocessors.py).
+
+- `low_res_dog.png` and `expected_controlnet_tile.png` are taken from Diffusers [documentation](https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/tree/main/images), respectively named
+`original.png` and `output.png`.
 
 ## VAE without randomness
 
