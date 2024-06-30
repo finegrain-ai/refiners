@@ -1,4 +1,5 @@
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.controlnet import SD1ControlnetAdapter
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.ella_adapter import SD1ELLAAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.ic_light import ICLight
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.image_prompt import SD1IPAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import (
@@ -18,4 +19,5 @@ __all__ = [
     "SD1IPAdapter",
     "SD1T2IAdapter",
     "ICLight",
+    "SD1ELLAAdapter",
 ]

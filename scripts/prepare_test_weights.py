@@ -353,6 +353,29 @@ def download_ip_adapter():
     download_files(urls, sdxl_models_folder)
 
 
+def download_t5xl_fp16():
+    base_folder = os.path.join(test_weights_dir, "QQGYLab", "T5XLFP16")
+    urls = [
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/config.json",
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/model.safetensors",
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/special_tokens_map.json",
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/spiece.model",
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/tokenizer.json",
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/models--google--flan-t5-xl--text_encoder/tokenizer_config.json",
+    ]
+    download_files(urls, base_folder)
+
+
+def download_ella_adapter():
+    download_t5xl_fp16()
+    base_folder = os.path.join(test_weights_dir, "QQGYLab", "ELLA")
+    download_file(
+        "https://huggingface.co/QQGYLab/ELLA/resolve/main/ella-sd1.5-tsc-t5xl.safetensors",
+        base_folder,
+        expected_hash="5af7b200",
+    )
+
+
 def download_t2i_adapter():
     base_folder = os.path.join(test_weights_dir, "TencentARC", "t2iadapter_depth_sd15v2")
     urls = [
@@ -689,6 +712,17 @@ def convert_ip_adapter():
     )
 
 
+def convert_ella_adapter():
+    os.makedirs("tests/weights/ELLA-Adapter", exist_ok=True)
+    run_conversion_script(
+        "convert_ella_adapter.py",
+        "tests/weights/QQGYLab/ELLA/ella-sd1.5-tsc-t5xl.safetensors",
+        "tests/weights/ELLA-Adapter/ella-sd1.5-tsc-t5xl.safetensors",
+        half=True,
+        expected_hash="b8244cb6",
+    )
+
+
 def convert_t2i_adapter():
     os.makedirs("tests/weights/T2I-Adapter", exist_ok=True)
     run_conversion_script(
@@ -860,6 +894,7 @@ def download_all():
     download_unclip()
     download_ip_adapter()
     download_t2i_adapter()
+    download_ella_adapter()
     download_sam()
     download_hq_sam()
     download_dinov2()
@@ -884,6 +919,7 @@ def convert_all():
     convert_unclip()
     convert_ip_adapter()
     convert_t2i_adapter()
+    convert_ella_adapter()
     convert_sam()
     convert_hq_sam()
     convert_dinov2()
