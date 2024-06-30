@@ -7,7 +7,7 @@ from warnings import warn
 import pytest
 import torch
 from PIL import Image
-from tests.utils import ensure_similar_images
+from tests.utils import T5TextEmbedder, ensure_similar_images
 
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
@@ -16,6 +16,7 @@ from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion import (
     ControlLoraAdapter,
     SD1ControlnetAdapter,
+    SD1ELLAAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
     SD1UNet,
@@ -114,6 +115,11 @@ def expected_image_std_random_init_sag(ref_path: Path) -> Image.Image:
 @pytest.fixture
 def expected_image_std_init_image(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_std_init_image.png").convert("RGB")
+
+
+@pytest.fixture
+def expected_image_ella_adapter(ref_path: Path) -> Image.Image:
+    return _img_open(ref_path / "expected_image_ella_adapter.png").convert("RGB")
 
 
 @pytest.fixture
@@ -504,6 +510,29 @@ def lda_ft_mse_weights(test_weights_path: Path) -> Path:
         warn(f"could not find weights at {lda_weights}, skipping")
         pytest.skip(allow_module_level=True)
     return lda_weights
+
+
+@pytest.fixture(scope="module")
+def ella_weights(test_weights_path: Path) -> tuple[Path, Path]:
+    ella_adapter_weights = test_weights_path / "ELLA-Adapter" / "ella-sd1.5-tsc-t5xl.safetensors"
+    if not ella_adapter_weights.is_file():
+        warn(f"could not find weights at {ella_adapter_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+    t5xl_weights = test_weights_path / "QQGYLab" / "T5XLFP16"
+    t5xl_files = [
+        "config.json",
+        "model.safetensors",
+        "special_tokens_map.json",
+        "spiece.model",
+        "tokenizer_config.json",
+        "tokenizer.json",
+    ]
+    for file in t5xl_files:
+        if not (t5xl_weights / file).is_file():
+            warn(f"could not find weights at {t5xl_weights / file}, skipping")
+            pytest.skip(allow_module_level=True)
+
+    return (ella_adapter_weights, t5xl_weights)
 
 
 @pytest.fixture(scope="module")
@@ -1797,6 +1826,43 @@ def test_diffusion_textual_inversion_random_init(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_textual_inversion_random_init, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_diffusion_ella_adapter(
+    sd15_std_float16: StableDiffusion_1,
+    ella_weights: tuple[Path, Path],
+    expected_image_ella_adapter: Image.Image,
+    test_device: torch.device,
+):
+    sd15 = sd15_std_float16
+    ella_adapter_weights, t5xl_weights = ella_weights
+    t5_encoder = T5TextEmbedder(pretrained_path=t5xl_weights, max_length=128).to(test_device, torch.float16)
+
+    prompt = "a chinese man wearing a white shirt and a checkered headscarf, holds a large falcon near his shoulder. the falcon has dark feathers with a distinctive beak. the background consists of a clear sky and a fence, suggesting an outdoor setting, possibly a desert or arid region"
+    negative_prompt = ""
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+    assert clip_text_embedding.dtype == torch.float16
+
+    llm_text_embedding, negative_prompt_embeds = t5_encoder(prompt), t5_encoder(negative_prompt)
+    prompt_embedding = torch.cat((negative_prompt_embeds, llm_text_embedding)).to(test_device, torch.float16)
+
+    adapter = SD1ELLAAdapter(target=sd15.unet, weights=load_from_safetensors(ella_adapter_weights))
+    adapter.inject()
+    sd15.set_inference_steps(50)
+    manual_seed(1001)
+    x = torch.randn(1, 4, 64, 64, device=test_device, dtype=torch.float16)
+
+    for step in sd15.steps:
+        adapter.set_llm_text_embedding(prompt_embedding)
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=12,
+        )
+    predicted_image = sd15.lda.latents_to_image(x)
+    ensure_similar_images(predicted_image, expected_image_ella_adapter, min_psnr=35, min_ssim=0.98)
 
 
 @no_grad()

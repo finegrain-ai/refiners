@@ -55,6 +55,7 @@ test = [
     # HQ-SAM missing dependency:
     # https://github.com/SysCV/sam-hq/pull/59
     "timm>=0.5.0",
+    "sentencepiece>=0.2.0",
 ]
 conversion = [
     "diffusers>=0.26.1",

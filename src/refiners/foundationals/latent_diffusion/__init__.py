@@ -8,6 +8,7 @@ from refiners.foundationals.latent_diffusion.freeu import SDFreeUAdapter
 from refiners.foundationals.latent_diffusion.solvers import DPMSolver, LCMSolver, Solver
 from refiners.foundationals.latent_diffusion.stable_diffusion_1 import (
     SD1ControlnetAdapter,
+    SD1ELLAAdapter,
     SD1IPAdapter,
     SD1T2IAdapter,
     SD1UNet,
@@ -32,6 +33,7 @@ __all__ = [
     "SD1ControlnetAdapter",
     "SD1IPAdapter",
     "SD1T2IAdapter",
+    "SD1ELLAAdapter",
     "SDXLUNet",
     "DoubleTextEncoder",
     "SDXLIPAdapter",
