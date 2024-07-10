@@ -10,6 +10,7 @@ from refiners.foundationals.latent_diffusion.solvers import (
     DDPM,
     DPMSolver,
     Euler,
+    FrankenSolver,
     LCMSolver,
     ModelPredictionType,
     NoiseSchedule,
@@ -117,6 +118,42 @@ def test_euler_diffusers(model_prediction_type: ModelPredictionType):
         refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.02), f"outputs differ at step {step}"
+
+
+def test_franken_diffusers():
+    from diffusers import EulerDiscreteScheduler  # type: ignore
+
+    manual_seed(0)
+    params = {
+        "beta_end": 0.012,
+        "beta_schedule": "scaled_linear",
+        "beta_start": 0.00085,
+        "num_train_timesteps": 1000,
+        "steps_offset": 1,
+        "timestep_spacing": "linspace",
+        "use_karras_sigmas": False,
+    }
+
+    diffusers_scheduler = EulerDiscreteScheduler(**params)  # type: ignore
+    diffusers_scheduler.set_timesteps(30)
+
+    diffusers_scheduler_2 = EulerDiscreteScheduler(**params)  # type: ignore
+    refiners_scheduler = FrankenSolver(diffusers_scheduler_2, num_inference_steps=30)
+    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+
+    sample = randn(1, 4, 32, 32)
+    predicted_noise = randn(1, 4, 32, 32)
+
+    ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
+    assert isinstance(ref_init_noise_sigma, Tensor)
+    init_noise_sigma = refiners_scheduler.scale_model_input(tensor(1), step=-1)
+    assert equal(ref_init_noise_sigma, init_noise_sigma), "init_noise_sigma differ"
+
+    for step, timestep in enumerate(diffusers_scheduler.timesteps):
+        diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
+        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
+
+        assert equal(diffusers_output, refiners_output), f"outputs differ at step {step}"
 
 
 def test_lcm_diffusers():
