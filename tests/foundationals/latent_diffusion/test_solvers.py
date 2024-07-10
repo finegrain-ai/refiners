@@ -25,8 +25,8 @@ def test_ddpm_diffusers():
 
     diffusers_scheduler = DDPMScheduler(beta_schedule="scaled_linear", beta_start=0.00085, beta_end=0.012)
     diffusers_scheduler.set_timesteps(1000)
-    refiners_scheduler = DDPM(num_inference_steps=1000)
-    assert equal(diffusers_scheduler.timesteps, refiners_scheduler.timesteps)
+    solver = DDPM(num_inference_steps=1000)
+    assert equal(diffusers_scheduler.timesteps, solver.timesteps)
 
 
 @pytest.mark.parametrize("n_steps, last_step_first_order", [(5, False), (5, True), (30, False), (30, True)])
@@ -44,18 +44,18 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
     )
     diffusers_scheduler.set_timesteps(n_steps)
-    refiners_scheduler = DPMSolver(
+    solver = DPMSolver(
         num_inference_steps=n_steps,
         last_step_first_order=last_step_first_order,
     )
-    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 3, 32, 32)
     predicted_noise = randn(1, 3, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
+        refiners_output = solver(x=sample, predicted_noise=predicted_noise, step=step)
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
@@ -73,15 +73,15 @@ def test_ddim_diffusers():
         clip_sample=False,
     )
     diffusers_scheduler.set_timesteps(30)
-    refiners_scheduler = DDIM(num_inference_steps=30)
-    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+    solver = DDIM(num_inference_steps=30)
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
+        refiners_output = solver(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
@@ -103,19 +103,19 @@ def test_euler_diffusers(model_prediction_type: ModelPredictionType):
         prediction_type=diffusers_prediction_type,
     )
     diffusers_scheduler.set_timesteps(30)
-    refiners_scheduler = Euler(num_inference_steps=30, params=SolverParams(model_prediction_type=model_prediction_type))
-    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+    solver = Euler(num_inference_steps=30, params=SolverParams(model_prediction_type=model_prediction_type))
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
 
     ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
     assert isinstance(ref_init_noise_sigma, Tensor)
-    assert isclose(ref_init_noise_sigma, refiners_scheduler.init_noise_sigma), "init_noise_sigma differ"
+    assert isclose(ref_init_noise_sigma, solver.init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
+        refiners_output = solver(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.02), f"outputs differ at step {step}"
 
@@ -138,20 +138,20 @@ def test_franken_diffusers():
     diffusers_scheduler.set_timesteps(30)
 
     diffusers_scheduler_2 = EulerDiscreteScheduler(**params)  # type: ignore
-    refiners_scheduler = FrankenSolver(diffusers_scheduler_2, num_inference_steps=30)
-    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+    solver = FrankenSolver(diffusers_scheduler_2, num_inference_steps=30)
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
 
     ref_init_noise_sigma = diffusers_scheduler.init_noise_sigma  # type: ignore
     assert isinstance(ref_init_noise_sigma, Tensor)
-    init_noise_sigma = refiners_scheduler.scale_model_input(tensor(1), step=-1)
+    init_noise_sigma = solver.scale_model_input(tensor(1), step=-1)
     assert equal(ref_init_noise_sigma, init_noise_sigma), "init_noise_sigma differ"
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = refiners_scheduler(x=sample, predicted_noise=predicted_noise, step=step)
+        refiners_output = solver(x=sample, predicted_noise=predicted_noise, step=step)
 
         assert equal(diffusers_output, refiners_output), f"outputs differ at step {step}"
 
@@ -167,8 +167,8 @@ def test_lcm_diffusers():
 
     diffusers_scheduler = LCMScheduler()
     diffusers_scheduler.set_timesteps(4)
-    refiners_scheduler = LCMSolver(num_inference_steps=4)
-    assert equal(refiners_scheduler.timesteps, diffusers_scheduler.timesteps)
+    solver = LCMSolver(num_inference_steps=4)
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
     predicted_noise = randn(1, 4, 32, 32)
@@ -178,8 +178,8 @@ def test_lcm_diffusers():
         diffusers_noise_ratio = (1 - alpha_prod_t).sqrt()
         diffusers_scale_factor = alpha_prod_t.sqrt()
 
-        refiners_scale_factor = refiners_scheduler.cumulative_scale_factors[timestep]
-        refiners_noise_ratio = refiners_scheduler.noise_std[timestep]
+        refiners_scale_factor = solver.cumulative_scale_factors[timestep]
+        refiners_noise_ratio = solver.noise_std[timestep]
 
         assert refiners_scale_factor == diffusers_scale_factor
         assert refiners_noise_ratio == diffusers_noise_ratio
@@ -187,7 +187,7 @@ def test_lcm_diffusers():
         d_out = diffusers_scheduler.step(predicted_noise, timestep, sample, generator=diffusers_generator)  # type: ignore
         diffusers_output = cast(Tensor, d_out.prev_sample)  # type: ignore
 
-        refiners_output = refiners_scheduler(
+        refiners_output = solver(
             x=sample,
             predicted_noise=predicted_noise,
             step=step,
@@ -211,14 +211,14 @@ def test_solver_remove_noise():
         clip_sample=False,
     )
     diffusers_scheduler.set_timesteps(30)
-    refiners_scheduler = DDIM(num_inference_steps=30)
+    solver = DDIM(num_inference_steps=30)
 
     sample = randn(1, 4, 32, 32)
     noise = randn(1, 4, 32, 32)
 
     for step, timestep in enumerate(diffusers_scheduler.timesteps):
         diffusers_output = cast(Tensor, diffusers_scheduler.step(noise, timestep, sample).pred_original_sample)  # type: ignore
-        refiners_output = refiners_scheduler.remove_noise(x=sample, noise=noise, step=step)
+        refiners_output = solver.remove_noise(x=sample, noise=noise, step=step)
 
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
