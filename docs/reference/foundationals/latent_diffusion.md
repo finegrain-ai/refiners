@@ -13,3 +13,5 @@
 ::: refiners.foundationals.latent_diffusion.image_prompt
 
 ::: refiners.foundationals.latent_diffusion.style_aligned
+
+::: refiners.foundationals.latent_diffusion.multi_diffusion
