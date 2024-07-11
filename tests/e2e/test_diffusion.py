@@ -25,11 +25,19 @@ from refiners.foundationals.latent_diffusion import (
     StableDiffusion_1_Inpainting,
 )
 from refiners.foundationals.latent_diffusion.lora import SDLoraManager
-from refiners.foundationals.latent_diffusion.multi_diffusion import DiffusionTarget
+from refiners.foundationals.latent_diffusion.multi_diffusion import Size, Tile
 from refiners.foundationals.latent_diffusion.reference_only_control import ReferenceOnlyControlAdapter
 from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule, SolverParams
-from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import SD1MultiDiffusion
+from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import (
+    SD1DiffusionTarget,
+    SD1MultiDiffusion,
+)
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_upscaler import (
+    MultiUpscaler,
+    UpscalerCheckpoints,
+)
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
 
@@ -407,6 +415,11 @@ def expected_multi_diffusion(ref_path: Path) -> Image.Image:
 
 
 @pytest.fixture
+def expected_multi_diffusion_dpm(ref_path: Path) -> Image.Image:
+    return _img_open(ref_path / "expected_multi_diffusion_dpm.png").convert(mode="RGB")
+
+
+@pytest.fixture
 def expected_restart(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_restart.png").convert(mode="RGB")
 
@@ -754,6 +767,41 @@ def sdxl_euler_deterministic(sdxl_ddim: StableDiffusion_XL) -> StableDiffusion_X
         device=sdxl_ddim.device,
         dtype=sdxl_ddim.dtype,
     )
+
+
+@pytest.fixture(scope="module")
+def multi_upscaler(
+    test_weights_path: Path,
+    unet_weights_std: Path,
+    text_encoder_weights: Path,
+    lda_ft_mse_weights: Path,
+    test_device: torch.device,
+) -> MultiUpscaler:
+    controlnet_tile_weights = test_weights_path / "controlnet" / "lllyasviel_control_v11f1e_sd15_tile.safetensors"
+    if not controlnet_tile_weights.is_file():
+        warn(message=f"could not find weights at {controlnet_tile_weights}, skipping")
+        pytest.skip(allow_module_level=True)
+
+    return MultiUpscaler(
+        checkpoints=UpscalerCheckpoints(
+            unet=unet_weights_std,
+            clip_text_encoder=text_encoder_weights,
+            lda=lda_ft_mse_weights,
+            controlnet_tile=controlnet_tile_weights,
+        ),
+        device=test_device,
+        dtype=torch.float32,
+    )
+
+
+@pytest.fixture(scope="module")
+def clarity_example(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "clarity_input_example.png")
+
+
+@pytest.fixture(scope="module")
+def expected_multi_upscaler(ref_path: Path) -> Image.Image:
+    return Image.open(ref_path / "expected_multi_upscaler.png")
 
 
 @no_grad()
@@ -2132,15 +2180,15 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
     sd = sd15_ddim
     multi_diffusion = SD1MultiDiffusion(sd)
     clip_text_embedding = sd.compute_clip_text_embedding(text="a panorama of a mountain")
-    target_1 = DiffusionTarget(
-        size=(64, 64),
-        offset=(0, 0),
+    # DDIM doesn't have an internal state, so we can share the same solver for all targets
+    target_1 = SD1DiffusionTarget(
+        tile=Tile(top=0, left=0, bottom=64, right=64),
+        solver=sd.solver,
         clip_text_embedding=clip_text_embedding,
-        start_step=0,
     )
-    target_2 = DiffusionTarget(
-        size=(64, 64),
-        offset=(0, 16),
+    target_2 = SD1DiffusionTarget(
+        solver=sd.solver,
+        tile=Tile(top=0, left=16, bottom=64, right=80),
         clip_text_embedding=clip_text_embedding,
         condition_scale=3,
         start_step=0,
@@ -2156,6 +2204,35 @@ def test_multi_diffusion(sd15_ddim: StableDiffusion_1, expected_multi_diffusion:
         )
     result = sd.lda.latents_to_image(x=x)
     ensure_similar_images(img_1=result, img_2=expected_multi_diffusion, min_psnr=35, min_ssim=0.98)
+
+
+@no_grad()
+def test_multi_diffusion_dpm(sd15_std: StableDiffusion_1, expected_multi_diffusion_dpm: Image.Image) -> None:
+    manual_seed(seed=2)
+    sd = sd15_std
+    multi_diffusion = SD1MultiDiffusion(sd)
+    clip_text_embedding = sd.compute_clip_text_embedding(text="a panorama of a mountain")
+    tiles = SD1MultiDiffusion.generate_latent_tiles(size=Size(112, 196), tile_size=Size(96, 64), min_overlap=12)
+    targets = [
+        SD1DiffusionTarget(
+            tile=tile,
+            solver=DPMSolver(num_inference_steps=sd.solver.num_inference_steps, device=sd.device),
+            clip_text_embedding=clip_text_embedding,
+        )
+        for tile in tiles
+    ]
+
+    noise = torch.randn(1, 4, 112, 196, device=sd.device, dtype=sd.dtype)
+    x = noise
+    for step in sd.steps:
+        x = multi_diffusion(
+            x,
+            noise=noise,
+            step=step,
+            targets=targets,
+        )
+    result = sd.lda.latents_to_image(x=x)
+    ensure_similar_images(img_1=result, img_2=expected_multi_diffusion_dpm, min_psnr=35, min_ssim=0.98)
 
 
 @no_grad()
@@ -2427,3 +2504,13 @@ def test_style_aligned(
 
     # compare against reference image
     ensure_similar_images(merged_image, expected_style_aligned, min_psnr=35, min_ssim=0.99)
+
+
+@no_grad()
+def test_multi_upscaler(
+    multi_upscaler: MultiUpscaler,
+    clarity_example: Image.Image,
+    expected_multi_upscaler: Image.Image,
+) -> None:
+    predicted_image = multi_upscaler.upscale(clarity_example)
+    ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=35, min_ssim=0.99)

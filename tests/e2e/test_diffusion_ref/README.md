@@ -58,6 +58,8 @@ Special cases:
     - `expected_controllora_disabled.png`
     - `expected_style_aligned.png`
     - `expected_controlnet_canny_scale_decay.png` 
+    - `expected_multi_diffusion_dpm.png`
+    - `expected_multi_upscaler.png`
 
 ## Other images
 
@@ -91,6 +93,8 @@ Special cases:
 
 - `low_res_dog.png` and `expected_controlnet_tile.png` are taken from Diffusers [documentation](https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile/tree/main/images), respectively named
 `original.png` and `output.png`.
+
+- `clarity_input_example.png` is taken from the [Replicate demo](https://replicate.com/philz1337x/clarity-upscaler/examples) of the Clarity upscaler.
 
 ## VAE without randomness
 
