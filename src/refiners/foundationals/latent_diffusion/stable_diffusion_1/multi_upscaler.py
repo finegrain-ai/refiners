@@ -112,7 +112,9 @@ class MultiUpscalerAbstract(MultiDiffusion[T], ABC):
         if path is None:
             return ""
 
-        embeddings: Tensor | dict[str, Any] = torch.load(path, weights_only=True)  # type: ignore
+        embeddings: torch.Tensor | dict[str, Any] = torch.load(  # type: ignore
+            path, weights_only=True, map_location=self.device
+        )
 
         if isinstance(embeddings, dict):
             assert key is not None, "Key must be provided to access the negative embedding."
