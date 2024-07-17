@@ -7,6 +7,7 @@
 #   all-features: true
 #   with-sources: false
 #   generate-hashes: false
+#   universal: false
 
 -e file:.
 aiohttp==3.9.5
@@ -233,7 +234,7 @@ pandas==2.2.2
 pathspec==0.12.1
     # via black
     # via mkdocs
-pillow==10.3.0
+pillow==10.4.0
     # via diffusers
     # via neptune
     # via refiners
