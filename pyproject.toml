@@ -7,7 +7,7 @@ license = "MIT"
 dependencies = [
     "torch>=2.1.1",
     "safetensors>=0.4.0",
-    "pillow>=10.1.0",
+    "pillow>=10.4.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",
     "numpy>=1.26.4",
@@ -75,7 +75,7 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "pyright==1.1.368",
+    "pyright==1.1.372",
     "docformatter>=1.7.5",
     "pytest>=8.0.0",
     "coverage>=7.4.1",
