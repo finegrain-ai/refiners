@@ -138,7 +138,7 @@ def test_franken_diffusers():
     diffusers_scheduler.set_timesteps(30)
 
     diffusers_scheduler_2 = EulerDiscreteScheduler(**params)  # type: ignore
-    solver = FrankenSolver(diffusers_scheduler_2, num_inference_steps=30)
+    solver = FrankenSolver(lambda: diffusers_scheduler_2, num_inference_steps=30)
     assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
     sample = randn(1, 4, 32, 32)
