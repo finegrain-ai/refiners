@@ -59,6 +59,45 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
 
 
+@pytest.mark.parametrize("n_steps, last_step_first_order", [(5, False), (5, True), (30, False), (30, True)])
+def test_dpm_solver_sde_diffusers(n_steps: int, last_step_first_order: bool):
+    from diffusers import DPMSolverMultistepScheduler as DiffuserScheduler  # type: ignore
+
+    manual_seed(0)
+
+    diffusers_scheduler = DiffuserScheduler(
+        beta_schedule="scaled_linear",
+        beta_start=0.00085,
+        beta_end=0.012,
+        lower_order_final=False,
+        euler_at_final=last_step_first_order,
+        final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
+        algorithm_type="sde-dpmsolver++",
+    )
+    diffusers_scheduler.set_timesteps(n_steps)
+    solver = DPMSolver(
+        num_inference_steps=n_steps,
+        last_step_first_order=last_step_first_order,
+        params=SolverParams(sde_variance=1.0),
+    )
+    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
+
+    sample = randn(1, 3, 32, 32)
+    predicted_noise = randn(1, 3, 32, 32)
+
+    manual_seed(37)
+    diffusers_outputs: list[Tensor] = [
+        cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
+        for timestep in diffusers_scheduler.timesteps
+    ]
+
+    manual_seed(37)
+    refiners_outputs = [solver(x=sample, predicted_noise=predicted_noise, step=step) for step in range(n_steps)]
+
+    for step, (diffusers_output, refiners_output) in enumerate(zip(diffusers_outputs, refiners_outputs)):
+        assert allclose(diffusers_output, refiners_output, rtol=0.01, atol=1e-6), f"outputs differ at step {step}"
+
+
 def test_ddim_diffusers():
     from diffusers import DDIMScheduler  # type: ignore
 

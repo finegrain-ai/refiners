@@ -36,6 +36,8 @@ class Euler(Solver):
         """
         if params and params.noise_schedule not in (NoiseSchedule.QUADRATIC, None):
             raise NotImplementedError
+        if params and params.sde_variance != 0.0:
+            raise NotImplementedError("Euler does not support sde_variance != 0.0 yet")
 
         super().__init__(
             num_inference_steps=num_inference_steps,

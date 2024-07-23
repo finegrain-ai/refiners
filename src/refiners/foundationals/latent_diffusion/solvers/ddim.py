@@ -41,6 +41,8 @@ class DDIM(Solver):
         """
         if params and params.model_prediction_type not in (ModelPredictionType.NOISE, None):
             raise NotImplementedError
+        if params and params.sde_variance != 0.0:
+            raise NotImplementedError("DDIM does not support sde_variance != 0.0 yet")
 
         super().__init__(
             num_inference_steps=num_inference_steps,
