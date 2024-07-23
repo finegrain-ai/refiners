@@ -67,6 +67,35 @@ Special cases:
 
 - `kitchen_dog.png` is generated with the same Diffusers script and negative prompt, seed 12, positive prompt "a small brown dog, detailed high-quality professional image, sitting on a chair, in a kitchen".
 
+- `expected_std_sde_random_init.png` is generated with the following code:
+
+```python
+import torch
+from diffusers import StableDiffusionPipeline
+from diffusers.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
+
+from refiners.fluxion.utils import manual_seed
+
+diffusers_solver = DPMSolverMultistepScheduler.from_config(  # type: ignore
+    {
+        "beta_end": 0.012,
+        "beta_schedule": "scaled_linear",
+        "beta_start": 0.00085,
+        "algorithm_type": "sde-dpmsolver++",
+        "use_karras_sigmas": False,
+        "final_sigmas_type": "sigma_min",
+        "euler_at_final": True,
+    }
+)
+model_id = "runwayml/stable-diffusion-v1-5"
+pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float32, scheduler=diffusers_solver)
+pipe = pipe.to("cuda")
+prompt = "a cute cat, detailed high-quality professional image"
+negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+manual_seed(2)
+image = pipe(prompt, negative_prompt=negative_prompt, guidance_scale=7.5).images[0]
+```
+
 - `kitchen_mask.png` is made manually.
 
 - Controlnet guides have been manually generated (x) using open source software and models, namely:

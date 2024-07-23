@@ -79,6 +79,7 @@ class BaseSolverParams:
     final_diffusion_rate: float | None
     noise_schedule: NoiseSchedule | None
     model_prediction_type: ModelPredictionType | None
+    sde_variance: float
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -102,6 +103,7 @@ class SolverParams(BaseSolverParams):
     final_diffusion_rate: float | None = None
     noise_schedule: NoiseSchedule | None = None
     model_prediction_type: ModelPredictionType | None = None
+    sde_variance: float = 0.0
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -113,6 +115,7 @@ class ResolvedSolverParams(BaseSolverParams):
     final_diffusion_rate: float
     noise_schedule: NoiseSchedule
     model_prediction_type: ModelPredictionType
+    sde_variance: float
 
 
 class Solver(fl.Module, ABC):
@@ -123,6 +126,19 @@ class Solver(fl.Module, ABC):
 
     This process is described using several parameters such as initial and final diffusion rates,
     and is encapsulated into a `__call__` method that applies a step of the diffusion process.
+
+    Attributes:
+        params: The common parameters for solvers. See `SolverParams`.
+        num_inference_steps: The number of inference steps to perform.
+        first_inference_step: The step to start the inference process from.
+        scale_factors: The scale factors used to denoise the input. These are called "betas" in other implementations,
+            and `1 - scale_factors` is called "alphas".
+        cumulative_scale_factors: The cumulative scale factors used to denoise the input. These are called "alpha_t" in
+            other implementations.
+        noise_std: The standard deviation of the noise used to denoise the input. This is called "sigma_t" in other
+            implementations.
+        signal_to_noise_ratios: The signal-to-noise ratios used to denoise the input. This is called "lambda_t" in other
+            implementations.
     """
 
     timesteps: Tensor
@@ -136,6 +152,7 @@ class Solver(fl.Module, ABC):
         final_diffusion_rate=1.2e-2,
         noise_schedule=NoiseSchedule.QUADRATIC,
         model_prediction_type=ModelPredictionType.NOISE,
+        sde_variance=0.0,
     )
 
     def __init__(
