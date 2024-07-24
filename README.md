@@ -21,7 +21,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
-- Added Multi Upscaler for high-resolution image generation, powered by [Tile Controlnet](https://huggingface.co/lllyasviel/control_v11f1e_sd15_tile), inspired from [Clarity Upscaler](https://github.com/philz1337x/clarity-upscaler)
+- Added Multi Upscaler for high-resolution image generation, inspired from [Clarity Upscaler](https://github.com/philz1337x/clarity-upscaler) ([HF Space](https://huggingface.co/spaces/finegrain/enhancer))
 - Added [HQ-SAM](https://arxiv.org/abs/2306.01567) for high quality mask prediction with Segment Anything
 - Added [SDXL-Lightning](https://arxiv.org/abs/2402.13929)
 - Added [Latent Consistency Models](https://arxiv.org/abs/2310.04378) and [LCM-LoRA](https://arxiv.org/abs/2311.05556) for Stable Diffusion XL
