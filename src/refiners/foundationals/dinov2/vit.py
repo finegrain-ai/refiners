@@ -1,5 +1,4 @@
 from math import sqrt
-from typing import cast
 
 import torch
 from torch import Tensor
@@ -123,8 +122,7 @@ class LayerScale(fl.WeightedModule):
             ),
         )
 
-        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
-        self.register_parameter(name="weight", param=cast(torch.nn.Parameter, p))
+        self.register_parameter(name="weight", param=p)
 
     def forward(self, x: Tensor) -> Tensor:
         return x * self.weight

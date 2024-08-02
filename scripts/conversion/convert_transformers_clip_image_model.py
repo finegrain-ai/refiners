@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from typing import NamedTuple, cast
 
 import torch
 from torch import nn
@@ -20,6 +21,20 @@ class Args(argparse.Namespace):
     threshold: float
 
 
+class CLIPImageEncoderConfig(NamedTuple):
+    architectures: list[str]
+    num_channels: int
+    hidden_size: int
+    hidden_act: str
+    image_size: int
+    projection_dim: int
+    patch_size: int
+    num_hidden_layers: int
+    num_attention_heads: int
+    intermediate_size: int
+    layer_norm_eps: float
+
+
 def setup_converter(args: Args) -> ModelConverter:
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     source: nn.Module = CLIPVisionModelWithProjection.from_pretrained(  # type: ignore
@@ -28,34 +43,26 @@ def setup_converter(args: Args) -> ModelConverter:
         low_cpu_mem_usage=False,
     )
     assert isinstance(source, nn.Module), "Source model is not a nn.Module"
-    architecture: str = source.config.architectures[0]  # type: ignore
-    num_channels: int = source.config.num_channels  # type: ignore
-    embedding_dim: int = source.config.hidden_size  # type: ignore
-    image_size: int = source.config.image_size  # type: ignore
-    patch_size: int = source.config.patch_size  # type: ignore
-    output_dim: int = source.config.projection_dim  # type: ignore
-    num_layers: int = source.config.num_hidden_layers  # type: ignore
-    num_attention_heads: int = source.config.num_attention_heads  # type: ignore
-    feedforward_dim: int = source.config.intermediate_size  # type: ignore
-    activation: str = source.config.hidden_act  # type: ignore
-    layer_norm_eps: float = source.config.layer_norm_eps  # type: ignore
+    config = cast(CLIPImageEncoderConfig, source.config)  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
 
-    assert architecture == "CLIPVisionModelWithProjection", f"Unsupported architecture: {architecture}"
-    assert num_channels == 3, f"Expected 3 input channels, got {num_channels}"
-    assert activation == "gelu", f"Unsupported activation: {activation}"
+    assert (
+        config.architectures[0] == "CLIPVisionModelWithProjection"
+    ), f"Unsupported architecture: {config.architectures[0]}"
+    assert config.num_channels == 3, f"Expected 3 input channels, got {config.num_channels}"
+    assert config.hidden_act == "gelu", f"Unsupported activation: {config.hidden_act}"
 
     target = CLIPImageEncoder(
-        image_size=image_size,
-        embedding_dim=embedding_dim,
-        output_dim=output_dim,
-        patch_size=patch_size,
-        num_layers=num_layers,
-        num_attention_heads=num_attention_heads,
-        feedforward_dim=feedforward_dim,
-        layer_norm_eps=layer_norm_eps,
+        image_size=config.image_size,
+        embedding_dim=config.hidden_size,
+        output_dim=config.projection_dim,
+        patch_size=config.patch_size,
+        num_layers=config.num_hidden_layers,
+        num_attention_heads=config.num_attention_heads,
+        feedforward_dim=config.intermediate_size,
+        layer_norm_eps=config.layer_norm_eps,
     )
 
-    x = torch.randn(1, 3, image_size, image_size)
+    x = torch.randn(1, 3, config.image_size, config.image_size)
 
     converter = ModelConverter(source_model=source, target_model=target, verbose=True)
 

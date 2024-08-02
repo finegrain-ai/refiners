@@ -8,7 +8,10 @@ from bitsandbytes.optim import AdamW8bit, Lion8bit  # type: ignore
 from prodigyopt import Prodigy  # type: ignore
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 from torch import Tensor
-from torch.optim import SGD, Adam, AdamW, Optimizer
+from torch.optim.adam import Adam
+from torch.optim.adamw import AdamW
+from torch.optim.optimizer import Optimizer
+from torch.optim.sgd import SGD
 
 from refiners.training_utils.clock import ClockConfig
 from refiners.training_utils.common import Epoch, Iteration, Step, TimeValue, parse_number_unit_field

@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 from torch import nn
 from transformers import CLIPTextModel, CLIPTextModelWithProjection  # type: ignore
@@ -21,6 +21,18 @@ class Args(argparse.Namespace):
     verbose: bool
 
 
+class CLIPTextEncoderConfig(NamedTuple):
+    architectures: list[str]
+    vocab_size: int
+    hidden_size: int
+    intermediate_size: int
+    num_hidden_layers: int
+    num_attention_heads: int
+    hidden_act: str
+    layer_norm_eps: float
+    projection_dim: int
+
+
 def setup_converter(args: Args, with_projection: bool = False) -> ModelConverter:
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     cls = CLIPTextModelWithProjection if with_projection else CLIPTextModel
@@ -30,19 +42,17 @@ def setup_converter(args: Args, with_projection: bool = False) -> ModelConverter
         low_cpu_mem_usage=False,
     )
     assert isinstance(source, nn.Module), "Source model is not a nn.Module"
-    architecture: str = source.config.architectures[0]  # type: ignore
-    embedding_dim: int = source.config.hidden_size  # type: ignore
-    projection_dim: int = source.config.projection_dim  # type: ignore
-    num_layers: int = source.config.num_hidden_layers  # type: ignore
-    num_attention_heads: int = source.config.num_attention_heads  # type: ignore
-    feed_forward_dim: int = source.config.intermediate_size  # type: ignore
-    use_quick_gelu: bool = source.config.hidden_act == "quick_gelu"  # type: ignore
+    config = cast(CLIPTextEncoderConfig, source.config)  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
+    architecture: str = config.architectures[0]
+    embedding_dim: int = config.hidden_size
+    projection_dim: int = config.projection_dim
+    use_quick_gelu = config.hidden_act == "quick_gelu"
     assert architecture in ("CLIPTextModel", "CLIPTextModelWithProjection"), f"Unsupported architecture: {architecture}"
     target = CLIPTextEncoder(
-        embedding_dim=embedding_dim,
-        num_layers=num_layers,
-        num_attention_heads=num_attention_heads,
-        feedforward_dim=feed_forward_dim,
+        embedding_dim=config.hidden_size,
+        num_layers=config.num_hidden_layers,
+        num_attention_heads=config.num_attention_heads,
+        feedforward_dim=config.intermediate_size,
         use_quick_gelu=use_quick_gelu,
     )
     if architecture == "CLIPTextModelWithProjection":

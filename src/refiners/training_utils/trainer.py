@@ -7,7 +7,6 @@ import torch
 from loguru import logger
 from torch import Tensor, device as Device, dtype as DType, nn
 from torch.autograd import backward
-from torch.optim import Optimizer
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
     CosineAnnealingWarmRestarts,
@@ -21,6 +20,7 @@ from torch.optim.lr_scheduler import (
     ReduceLROnPlateau,
     StepLR,
 )
+from torch.optim.optimizer import Optimizer
 
 from refiners.fluxion import layers as fl
 from refiners.training_utils.callback import (
@@ -226,7 +226,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
                 lr_scheduler = ExponentialLR(optimizer=self.optimizer, gamma=config.gamma)
             case LRSchedulerType.COSINE_ANNEALING_LR:
                 lr_scheduler = CosineAnnealingLR(
-                    optimizer=self.optimizer, T_max=scheduler_step_size, eta_min=config.eta_min
+                    optimizer=self.optimizer,
+                    T_max=scheduler_step_size,
+                    eta_min=config.eta_min,  # pyright: ignore[reportArgumentType]
                 )
             case LRSchedulerType.REDUCE_LR_ON_PLATEAU:
                 lr_scheduler = cast(

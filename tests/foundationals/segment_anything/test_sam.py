@@ -379,7 +379,7 @@ def test_predictor_dense_mask(
     mask_input = logits[:, scores.max(dim=0).indices, ...]  # shape: 1xHxW
 
     assert np.allclose(
-        mask_input.cpu().numpy(), facebook_mask_input, atol=1e-1
+        mask_input.cpu(), facebook_mask_input, atol=1e-1
     )  # Lower doesn't pass, but it's close enough for logits
 
     refiners_prompt = SAMPrompt(

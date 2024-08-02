@@ -2,12 +2,11 @@ import random
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 import pytest
 import torch
 from torch import Tensor, nn
-from torch.optim import SGD
+from torch.optim.sgd import SGD
 
 from refiners.fluxion import layers as fl
 from refiners.fluxion.utils import norm
@@ -188,8 +187,7 @@ def test_count_learnable_parameters_with_params() -> None:
         nn.Parameter(torch.randn(5), requires_grad=False),
         nn.Parameter(torch.randn(3, 3), requires_grad=True),
     ]
-    # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
-    assert count_learnable_parameters(cast(list[nn.Parameter], params)) == 13
+    assert count_learnable_parameters(params) == 13
 
 
 def test_count_learnable_parameters_with_model(mock_model: fl.Chain) -> None:

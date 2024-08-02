@@ -12,7 +12,7 @@ from segment_anything_hq import (  # type: ignore
 )
 from segment_anything_hq.modeling.sam import Sam  # type: ignore
 from tests.foundationals.segment_anything.utils import FacebookSAM, FacebookSAMPredictorHQ, SAMPrompt
-from torch import optim
+from torch.optim.sgd import SGD
 
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, no_grad
 from refiners.foundationals.segment_anything.hq_sam import (
@@ -125,13 +125,13 @@ def test_mask_decoder_tokens_extender() -> None:
             case _:
                 raise ValueError
 
-    optimizer = optim.SGD(mask_decoder_tokens.parameters(), lr=10)
+    optimizer = SGD(mask_decoder_tokens.parameters(), lr=10)
     optimizer.zero_grad()
 
     ones = torch.ones_like(tokens_before)
     loss = torch.nn.functional.mse_loss(tokens_before, ones)
-    loss.backward()  # type: ignore
-    optimizer.step()
+    loss.backward()  # pyright: ignore[reportUnknownMemberType]
+    optimizer.step()  # pyright: ignore[reportUnknownMemberType]
 
     tokens_after = mask_decoder_tokens()
 
