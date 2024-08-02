@@ -1,6 +1,6 @@
 [project]
 name = "refiners"
-version = "0.4.0"
+dynamic = ["version"]
 description = "The simplest way to train and run adapters on top of foundation models"
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = "MIT"
@@ -24,6 +24,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "License :: OSI Approved :: MIT License",
 ]
+
+[project.urls]
+source = "https://github.com/finegrain-ai/refiners"
+documentation = "https://refine.rs/"
 
 [project.optional-dependencies]
 training = [
@@ -72,9 +76,12 @@ solutions = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+source = "vcs"
+fallback-version = '0.0.0'
 
 [tool.rye]
 managed = true
