@@ -56,7 +56,7 @@ class Euler(Solver):
     def _generate_sigmas(self) -> Tensor:
         """Generate the sigmas used by the solver."""
         sigmas = self.noise_std / self.cumulative_scale_factors
-        sigmas = torch.tensor(np.interp(self.timesteps.cpu().numpy(), np.arange(0, len(sigmas)), sigmas.cpu().numpy()))
+        sigmas = torch.tensor(np.interp(self.timesteps.cpu(), np.arange(0, len(sigmas)), sigmas.cpu()))
         sigmas = torch.cat([sigmas, tensor([0.0])])
         return sigmas.to(device=self.device, dtype=self.dtype)
 

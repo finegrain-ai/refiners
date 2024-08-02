@@ -182,8 +182,7 @@ class MaskEncoder(fl.Chain):
             ),
         )
         p = nn.Parameter(torch.randn(1, embedding_dim, device=device, dtype=dtype))
-        # cast because of PyTorch 2.2, see https://github.com/pytorch/pytorch/issues/118736
-        self.register_parameter("no_mask_embedding", cast(nn.Parameter, p))
+        self.register_parameter("no_mask_embedding", p)
 
     def get_no_mask_dense_embedding(
         self, image_embedding_size: tuple[int, int], batch_size: int = 1
