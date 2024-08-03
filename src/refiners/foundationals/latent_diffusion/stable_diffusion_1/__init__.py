@@ -7,6 +7,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import (
 )
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.t2i_adapter import SD1T2IAdapter
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1UNet
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.ella_adapter import SD1ELLAAdapter
 
 __all__ = [
     "StableDiffusion_1",
@@ -16,4 +17,5 @@ __all__ = [
     "SD1ControlnetAdapter",
     "SD1IPAdapter",
     "SD1T2IAdapter",
+    "SD1ELLAAdapter",
 ]
