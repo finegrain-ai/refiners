@@ -358,7 +358,10 @@ class ModuleTree:
 
         node: TreeNode = {"value": value, "class_name": class_name, "children": []}
         for child in module.children():
-            node["children"].append(self._module_to_tree(module=child))  # type: ignore
+            if isinstance(child, Module):
+                node["children"].append(self._module_to_tree(module=child))
+            else:
+                node["children"].append({"value": str(child), "class_name": child.__class__.__name__, "children": []})
         return node
 
     def _fold_successive_identical(self, node: TreeNode) -> None:
