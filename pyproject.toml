@@ -58,6 +58,7 @@ conversion = [
     "segment-anything-py>=1.0",
     "requests>=2.26.0",
     "tqdm>=4.62.3",
+    "gdown>=5.2.0",
 ]
 doc = [
     # required by mkdocs to format the signatures
