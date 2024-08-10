@@ -11,6 +11,7 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 
+import gdown
 import requests
 from tqdm import tqdm
 
@@ -446,6 +447,25 @@ def download_ic_light():
     )
 
 
+def download_mvanet():
+    fn = "Model_80.pth"
+    dest_folder = os.path.join(test_weights_dir, "mvanet")
+    dest_filename = os.path.join(dest_folder, fn)
+
+    if os.environ.get("DRY_RUN") == "1":
+        return
+
+    if os.path.exists(dest_filename):
+        print(f"✖️ ️ Skipping previously downloaded mvanet/{fn}")
+    else:
+        os.makedirs(dest_folder, exist_ok=True)
+        print(f"🔽 Downloading mvanet/{fn} => '{rel(dest_filename)}'", end="\n")
+        gdown.download(id="1_gabQXOF03MfXnf3EWDK1d_8wKiOemOv", output=dest_filename, quiet=True)
+        print(f"{previous_line}✅ Downloaded mvanet/{fn} => '{rel(dest_filename)}' ")
+
+    check_hash(dest_filename, "b915d492")
+
+
 def printg(msg: str):
     """print in green color"""
     print("\033[92m" + msg + "\033[0m")
@@ -808,6 +828,16 @@ def convert_ic_light():
     )
 
 
+def convert_mvanet():
+    run_conversion_script(
+        "convert_mvanet.py",
+        "tests/weights/mvanet/Model_80.pth",
+        "tests/weights/mvanet/mvanet.safetensors",
+        half=True,
+        expected_hash="bf9ae4cb",
+    )
+
+
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
     download_sd15("runwayml/stable-diffusion-v1-5")
@@ -830,6 +860,7 @@ def download_all():
     download_sdxl_lightning_base()
     download_sdxl_lightning_lora()
     download_ic_light()
+    download_mvanet()
 
 
 def convert_all():
@@ -850,6 +881,7 @@ def convert_all():
     convert_lcm_base()
     convert_sdxl_lightning_base()
     convert_ic_light()
+    convert_mvanet()
 
 
 def main():

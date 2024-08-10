@@ -9,4 +9,4 @@
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> DINOv2](foundationals/dinov2.md)
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Latent Diffusion](foundationals/latent_diffusion.md)
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Segment Anything](foundationals/segment_anything.md)
-
+    * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Swin Transformers](foundationals/swin.md)
