@@ -438,6 +438,14 @@ def download_sdxl_lightning_lora():
     )
 
 
+def download_ic_light():
+    download_file(
+        "https://huggingface.co/lllyasviel/ic-light/resolve/main/iclight_sd15_fc.safetensors",
+        dest_folder=test_weights_dir,
+        expected_hash="bce70123",
+    )
+
+
 def printg(msg: str):
     """print in green color"""
     print("\033[92m" + msg + "\033[0m")
@@ -790,6 +798,16 @@ def convert_sdxl_lightning_base():
     )
 
 
+def convert_ic_light():
+    run_conversion_script(
+        "convert_ic_light.py",
+        "tests/weights/iclight_sd15_fc.safetensors",
+        "tests/weights/iclight_sd15_fc-refiners.safetensors",
+        half=False,
+        expected_hash="be315c1f",
+    )
+
+
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
     download_sd15("runwayml/stable-diffusion-v1-5")
@@ -811,6 +829,7 @@ def download_all():
     download_lcm_lora()
     download_sdxl_lightning_base()
     download_sdxl_lightning_lora()
+    download_ic_light()
 
 
 def convert_all():
@@ -830,6 +849,7 @@ def convert_all():
     convert_control_lora_fooocus()
     convert_lcm_base()
     convert_sdxl_lightning_base()
+    convert_ic_light()
 
 
 def main():
