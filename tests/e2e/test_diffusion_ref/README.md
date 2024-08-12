@@ -60,6 +60,7 @@ Special cases:
     - `expected_controlnet_canny_scale_decay.png` 
     - `expected_multi_diffusion_dpm.png`
     - `expected_multi_upscaler.png`
+    - `expected_ic_light.png`
 
 ## Other images
 

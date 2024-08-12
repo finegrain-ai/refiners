@@ -12,6 +12,7 @@ from tests.utils import ensure_similar_images
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
+from refiners.foundationals.clip.text_encoder import CLIPTextEncoderL
 from refiners.foundationals.latent_diffusion import (
     ControlLoraAdapter,
     SD1ControlnetAdapter,
@@ -30,6 +31,8 @@ from refiners.foundationals.latent_diffusion.reference_only_control import Refer
 from refiners.foundationals.latent_diffusion.restart import Restart
 from refiners.foundationals.latent_diffusion.solvers import DDIM, Euler, NoiseSchedule, SolverParams
 from refiners.foundationals.latent_diffusion.solvers.dpm import DPMSolver
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.ic_light import ICLight
+from refiners.foundationals.latent_diffusion.stable_diffusion_1.model import SD1Autoencoder
 from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_diffusion import (
     SD1DiffusionTarget,
     SD1MultiDiffusion,
@@ -2564,3 +2567,58 @@ def test_multi_upscaler(
 ) -> None:
     predicted_image = multi_upscaler.upscale(clarity_example)
     ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=35, min_ssim=0.99)
+
+
+@pytest.fixture(scope="module")
+def expected_ic_light(ref_path: Path) -> Image.Image:
+    return _img_open(ref_path / "expected_ic_light.png").convert("RGB")
+
+
+@pytest.fixture(scope="module")
+def ic_light_sd15_fc_weights(test_weights_path: Path) -> Path:
+    return test_weights_path / "iclight_sd15_fc-refiners.safetensors"
+
+
+@pytest.fixture(scope="module")
+def ic_light_sd15_fc(
+    ic_light_sd15_fc_weights: Path,
+    unet_weights_std: Path,
+    lda_weights: Path,
+    text_encoder_weights: Path,
+    test_device: torch.device,
+) -> ICLight:
+    return ICLight(
+        patch_weights=load_from_safetensors(ic_light_sd15_fc_weights),
+        unet=SD1UNet(in_channels=4).load_from_safetensors(unet_weights_std),
+        lda=SD1Autoencoder().load_from_safetensors(lda_weights),
+        clip_text_encoder=CLIPTextEncoderL().load_from_safetensors(text_encoder_weights),
+        device=test_device,
+    )
+
+
+@no_grad()
+def test_ic_light(
+    kitchen_dog: Image.Image,
+    kitchen_dog_mask: Image.Image,
+    ic_light_sd15_fc: ICLight,
+    expected_ic_light: Image.Image,
+    test_device: torch.device,
+) -> None:
+    sd = ic_light_sd15_fc
+    manual_seed(2)
+    clip_text_embedding = sd.compute_clip_text_embedding(
+        text="a photo of dog, purple neon lighting",
+        negative_text="lowres, bad anatomy, bad hands, cropped, worst quality",
+    )
+    ic_light_condition = sd.compute_gray_composite(image=kitchen_dog, mask=kitchen_dog_mask.convert("L"))
+    sd.set_ic_light_condition(ic_light_condition)
+    x = torch.randn(1, 4, 64, 64, device=test_device)
+    for step in sd.steps:
+        x = sd(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=2.0,
+        )
+    predicted_image = sd.lda.latents_to_image(x)
+    ensure_similar_images(predicted_image, expected_ic_light, min_psnr=35, min_ssim=0.99)

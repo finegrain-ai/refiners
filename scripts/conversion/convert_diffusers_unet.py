@@ -19,6 +19,7 @@ class Args(argparse.Namespace):
     half: bool
     verbose: bool
     skip_init_check: bool
+    override_weights: str | None
 
 
 def setup_converter(args: Args) -> ModelConverter:
