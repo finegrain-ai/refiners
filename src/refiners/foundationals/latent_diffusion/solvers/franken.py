@@ -1,7 +1,8 @@
 import dataclasses
 from typing import Any, Callable, Protocol, TypeVar
 
-from torch import Generator, Tensor, device as Device, dtype as DType, float32
+import torch
+from torch import Generator, Tensor, device as Device, dtype as DType
 
 from refiners.foundationals.latent_diffusion.solvers.solver import Solver, TimestepSpacing
 
@@ -60,7 +61,7 @@ class FrankenSolver(Solver):
         num_inference_steps: int,
         first_inference_step: int = 0,
         device: Device | str = "cpu",
-        dtype: DType = float32,
+        dtype: DType = torch.float32,
         **kwargs: Any,  # for typing, ignored
     ) -> None:
         self.get_diffusers_scheduler = get_diffusers_scheduler

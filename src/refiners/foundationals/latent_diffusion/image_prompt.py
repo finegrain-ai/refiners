@@ -1,9 +1,10 @@
 import math
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
+import torch
 from jaxtyping import Float
 from PIL import Image
-from torch import Tensor, cat, device as Device, dtype as DType, nn, softmax, tensor, zeros_like
+from torch import Tensor, device as Device, dtype as DType, nn
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -98,7 +99,7 @@ class PerceiverScaledDotProductAttention(fl.Module):
         v = self.reshape_tensor(value)
 
         attention = (q * self.scale) @ (k * self.scale).transpose(-2, -1)
-        attention = softmax(input=attention.float(), dim=-1).type(attention.dtype)
+        attention = torch.softmax(input=attention.float(), dim=-1).type(attention.dtype)
         attention = attention @ v
 
         return attention.permute(0, 2, 1, 3).reshape(bs, length, -1)
@@ -159,7 +160,7 @@ class PerceiverAttention(fl.Chain):
         )
 
     def to_kv(self, x: Tensor, latents: Tensor) -> Tensor:
-        return cat((x, latents), dim=-2)
+        return torch.cat((x, latents), dim=-2)
 
 
 class LatentsToken(fl.Chain):
@@ -484,7 +485,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             image_prompt = self.preprocess_image(image_prompt)
         elif isinstance(image_prompt, list):
             assert all(isinstance(image, Image.Image) for image in image_prompt)
-            image_prompt = cat([self.preprocess_image(image) for image in image_prompt])
+            image_prompt = torch.cat([self.preprocess_image(image) for image in image_prompt])
 
         negative_embedding, conditional_embedding = self._compute_clip_image_embedding(image_prompt)
 
@@ -493,7 +494,7 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
             assert len(weights) == batch_size, f"Got {len(weights)} weights for {batch_size} images"
             if any(weight != 1.0 for weight in weights):
                 conditional_embedding *= (
-                    tensor(weights, device=conditional_embedding.device, dtype=conditional_embedding.dtype)
+                    torch.tensor(weights, device=conditional_embedding.device, dtype=conditional_embedding.dtype)
                     .unsqueeze(-1)
                     .unsqueeze(-1)
                 )
@@ -501,20 +502,20 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
         if batch_size > 1 and concat_batches:
             # Create a longer image tokens sequence when a batch of images is given
             # See https://github.com/tencent-ailab/IP-Adapter/issues/99
-            negative_embedding = cat(negative_embedding.chunk(batch_size), dim=1)
-            conditional_embedding = cat(conditional_embedding.chunk(batch_size), dim=1)
+            negative_embedding = torch.cat(negative_embedding.chunk(batch_size), dim=1)
+            conditional_embedding = torch.cat(conditional_embedding.chunk(batch_size), dim=1)
 
-        return cat((negative_embedding, conditional_embedding))
+        return torch.cat((negative_embedding, conditional_embedding))
 
     def _compute_clip_image_embedding(self, image_prompt: Tensor) -> tuple[Tensor, Tensor]:
         image_encoder = self.clip_image_encoder if not self.fine_grained else self.grid_image_encoder
         clip_embedding = image_encoder(image_prompt)
         conditional_embedding = self.image_proj(clip_embedding)
         if not self.fine_grained:
-            negative_embedding = self.image_proj(zeros_like(clip_embedding))
+            negative_embedding = self.image_proj(torch.zeros_like(clip_embedding))
         else:
             # See https://github.com/tencent-ailab/IP-Adapter/blob/d580c50/tutorial_train_plus.py#L351-L352
-            clip_embedding = image_encoder(zeros_like(image_prompt))
+            clip_embedding = image_encoder(torch.zeros_like(image_prompt))
             negative_embedding = self.image_proj(clip_embedding)
         return negative_embedding, conditional_embedding
 

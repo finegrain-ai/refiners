@@ -4,19 +4,8 @@ from enum import Enum
 from typing import TypeVar
 
 import numpy as np
-from torch import (
-    Generator,
-    Tensor,
-    arange,
-    device as Device,
-    dtype as DType,
-    float32,
-    linspace,
-    log,
-    sqrt,
-    stack,
-    tensor,
-)
+import torch
+from torch import Generator, Tensor, device as Device, dtype as DType
 
 from refiners.fluxion import layers as fl
 
@@ -161,7 +150,7 @@ class Solver(fl.Module, ABC):
         first_inference_step: int = 0,
         params: BaseSolverParams | None = None,
         device: Device | str = "cpu",
-        dtype: DType = float32,
+        dtype: DType = torch.float32,
     ) -> None:
         """Initializes a new `Solver` instance.
 
@@ -179,9 +168,9 @@ class Solver(fl.Module, ABC):
         self.params = self.resolve_params(params)
 
         self.scale_factors = self.sample_noise_schedule()
-        self.cumulative_scale_factors = sqrt(self.scale_factors.cumprod(dim=0))
-        self.noise_std = sqrt(1.0 - self.scale_factors.cumprod(dim=0))
-        self.signal_to_noise_ratios = log(self.cumulative_scale_factors) - log(self.noise_std)
+        self.cumulative_scale_factors = torch.sqrt(self.scale_factors.cumprod(dim=0))
+        self.noise_std = torch.sqrt(1.0 - self.scale_factors.cumprod(dim=0))
+        self.signal_to_noise_ratios = torch.log(self.cumulative_scale_factors) - torch.log(self.noise_std)
         self.timesteps = self._generate_timesteps()
 
         self.to(device=device, dtype=dtype)
@@ -227,16 +216,16 @@ class Solver(fl.Module, ABC):
         max_timestep = num_train_timesteps - 1 + offset
         match spacing:
             case TimestepSpacing.LINSPACE:
-                return tensor(np.linspace(offset, max_timestep, num_inference_steps), dtype=float32).flip(0)
+                return torch.tensor(np.linspace(offset, max_timestep, num_inference_steps), dtype=torch.float32).flip(0)
             case TimestepSpacing.LINSPACE_ROUNDED:
-                return tensor(np.linspace(offset, max_timestep, num_inference_steps).round().astype(int)).flip(0)
+                return torch.tensor(np.linspace(offset, max_timestep, num_inference_steps).round().astype(int)).flip(0)
             case TimestepSpacing.LEADING:
                 step_ratio = num_train_timesteps // num_inference_steps
-                return (arange(0, num_inference_steps, 1) * step_ratio + offset).flip(0)
+                return (torch.arange(0, num_inference_steps, 1) * step_ratio + offset).flip(0)
             case TimestepSpacing.TRAILING:
                 step_ratio = num_train_timesteps // num_inference_steps
                 max_timestep = num_train_timesteps - 1 + offset
-                return arange(max_timestep, offset, -step_ratio)
+                return torch.arange(max_timestep, offset, -step_ratio)
             case TimestepSpacing.CUSTOM:
                 raise RuntimeError("generate_timesteps called with custom spacing")
 
@@ -290,7 +279,7 @@ class Solver(fl.Module, ABC):
         """
         if isinstance(step, list):
             assert len(x) == len(noise) == len(step), "x, noise, and step must have the same length"
-            return stack(
+            return torch.stack(
                 tensors=[
                     self._add_noise(
                         x=x[i],
@@ -400,7 +389,7 @@ class Solver(fl.Module, ABC):
             A tensor representing the power distribution between the initial and final diffusion rates of the solver.
         """
         return (
-            linspace(
+            torch.linspace(
                 start=self.params.initial_diffusion_rate ** (1 / power),
                 end=self.params.final_diffusion_rate ** (1 / power),
                 steps=self.params.num_train_timesteps,

@@ -1,6 +1,7 @@
 import dataclasses
 
-from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, sqrt, tensor
+import torch
+from torch import Generator, Tensor, device as Device, dtype as Dtype
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
     BaseSolverParams,
@@ -28,7 +29,7 @@ class DDIM(Solver):
         first_inference_step: int = 0,
         params: BaseSolverParams | None = None,
         device: Device | str = "cpu",
-        dtype: Dtype = float32,
+        dtype: Dtype = torch.float32,
     ) -> None:
         """Initializes a new DDIM solver.
 
@@ -71,7 +72,7 @@ class DDIM(Solver):
             (
                 self.timesteps[step + 1]
                 if step < self.num_inference_steps - 1
-                else tensor(data=[0], device=self.device, dtype=self.dtype)
+                else torch.tensor(data=[0], device=self.device, dtype=self.dtype)
             ),
         )
         current_scale_factor, previous_scale_factor = (
@@ -82,8 +83,8 @@ class DDIM(Solver):
                 else self.cumulative_scale_factors[0]
             ),
         )
-        predicted_x = (x - sqrt(1 - current_scale_factor**2) * predicted_noise) / current_scale_factor
-        noise_factor = sqrt(1 - previous_scale_factor**2)
+        predicted_x = (x - torch.sqrt(1 - current_scale_factor**2) * predicted_noise) / current_scale_factor
+        noise_factor = torch.sqrt(1 - previous_scale_factor**2)
 
         # Do not add noise at the last step to avoid visual artifacts.
         if step == self.num_inference_steps - 1:

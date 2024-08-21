@@ -1,4 +1,5 @@
-from torch import Tensor, arange, device as Device, dtype as DType
+import torch
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 
@@ -25,7 +26,7 @@ class PositionalEncoder(fl.Chain):
 
     @property
     def position_ids(self) -> Tensor:
-        return arange(end=self.max_sequence_length, device=self.device).reshape(1, -1)
+        return torch.arange(end=self.max_sequence_length, device=self.device).reshape(1, -1)
 
     def get_position_ids(self, x: Tensor) -> Tensor:
         return self.position_ids[:, : x.shape[1]]

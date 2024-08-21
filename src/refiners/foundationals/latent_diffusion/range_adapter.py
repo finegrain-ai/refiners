@@ -1,7 +1,8 @@
 import math
 
+import torch
 from jaxtyping import Float, Int
-from torch import Tensor, arange, cat, cos, device as Device, dtype as DType, exp, float32, sin
+from torch import Tensor, device as Device, dtype as DType
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.adapters.adapter import Adapter
@@ -14,10 +15,10 @@ def compute_sinusoidal_embedding(
     half_dim = embedding_dim // 2
     # Note: it is important that this computation is done in float32.
     # The result can be cast to lower precision later if necessary.
-    exponent = -math.log(10000) * arange(start=0, end=half_dim, dtype=float32, device=x.device)
+    exponent = -math.log(10000) * torch.arange(start=0, end=half_dim, dtype=torch.float32, device=x.device)
     exponent /= half_dim
-    embedding = x.unsqueeze(1).float() * exp(exponent).unsqueeze(0)
-    embedding = cat([cos(embedding), sin(embedding)], dim=-1)
+    embedding = x.unsqueeze(1).float() * torch.exp(exponent).unsqueeze(0)
+    embedding = torch.cat([torch.cos(embedding), torch.sin(embedding)], dim=-1)
     return embedding
 
 

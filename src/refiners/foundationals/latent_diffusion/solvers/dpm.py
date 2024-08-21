@@ -3,7 +3,7 @@ from collections import deque
 
 import numpy as np
 import torch
-from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
+from torch import Generator, Tensor, device as Device, dtype as Dtype
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
     BaseSolverParams,
@@ -38,7 +38,7 @@ class DPMSolver(Solver):
         params: BaseSolverParams | None = None,
         last_step_first_order: bool = False,
         device: Device | str = "cpu",
-        dtype: Dtype = float32,
+        dtype: Dtype = torch.float32,
     ):
         """Initializes a new DPM solver.
 
@@ -62,7 +62,7 @@ class DPMSolver(Solver):
             device=device,
             dtype=dtype,
         )
-        self.estimated_data = deque([tensor([])] * 2, maxlen=2)
+        self.estimated_data = deque([torch.tensor([])] * 2, maxlen=2)
         self.last_step_first_order = last_step_first_order
 
     def rebuild(
@@ -94,7 +94,7 @@ class DPMSolver(Solver):
         offset = self.params.timesteps_offset
         max_timestep = self.params.num_train_timesteps - 1 + offset
         np_space = np.linspace(offset, max_timestep, self.num_inference_steps + 1).round().astype(int)[1:]
-        return tensor(np_space).flip(0)
+        return torch.tensor(np_space).flip(0)
 
     def dpm_solver_first_order_update(
         self, x: Tensor, noise: Tensor, step: int, sde_noise: Tensor | None = None
@@ -110,7 +110,7 @@ class DPMSolver(Solver):
             The denoised version of the input data `x`.
         """
         current_timestep = self.timesteps[step]
-        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else tensor([0])
+        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else torch.tensor([0])
 
         previous_ratio = self.signal_to_noise_ratios[previous_timestep]
         current_ratio = self.signal_to_noise_ratios[current_timestep]
@@ -144,7 +144,7 @@ class DPMSolver(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else tensor([0])
+        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else torch.tensor([0])
         current_timestep = self.timesteps[step]
         next_timestep = self.timesteps[step - 1]
 

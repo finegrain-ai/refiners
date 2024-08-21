@@ -6,7 +6,7 @@ from collections import defaultdict
 from typing import Any, Callable, Iterable, Iterator, Sequence, TypeVar, cast, get_origin, overload
 
 import torch
-from torch import Tensor, cat, device as Device, dtype as DType
+from torch import Tensor, device as Device, dtype as DType
 
 from refiners.fluxion.context import ContextProvider, Contexts
 from refiners.fluxion.layers.module import ContextModule, Module, ModuleTree, WeightedModule
@@ -950,7 +950,7 @@ class Concatenate(Chain):
 
     def forward(self, *args: Any) -> Tensor:
         outputs = [module(*args) for module in self]
-        return cat(
+        return torch.cat(
             [output for output in outputs if output is not None],
             dim=self.dim,
         )
