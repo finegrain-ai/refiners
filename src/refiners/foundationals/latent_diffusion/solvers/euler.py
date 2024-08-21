@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch import Generator, Tensor, device as Device, dtype as Dtype, float32, tensor
+from torch import Generator, Tensor, device as Device, dtype as Dtype
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
     BaseSolverParams,
@@ -23,7 +23,7 @@ class Euler(Solver):
         first_inference_step: int = 0,
         params: BaseSolverParams | None = None,
         device: Device | str = "cpu",
-        dtype: Dtype = float32,
+        dtype: Dtype = torch.float32,
     ):
         """Initializes a new Euler solver.
 
@@ -57,7 +57,7 @@ class Euler(Solver):
         """Generate the sigmas used by the solver."""
         sigmas = self.noise_std / self.cumulative_scale_factors
         sigmas = torch.tensor(np.interp(self.timesteps.cpu(), np.arange(0, len(sigmas)), sigmas.cpu()))
-        sigmas = torch.cat([sigmas, tensor([0.0])])
+        sigmas = torch.cat([sigmas, torch.tensor([0.0])])
         return sigmas.to(device=self.device, dtype=self.dtype)
 
     def scale_model_input(self, x: Tensor, step: int) -> Tensor:

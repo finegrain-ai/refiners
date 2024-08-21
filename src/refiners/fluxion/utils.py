@@ -8,15 +8,7 @@ from numpy import array, float32
 from PIL import Image
 from safetensors import safe_open as _safe_open  # type: ignore
 from safetensors.torch import save_file as _save_file  # type: ignore
-from torch import (
-    Tensor,
-    cat,
-    device as Device,
-    dtype as DType,
-    manual_seed as _manual_seed,  # type: ignore
-    no_grad as _no_grad,  # type: ignore
-    norm as _norm,  # type: ignore
-)
+from torch import Tensor, device as Device, dtype as DType
 from torch.nn.functional import conv2d, interpolate as _interpolate, pad as _pad  # type: ignore
 
 T = TypeVar("T")
@@ -24,14 +16,14 @@ E = TypeVar("E")
 
 
 def norm(x: Tensor) -> Tensor:
-    return _norm(x)  # type: ignore
+    return torch.norm(x)  # type: ignore
 
 
 def manual_seed(seed: int) -> None:
-    _manual_seed(seed)
+    torch.manual_seed(seed)  # type: ignore
 
 
-class no_grad(_no_grad):
+class no_grad(torch.no_grad):
     def __new__(cls, orig_func: Any | None = None) -> "no_grad":  # type: ignore
         return object.__new__(cls)
 
@@ -123,7 +115,7 @@ def gaussian_blur(
 def images_to_tensor(
     images: list[Image.Image], device: Device | str | None = None, dtype: DType | None = None
 ) -> Tensor:
-    return cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
+    return torch.cat([image_to_tensor(image, device=device, dtype=dtype) for image in images])
 
 
 def image_to_tensor(image: Image.Image, device: Device | str | None = None, dtype: DType | None = None) -> Tensor:

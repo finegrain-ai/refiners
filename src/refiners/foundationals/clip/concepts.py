@@ -1,8 +1,9 @@
 import re
 from typing import cast
 
+import torch
 import torch.nn.functional as F
-from torch import Tensor, cat, zeros
+from torch import Tensor
 from torch.nn import Parameter
 
 import refiners.fluxion.layers as fl
@@ -22,7 +23,7 @@ class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
         with self.setup_adapter(target):
             super().__init__(fl.Lambda(func=self.lookup))
         p = Parameter(
-            zeros([0, target.embedding_dim], device=target.device, dtype=target.dtype)
+            torch.zeros([0, target.embedding_dim], device=target.device, dtype=target.dtype)
         )  # requires_grad=True by default
         self.old_weight = cast(Parameter, target.weight)
         self.new_weight = p
@@ -30,11 +31,18 @@ class EmbeddingExtender(fl.Chain, Adapter[TokenEncoder]):
     # Use F.embedding instead of nn.Embedding to make sure that gradients can only be computed for the new embeddings
     def lookup(self, x: Tensor) -> Tensor:
         # Concatenate old and new weights for dynamic embedding updates during training
-        return F.embedding(x, cat([self.old_weight, self.new_weight]))
+        return F.embedding(x, torch.cat([self.old_weight, self.new_weight]))
 
     def add_embedding(self, embedding: Tensor) -> None:
         assert embedding.shape == (self.old_weight.shape[1],)
-        p = Parameter(cat([self.new_weight, embedding.unsqueeze(0).to(self.new_weight.device, self.new_weight.dtype)]))
+        p = Parameter(
+            torch.cat(
+                [
+                    self.new_weight,
+                    embedding.unsqueeze(0).to(self.new_weight.device, self.new_weight.dtype),
+                ]
+            )
+        )
         self.new_weight = p
 
     @property

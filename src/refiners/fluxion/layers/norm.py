@@ -1,5 +1,6 @@
+import torch
 from jaxtyping import Float
-from torch import Tensor, device as Device, dtype as DType, ones, sqrt, zeros
+from torch import Tensor, device as Device, dtype as DType
 from torch.nn import (
     GroupNorm as _GroupNorm,
     InstanceNorm2d as _InstanceNorm2d,
@@ -111,8 +112,8 @@ class LayerNorm2d(WeightedModule):
         dtype: DType | None = None,
     ) -> None:
         super().__init__()
-        self.weight = TorchParameter(ones(channels, device=device, dtype=dtype))
-        self.bias = TorchParameter(zeros(channels, device=device, dtype=dtype))
+        self.weight = TorchParameter(torch.ones(channels, device=device, dtype=dtype))
+        self.bias = TorchParameter(torch.zeros(channels, device=device, dtype=dtype))
         self.eps = eps
 
     def forward(
@@ -121,7 +122,7 @@ class LayerNorm2d(WeightedModule):
     ) -> Float[Tensor, "batch channels height width"]:
         x_mean = x.mean(1, keepdim=True)
         x_var = (x - x_mean).pow(2).mean(1, keepdim=True)
-        x_norm = (x - x_mean) / sqrt(x_var + self.eps)
+        x_norm = (x - x_mean) / torch.sqrt(x_var + self.eps)
         x_out = self.weight.unsqueeze(-1).unsqueeze(-1) * x_norm + self.bias.unsqueeze(-1).unsqueeze(-1)
         return x_out
 
