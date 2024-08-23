@@ -8,15 +8,25 @@
 
 **The simplest way to train and run adapters on top of foundation models**
 
-[**Manifesto**](https://refine.rs/home/why/) | [**Docs**](https://refine.rs) | [**Guides**](https://refine.rs/guides/adapting_sdxl/) | [**Discussions**](https://github.com/finegrain-ai/refiners/discussions) | [**Discord**](https://discord.gg/mCmjNUVV7d)
+[**Manifesto**](https://refine.rs/home/why/) |
+[**Docs**](https://refine.rs) |
+[**Guides**](https://refine.rs/guides/adapting_sdxl/) |
+[**Discussions**](https://github.com/finegrain-ai/refiners/discussions) |
+[**Discord**](https://discord.gg/mCmjNUVV7d)
 
 ______________________________________________________________________
 
+[![dependencies - Rye](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/rye/main/artwork/badge.json)](https://github.com/astral-sh/rye)
+[![linting - Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![packaging - Hatch](https://img.shields.io/badge/%F0%9F%A5%9A-Hatch-4051b5.svg)](https://github.com/pypa/hatch)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/refiners)](https://pypi.org/project/refiners/)
-[![PyPI Status](https://badge.fury.io/py/refiners.svg)](https://badge.fury.io/py/refiners)
-[![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE)
+[![PyPI - Status](https://badge.fury.io/py/refiners.svg)](https://pypi.org/project/refiners/)
+[![license](https://img.shields.io/badge/license-MIT-blue)](/LICENSE) \
 [![code bounties](https://img.shields.io/badge/code-bounties-blue)](https://finegrain.ai/bounties)
-[![chat](https://img.shields.io/discord/1179456777406922913?logo=discord&logoColor=white&color=%235765F2)](https://discord.gg/mCmjNUVV7d)
+[![Discord](https://img.shields.io/discord/1179456777406922913?logo=discord&logoColor=white&color=%235765F2)](https://discord.gg/mCmjNUVV7d)
+[![HuggingFace - Refiners](https://img.shields.io/badge/refiners-ffd21e?logo=huggingface&labelColor=555)](https://huggingface.co/refiners)
+[![HuggingFace - Finegrain](https://img.shields.io/badge/finegrain-ffd21e?logo=huggingface&labelColor=555)](https://huggingface.co/finegrain)
+
 </div>
 
 ## Latest News 🔥
