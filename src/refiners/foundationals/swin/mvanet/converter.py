@@ -11,7 +11,7 @@ def convert_weights(official_state_dict: dict[str, Tensor]) -> dict[str, Tensor]
         r"multifieldcrossatt.attention.5",
         r"dec_blk\d+\.linear[12]",
         r"dec_blk[1234]\.attention\.[4567]",
-        # We don't need the sideout weights
+        # We don't need the sideout weights for inference
         r"sideout\d+",
     ]
     state_dict = {k: v for k, v in official_state_dict.items() if not any(re.match(rm, k) for rm in rm_list)}
