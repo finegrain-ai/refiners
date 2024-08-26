@@ -43,11 +43,13 @@ class FrankenSolver(Solver):
     """Lets you use Diffusers Schedulers as Refiners Solvers.
 
     For instance:
+        ```py
         from diffusers import EulerDiscreteScheduler
         from refiners.foundationals.latent_diffusion.solvers import FrankenSolver
 
         scheduler = EulerDiscreteScheduler(...)
         solver = FrankenSolver(lambda: scheduler, num_inference_steps=steps)
+        ```
     """
 
     default_params = dataclasses.replace(
