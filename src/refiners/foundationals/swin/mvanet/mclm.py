@@ -132,6 +132,8 @@ class MCLM(fl.Chain):
         positional_embedding = PositionEmbeddingSine(num_pos_feats=emb_dim // 2, device=device)
 
         # LayerNorms in MCLM share their weights.
+        # We use the `proxy` trick below so they can be present only
+        # once in the tree but called in two different places.
 
         ln1 = fl.LayerNorm(emb_dim, device=device)
         ln2 = fl.LayerNorm(emb_dim, device=device)
