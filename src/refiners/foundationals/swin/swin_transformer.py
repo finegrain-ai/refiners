@@ -22,7 +22,7 @@ def to_windows(x: Tensor, window_size: int) -> Tensor:
 
 
 class ToWindows(fl.Module):
-    def __init__(self, window_size: int):
+    def __init__(self, window_size: int) -> None:
         super().__init__()
         self.window_size = window_size
 
@@ -67,7 +67,7 @@ def get_attn_mask(H: int, window_size: int, device: Device | None = None) -> Ten
 
 
 class Pad(fl.Module):
-    def __init__(self, step: int):
+    def __init__(self, step: int) -> None:
         super().__init__()
         self.step = step
 
@@ -135,7 +135,7 @@ class WindowUnflatten(fl.Module):
 
 
 class Roll(fl.Module):
-    def __init__(self, *shifts: tuple[int, int]):
+    def __init__(self, *shifts: tuple[int, int]) -> None:
         super().__init__()
         self.shifts = shifts
         self._dims = tuple(s[0] for s in shifts)
@@ -148,7 +148,7 @@ class Roll(fl.Module):
 class RelativePositionBias(fl.Module):
     relative_position_index: Tensor
 
-    def __init__(self, window_size: int, num_heads: int, device: Device | None = None):
+    def __init__(self, window_size: int, num_heads: int, device: Device | None = None) -> None:
         super().__init__()
         self.relative_position_bias_table = torch.nn.Parameter(
             torch.empty(
@@ -178,7 +178,7 @@ class WindowSDPA(fl.Module):
         num_heads: int,
         shift: bool = False,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self.window_size = window_size
         self.num_heads = num_heads
@@ -220,7 +220,7 @@ class WindowAttention(fl.Chain):
         num_heads: int,
         shift: bool = False,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Linear(dim, dim * 3, bias=True, device=device),
             WindowSDPA(dim, window_size, num_heads, shift, device=device),
@@ -237,7 +237,7 @@ class SwinTransformerBlock(fl.Chain):
         shift_size: int = 0,
         mlp_ratio: float = 4.0,
         device: Device | None = None,
-    ):
+    ) -> None:
         assert 0 <= shift_size < window_size, "shift_size must in [0, window_size["
 
         super().__init__(
@@ -272,7 +272,7 @@ class SwinTransformerBlock(fl.Chain):
 
 
 class PatchMerging(fl.Chain):
-    def __init__(self, dim: int, device: Device | None = None):
+    def __init__(self, dim: int, device: Device | None = None) -> None:
         super().__init__(
             SquareUnflatten(1),
             Pad(2),
@@ -295,7 +295,7 @@ class BasicLayer(fl.Chain):
         window_size: int = 7,
         mlp_ratio: float = 4.0,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             SwinTransformerBlock(
                 dim=dim,
@@ -316,7 +316,7 @@ class PatchEmbedding(fl.Chain):
         in_chans: int = 3,
         embedding_dim: int = 96,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Conv2d(in_chans, embedding_dim, kernel_size=patch_size, stride=patch_size, device=device),
             fl.Flatten(2),
@@ -341,7 +341,7 @@ class SwinTransformer(fl.Chain):
         window_size: int = 7,  # image size is 32 * this
         mlp_ratio: float = 4.0,
         device: Device | None = None,
-    ):
+    ) -> None:
         if depths is None:
             depths = [2, 2, 6, 2]
 

@@ -14,7 +14,7 @@ from .utils import FeedForward, MultiheadAttention, MultiPool, PatchMerge, Patch
 class PerPixel(fl.Chain):
     """(B, C, H, W) -> H*W, B, C"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             fl.Permute(2, 3, 0, 1),
             fl.Flatten(0, 1),
@@ -26,7 +26,7 @@ class PositionEmbeddingSine(fl.Module):
     Non-trainable position embedding, originally from https://github.com/facebookresearch/detr
     """
 
-    def __init__(self, num_pos_feats: int, device: Device | None = None):
+    def __init__(self, num_pos_feats: int, device: Device | None = None) -> None:
         super().__init__()
         self.device = device
         temperature = 10000
@@ -51,7 +51,7 @@ class PositionEmbeddingSine(fl.Module):
 
 
 class MultiPoolPos(fl.Module):
-    def __init__(self, pool_ratios: list[int], positional_embedding: PositionEmbeddingSine):
+    def __init__(self, pool_ratios: list[int], positional_embedding: PositionEmbeddingSine) -> None:
         super().__init__()
         self.pool_ratios = pool_ratios
         self.positional_embedding = positional_embedding
@@ -62,7 +62,7 @@ class MultiPoolPos(fl.Module):
 
 
 class Repeat(fl.Module):
-    def __init__(self, dim: int = 0):
+    def __init__(self, dim: int = 0) -> None:
         self.dim = dim
         super().__init__()
 
@@ -71,7 +71,7 @@ class Repeat(fl.Module):
 
 
 class _MHA_Arg(fl.Sum):
-    def __init__(self, offset: int):
+    def __init__(self, offset: int) -> None:
         self.offset = offset
         super().__init__(
             fl.GetArg(offset),  # value
@@ -95,7 +95,7 @@ class GlobalAttention(fl.Chain):
         emb_dim: int,
         num_heads: int = 1,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 fl.GetArg(0),  # global
@@ -125,7 +125,7 @@ class MCLM(fl.Chain):
         num_heads: int = 1,
         pool_ratios: list[int] | None = None,
         device: Device | None = None,
-    ):
+    ) -> None:
         if pool_ratios is None:
             pool_ratios = [2, 8, 16]
 
