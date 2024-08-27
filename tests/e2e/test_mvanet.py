@@ -57,3 +57,25 @@ def test_mvanet(
     prediction: torch.Tensor = mvanet_model(in_t.to(test_device)).sigmoid()
     cactus_mask = tensor_to_image(prediction).resize(ref_cactus.size, Image.Resampling.BILINEAR)
     ensure_similar_images(cactus_mask.convert("RGB"), expected_cactus_mask.convert("RGB"))
+
+
+@no_grad()
+def test_mvanet_to(
+    mvanet_weights: Path,
+    ref_cactus: Image.Image,
+    expected_cactus_mask: Image.Image,
+    test_device: torch.device,
+):
+    if test_device.type == "cpu":
+        warn("not running on CPU, skipping")
+        pytest.skip()
+
+    model = MVANet(device=torch.device("cpu")).eval()
+    model.load_from_safetensors(mvanet_weights)
+    model.to(test_device)
+
+    in_t = image_to_tensor(ref_cactus.resize((1024, 1024), Image.Resampling.BILINEAR)).squeeze()
+    in_t = normalize(in_t, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]).unsqueeze(0)
+    prediction: torch.Tensor = model(in_t.to(test_device)).sigmoid()
+    cactus_mask = tensor_to_image(prediction).resize(ref_cactus.size, Image.Resampling.BILINEAR)
+    ensure_similar_images(cactus_mask.convert("RGB"), expected_cactus_mask.convert("RGB"))

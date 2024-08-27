@@ -26,15 +26,14 @@ class PositionEmbeddingSine(fl.Module):
     Non-trainable position embedding, originally from https://github.com/facebookresearch/detr
     """
 
-    def __init__(self, num_pos_feats: int, device: Device | None = None) -> None:
+    def __init__(self, num_pos_feats: int) -> None:
         super().__init__()
-        self.device = device
         temperature = 10000
-        self.dim_t = torch.arange(0, num_pos_feats, dtype=torch.float32, device=self.device)
+        self.dim_t = torch.arange(0, num_pos_feats, dtype=torch.float32)
         self.dim_t = temperature ** (2 * (self.dim_t // 2) / num_pos_feats)
 
     def __call__(self, h: int, w: int) -> Tensor:
-        mask = torch.ones([1, h, w, 1], dtype=torch.bool, device=self.device)
+        mask = torch.ones([1, h, w, 1], dtype=torch.bool)
         y_embed = mask.cumsum(dim=1, dtype=torch.float32)
         x_embed = mask.cumsum(dim=2, dtype=torch.float32)
 
@@ -129,7 +128,7 @@ class MCLM(fl.Chain):
         if pool_ratios is None:
             pool_ratios = [2, 8, 16]
 
-        positional_embedding = PositionEmbeddingSine(num_pos_feats=emb_dim // 2, device=device)
+        positional_embedding = PositionEmbeddingSine(num_pos_feats=emb_dim // 2)
 
         # LayerNorms in MCLM share their weights.
         # We use the `proxy` trick below so they can be present only
@@ -174,6 +173,7 @@ class MCLM(fl.Chain):
                 ),
             ),
             fl.Lambda(lambda t1, t2: (*t1, *t2)),  # type: ignore
+            fl.Converter(set_dtype=False),
             GlobalAttention(emb_dim, num_heads, device=device),
             ln1,
             FeedForward(emb_dim, device=device),
