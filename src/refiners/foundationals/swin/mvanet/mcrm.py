@@ -24,7 +24,7 @@ class TiledCrossAttention(fl.Chain):
         num_heads: int = 1,
         pool_ratios: list[int] | None = None,
         device: Device | None = None,
-    ):
+    ) -> None:
         # Input must be a 4-tuple: (local, global)
 
         if pool_ratios is None:
@@ -70,7 +70,7 @@ class MCRM(fl.Chain):
         num_heads: int = 1,
         pool_ratios: list[int] | None = None,
         device: Device | None = None,
-    ):
+    ) -> None:
         if pool_ratios is None:
             pool_ratios = [1, 2, 4]
 

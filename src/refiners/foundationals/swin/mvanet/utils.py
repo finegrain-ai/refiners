@@ -19,7 +19,7 @@ class Unflatten(fl.Module):
 
 
 class Interpolate(fl.Module):
-    def __init__(self, size: tuple[int, ...], mode: str = "bilinear"):
+    def __init__(self, size: tuple[int, ...], mode: str = "bilinear") -> None:
         super().__init__()
         self.size = Size(size)
         self.mode = mode
@@ -29,7 +29,7 @@ class Interpolate(fl.Module):
 
 
 class Rescale(fl.Module):
-    def __init__(self, scale_factor: float, mode: str = "nearest"):
+    def __init__(self, scale_factor: float, mode: str = "nearest") -> None:
         super().__init__()
         self.scale_factor = scale_factor
         self.mode = mode
@@ -39,19 +39,19 @@ class Rescale(fl.Module):
 
 
 class BatchNorm2d(torch.nn.BatchNorm2d, fl.WeightedModule):
-    def __init__(self, num_features: int, device: torch.device | None = None):
+    def __init__(self, num_features: int, device: torch.device | None = None) -> None:
         super().__init__(num_features=num_features, device=device)  # type: ignore
 
 
 class PReLU(torch.nn.PReLU, fl.WeightedModule, fl.Activation):
-    def __init__(self, device: torch.device | None = None):
+    def __init__(self, device: torch.device | None = None) -> None:
         super().__init__(device=device)  # type: ignore
 
 
 class PatchSplit(fl.Chain):
     """(B, N, H, W) -> B, 4, N, H/2, W/2"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             Unflatten(-2, (2, -1)),
             Unflatten(-1, (2, -1)),
@@ -63,7 +63,7 @@ class PatchSplit(fl.Chain):
 class PatchMerge(fl.Chain):
     """B, 4, N, H, W -> (B, N, 2*H, 2*W)"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             Unflatten(1, (2, 2)),
             fl.Permute(0, 3, 1, 4, 2, 5),
@@ -82,7 +82,7 @@ class FeedForward(fl.Residual):
 
 
 class _GetArgs(fl.Parallel):
-    def __init__(self, n: int):
+    def __init__(self, n: int) -> None:
         super().__init__(
             fl.Chain(
                 fl.GetArg(0),
@@ -103,7 +103,7 @@ class _GetArgs(fl.Parallel):
 
 
 class MultiheadAttention(torch.nn.MultiheadAttention, fl.WeightedModule):
-    def __init__(self, embedding_dim: int, num_heads: int, device: torch.device | None = None):
+    def __init__(self, embedding_dim: int, num_heads: int, device: torch.device | None = None) -> None:
         super().__init__(embed_dim=embedding_dim, num_heads=num_heads, device=device)  # type: ignore
 
     @property
@@ -122,7 +122,7 @@ class PatchwiseCrossAttention(fl.Chain):
         d_model: int,
         num_heads: int,
         device: torch.device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Concatenate(
                 fl.Chain(

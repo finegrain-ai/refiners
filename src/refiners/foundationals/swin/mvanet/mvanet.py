@@ -19,7 +19,7 @@ class CBG(fl.Chain):
         in_dim: int,
         out_dim: int | None = None,
         device: Device | None = None,
-    ):
+    ) -> None:
         out_dim = out_dim or in_dim
         super().__init__(
             fl.Conv2d(in_dim, out_dim, kernel_size=3, padding=1, device=device),
@@ -36,7 +36,7 @@ class CBR(fl.Chain):
         in_dim: int,
         out_dim: int | None = None,
         device: Device | None = None,
-    ):
+    ) -> None:
         out_dim = out_dim or in_dim
         super().__init__(
             fl.Conv2d(in_dim, out_dim, kernel_size=3, padding=1, device=device),
@@ -57,7 +57,7 @@ class SplitMultiView(fl.Chain):
         multi_view (b, 5, c, H/2, W/2)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             fl.Concatenate(
                 PatchSplit(),  # global features
@@ -88,7 +88,7 @@ class ShallowUpscaler(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 fl.Identity(),
@@ -117,7 +117,7 @@ class PyramidL5(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.GetArg(0),  # output5
             fl.Flatten(0, 1),
@@ -134,7 +134,7 @@ class PyramidL4(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 PyramidL5(embedding_dim=embedding_dim, device=device),
@@ -157,7 +157,7 @@ class PyramidL3(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 PyramidL4(embedding_dim=embedding_dim, device=device),
@@ -180,7 +180,7 @@ class PyramidL2(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         embedding_dim = 128
         super().__init__(
             fl.Sum(
@@ -219,7 +219,7 @@ class Pyramid(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 PyramidL2(embedding_dim=embedding_dim, device=device),
@@ -253,7 +253,7 @@ class RearrangeMultiView(fl.Chain):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Sum(
                 fl.Chain(  # local features
@@ -279,7 +279,7 @@ class ComputeShallow(fl.Passthrough):
         self,
         embedding_dim: int = 128,
         device: Device | None = None,
-    ):
+    ) -> None:
         super().__init__(
             fl.Conv2d(3, embedding_dim, kernel_size=3, padding=1, device=device),
             fl.SetContext("mvanet", "shallow"),
@@ -309,7 +309,7 @@ class MVANet(fl.Chain):
         num_heads: list[int] | None = None,
         window_size: int = 12,
         device: Device | None = None,
-    ):
+    ) -> None:
         if depths is None:
             depths = [2, 2, 18, 2]
         if num_heads is None:
