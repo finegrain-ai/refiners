@@ -21,6 +21,8 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added the Box Segmenter all-in-one solution ([model](https://huggingface.co/finegrain/finegrain-box-segmenter), [HF Space](https://huggingface.co/spaces/finegrain/finegrain-object-cutter))
+- Added [MVANet](https://arxiv.org/abs/2404.07445) for high resolution segmentation
 - Added [IC-Light](https://github.com/lllyasviel/IC-Light) to manipulate the illumination of images
 - Added Multi Upscaler for high-resolution image generation, inspired from [Clarity Upscaler](https://github.com/philz1337x/clarity-upscaler) ([HF Space](https://huggingface.co/spaces/finegrain/enhancer))
 - Added [HQ-SAM](https://arxiv.org/abs/2306.01567) for high quality mask prediction with Segment Anything

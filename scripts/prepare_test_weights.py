@@ -466,6 +466,15 @@ def download_mvanet():
     check_hash(dest_filename, "b915d492")
 
 
+def download_box_segmenter():
+    download_file(
+        "https://huggingface.co/finegrain/finegrain-box-segmenter/resolve/v0.1/model.safetensors",
+        dest_folder=test_weights_dir,
+        filename="finegrain-box-segmenter-v0-1.safetensors",
+        expected_hash="e0450e8c",
+    )
+
+
 def printg(msg: str):
     """print in green color"""
     print("\033[92m" + msg + "\033[0m")
@@ -861,6 +870,7 @@ def download_all():
     download_sdxl_lightning_lora()
     download_ic_light()
     download_mvanet()
+    download_box_segmenter()
 
 
 def convert_all():
