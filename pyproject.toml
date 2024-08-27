@@ -67,6 +67,9 @@ doc = [
     "mkdocstrings[python]>=0.24.0",
     "mkdocs-literate-nav>=0.6.1",
 ]
+solutions = [
+    "huggingface-hub>=0.24.6",
+]
 
 [build-system]
 requires = ["hatchling"]
