@@ -1,5 +1,5 @@
 from enum import Enum
-from logging import warn
+from logging import warning
 from pathlib import Path
 from typing import Annotated, Any, Callable, Iterable, Literal, Type, TypeVar
 
@@ -132,7 +132,7 @@ class OptimizerConfig(BaseModel):
                 )
             case Optimizers.Prodigy:
                 if self.learning_rate != 1.0:
-                    warn("Prodigy learning rate is not 1.0, this might cause instability.")
+                    warning("Prodigy learning rate is not 1.0, this might cause instability.")
                 return Prodigy(
                     lr=self.learning_rate,
                     params=params,
