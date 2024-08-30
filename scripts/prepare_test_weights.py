@@ -849,6 +849,7 @@ def convert_mvanet():
 
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
+    # FKA runwayml/stable-diffusion-v1-5
     download_sd15("sd-legacy/stable-diffusion-v1-5")
     download_sd15("sd-legacy/stable-diffusion-inpainting")
     download_sdxl("stabilityai/stable-diffusion-xl-base-1.0")
