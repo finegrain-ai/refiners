@@ -145,7 +145,7 @@ def human_readable_size(size: int | float, decimal_places: int = 2) -> str:
     return f"{size:.{decimal_places}f}{unit}"  # type: ignore
 
 
-def download_sd_text_encoder(hf_repo_id: str = "runwayml/stable-diffusion-v1-5", subdir: str = "text_encoder"):
+def download_sd_text_encoder(hf_repo_id: str = "sd-legacy/stable-diffusion-v1-5", subdir: str = "text_encoder"):
     encoder_filename = "model.safetensors" if "inpainting" not in hf_repo_id else "model.fp16.safetensors"
     base_url = f"https://huggingface.co/{hf_repo_id}"
     download_files(
@@ -157,7 +157,7 @@ def download_sd_text_encoder(hf_repo_id: str = "runwayml/stable-diffusion-v1-5",
     )
 
 
-def download_sd_tokenizer(hf_repo_id: str = "runwayml/stable-diffusion-v1-5", subdir: str = "tokenizer"):
+def download_sd_tokenizer(hf_repo_id: str = "sd-legacy/stable-diffusion-v1-5", subdir: str = "tokenizer"):
     download_files(
         urls=[
             f"https://huggingface.co/{hf_repo_id}/raw/main/{subdir}/merges.txt",
@@ -169,7 +169,7 @@ def download_sd_tokenizer(hf_repo_id: str = "runwayml/stable-diffusion-v1-5", su
     )
 
 
-def download_sd_base(hf_repo_id: str = "runwayml/stable-diffusion-v1-5"):
+def download_sd_base(hf_repo_id: str = "sd-legacy/stable-diffusion-v1-5"):
     is_inpainting = "inpainting" in hf_repo_id
     ext = "safetensors" if not is_inpainting else "bin"
     base_folder = os.path.join(test_weights_dir, hf_repo_id)
@@ -191,7 +191,7 @@ def download_sd_base(hf_repo_id: str = "runwayml/stable-diffusion-v1-5"):
     download_sd_tokenizer(hf_repo_id, "tokenizer")
 
 
-def download_sd15(hf_repo_id: str = "runwayml/stable-diffusion-v1-5"):
+def download_sd15(hf_repo_id: str = "sd-legacy/stable-diffusion-v1-5"):
     download_sd_base(hf_repo_id)
     base_folder = os.path.join(test_weights_dir, hf_repo_id)
 
@@ -515,20 +515,20 @@ def run_conversion_script(
 def convert_sd15():
     run_conversion_script(
         script_filename="convert_transformers_clip_text_model.py",
-        from_weights="tests/weights/runwayml/stable-diffusion-v1-5",
+        from_weights="tests/weights/sd-legacy/stable-diffusion-v1-5",
         to_weights="tests/weights/CLIPTextEncoderL.safetensors",
         half=True,
         expected_hash="6c9cbc59",
     )
     run_conversion_script(
         "convert_diffusers_autoencoder_kl.py",
-        "tests/weights/runwayml/stable-diffusion-v1-5",
+        "tests/weights/sd-legacy/stable-diffusion-v1-5",
         "tests/weights/lda.safetensors",
         expected_hash="329e369c",
     )
     run_conversion_script(
         "convert_diffusers_unet.py",
-        "tests/weights/runwayml/stable-diffusion-v1-5",
+        "tests/weights/sd-legacy/stable-diffusion-v1-5",
         "tests/weights/unet.safetensors",
         half=True,
         expected_hash="f81ac65a",
@@ -536,7 +536,7 @@ def convert_sd15():
     os.makedirs("tests/weights/inpainting", exist_ok=True)
     run_conversion_script(
         "convert_diffusers_unet.py",
-        "tests/weights/runwayml/stable-diffusion-inpainting",
+        "tests/weights/sd-legacy/stable-diffusion-inpainting",
         "tests/weights/inpainting/unet.safetensors",
         half=True,
         expected_hash="c07a8c61",
@@ -849,8 +849,8 @@ def convert_mvanet():
 
 def download_all():
     print(f"\nAll weights will be downloaded to {test_weights_dir}\n")
-    download_sd15("runwayml/stable-diffusion-v1-5")
-    download_sd15("runwayml/stable-diffusion-inpainting")
+    download_sd15("sd-legacy/stable-diffusion-v1-5")
+    download_sd15("sd-legacy/stable-diffusion-inpainting")
     download_sdxl("stabilityai/stable-diffusion-xl-base-1.0")
     download_vae_ft_mse()
     download_vae_fp16_fix()

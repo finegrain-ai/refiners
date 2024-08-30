@@ -13,7 +13,7 @@ from diffusers import DPMSolverMultistepScheduler
 from diffusers import StableDiffusionPipeline
 
 pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+    "sd-legacy/stable-diffusion-v1-5",
     torch_dtype=torch.float32,
 ).to("cuda")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -88,7 +88,7 @@ diffusers_solver = DPMSolverMultistepScheduler.from_config(  # type: ignore
         "euler_at_final": True,
     }
 )
-model_id = "runwayml/stable-diffusion-v1-5"
+model_id = "sd-legacy/stable-diffusion-v1-5"
 pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float32, scheduler=diffusers_solver)
 pipe = pipe.to("cuda")
 prompt = "a cute cat, detailed high-quality professional image"
@@ -159,7 +159,7 @@ from diffusers import DPMSolverMultistepScheduler
 from diffusers import StableDiffusionPipeline
 
 pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+    "sd-legacy/stable-diffusion-v1-5",
     torch_dtype=torch.float32,
 ).to("cuda")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)

@@ -52,7 +52,7 @@ def ref_sd15_with_new_concepts(
 
 @pytest.fixture(scope="module")
 def runwayml_weights_path(test_weights_path: Path):
-    r = test_weights_path / "runwayml" / "stable-diffusion-v1-5"
+    r = test_weights_path / "sd-legacy" / "stable-diffusion-v1-5"
     if not r.is_dir():
         warn(f"could not find RunwayML weights at {r}, skipping")
         pytest.skip(allow_module_level=True)

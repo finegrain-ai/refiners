@@ -49,7 +49,7 @@ def main() -> None:
         "--reference-unet-path",
         type=str,
         dest="reference_unet_path",
-        default="runwayml/stable-diffusion-v1-5",
+        default="sd-legacy/stable-diffusion-v1-5",
         help="Path to the reference UNet weights.",
     )
     args = parser.parse_args(namespace=Args())

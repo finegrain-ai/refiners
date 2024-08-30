@@ -9,7 +9,7 @@ from refiners.foundationals.latent_diffusion import SD1IPAdapter, SD1UNet, SDXLI
 # Running:
 #
 #     from diffusers import UNet2DConditionModel
-#     unet = UNet2DConditionModel.from_pretrained("runwayml/stable-diffusion-v1-5", subfolder="unet")
+#     unet = UNet2DConditionModel.from_pretrained("sd-legacy/stable-diffusion-v1-5", subfolder="unet")
 #     for k in unet.attn_processors.keys():
 #         print(k)
 #

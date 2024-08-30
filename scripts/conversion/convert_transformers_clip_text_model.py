@@ -74,10 +74,10 @@ def main() -> None:
         "--from",
         type=str,
         dest="source_path",
-        default="runwayml/stable-diffusion-v1-5",
+        default="sd-legacy/stable-diffusion-v1-5",
         help=(
             "Can be a path to a .bin file, a .safetensors file or a model name from the HuggingFace Hub. Default:"
-            " runwayml/stable-diffusion-v1-5"
+            " sd-legacy/stable-diffusion-v1-5"
         ),
     )
     parser.add_argument(

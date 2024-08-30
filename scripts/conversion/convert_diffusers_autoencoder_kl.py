@@ -39,8 +39,8 @@ if __name__ == "__main__":
         "--from",
         type=str,
         dest="source_path",
-        default="runwayml/stable-diffusion-v1-5",
-        help="Path to the source pretrained model (default: 'runwayml/stable-diffusion-v1-5').",
+        default="sd-legacy/stable-diffusion-v1-5",
+        help="Path to the source pretrained model (default: 'sd-legacy/stable-diffusion-v1-5').",
     )
     parser.add_argument(
         "--subfolder",
