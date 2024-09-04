@@ -210,6 +210,11 @@ class PerceiverResampler(fl.Chain):
 
 
 class ELLA(fl.Passthrough):
+    """ELLA latents encoder.
+
+    See [[arXiv:2403.05135] ELLA: Equip Diffusion Models with LLM for Enhanced Semantic Alignment](https://arxiv.org/abs/2403.05135) for more details.
+    """
+
     def __init__(
         self,
         time_channel: int,
@@ -249,6 +254,8 @@ class ELLACrossAttentionAdapter(fl.Chain, Adapter[fl.UseContext]):
 
 
 class ELLAAdapter(Generic[T], fl.Chain, Adapter[T]):
+    """Adapter for [`ELLA`][refiners.foundationals.latent_diffusion.ella_adapter.ELLA]."""
+
     def __init__(self, target: T, latents_encoder: ELLA, weights: dict[str, Tensor] | None = None) -> None:
         if weights is not None:
             latents_encoder.load_state_dict(weights)

@@ -31,6 +31,7 @@ ______________________________________________________________________
 
 ## Latest News 🔥
 
+- Added [ELLA](https://arxiv.org/abs/2403.05135) for better prompts handling (contributed by [@ily-R](https://github.com/ily-R))
 - Added the Box Segmenter all-in-one solution ([model](https://huggingface.co/finegrain/finegrain-box-segmenter), [HF Space](https://huggingface.co/spaces/finegrain/finegrain-object-cutter))
 - Added [MVANet](https://arxiv.org/abs/2404.07445) for high resolution segmentation
 - Added [IC-Light](https://github.com/lllyasviel/IC-Light) to manipulate the illumination of images
