@@ -15,3 +15,5 @@
 ::: refiners.foundationals.latent_diffusion.style_aligned
 
 ::: refiners.foundationals.latent_diffusion.multi_diffusion
+
+::: refiners.foundationals.latent_diffusion.ella_adapter

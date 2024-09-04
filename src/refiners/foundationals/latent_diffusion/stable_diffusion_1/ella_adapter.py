@@ -5,7 +5,15 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.unet import SD1U
 
 
 class SD1ELLAAdapter(ELLAAdapter[SD1UNet]):
+    """[`ELLA`][refiners.foundationals.latent_diffusion.ella_adapter.ELLA] adapter for Stable Diffusion 1.5."""
+
     def __init__(self, target: SD1UNet, weights: dict[str, Tensor] | None = None) -> None:
+        """Initialize the adapter.
+
+        Args:
+            target: The target model to adapt.
+            weights: The weights of the ELLA adapter (see `scripts/conversion/convert_ella_adapter.py`).
+        """
         latents_encoder = ELLA(
             time_channel=320,
             timestep_embedding_dim=768,
