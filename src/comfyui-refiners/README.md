@@ -28,3 +28,10 @@ comfy node registry-install comfyui-refiners
 You may also download the nodes by cliking the "Download Latest" button and unzipping the content of the archive into you custom_nodes directory.
 
 See https://docs.comfy.org/registry/overview for more information.
+
+## Example Workflows
+
+### [Box Segmenter](assets/box_segmenter.json)
+
+This simple workflow leverages GroundingDino and our BoxSegmenter model to extract objects from an image.
+[![Box Segmenter Workflow](assets/box_segmenter.png)](assets/box_segmenter.json)
