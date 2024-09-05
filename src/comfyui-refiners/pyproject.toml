@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-refiners"
 description = "ComfyUI custom nodes for refiners models"
-version = "1.0.1"
+version = "1.0.2"
 license = { file = "LICENSE" }
 dependencies = [
     "refiners @ git+https://github.com/finegrain-ai/refiners.git",
