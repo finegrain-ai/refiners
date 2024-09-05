@@ -1,0 +1,780 @@
+{
+  "last_node_id": 47,
+  "last_link_id": 64,
+  "nodes": [
+    {
+      "id": 22,
+      "type": "BoxSegmenter",
+      "pos": {
+        "0": 1350,
+        "1": 180,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 210,
+        "1": 66
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 22
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23
+        },
+        {
+          "name": "bbox",
+          "type": "BOUNDING_BOX",
+          "link": 53
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            24
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BoxSegmenter"
+      }
+    },
+    {
+      "id": 23,
+      "type": "PreviewImage",
+      "pos": {
+        "0": 1660,
+        "1": 340,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 276,
+        "1": 390
+      },
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 28
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 17,
+      "type": "PreviewImage",
+      "pos": {
+        "0": 1340,
+        "1": 370,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 276,
+        "1": 390
+      },
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 13
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 21,
+      "type": "LoadBoxSegmenter",
+      "pos": {
+        "0": 360,
+        "1": 70,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 210,
+        "1": 82
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "checkpoint",
+          "type": "PATH",
+          "link": 63
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            22
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadBoxSegmenter"
+      },
+      "widgets_values": [
+        0.05,
+        "cuda"
+      ]
+    },
+    {
+      "id": 16,
+      "type": "MaskToImage",
+      "pos": {
+        "0": 1350,
+        "1": 290,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 264.5999755859375,
+        "1": 26
+      },
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            13,
+            26
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskToImage"
+      }
+    },
+    {
+      "id": 45,
+      "type": "LoadGroundingDino",
+      "pos": {
+        "0": 360,
+        "1": 240,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "checkpoint",
+          "type": "PATH",
+          "link": 58
+        }
+      ],
+      "outputs": [
+        {
+          "name": "processor",
+          "type": "PROCESSOR",
+          "links": [
+            59
+          ],
+          "slot_index": 0,
+          "shape": 3
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            60
+          ],
+          "slot_index": 1,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadGroundingDino"
+      },
+      "widgets_values": [
+        "float32",
+        "cuda"
+      ]
+    },
+    {
+      "id": 44,
+      "type": "HfHubDownload",
+      "pos": {
+        "0": 20,
+        "1": 240,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "type": "PATH",
+          "links": [
+            58
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "HfHubDownload"
+      },
+      "widgets_values": [
+        "IDEA-Research/grounding-dino-tiny",
+        "",
+        "main"
+      ]
+    },
+    {
+      "id": 46,
+      "type": "HfHubDownload",
+      "pos": {
+        "0": 20,
+        "1": 70,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "type": "PATH",
+          "links": [
+            63
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "HfHubDownload"
+      },
+      "widgets_values": [
+        "finegrain/finegrain-box-segmenter",
+        "model.safetensors",
+        "main"
+      ]
+    },
+    {
+      "id": 43,
+      "type": "PreviewImage",
+      "pos": {
+        "0": 990,
+        "1": 500,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 276,
+        "1": 390
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 52
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 42,
+      "type": "DrawBoundingBox",
+      "pos": {
+        "0": 1020,
+        "1": 350,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 210,
+        "1": 102
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 57
+        },
+        {
+          "name": "bbox",
+          "type": "BOUNDING_BOX",
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            52
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DrawBoundingBox"
+      },
+      "widgets_values": [
+        "red",
+        3
+      ]
+    },
+    {
+      "id": 25,
+      "type": "ImageBlend",
+      "pos": {
+        "0": 1650,
+        "1": 180,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 26
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            28
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageBlend"
+      },
+      "widgets_values": [
+        1,
+        "multiply"
+      ]
+    },
+    {
+      "id": 41,
+      "type": "GroundingDino",
+      "pos": {
+        "0": 970,
+        "1": 150,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 315,
+        "1": 146
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "processor",
+          "type": "PROCESSOR",
+          "link": 59
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 60
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 56
+        }
+      ],
+      "outputs": [
+        {
+          "name": "bbox",
+          "type": "BOUNDING_BOX",
+          "links": [
+            51,
+            53
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GroundingDino"
+      },
+      "widgets_values": [
+        "potted plant",
+        0.25,
+        0.25
+      ]
+    },
+    {
+      "id": 15,
+      "type": "LoadImage",
+      "pos": {
+        "0": 210,
+        "1": 470,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0
+      },
+      "size": {
+        "0": 294,
+        "1": 461
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23,
+            27,
+            56,
+            57
+          ],
+          "slot_index": 0,
+          "shape": 3
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "potted-plant.jpg",
+        "image"
+      ]
+    }
+  ],
+  "links": [
+    [
+      13,
+      16,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      22,
+      21,
+      0,
+      22,
+      0,
+      "MODEL"
+    ],
+    [
+      23,
+      15,
+      0,
+      22,
+      1,
+      "IMAGE"
+    ],
+    [
+      24,
+      22,
+      0,
+      16,
+      0,
+      "MASK"
+    ],
+    [
+      26,
+      16,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      27,
+      15,
+      0,
+      25,
+      1,
+      "IMAGE"
+    ],
+    [
+      28,
+      25,
+      0,
+      23,
+      0,
+      "IMAGE"
+    ],
+    [
+      51,
+      41,
+      0,
+      42,
+      1,
+      "BOUNDING_BOX"
+    ],
+    [
+      52,
+      42,
+      0,
+      43,
+      0,
+      "IMAGE"
+    ],
+    [
+      53,
+      41,
+      0,
+      22,
+      2,
+      "BOUNDING_BOX"
+    ],
+    [
+      56,
+      15,
+      0,
+      41,
+      2,
+      "IMAGE"
+    ],
+    [
+      57,
+      15,
+      0,
+      42,
+      0,
+      "IMAGE"
+    ],
+    [
+      58,
+      44,
+      0,
+      45,
+      0,
+      "PATH"
+    ],
+    [
+      59,
+      45,
+      0,
+      41,
+      0,
+      "PROCESSOR"
+    ],
+    [
+      60,
+      45,
+      1,
+      41,
+      1,
+      "MODEL"
+    ],
+    [
+      63,
+      46,
+      0,
+      21,
+      0,
+      "PATH"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Segment",
+      "bounding": [
+        1330,
+        106,
+        645,
+        664
+      ],
+      "color": "#3f789e",
+      "font_size": 24
+    },
+    {
+      "title": "Detect",
+      "bounding": [
+        960,
+        76,
+        335,
+        824
+      ],
+      "color": "#a1309b",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        33,
+        35
+      ]
+    }
+  },
+  "version": 0.4
+}
