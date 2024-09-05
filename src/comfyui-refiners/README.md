@@ -33,5 +33,5 @@ See https://docs.comfy.org/registry/overview for more information.
 
 ### [Box Segmenter](assets/box_segmenter.json)
 
-This simple workflow leverages GroundingDino and our BoxSegmenter model to extract objects from an image.
+This simple workflow leverages GroundingDINO and our [BoxSegmenter](https://huggingface.co/finegrain/finegrain-box-segmenter) to extract objects from an image.
 [![Box Segmenter Workflow](assets/box_segmenter.png)](assets/box_segmenter.json)
