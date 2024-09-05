@@ -1,0 +1,18 @@
+[project]
+name = "comfyui-refiners"
+description = "ComfyUI custom nodes for refiners models"
+version = "1.0.1"
+license = { file = "LICENSE" }
+dependencies = [
+    "refiners @ git+https://github.com/finegrain-ai/refiners.git",
+    "huggingface_hub",
+    "transformers",
+]
+
+[project.urls]
+Repository = "https://github.com/finegrain-ai/refiners"
+
+[tool.comfy]
+PublisherId = "finegrain"
+DisplayName = "refiners"
+Icon = "https://raw.githubusercontent.com/finegrain-ai/refiners/main/assets/dropy.png"
