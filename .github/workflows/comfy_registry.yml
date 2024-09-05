@@ -1,0 +1,32 @@
+name: Publish to Comfy registry
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/comfyui-refiners/pyproject.toml"
+
+jobs:
+  publish-node:
+    name: Publish Custom Node to registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # See https://github.com/Comfy-Org/publish-node-action
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install comfy-cli
+        shell: bash
+        run: |
+          pip install comfy-cli
+      - name: Publish Node
+        working-directory: ./src/comfyui-refiners
+        shell: bash
+        run: |
+          comfy --skip-prompt --no-enable-telemetry env
+          comfy node publish --token ${{ secrets.COMFYUI_REGISTRY_ACCESS_TOKEN }}
