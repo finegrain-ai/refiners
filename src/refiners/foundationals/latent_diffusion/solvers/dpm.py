@@ -1,16 +1,33 @@
 import dataclasses
 from collections import deque
+from typing import NamedTuple
 
 import numpy as np
 import torch
-from torch import Generator, Tensor, device as Device, dtype as Dtype
 
 from refiners.foundationals.latent_diffusion.solvers.solver import (
     BaseSolverParams,
     ModelPredictionType,
+    NoiseSchedule,
     Solver,
     TimestepSpacing,
 )
+
+
+def safe_log(x: torch.Tensor, lower_bound: float = 1e-6) -> torch.Tensor:
+    """Compute the log of a tensor with a lower bound."""
+    return torch.log(torch.maximum(x, torch.tensor(lower_bound)))
+
+
+def safe_sqrt(x: torch.Tensor) -> torch.Tensor:
+    """Compute the square root of a tensor ensuring that the input is non-negative"""
+    return torch.sqrt(torch.maximum(x, torch.tensor(0)))
+
+
+class SolverTensors(NamedTuple):
+    cumulative_scale_factors: torch.Tensor
+    noise_std: torch.Tensor
+    signal_to_noise_ratios: torch.Tensor
 
 
 class DPMSolver(Solver):
@@ -37,9 +54,9 @@ class DPMSolver(Solver):
         first_inference_step: int = 0,
         params: BaseSolverParams | None = None,
         last_step_first_order: bool = False,
-        device: Device | str = "cpu",
-        dtype: Dtype = torch.float32,
-    ):
+        device: torch.device | str = "cpu",
+        dtype: torch.dtype = torch.float32,
+    ) -> None:
         """Initializes a new DPM solver.
 
         Args:
@@ -64,6 +81,14 @@ class DPMSolver(Solver):
         )
         self.estimated_data = deque([torch.tensor([])] * 2, maxlen=2)
         self.last_step_first_order = last_step_first_order
+        sigmas = self.noise_std / self.cumulative_scale_factors
+        self.sigmas = self._rescale_sigmas(sigmas, self.params.sigma_schedule)
+        sigma_min = sigmas[0:1]  # corresponds to `final_sigmas_type="sigma_min" in diffusers`
+        self.sigmas = torch.cat([self.sigmas, sigma_min])
+        self.cumulative_scale_factors, self.noise_std, self.signal_to_noise_ratios = self._solver_tensors_from_sigmas(
+            self.sigmas
+        )
+        self.timesteps = self._timesteps_from_sigmas(sigmas)
 
     def rebuild(
         self: "DPMSolver",
@@ -83,7 +108,7 @@ class DPMSolver(Solver):
         r.last_step_first_order = self.last_step_first_order
         return r
 
-    def _generate_timesteps(self) -> Tensor:
+    def _generate_timesteps(self) -> torch.Tensor:
         if self.params.timesteps_spacing != TimestepSpacing.CUSTOM:
             return super()._generate_timesteps()
 
@@ -96,9 +121,75 @@ class DPMSolver(Solver):
         np_space = np.linspace(offset, max_timestep, self.num_inference_steps + 1).round().astype(int)[1:]
         return torch.tensor(np_space).flip(0)
 
+    def _generate_sigmas(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generate the sigmas used by the solver."""
+        assert self.params.sigma_schedule is not None, "sigma_schedule must be set for the DPM solver"
+        sigmas = self.noise_std / self.cumulative_scale_factors
+        sigmas = sigmas.flip(0)
+        rescaled_sigmas = self._rescale_sigmas(sigmas, self.params.sigma_schedule)
+        rescaled_sigmas = torch.cat([rescaled_sigmas, torch.tensor([0.0])])
+        return sigmas, rescaled_sigmas
+
+    def _rescale_sigmas(self, sigmas: torch.Tensor, sigma_schedule: NoiseSchedule | None) -> torch.Tensor:
+        """Rescale the sigmas according to the sigma schedule."""
+        match sigma_schedule:
+            case NoiseSchedule.UNIFORM:
+                rho = 1
+            case NoiseSchedule.QUADRATIC:
+                rho = 2
+            case NoiseSchedule.KARRAS:
+                rho = 7
+            case None:
+                return torch.tensor(
+                    np.interp(self.timesteps.cpu(), np.arange(0, len(sigmas)), sigmas.cpu()),
+                    device=self.device,
+                )
+
+        linear_schedule = torch.linspace(0, 1, steps=self.num_inference_steps, device=self.device)
+        first_sigma = sigmas[0]
+        last_sigma = sigmas[-1]
+        rescaled_sigmas = (
+            first_sigma ** (1 / rho) + linear_schedule * (last_sigma ** (1 / rho) - first_sigma ** (1 / rho))
+        ) ** rho
+        return rescaled_sigmas.flip(0)
+
+    def _timesteps_from_sigmas(self, sigmas: torch.Tensor) -> torch.Tensor:
+        """Generate the timesteps from the sigmas."""
+        log_sigmas = safe_log(sigmas)
+        timesteps: list[torch.Tensor] = []
+        for sigma in self.sigmas[:-1]:
+            log_sigma = safe_log(sigma)
+            distance_matrix = log_sigma - log_sigmas.unsqueeze(1)
+
+            # Determine the range of sigma indices
+            low_indices = (distance_matrix >= 0).cumsum(dim=0).argmax(dim=0).clip(max=sigmas.size(0) - 2)
+            high_indices = low_indices + 1
+
+            low_log_sigma = log_sigmas[low_indices]
+            high_log_sigma = log_sigmas[high_indices]
+
+            # Interpolate sigma values
+            interpolation_weights = (low_log_sigma - log_sigma) / (low_log_sigma - high_log_sigma)
+            interpolation_weights = torch.clamp(interpolation_weights, 0, 1)
+            timestep = (1 - interpolation_weights) * low_indices + interpolation_weights * high_indices
+            timesteps.append(timestep)
+
+        return torch.cat(timesteps).round()
+
+    def _solver_tensors_from_sigmas(self, sigmas: torch.Tensor) -> SolverTensors:
+        """Generate the tensors from the sigmas."""
+        cumulative_scale_factors = 1 / torch.sqrt(sigmas**2 + 1)
+        noise_std = sigmas * cumulative_scale_factors
+        signal_to_noise_ratios = safe_log(cumulative_scale_factors) - safe_log(noise_std)
+        return SolverTensors(
+            cumulative_scale_factors=cumulative_scale_factors,
+            noise_std=noise_std,
+            signal_to_noise_ratios=signal_to_noise_ratios,
+        )
+
     def dpm_solver_first_order_update(
-        self, x: Tensor, noise: Tensor, step: int, sde_noise: Tensor | None = None
-    ) -> Tensor:
+        self, x: torch.Tensor, noise: torch.Tensor, step: int, sde_noise: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Applies a first-order backward Euler update to the input data `x`.
 
         Args:
@@ -109,32 +200,29 @@ class DPMSolver(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        current_timestep = self.timesteps[step]
-        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else torch.tensor([0])
+        current_ratio = self.signal_to_noise_ratios[step]
+        next_ratio = self.signal_to_noise_ratios[step + 1]
 
-        previous_ratio = self.signal_to_noise_ratios[previous_timestep]
-        current_ratio = self.signal_to_noise_ratios[current_timestep]
+        next_scale_factor = self.cumulative_scale_factors[step + 1]
 
-        previous_scale_factor = self.cumulative_scale_factors[previous_timestep]
+        next_noise_std = self.noise_std[step + 1]
+        current_noise_std = self.noise_std[step]
 
-        previous_noise_std = self.noise_std[previous_timestep]
-        current_noise_std = self.noise_std[current_timestep]
-
-        ratio_delta = current_ratio - previous_ratio
+        ratio_delta = current_ratio - next_ratio
 
         if sde_noise is None:
-            return (previous_noise_std / current_noise_std) * x + (
-                1.0 - torch.exp(ratio_delta)
-            ) * previous_scale_factor * noise
+            return (next_noise_std / current_noise_std) * x + (1.0 - torch.exp(ratio_delta)) * next_scale_factor * noise
 
         factor = 1.0 - torch.exp(2.0 * ratio_delta)
         return (
-            (previous_noise_std / current_noise_std) * torch.exp(ratio_delta) * x
-            + previous_scale_factor * factor * noise
-            + previous_noise_std * torch.sqrt(factor) * sde_noise
+            (next_noise_std / current_noise_std) * torch.exp(ratio_delta) * x
+            + next_scale_factor * factor * noise
+            + next_noise_std * safe_sqrt(factor) * sde_noise
         )
 
-    def multistep_dpm_solver_second_order_update(self, x: Tensor, step: int, sde_noise: Tensor | None = None) -> Tensor:
+    def multistep_dpm_solver_second_order_update(
+        self, x: torch.Tensor, step: int, sde_noise: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Applies a second-order backward Euler update to the input data `x`.
 
         Args:
@@ -144,43 +232,41 @@ class DPMSolver(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        previous_timestep = self.timesteps[step + 1] if step < self.num_inference_steps - 1 else torch.tensor([0])
-        current_timestep = self.timesteps[step]
-        next_timestep = self.timesteps[step - 1]
-
         current_data_estimation = self.estimated_data[-1]
-        next_data_estimation = self.estimated_data[-2]
+        previous_data_estimation = self.estimated_data[-2]
 
-        previous_ratio = self.signal_to_noise_ratios[previous_timestep]
-        current_ratio = self.signal_to_noise_ratios[current_timestep]
-        next_ratio = self.signal_to_noise_ratios[next_timestep]
+        next_ratio = self.signal_to_noise_ratios[step + 1]
+        current_ratio = self.signal_to_noise_ratios[step]
+        previous_ratio = self.signal_to_noise_ratios[step - 1]
 
-        previous_scale_factor = self.cumulative_scale_factors[previous_timestep]
-        previous_noise_std = self.noise_std[previous_timestep]
-        current_noise_std = self.noise_std[current_timestep]
+        next_scale_factor = self.cumulative_scale_factors[step + 1]
+        next_noise_std = self.noise_std[step + 1]
+        current_noise_std = self.noise_std[step]
 
-        estimation_delta = (current_data_estimation - next_data_estimation) / (
-            (current_ratio - next_ratio) / (previous_ratio - current_ratio)
+        estimation_delta = (current_data_estimation - previous_data_estimation) / (
+            (current_ratio - previous_ratio) / (next_ratio - current_ratio)
         )
-        ratio_delta = current_ratio - previous_ratio
+        ratio_delta = current_ratio - next_ratio
 
         if sde_noise is None:
             factor = 1.0 - torch.exp(ratio_delta)
             return (
-                (previous_noise_std / current_noise_std) * x
-                + previous_scale_factor * factor * current_data_estimation
-                + 0.5 * previous_scale_factor * factor * estimation_delta
+                (next_noise_std / current_noise_std) * x
+                + next_scale_factor * factor * current_data_estimation
+                + 0.5 * next_scale_factor * factor * estimation_delta
             )
 
         factor = 1.0 - torch.exp(2.0 * ratio_delta)
         return (
-            (previous_noise_std / current_noise_std) * torch.exp(ratio_delta) * x
-            + previous_scale_factor * factor * current_data_estimation
-            + 0.5 * previous_scale_factor * factor * estimation_delta
-            + previous_noise_std * torch.sqrt(factor) * sde_noise
+            (next_noise_std / current_noise_std) * torch.exp(ratio_delta) * x
+            + next_scale_factor * factor * current_data_estimation
+            + 0.5 * next_scale_factor * factor * estimation_delta
+            + next_noise_std * safe_sqrt(factor) * sde_noise
         )
 
-    def __call__(self, x: Tensor, predicted_noise: Tensor, step: int, generator: Generator | None = None) -> Tensor:
+    def __call__(
+        self, x: torch.Tensor, predicted_noise: torch.Tensor, step: int, generator: torch.Generator | None = None
+    ) -> torch.Tensor:
         """Apply one step of the backward diffusion process.
 
         Note:
@@ -199,9 +285,8 @@ class DPMSolver(Solver):
         """
         assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
 
-        current_timestep = self.timesteps[step]
-        scale_factor = self.cumulative_scale_factors[current_timestep]
-        noise_ratio = self.noise_std[current_timestep]
+        scale_factor = self.cumulative_scale_factors[step]
+        noise_ratio = self.noise_std[step]
         estimated_denoised_data = (x - noise_ratio * predicted_noise) / scale_factor
         self.estimated_data.append(estimated_denoised_data)
         variance = self.params.sde_variance
