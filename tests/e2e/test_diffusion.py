@@ -98,6 +98,11 @@ def expected_image_std_sde_random_init(ref_path: Path) -> Image.Image:
 
 
 @pytest.fixture
+def expected_image_std_sde_karras_random_init(ref_path: Path) -> Image.Image:
+    return _img_open(ref_path / "expected_std_sde_karras_random_init.png").convert("RGB")
+
+
+@pytest.fixture
 def expected_image_std_random_init_euler(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_std_random_init_euler.png").convert("RGB")
 
@@ -911,6 +916,39 @@ def test_diffusion_std_sde_random_init(
     predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_std_sde_random_init)
+
+
+@no_grad()
+def test_diffusion_std_sde_karras_random_init(
+    sd15_std_sde: StableDiffusion_1, expected_image_std_sde_karras_random_init: Image.Image, test_device: torch.device
+):
+    sd15 = sd15_std_sde
+
+    prompt = "a cute cat, detailed high-quality professional image"
+    negative_prompt = "lowres, bad anatomy, bad hands, cropped, worst quality"
+    clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
+
+    sd15.solver = DPMSolver(
+        num_inference_steps=18,
+        last_step_first_order=True,
+        params=SolverParams(sde_variance=1.0, sigma_schedule=NoiseSchedule.KARRAS),
+        device=test_device,
+    )
+
+    manual_seed(2)
+    x = sd15.init_latents((512, 512))
+
+    for step in sd15.steps:
+        x = sd15(
+            x,
+            step=step,
+            clip_text_embedding=clip_text_embedding,
+            condition_scale=7.5,
+        )
+
+    predicted_image = sd15.lda.latents_to_image(x)
+
+    ensure_similar_images(predicted_image, expected_image_std_sde_karras_random_init)
 
 
 @no_grad()

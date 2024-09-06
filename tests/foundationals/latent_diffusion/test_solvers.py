@@ -1,3 +1,4 @@
+import itertools
 from typing import cast
 from warnings import warn
 
@@ -29,8 +30,11 @@ def test_ddpm_diffusers():
     assert equal(diffusers_scheduler.timesteps, solver.timesteps)
 
 
-@pytest.mark.parametrize("n_steps, last_step_first_order", [(5, False), (5, True), (30, False), (30, True)])
-def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
+@pytest.mark.parametrize(
+    "n_steps, last_step_first_order, sde_variance, use_karras_sigmas",
+    list(itertools.product([5, 30], [False, True], [0.0, 1.0], [False, True])),
+)
+def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool, sde_variance: float, use_karras_sigmas: bool):
     from diffusers import DPMSolverMultistepScheduler as DiffuserScheduler  # type: ignore
 
     manual_seed(0)
@@ -42,43 +46,17 @@ def test_dpm_solver_diffusers(n_steps: int, last_step_first_order: bool):
         lower_order_final=False,
         euler_at_final=last_step_first_order,
         final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
+        algorithm_type="sde-dpmsolver++" if sde_variance == 1.0 else "dpmsolver++",
+        use_karras_sigmas=use_karras_sigmas,
     )
     diffusers_scheduler.set_timesteps(n_steps)
     solver = DPMSolver(
         num_inference_steps=n_steps,
         last_step_first_order=last_step_first_order,
-    )
-    assert equal(solver.timesteps, diffusers_scheduler.timesteps)
-
-    sample = randn(1, 3, 32, 32)
-    predicted_noise = randn(1, 3, 32, 32)
-
-    for step, timestep in enumerate(diffusers_scheduler.timesteps):
-        diffusers_output = cast(Tensor, diffusers_scheduler.step(predicted_noise, timestep, sample).prev_sample)  # type: ignore
-        refiners_output = solver(x=sample, predicted_noise=predicted_noise, step=step)
-        assert allclose(diffusers_output, refiners_output, rtol=0.01), f"outputs differ at step {step}"
-
-
-@pytest.mark.parametrize("n_steps, last_step_first_order", [(5, False), (5, True), (30, False), (30, True)])
-def test_dpm_solver_sde_diffusers(n_steps: int, last_step_first_order: bool):
-    from diffusers import DPMSolverMultistepScheduler as DiffuserScheduler  # type: ignore
-
-    manual_seed(0)
-
-    diffusers_scheduler = DiffuserScheduler(
-        beta_schedule="scaled_linear",
-        beta_start=0.00085,
-        beta_end=0.012,
-        lower_order_final=False,
-        euler_at_final=last_step_first_order,
-        final_sigmas_type="sigma_min",  # default before Diffusers 0.26.0
-        algorithm_type="sde-dpmsolver++",
-    )
-    diffusers_scheduler.set_timesteps(n_steps)
-    solver = DPMSolver(
-        num_inference_steps=n_steps,
-        last_step_first_order=last_step_first_order,
-        params=SolverParams(sde_variance=1.0),
+        params=SolverParams(
+            sde_variance=sde_variance,
+            sigma_schedule=NoiseSchedule.KARRAS if use_karras_sigmas else None,
+        ),
     )
     assert equal(solver.timesteps, diffusers_scheduler.timesteps)
 
@@ -94,8 +72,9 @@ def test_dpm_solver_sde_diffusers(n_steps: int, last_step_first_order: bool):
     manual_seed(37)
     refiners_outputs = [solver(x=sample, predicted_noise=predicted_noise, step=step) for step in range(n_steps)]
 
+    atol = 1e-4 if use_karras_sigmas else 1e-6
     for step, (diffusers_output, refiners_output) in enumerate(zip(diffusers_outputs, refiners_outputs)):
-        assert allclose(diffusers_output, refiners_output, rtol=0.01, atol=1e-6), f"outputs differ at step {step}"
+        assert allclose(diffusers_output, refiners_output, rtol=0.01, atol=atol), f"outputs differ at step {step}"
 
 
 def test_ddim_diffusers():
