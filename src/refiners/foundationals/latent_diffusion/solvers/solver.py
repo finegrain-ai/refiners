@@ -67,6 +67,7 @@ class BaseSolverParams:
     initial_diffusion_rate: float | None
     final_diffusion_rate: float | None
     noise_schedule: NoiseSchedule | None
+    sigma_schedule: NoiseSchedule | None
     model_prediction_type: ModelPredictionType | None
     sde_variance: float
 
@@ -91,6 +92,7 @@ class SolverParams(BaseSolverParams):
     initial_diffusion_rate: float | None = None
     final_diffusion_rate: float | None = None
     noise_schedule: NoiseSchedule | None = None
+    sigma_schedule: NoiseSchedule | None = None
     model_prediction_type: ModelPredictionType | None = None
     sde_variance: float = 0.0
 
@@ -103,6 +105,7 @@ class ResolvedSolverParams(BaseSolverParams):
     initial_diffusion_rate: float
     final_diffusion_rate: float
     noise_schedule: NoiseSchedule
+    sigma_schedule: NoiseSchedule | None
     model_prediction_type: ModelPredictionType
     sde_variance: float
 
@@ -140,6 +143,7 @@ class Solver(fl.Module, ABC):
         initial_diffusion_rate=8.5e-4,
         final_diffusion_rate=1.2e-2,
         noise_schedule=NoiseSchedule.QUADRATIC,
+        sigma_schedule=None,
         model_prediction_type=ModelPredictionType.NOISE,
         sde_variance=0.0,
     )
@@ -404,14 +408,12 @@ class Solver(fl.Module, ABC):
             A tensor representing the noise schedule.
         """
         match self.params.noise_schedule:
-            case "uniform":
+            case NoiseSchedule.UNIFORM:
                 return 1 - self.sample_power_distribution(1)
-            case "quadratic":
+            case NoiseSchedule.QUADRATIC:
                 return 1 - self.sample_power_distribution(2)
-            case "karras":
+            case NoiseSchedule.KARRAS:
                 return 1 - self.sample_power_distribution(7)
-            case _:
-                raise ValueError(f"Unknown noise schedule: {self.params.noise_schedule}")
 
     def to(self, device: Device | str | None = None, dtype: DType | None = None) -> "Solver":
         """Move the solver to the specified device and data type.
