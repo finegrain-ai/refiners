@@ -171,31 +171,18 @@ class MultiUpscalerAbstract(MultiDiffusion[T], ABC):
             condition_scale=target.condition_scale,
         )
 
-    @staticmethod
-    def resize_modulo_8(image: Image.Image, size: int = 768, on_short: bool = True) -> Image.Image:
-        """
-        Resize an image respecting the aspect ratio and ensuring the size is a multiple of 8.
-
-        The `on_short` parameter determines whether the resizing is based on the shortest side.
-        """
-        assert size % 8 == 0, "Size must be a multiple of 8 because this is the latent compression size."
-        side_size = min(image.size) if on_short else max(image.size)
-        scale = size / (side_size * 8)
-        new_size = (int(image.width * scale) * 8, int(image.height * scale) * 8)
-        return image.resize(new_size, resample=Image.Resampling.LANCZOS)  # type: ignore
-
-    @no_grad()
-    def pre_upscale(self, image: Image.Image, upscale_factor: float, **_: Any) -> Image.Image:
+    def pre_upscale(self, image: Image.Image, upscale_factor: float) -> Image.Image:
         """
         Pre-upscale an image before the actual upscaling process.
 
-        You can override this method to implement custom pre-upscaling logic like using a ESRGAN model like in the
-        original implementation.
+        You can override this method to implement custom pre-upscaling logic
+        like using a ESRGAN model like in the original implementation.
+        The resulting image must have a width and height divisible by 8.
         """
 
         return image.resize(
-            (int(image.width * upscale_factor), int(image.height * upscale_factor)),
-            resample=Image.Resampling.LANCZOS,  # type: ignore
+            (int((image.width * upscale_factor) // 8 * 8), int((image.height * upscale_factor) // 8 * 8)),
+            resample=Image.Resampling.LANCZOS,
         )
 
     def compute_upscaler_targets(
@@ -253,7 +240,6 @@ class MultiUpscalerAbstract(MultiDiffusion[T], ABC):
         prompt: str = "masterpiece, best quality, highres",
         negative_prompt: str = "worst quality, low quality, normal quality",
         upscale_factor: float = 2,
-        downscale_size: int = 768,
         tile_size: tuple[int, int] = (144, 112),
         denoise_strength: float = 0.35,
         condition_scale: float = 6,
@@ -276,8 +262,6 @@ class MultiUpscalerAbstract(MultiDiffusion[T], ABC):
             negative_prompt: The negative prompt to use for the upscaling. Original default has a weight of 2.0, but
                 using prompt weighting is no supported yet in Refiners.
             upscale_factor: The factor to upscale the image by.
-            downscale_size: The size to downscale the image along is short side to before upscaling. Must be a
-                multiple of 8 because of latent compression.
             tile_size: The size (H, W) of the tiles to use for latent diffusion. The smaller the tile size, the more "fractal"
                 the upscaling will be.
             denoise_strength: The strength of the denoising. A value of 0.0 means no denoising (so nothing happens),
@@ -321,8 +305,8 @@ class MultiUpscalerAbstract(MultiDiffusion[T], ABC):
         clip_text_embedding = self.compute_clip_text_embedding(prompt=prompt, negative_prompt=negative_prompt)
 
         # prepare the image for the upscale
-        image = self.resize_modulo_8(image, size=downscale_size)
         image = self.pre_upscale(image, upscale_factor=upscale_factor)
+        assert image.width % 8 == 0 and image.height % 8 == 0, "rescaled image dimensions must be divisible by 8"
 
         # compute the latent size and tile size
         latent_size = Size(height=image.height // 8, width=image.width // 8)
