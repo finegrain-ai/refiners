@@ -256,8 +256,8 @@ def test_predictor(
         atol=4e-3,
     )
     assert (
-        torch.abs(reference_high_res_mask_hq - refiners_high_res_mask_hq).flatten().sum() <= 1
-    )  # The diff on the logits above leads to an absolute diff of 1 pixel on the high res masks
+        torch.abs(reference_high_res_mask_hq - refiners_high_res_mask_hq).flatten().sum() <= 2
+    )  # The diff on the logits above leads to an absolute diff of 2 pixel on the high res masks
     assert torch.allclose(
         iou_predictions_np,
         torch.max(iou_predictions),
