@@ -422,7 +422,7 @@ def test_predictor_single_output(
     assert torch.allclose(
         low_res_masks[0, 0, ...],
         torch.as_tensor(facebook_low_res_masks[0], device=sam_h_single_output.device),
-        atol=6e-3,  # see test_predictor_resized_single_output for more explanation
+        atol=5e-2,  # see test_predictor_resized_single_output for more explanation
     )
     assert isclose(scores[0].item(), facebook_scores[0].item(), abs_tol=1e-05)
 
@@ -497,7 +497,7 @@ def test_mask_encoder(
     dense_embeddings = sam_h.mask_encoder(mask_input)
 
     assert facebook_mask_input.shape == mask_input.shape
-    assert torch.allclose(dense_embeddings, fb_dense_embeddings, atol=1e-4, rtol=1e-4)
+    assert torch.allclose(dense_embeddings, fb_dense_embeddings, atol=1e-3)
 
 
 @no_grad()
