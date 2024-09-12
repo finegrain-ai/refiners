@@ -6,7 +6,7 @@ authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = { text = "MIT License" }
 dependencies = [
     "torch>=2.1.1",
-    "safetensors>=0.4.0",
+    "safetensors>=0.4.5",
     "pillow>=10.4.0",
     "jaxtyping>=0.2.23",
     "packaging>=23.2",

@@ -338,7 +338,7 @@ rpds-py==0.19.1
     # via referencing
 s3transfer==0.10.2
     # via boto3
-safetensors==0.4.3
+safetensors==0.4.5
     # via diffusers
     # via refiners
     # via timm
@@ -346,6 +346,8 @@ safetensors==0.4.3
 segment-anything-hq==0.3
     # via refiners
 segment-anything-py==1.0.1
+    # via refiners
+sentencepiece==0.2.0
     # via refiners
 sentry-sdk==2.12.0
     # via wandb
