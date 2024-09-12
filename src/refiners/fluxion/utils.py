@@ -1,13 +1,12 @@
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Literal, TypeVar, cast
+from typing import Any, Iterable, TypeVar, cast
 
 import torch
 from jaxtyping import Float
 from numpy import array, float32
 from PIL import Image
-from safetensors import safe_open as _safe_open  # type: ignore
-from safetensors.torch import save_file as _save_file  # type: ignore
+from safetensors.torch import load_file as _load_file, save_file as _save_file  # type: ignore
 from torch import Tensor, device as Device, dtype as DType
 from torch.nn.functional import conv2d, interpolate as _interpolate, pad as _pad  # type: ignore
 
@@ -186,34 +185,6 @@ def tensor_to_image(tensor: Tensor) -> Image.Image:
     return Image.fromarray((tensor.cpu().numpy() * 255).astype("uint8"))  # type: ignore[reportUnknownType]
 
 
-def safe_open(
-    path: Path | str,
-    framework: Literal["pytorch", "tensorflow", "flax", "numpy"],
-    device: Device | str = "cpu",
-) -> dict[str, Tensor]:
-    """Open a SafeTensor file from disk.
-
-    Args:
-        path: The path to the file.
-        framework: The framework used to save the file.
-        device: The device to use for the tensors.
-
-    Returns:
-        The loaded tensors.
-    """
-    framework_mapping = {
-        "pytorch": "pt",
-        "tensorflow": "tf",
-        "flax": "flax",
-        "numpy": "numpy",
-    }
-    return _safe_open(
-        str(path),
-        framework=framework_mapping[framework],
-        device=str(device),
-    )  # type: ignore
-
-
 def load_tensors(path: Path | str, /, device: Device | str = "cpu") -> dict[str, Tensor]:
     """Load tensors from a file saved with `torch.save` from disk.
 
@@ -247,8 +218,7 @@ def load_from_safetensors(path: Path | str, device: Device | str = "cpu") -> dic
     Returns:
         The loaded tensors.
     """
-    with safe_open(path=path, framework="pytorch", device=device) as tensors:  # type: ignore
-        return {key: tensors.get_tensor(key) for key in tensors.keys()}  # type: ignore
+    return _load_file(path, str(device))
 
 
 def save_to_safetensors(path: Path | str, tensors: dict[str, Tensor], metadata: dict[str, str] | None = None) -> None:
