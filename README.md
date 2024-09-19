@@ -38,21 +38,7 @@ ______________________________________________________________________
 - Added [IC-Light](https://github.com/lllyasviel/IC-Light) to manipulate the illumination of images
 - Added Multi Upscaler for high-resolution image generation, inspired from [Clarity Upscaler](https://github.com/philz1337x/clarity-upscaler) ([HF Space](https://huggingface.co/spaces/finegrain/enhancer))
 - Added [HQ-SAM](https://arxiv.org/abs/2306.01567) for high quality mask prediction with Segment Anything
-- Added [SDXL-Lightning](https://arxiv.org/abs/2402.13929)
-- Added [Latent Consistency Models](https://arxiv.org/abs/2310.04378) and [LCM-LoRA](https://arxiv.org/abs/2311.05556) for Stable Diffusion XL
-- Added [Style Aligned adapter](https://arxiv.org/abs/2312.02133) to Stable Diffusion models
-- Added [ControlLoRA (v2) adapter](https://github.com/HighCWu/control-lora-v2) to Stable Diffusion XL
-- Added [Euler's method](https://arxiv.org/abs/2206.00364) to solvers (contributed by [@israfelsr](https://github.com/israfelsr))
-- Added [DINOv2](https://github.com/facebookresearch/dinov2) for high-performance visual features (contributed by [@Laurent2916](https://github.com/Laurent2916))
-- Added [FreeU](https://github.com/ChenyangSi/FreeU) for improved quality at no cost (contributed by [@isamu-isozaki](https://github.com/isamu-isozaki))
-- Added [Restart Sampling](https://github.com/Newbeeer/diffusion_restart_sampling) for improved image generation ([example](https://github.com/Newbeeer/diffusion_restart_sampling/issues/4))
-- Added [Self-Attention Guidance](https://github.com/KU-CVLAB/Self-Attention-Guidance/) to avoid e.g. too smooth images ([example](https://github.com/SusungHong/Self-Attention-Guidance/issues/4))
-- Added [T2I-Adapter](https://github.com/TencentARC/T2I-Adapter) for extra guidance ([example](https://github.com/TencentARC/T2I-Adapter/discussions/93))
-- Added [MultiDiffusion](https://github.com/omerbt/MultiDiffusion) for e.g. panorama images
-- Added [IP-Adapter](https://github.com/tencent-ailab/IP-Adapter), aka image prompt ([example](https://github.com/tencent-ailab/IP-Adapter/issues/92))
-- Added [Segment Anything](https://github.com/facebookresearch/segment-anything) to foundation models
-- Added [SDXL 1.0](https://github.com/Stability-AI/generative-models) to foundation models
-- Made possible to add new concepts to the CLIP text encoder, e.g. via [Textual Inversion](https://arxiv.org/abs/2208.01618)
+- ...see past [releases](https://github.com/finegrain-ai/refiners/releases)
 
 ## Installation
 
@@ -68,6 +54,12 @@ rye sync --all-features
 
 Refiners comes with a MkDocs-based documentation website available at https://refine.rs. You will find there a [quick start guide](https://refine.rs/getting-started/recommended/), a description of the [key concepts](https://refine.rs/concepts/chain/), as well as in-depth foundation model adaptation [guides](https://refine.rs/guides/adapting_sdxl/).
 
+## Projects using Refiners
+
+- [Finegrain Editor](https://editor.finegrain.ai/signup?utm_source=github&utm_campaign=refiners): use state-of-the-art visual AI skills to edit product photos
+- [Visoid](https://www.visoid.com/): AI-powered architectural visualization
+- [imaginAIry](https://github.com/brycedrennan/imaginAIry): Pythonic AI generation of images and videos 
+
 ## Awesome Adaptation Papers
 
 If you're interested in understanding the diversity of use cases for foundation model adaptation (potentially beyond the specific adapters supported by Refiners), we suggest you take a look at these outstanding papers:
@@ -80,10 +72,6 @@ If you're interested in understanding the diversity of use cases for foundation 
 - [SAM-adapter](https://arxiv.org/abs/2304.09148)
 - [Cross Modality Attention Adapter](https://arxiv.org/abs/2307.01124)
 - [UniAdapter](https://arxiv.org/abs/2302.06605)
-
-## Projects using Refiners
-
-- https://github.com/brycedrennan/imaginAIry
 
 ## Credits
 
