@@ -18,16 +18,32 @@
 
 ## Installation
 
+1. Navigate to the root of your ComfyUI workspace.
+2. Activate your python virtual environment.
+3. Install the nodes using one of the following methods.
+
+### Comfy Registry (recommended)
+
 The nodes are published at https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners.
 
-To easily install the nodes, run the following command:
+See https://docs.comfy.org/comfy-cli/getting-started to install the Comfy CLI.
+
+To automagically install the nodes, run the following command:
 ```bash
 comfy node registry-install comfyui-refiners
 ```
 
-You may also download the nodes by cliking the "Download Latest" button and unzipping the content of the archive into you custom_nodes directory.
-
 See https://docs.comfy.org/registry/overview for more information.
+
+### Manual
+
+To manually install the nodes, you may alternatively do the following:
+```bash
+curl -o comfyui-refiners.zip https://storage.googleapis.com/comfy-registry/finegrain/comfyui-refiners/1.0.3/node.tar.gz
+unzip -d custom_nodes/comfyui-refiners comfyui-refiners.zip
+pip install -r custom_nodes/comfyui-refiners/requirements.txt
+rm comfyui-refiners.zip
+```
 
 ## Example Workflows
 
