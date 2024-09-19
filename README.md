@@ -56,13 +56,13 @@ ______________________________________________________________________
 
 ## Installation
 
-The current recommended way to install Refiners is from source using [Rye](https://rye-up.com/):
+The current recommended way to install Refiners is from source:
 
 ```bash
-git clone "git@github.com:finegrain-ai/refiners.git"
-cd refiners
-rye sync --all-features
+pip install git+https://github.com/finegrain-ai/refiners.git
 ```
+
+To setup a development environment, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documentation
 

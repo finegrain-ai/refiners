@@ -19,7 +19,12 @@ We do not enforce strict rules on the design of the code, but we do have a few g
 
 We use [Rye](https://rye-up.com/guide/installation/) to manage our development environment. Please follow the instructions on the Rye website to install it.
 
-Once Rye is installed, you can clone the repository and run `rye sync` to install the dependencies.
+Once Rye is installed, you can setup your development environment by doing:
+```bash
+git clone "git@github.com:finegrain-ai/refiners.git"
+cd refiners
+rye sync --all-features
+```
 
 ## Linting
 
