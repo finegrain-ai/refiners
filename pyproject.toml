@@ -163,6 +163,9 @@ extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
 [tool.typos.default.extend-words]
 adaptee = "adaptee"  # Common name for an adapter's target
 
+[tool.typos.default.extend-identifiers]
+imaginAIry = "imaginAIry"
+
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::UserWarning:segment_anything_hq.modeling.tiny_vit_sam.*",
