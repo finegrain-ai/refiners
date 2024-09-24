@@ -59,7 +59,7 @@ Refiners comes with a MkDocs-based documentation website available at https://re
 - [Finegrain Editor](https://editor.finegrain.ai/signup?utm_source=github&utm_campaign=refiners): use state-of-the-art visual AI skills to edit product photos
 - [Visoid](https://www.visoid.com/): AI-powered architectural visualization
 - [brycedrennan/imaginAIry](https://github.com/brycedrennan/imaginAIry): Pythonic AI generation of images and videos
-- [chloedia/layerdiffuse](https://github.com/chloedia/layerdiffuse): an implemention of [LayerDiffuse](https://arxiv.org/abs/2402.17113v3) (foreground generation only)
+- [chloedia/layerdiffuse](https://github.com/chloedia/layerdiffuse): an implementation of [LayerDiffuse](https://arxiv.org/abs/2402.17113v3) (foreground generation only)
 
 ## Awesome Adaptation Papers
 
