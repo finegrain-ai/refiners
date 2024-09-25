@@ -121,15 +121,6 @@ class DPMSolver(Solver):
         np_space = np.linspace(offset, max_timestep, self.num_inference_steps + 1).round().astype(int)[1:]
         return torch.tensor(np_space).flip(0)
 
-    def _generate_sigmas(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generate the sigmas used by the solver."""
-        assert self.params.sigma_schedule is not None, "sigma_schedule must be set for the DPM solver"
-        sigmas = self.noise_std / self.cumulative_scale_factors
-        sigmas = sigmas.flip(0)
-        rescaled_sigmas = self._rescale_sigmas(sigmas, self.params.sigma_schedule)
-        rescaled_sigmas = torch.cat([rescaled_sigmas, torch.tensor([0.0])])
-        return sigmas, rescaled_sigmas
-
     def _rescale_sigmas(self, sigmas: torch.Tensor, sigma_schedule: NoiseSchedule | None) -> torch.Tensor:
         """Rescale the sigmas according to the sigma schedule."""
         match sigma_schedule:
@@ -140,9 +131,12 @@ class DPMSolver(Solver):
             case NoiseSchedule.KARRAS:
                 rho = 7
             case None:
+                if sigmas.dtype == torch.bfloat16:
+                    sigmas = sigmas.to(torch.float32)
                 return torch.tensor(
                     np.interp(self.timesteps.cpu(), np.arange(0, len(sigmas)), sigmas.cpu()),
                     device=self.device,
+                    dtype=self.dtype,
                 )
 
         linear_schedule = torch.linspace(0, 1, steps=self.num_inference_steps, device=self.device)
