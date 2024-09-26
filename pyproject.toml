@@ -139,7 +139,7 @@ black = true
 [tool.pyright]
 include = ["src/refiners", "tests", "scripts"]
 strict = ["*"]
-exclude = ["**/__pycache__", "tests/weights"]
+exclude = ["**/__pycache__", "tests/weights", "tests/repos"]
 reportMissingTypeStubs = "warning"
 
 [tool.coverage.run]
