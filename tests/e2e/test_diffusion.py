@@ -2669,7 +2669,9 @@ def test_multi_upscaler(
     clarity_example: Image.Image,
     expected_multi_upscaler: Image.Image,
 ) -> None:
-    predicted_image = multi_upscaler.upscale(clarity_example)
+    generator = torch.Generator(device=multi_upscaler.device)
+    generator.manual_seed(37)
+    predicted_image = multi_upscaler.upscale(clarity_example, generator=generator)
     ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=35, min_ssim=0.99)
 
 
