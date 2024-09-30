@@ -293,7 +293,7 @@ class DPMSolver(Solver):
             x: The input tensor to apply the diffusion process to.
             predicted_noise: The predicted noise tensor for the current step.
             step: The current step of the diffusion process.
-            generator: The random number generator to use for sampling noise (ignored, this solver is deterministic).
+            generator: The random number generator to use for sampling noise (ignored, except if `sde_variance=1.0` in CTOR params)
 
         Returns:
             The denoised version of the input data `x`.
