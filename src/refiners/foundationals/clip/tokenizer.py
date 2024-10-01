@@ -44,7 +44,7 @@ class CLIPTokenizer(fl.Module):
         # to get rid of the dependence on the `regex` module. Unicode support could
         # potentially be added back by leveraging the `\w` character class.
         self.token_pattern = re.compile(
-            pattern=r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[a-zA-Z]+|[0-9]|[^\s\w]+""",
+            pattern=r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[a-zA-Z]+|[0-9]|(?:[^\s\w]|_)+""",
             flags=re.IGNORECASE,
         )
         self.start_of_text_token_id: int = start_of_text_token_id
