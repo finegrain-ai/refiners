@@ -14,6 +14,31 @@ dependencies = [
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
+keywords = [
+    "pytorch",
+    "text-to-image",
+    "image-to-image",
+    "image-generation",
+    "diffusion-models",
+    "stable-diffusion",
+    "sd1.5",
+    "sdxl",
+    "background-generation",
+    "background-removal",
+    "shadow-generation",
+    "textual-inversion",
+    "adapters",
+    "controlnet",
+    "ip-adapter",
+    "t2i-adapter",
+    "lora",
+    "lcm",
+    "lcm-lora",
+    "upscaler",
+    "dinov2",
+    "segment-anything",
+    "sam",
+]
 classifiers = [
     "Typing :: Typed",
     "Intended Audience :: Developers",
@@ -26,8 +51,10 @@ classifiers = [
 ]
 
 [project.urls]
-source = "https://github.com/finegrain-ai/refiners"
-documentation = "https://refine.rs/"
+Homepage = "https://refine.rs/"
+Documentation = "https://refine.rs/"
+Repository = "https://github.com/finegrain-ai/refiners"
+Issues = "https://github.com/finegrain-ai/refiners/issues"
 
 [project.optional-dependencies]
 training = [
@@ -94,7 +121,6 @@ dev-dependencies = [
     "typos>=1.18.2",
     "comfy-cli>=1.1.6",
 ]
-
 
 [tool.hatch.metadata]
 allow-direct-references = true
