@@ -2675,6 +2675,16 @@ def test_multi_upscaler(
     ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=35, min_ssim=0.99)
 
 
+@no_grad()
+def test_multi_upscaler_small(
+    multi_upscaler: MultiUpscaler,
+    clarity_example: Image.Image,
+) -> None:
+    image = clarity_example.resize((16, 16))
+    image = multi_upscaler.upscale(image)  # check we can upscale a small image
+    image = multi_upscaler.upscale(image)  # check we can upscale it twice
+
+
 @pytest.fixture(scope="module")
 def expected_ic_light(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_ic_light.png").convert("RGB")
