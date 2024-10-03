@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
+from typing import Callable
 
 import torch
-from pytest import fixture
+from pytest import FixtureRequest, fixture, skip
+
+from refiners.fluxion.utils import str_to_dtype
 
 PARENT_PATH = Path(__file__).parent
 
@@ -16,6 +19,23 @@ def test_device() -> torch.device:
     if not test_device:
         return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     return torch.device(test_device)
+
+
+def dtype_fixture_factory(params: list[str]) -> Callable[[FixtureRequest], torch.dtype]:
+    @fixture(scope="session", params=params)
+    def dtype_fixture(request: FixtureRequest) -> torch.dtype:
+        torch_dtype = str_to_dtype(request.param)
+        if torch_dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+            skip("bfloat16 is not supported on this test device")
+        return torch_dtype
+
+    return dtype_fixture
+
+
+test_dtype_fp32_bf16_fp16 = dtype_fixture_factory(["float32", "bfloat16", "float16"])
+test_dtype_fp32_fp16 = dtype_fixture_factory(["float32", "float16"])
+test_dtype_fp32_bf16 = dtype_fixture_factory(["float32", "bfloat16"])
+test_dtype_fp16_bf16 = dtype_fixture_factory(["float16", "bfloat16"])
 
 
 @fixture(scope="session")
