@@ -609,6 +609,7 @@ class Chain(ContextModule):
             new_module._set_parent(self)
         if isinstance(old_module, ContextModule):
             old_module._set_parent(old_module_parent)
+        self._register_provider()
 
     def structural_copy(self: TChain) -> TChain:
         """Copy the structure of the Chain tree.
