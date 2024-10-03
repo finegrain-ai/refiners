@@ -7,9 +7,15 @@ from refiners.foundationals.latent_diffusion import SD1UNet
 
 
 @pytest.fixture(scope="module")
-def refiners_sd15_unet(test_device: torch.device) -> SD1UNet:
-    unet = SD1UNet(in_channels=4, device=test_device)
-    return unet
+def refiners_sd15_unet(
+    test_device: torch.device,
+    test_dtype_fp32_bf16_fp16: torch.dtype,
+) -> SD1UNet:
+    return SD1UNet(
+        in_channels=4,
+        device=test_device,
+        dtype=test_dtype_fp32_bf16_fp16,
+    )
 
 
 def test_unet_context_flush(refiners_sd15_unet: SD1UNet):

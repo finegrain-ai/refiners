@@ -6,8 +6,8 @@ import torch
 from PIL import Image
 from tests.utils import ensure_similar_images
 
-from refiners.fluxion.utils import load_from_safetensors, no_grad
-from refiners.foundationals.latent_diffusion.auto_encoder import LatentDiffusionAutoencoder
+from refiners.fluxion.utils import no_grad
+from refiners.foundationals.latent_diffusion import LatentDiffusionAutoencoder, SD1Autoencoder, SDXLAutoencoder
 
 
 @pytest.fixture(scope="module")
@@ -15,16 +15,37 @@ def ref_path() -> Path:
     return Path(__file__).parent / "test_auto_encoder_ref"
 
 
-@pytest.fixture(scope="module")
-def lda(test_weights_path: Path, test_device: torch.device) -> LatentDiffusionAutoencoder:
-    lda_weights = test_weights_path / "lda.safetensors"
-    if not lda_weights.is_file():
-        warn(f"could not find weights at {lda_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    encoder = LatentDiffusionAutoencoder(device=test_device)
-    tensors = load_from_safetensors(lda_weights)
-    encoder.load_state_dict(tensors)
-    return encoder
+@pytest.fixture(scope="module", params=["SD1.5", "SDXL"])
+def lda(
+    request: pytest.FixtureRequest,
+    test_weights_path: Path,
+    test_dtype_fp32_bf16_fp16: torch.dtype,
+    test_device: torch.device,
+) -> LatentDiffusionAutoencoder:
+    model_version = request.param
+    match (model_version, test_dtype_fp32_bf16_fp16):
+        case ("SD1.5", _):
+            weight_path = test_weights_path / "lda.safetensors"
+            if not weight_path.is_file():
+                warn(f"could not find weights at {weight_path}, skipping")
+                pytest.skip(allow_module_level=True)
+            model = SD1Autoencoder().load_from_safetensors(weight_path)
+        case ("SDXL", torch.float16):
+            weight_path = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
+            if not weight_path.is_file():
+                warn(f"could not find weights at {weight_path}, skipping")
+                pytest.skip(allow_module_level=True)
+            model = SDXLAutoencoder().load_from_safetensors(weight_path)
+        case ("SDXL", _):
+            weight_path = test_weights_path / "sdxl-lda.safetensors"
+            if not weight_path.is_file():
+                warn(f"could not find weights at {weight_path}, skipping")
+                pytest.skip(allow_module_level=True)
+            model = SDXLAutoencoder().load_from_safetensors(weight_path)
+        case _:
+            raise ValueError(f"Unknown model version: {model_version}")
+    model = model.to(device=test_device, dtype=test_dtype_fp32_bf16_fp16)
+    return model
 
 
 @pytest.fixture(scope="module")
