@@ -270,3 +270,37 @@ def summarize_tensor(tensor: torch.Tensor, /) -> str:
     )
 
     return "Tensor(" + ", ".join(info_list) + ")"
+
+
+def str_to_dtype(dtype: str) -> torch.dtype:
+    """Converts a string dtype to a torch.dtype.
+
+    See also https://pytorch.org/docs/stable/tensor_attributes.html#torch-dtype
+    """
+    match dtype.lower():
+        case "float32" | "float":
+            return torch.float32
+        case "float64" | "double":
+            return torch.float64
+        case "complex64" | "cfloat":
+            return torch.complex64
+        case "complex128" | "cdouble":
+            return torch.complex128
+        case "float16" | "half":
+            return torch.float16
+        case "bfloat16":
+            return torch.bfloat16
+        case "uint8":
+            return torch.uint8
+        case "int8":
+            return torch.int8
+        case "int16" | "short":
+            return torch.int16
+        case "int32" | "int":
+            return torch.int32
+        case "int64" | "long":
+            return torch.int64
+        case "bool":
+            return torch.bool
+        case _:
+            raise ValueError(f"Unknown dtype: {dtype}")

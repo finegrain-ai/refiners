@@ -3,9 +3,9 @@ from typing import Any, Sequence
 import torch
 from transformers import GroundingDinoForObjectDetection, GroundingDinoProcessor  # type: ignore
 
-from refiners.fluxion.utils import no_grad, tensor_to_image
+from refiners.fluxion.utils import no_grad, str_to_dtype, tensor_to_image
 
-from .utils import BoundingBox, get_dtype
+from .utils import BoundingBox
 
 
 class LoadGroundingDino:
@@ -54,7 +54,7 @@ class LoadGroundingDino:
         processor = GroundingDinoProcessor.from_pretrained(checkpoint)  # type: ignore
         assert isinstance(processor, GroundingDinoProcessor)
 
-        model = GroundingDinoForObjectDetection.from_pretrained(checkpoint, torch_dtype=get_dtype(dtype))  # type: ignore
+        model = GroundingDinoForObjectDetection.from_pretrained(checkpoint, torch_dtype=str_to_dtype(dtype))  # type: ignore
         model = model.to(device=device)  # type: ignore
         assert isinstance(model, GroundingDinoForObjectDetection)
 
