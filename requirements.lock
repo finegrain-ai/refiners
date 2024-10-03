@@ -67,6 +67,8 @@ dill==0.3.8
     # via multiprocess
 docker-pycreds==0.4.0
     # via wandb
+exceptiongroup==1.2.2
+    # via pytest
 filelock==3.16.1
     # via datasets
     # via diffusers
@@ -113,6 +115,8 @@ importlib-metadata==8.5.0
     # via diffusers
 importlib-resources==6.4.5
     # via swagger-spec-validator
+iniconfig==2.0.0
+    # via pytest
 isoduration==20.11.0
     # via jsonschema
 jaxtyping==0.2.34
@@ -235,6 +239,8 @@ packaging==24.1
     # via huggingface-hub
     # via mkdocs
     # via neptune
+    # via pytest
+    # via pytest-rerunfailures
     # via refiners
     # via transformers
 paginate==0.5.7
@@ -257,6 +263,8 @@ platformdirs==4.3.6
     # via mkdocs-get-deps
     # via mkdocstrings
     # via wandb
+pluggy==1.5.0
+    # via pytest
 prodigyopt==1.0
     # via refiners
 protobuf==5.28.2
@@ -279,6 +287,10 @@ pymdown-extensions==10.10.2
     # via mkdocstrings
 pysocks==1.7.1
     # via requests
+pytest==8.3.3
+    # via pytest-rerunfailures
+pytest-rerunfailures==14.0
+    # via refiners
 python-dateutil==2.9.0.post0
     # via arrow
     # via botocore
@@ -377,6 +389,7 @@ tokenizers==0.20.0
     # via transformers
 tomli==2.0.1
     # via black
+    # via pytest
     # via refiners
 torch==2.4.1
     # via bitsandbytes
