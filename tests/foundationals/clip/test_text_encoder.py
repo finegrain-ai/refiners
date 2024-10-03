@@ -30,13 +30,17 @@ PROMPTS = [
 
 
 @pytest.fixture(scope="module")
-def our_encoder(test_weights_path: Path, test_device: torch.device) -> CLIPTextEncoderL:
+def our_encoder(
+    test_weights_path: Path,
+    test_device: torch.device,
+    test_dtype_fp32_fp16: torch.dtype,
+) -> CLIPTextEncoderL:
     weights = test_weights_path / "CLIPTextEncoderL.safetensors"
     if not weights.is_file():
         warn(f"could not find weights at {weights}, skipping")
         pytest.skip(allow_module_level=True)
-    encoder = CLIPTextEncoderL(device=test_device)
     tensors = load_from_safetensors(weights)
+    encoder = CLIPTextEncoderL(device=test_device, dtype=test_dtype_fp32_fp16)
     encoder.load_state_dict(tensors)
     return encoder
 
@@ -56,8 +60,15 @@ def ref_tokenizer(runwayml_weights_path: Path) -> transformers.CLIPTokenizer:
 
 
 @pytest.fixture(scope="module")
-def ref_encoder(runwayml_weights_path: Path, test_device: torch.device) -> transformers.CLIPTextModel:
-    return transformers.CLIPTextModel.from_pretrained(runwayml_weights_path, subfolder="text_encoder").to(test_device)  # type: ignore
+def ref_encoder(
+    runwayml_weights_path: Path,
+    test_device: torch.device,
+    test_dtype_fp32_fp16: torch.dtype,
+) -> transformers.CLIPTextModel:
+    return transformers.CLIPTextModel.from_pretrained(  # type: ignore
+        runwayml_weights_path,
+        subfolder="text_encoder",
+    ).to(device=test_device, dtype=test_dtype_fp32_fp16)  # type: ignore
 
 
 def test_basics(ref_tokenizer: transformers.CLIPTokenizer, our_encoder: CLIPTextEncoderL):
@@ -70,12 +81,12 @@ def prompt(request: pytest.FixtureRequest):
     return long_prompt if request.param == "<long prompt>" else request.param
 
 
+@no_grad()
 def test_encoder(
     prompt: str,
     ref_tokenizer: transformers.CLIPTokenizer,
     ref_encoder: transformers.CLIPTextModel,
     our_encoder: CLIPTextEncoderL,
-    test_device: torch.device,
 ):
     ref_tokens = ref_tokenizer(  # type: ignore
         prompt,
@@ -89,18 +100,16 @@ def test_encoder(
     our_tokens = tokenizer(prompt)
     assert torch.equal(our_tokens, ref_tokens)
 
-    with no_grad():
-        ref_embeddings = ref_encoder(ref_tokens.to(test_device))[0]
-        our_embeddings = our_encoder(prompt)
+    ref_embeddings = ref_encoder(ref_tokens.to(device=ref_encoder.device))[0]
+    our_embeddings = our_encoder(prompt)
 
     assert ref_embeddings.shape == (1, 77, 768)
     assert our_embeddings.shape == (1, 77, 768)
 
     # FG-336 - Not strictly equal because we do not use the same implementation
     # of self-attention. We use `scaled_dot_product_attention` which can have
-    # numerical differences depending on the backend.
-    # Also we use FP16 weights.
-    assert (our_embeddings - ref_embeddings).abs().max() < 0.01
+    # numerical differences depending on the backend. Also we use FP16 weights.
+    torch.testing.assert_close(our_embeddings, ref_embeddings, atol=0.035, rtol=0.0)
 
 
 def test_list_string_tokenizer(
