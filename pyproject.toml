@@ -56,6 +56,9 @@ Documentation = "https://refine.rs/"
 Repository = "https://github.com/finegrain-ai/refiners"
 Issues = "https://github.com/finegrain-ai/refiners/issues"
 
+[project.scripts]
+get_weights = "refiners.conversion.cli:main"
+
 [project.optional-dependencies]
 training = [
     "bitsandbytes>=0.41.2.post2",
@@ -84,6 +87,7 @@ test = [
     "sentencepiece>=0.2.0",
 ]
 conversion = [
+    "huggingface-hub>=0.25.1",
     "diffusers>=0.26.1",
     "transformers>=4.35.2",
     "segment-anything-py>=1.0",
@@ -181,7 +185,7 @@ exclude_also = [
 ]
 
 [tool.typos.default]
-extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded"]
+extend-ignore-identifiers-re = ["NDArray*", "interm", "af000ded", "nin"]
 
 [tool.typos.default.extend-words]
 adaptee = "adaptee"  # Common name for an adapter's target
