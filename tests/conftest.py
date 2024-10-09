@@ -5,12 +5,14 @@ from typing import Callable
 import torch
 from pytest import FixtureRequest, fixture, skip
 
+from refiners.conversion.utils import Hub
 from refiners.fluxion.utils import device_has_bfloat16, str_to_dtype
 
 PARENT_PATH = Path(__file__).parent
 
 collect_ignore = ["weights", "repos", "datasets"]
 collect_ignore_glob = ["*_ref"]
+pytest_plugins = ["tests.weight_paths"]
 
 
 @fixture(scope="session")
@@ -39,9 +41,14 @@ test_dtype_fp16_bf16 = dtype_fixture_factory(["float16", "bfloat16"])
 
 
 @fixture(scope="session")
+def use_local_weights() -> bool:
+    from_env = os.getenv("REFINERS_USE_LOCAL_WEIGHTS")
+    return from_env == "1" if from_env else False
+
+
+@fixture(scope="session")
 def test_weights_path() -> Path:
-    from_env = os.getenv("REFINERS_TEST_WEIGHTS_DIR")
-    return Path(from_env) if from_env else PARENT_PATH / "weights"
+    return Hub.hub_location()
 
 
 @fixture(scope="session")

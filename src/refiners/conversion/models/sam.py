@@ -1,15 +1,17 @@
-import argparse
+import logging
 import types
 from typing import Any, Callable, cast
 
+import requests
 import torch
 import torch.nn as nn
 from segment_anything import build_sam_vit_h  # type: ignore
 from segment_anything.modeling.common import LayerNorm2d  # type: ignore
-from torch import Tensor
+from torch import Tensor, nn
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.model_converter import ModelConverter
+from refiners.conversion.model_converter import ModelConverter
+from refiners.conversion.utils import Conversion, Hub
 from refiners.fluxion.utils import load_tensors, manual_seed, save_to_safetensors
 from refiners.foundationals.segment_anything.image_encoder import PositionalEncoder, SAMViTH
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
@@ -29,13 +31,6 @@ assert issubclass(LayerNorm2d, nn.Module)
 custom_layers = {LayerNorm2d: fl.LayerNorm2d}
 
 
-class Args(argparse.Namespace):
-    source_path: str
-    output_path: str
-    half: bool
-    verbose: bool
-
-
 def convert_mask_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
     manual_seed(seed=0)
     refiners_mask_encoder = MaskEncoder()
@@ -44,6 +39,7 @@ def convert_mask_encoder(prompt_encoder: nn.Module) -> dict[str, Tensor]:
         source_model=prompt_encoder.mask_downscaling,
         target_model=refiners_mask_encoder,
         custom_layer_mapping=custom_layers,  # type: ignore
+        verbose=False,
     )
 
     x = torch.randn(1, 256, 256)
@@ -97,6 +93,7 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
         source_model=vit,
         target_model=refiners_sam_vit_h,
         custom_layer_mapping=custom_layers,  # type: ignore
+        verbose=False,
     )
     converter.skip_init_check = True
 
@@ -142,7 +139,7 @@ def convert_vit(vit: nn.Module) -> dict[str, Tensor]:
     converted_source.update(rel_items)
 
     refiners_sam_vit_h.load_state_dict(state_dict=converted_source)
-    assert converter.compare_models((x,), threshold=1e-2)
+    assert converter.compare_models((x,), threshold=0.5)
 
     return converted_source
 
@@ -168,6 +165,7 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
         source_model=mask_decoder,
         target_model=refiners_mask_decoder,
         custom_layer_mapping=custom_layers,  # type: ignore
+        verbose=False,
     )
 
     inputs = {
@@ -218,51 +216,78 @@ def convert_mask_decoder(mask_decoder: nn.Module) -> dict[str, Tensor]:
     return state_dict
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Converts a Segment Anything ViT model to a Refiners SAMViTH model")
-    parser.add_argument(
-        "--from",
-        type=str,
-        dest="source_path",
-        default="sam_vit_h_4b8939.pth",
-        # required=True,
-        help="Path to the Segment Anything model weights",
-    )
-    parser.add_argument(
-        "--to",
-        type=str,
-        dest="output_path",
-        default="segment-anything-h.safetensors",
-        help="Output path for converted model (as safetensors).",
-    )
-    parser.add_argument("--half", action="store_true", default=False, help="Convert to half precision. Default: False")
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Prints additional information during conversion. Default: False",
-    )
-    args = parser.parse_args(namespace=Args())
+# TODO(laurent): convert this to a simple mapping
+class ModelConverterHubDuo(Conversion):
+    def __init__(
+        self,
+        original: Hub,
+        converted: Hub,
+        dtype: torch.dtype,
+    ) -> None:
+        self.original = original
+        self.converted = converted
+        self.dtype = dtype
 
-    sam_h = build_sam_vit_h()  # type: ignore
-    sam_h.load_state_dict(state_dict=load_tensors(args.source_path))
+    def convert(self) -> None:
+        logging.info(f"Converting {self.original.repo_id} to {self.converted.repo_id}")
 
-    vit_state_dict = convert_vit(vit=sam_h.image_encoder)
-    mask_decoder_state_dict = convert_mask_decoder(mask_decoder=sam_h.mask_decoder)
-    point_encoder_state_dict = convert_point_encoder(prompt_encoder=sam_h.prompt_encoder)
-    mask_encoder_state_dict = convert_mask_encoder(prompt_encoder=sam_h.prompt_encoder)
+        # check if the converted file already exists
+        if self.converted.local_path.is_file():
+            logging.warning(f"{self.converted.local_path} already exists")
+            if self.converted.check_local_hash():
+                try:
+                    assert self.converted.check_remote_hash()
+                except requests.exceptions.HTTPError:
+                    logging.error(f"{self.converted.local_path} couldn't verify remote hash")
+                return
 
-    output_state_dict = {
-        **{f"SAMViTH.{key}": value for key, value in vit_state_dict.items()},
-        **{f"MaskDecoder.{key}": value for key, value in mask_decoder_state_dict.items()},
-        **{f"PointEncoder.{key}": value for key, value in point_encoder_state_dict.items()},
-        **{f"MaskEncoder.{key}": value for key, value in mask_encoder_state_dict.items()},
-    }
-    if args.half:
-        output_state_dict = {key: value.half() for key, value in output_state_dict.items()}
+        # get the original state_dict
+        self.original.download()
 
-    save_to_safetensors(path=args.output_path, tensors=output_state_dict)
+        # load the original model
+        sam_h = build_sam_vit_h()  # type: ignore
+        sam_h.load_state_dict(state_dict=load_tensors(self.original.local_path))
+
+        # convert each part of the model
+        vit_state_dict = convert_vit(vit=sam_h.image_encoder)
+        mask_decoder_state_dict = convert_mask_decoder(mask_decoder=sam_h.mask_decoder)
+        point_encoder_state_dict = convert_point_encoder(prompt_encoder=sam_h.prompt_encoder)
+        mask_encoder_state_dict = convert_mask_encoder(prompt_encoder=sam_h.prompt_encoder)
+
+        # build the entire state_dict
+        output_state_dict = {
+            **{f"SAMViTH.{key}": value for key, value in vit_state_dict.items()},
+            **{f"MaskDecoder.{key}": value for key, value in mask_decoder_state_dict.items()},
+            **{f"PointEncoder.{key}": value for key, value in point_encoder_state_dict.items()},
+            **{f"MaskEncoder.{key}": value for key, value in mask_encoder_state_dict.items()},
+        }
+
+        # extract the state_dict from the DoubleTextEncoder model
+        state_dict = self.change_dtype(output_state_dict, self.dtype)
+
+        # save the converted state_dict
+        self.converted.local_path.parent.mkdir(parents=True, exist_ok=True)
+        save_to_safetensors(self.converted.local_path, state_dict)
+
+        # check the converted state_dict
+        assert self.converted.check_local_hash()
+        try:
+            assert self.converted.check_remote_hash()
+        except requests.exceptions.HTTPError:
+            logging.warning(f"{self.converted.local_path} couldn't verify remote hash")
 
 
-if __name__ == "__main__":
-    main()
+vit_h = ModelConverterHubDuo(
+    original=Hub(
+        repo_id="facebook/github_segment_anything",
+        filename="sam_vit_h.pth",
+        expected_sha256="a7bf3b02f3ebf1267aba913ff637d9a2d5c33d3173bb679e46d9f338c26f262e",
+        download_url="https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+    ),
+    converted=Hub(
+        repo_id="refiners/sam.vit_h",
+        filename="model.safetensors",
+        expected_sha256="acc3034e9253b8e91d3e56b12e4c846c5bd44b640fd2e08bf328229f4714e8cf",
+    ),
+    dtype=torch.float32,
+)

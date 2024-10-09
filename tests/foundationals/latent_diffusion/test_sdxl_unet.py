@@ -1,34 +1,11 @@
-from pathlib import Path
 from typing import Any
-from warnings import warn
 
 import pytest
 import torch
 
-from refiners.fluxion.model_converter import ConversionStage, ModelConverter
+from refiners.conversion.model_converter import ConversionStage, ModelConverter
 from refiners.fluxion.utils import manual_seed, no_grad
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import SDXLUNet
-
-
-@pytest.fixture(scope="module")
-def stabilityai_sdxl_base_path(test_weights_path: Path) -> Path:
-    r = test_weights_path / "stabilityai" / "stable-diffusion-xl-base-1.0"
-    if not r.is_dir():
-        warn(f"could not find Stability SDXL base weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture(scope="module")
-def diffusers_sdxl(stabilityai_sdxl_base_path: Path) -> Any:
-    from diffusers import DiffusionPipeline  # type: ignore
-
-    return DiffusionPipeline.from_pretrained(pretrained_model_name_or_path=stabilityai_sdxl_base_path)  # type: ignore
-
-
-@pytest.fixture(scope="module")
-def diffusers_sdxl_unet(diffusers_sdxl: Any) -> Any:
-    return diffusers_sdxl.unet
 
 
 @pytest.fixture(scope="module")
@@ -38,7 +15,10 @@ def refiners_sdxl_unet() -> SDXLUNet:
 
 
 @no_grad()
-def test_sdxl_unet(diffusers_sdxl_unet: Any, refiners_sdxl_unet: SDXLUNet) -> None:
+def test_sdxl_unet(
+    diffusers_sdxl_unet: Any,
+    refiners_sdxl_unet: SDXLUNet,
+) -> None:
     source = diffusers_sdxl_unet
     target = refiners_sdxl_unet
 

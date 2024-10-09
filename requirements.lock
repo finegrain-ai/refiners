@@ -29,8 +29,6 @@ attrs==24.2.0
     # via referencing
 babel==2.16.0
     # via mkdocs-material
-beautifulsoup4==4.12.3
-    # via gdown
 bitsandbytes==0.44.0
     # via refiners
 black==24.8.0
@@ -72,7 +70,6 @@ exceptiongroup==1.2.2
 filelock==3.16.1
     # via datasets
     # via diffusers
-    # via gdown
     # via huggingface-hub
     # via torch
     # via transformers
@@ -88,8 +85,6 @@ fsspec==2024.6.1
     # via torch
 future==1.0.0
     # via neptune
-gdown==5.2.0
-    # via refiners
 ghp-import==2.1.0
     # via mkdocs
 gitdb==4.0.11
@@ -285,8 +280,6 @@ pyjwt==2.9.0
 pymdown-extensions==10.10.2
     # via mkdocs-material
     # via mkdocstrings
-pysocks==1.7.1
-    # via requests
 pytest==8.3.3
     # via pytest-rerunfailures
 pytest-rerunfailures==14.0
@@ -328,7 +321,6 @@ requests==2.32.3
     # via bravado-core
     # via datasets
     # via diffusers
-    # via gdown
     # via huggingface-hub
     # via mkdocs-material
     # via neptune
@@ -376,8 +368,6 @@ six==1.16.0
     # via rfc3339-validator
 smmap==5.0.1
     # via gitdb
-soupsieve==2.6
-    # via beautifulsoup4
 swagger-spec-validator==3.0.4
     # via bravado-core
     # via neptune
@@ -406,7 +396,6 @@ torchvision==0.19.1
     # via timm
 tqdm==4.66.5
     # via datasets
-    # via gdown
     # via huggingface-hub
     # via refiners
     # via transformers

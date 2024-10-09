@@ -1,9 +1,14 @@
+import logging
 import re
 
-from torch import Tensor
+import requests
+import torch
+
+from refiners.conversion.utils import Conversion, Hub, TensorDict
+from refiners.fluxion.utils import save_to_safetensors
 
 
-def convert_weights(official_state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+def convert_weights(official_state_dict: TensorDict) -> TensorDict:
     rm_list = [
         # Official weights contains useless keys
         # See https://github.com/qianyu-dlut/MVANet/issues/3#issuecomment-2105650425
@@ -136,3 +141,72 @@ def convert_weights(official_state_dict: dict[str, Tensor]) -> dict[str, Tensor]
         state_dict.pop(key)
 
     return state_dict
+
+
+class MVANetConversion(Conversion):
+    def __init__(
+        self,
+        original: Hub,
+        converted: Hub,
+        dtype: torch.dtype = torch.float16,
+    ) -> None:
+        self.original = original
+        self.converted = converted
+        self.dtype = dtype
+
+    def convert(self) -> None:  # type: ignore
+        """Convert the weights from the original to the converted weights."""
+        logging.info(f"Converting {self.original.repo_id}/{self.original.filename} to {self.converted.repo_id}")
+
+        # check if the converted file already exists
+        if self.converted.local_path.is_file():
+            logging.warning(f"{self.converted.local_path} already exists")
+            if self.converted.check_local_hash():
+                try:
+                    assert self.converted.check_remote_hash()
+                except requests.exceptions.HTTPError:
+                    logging.error(f"{self.converted.local_path} couldn't verify remote hash")
+                return
+
+        # get the original state_dict
+        self.original.download()
+
+        # load the original state_dict
+        original_weights = self.load_state_dict(self.original.local_path)
+
+        # convert the state_dict
+        converted_weights = convert_weights(original_weights)
+        converted_weights = self.change_dtype(converted_weights, self.dtype)
+
+        # save the converted state_dict
+        self.converted.local_path.parent.mkdir(parents=True, exist_ok=True)
+        save_to_safetensors(self.converted.local_path, converted_weights)
+
+        # check the converted state_dict
+        assert self.converted.check_local_hash()
+        try:
+            assert self.converted.check_remote_hash()
+        except requests.exceptions.HTTPError:
+            logging.warning(f"{self.converted.local_path} couldn't verify remote hash")
+
+
+mvanet = MVANetConversion(
+    original=Hub(
+        repo_id="creative-graphic-design/MVANet-checkpoints",
+        filename="Model_80.pth",
+        revision="62d38c42a28b999067e2f755e32b27249bcc66c6",
+        expected_sha256="ffec20a382b0a1832786438475e8b912a03be727a0e3197e7ab039153fb3bc46",
+    ),
+    converted=Hub(
+        repo_id="refiners/mvanet",
+        filename="model.safetensors",
+        expected_sha256="cca9a6e05e977ee9ac98b3f9a248430d7fe8385f7d249eaddece318e777788e5",
+    ),
+    dtype=torch.float16,
+)
+finegrain_v01 = Hub(
+    repo_id="finegrain/finegrain-box-segmenter",
+    filename="model.safetensors",
+    revision="v0.1",
+    expected_sha256="fd5f13919dfc0dda102df1af648c3773c61221aa65fe58d6af978637baded1ae",
+)

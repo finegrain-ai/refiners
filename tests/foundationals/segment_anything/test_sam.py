@@ -1,7 +1,6 @@
 from math import isclose
 from pathlib import Path
 from typing import cast
-from warnings import warn
 
 import numpy as np
 import pytest
@@ -17,8 +16,8 @@ from tests.foundationals.segment_anything.utils import (
 from torch import Tensor
 
 import refiners.fluxion.layers as fl
+from refiners.conversion.model_converter import ModelConverter
 from refiners.fluxion import manual_seed
-from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import image_to_tensor, load_tensors, no_grad
 from refiners.foundationals.segment_anything.image_encoder import FusedSelfAttention, RelativePositionAttention
 from refiners.foundationals.segment_anything.mask_decoder import MaskDecoder
@@ -49,20 +48,11 @@ def one_prompt() -> SAMPrompt:
 
 
 @pytest.fixture(scope="module")
-def facebook_sam_h_weights(test_weights_path: Path) -> Path:
-    sam_h_weights = test_weights_path / "sam_vit_h_4b8939.pth"
-    if not sam_h_weights.is_file():
-        warn(f"could not find weights at {sam_h_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sam_h_weights
-
-
-@pytest.fixture(scope="module")
-def facebook_sam_h(facebook_sam_h_weights: Path, test_device: torch.device) -> FacebookSAM:
+def facebook_sam_h(sam_h_unconverted_weights_path: Path, test_device: torch.device) -> FacebookSAM:
     from segment_anything import build_sam_vit_h  # type: ignore
 
     sam_h = cast(FacebookSAM, build_sam_vit_h())
-    sam_h.load_state_dict(state_dict=load_tensors(facebook_sam_h_weights))
+    sam_h.load_state_dict(state_dict=load_tensors(sam_h_unconverted_weights_path))
     return sam_h.to(device=test_device)
 
 
@@ -76,16 +66,16 @@ def facebook_sam_h_predictor(facebook_sam_h: FacebookSAM) -> FacebookSAMPredicto
 
 
 @pytest.fixture(scope="module")
-def sam_h(sam_h_weights: Path, test_device: torch.device) -> SegmentAnythingH:
+def sam_h(sam_h_weights_path: Path, test_device: torch.device) -> SegmentAnythingH:
     sam_h = SegmentAnythingH(device=test_device)
-    sam_h.load_from_safetensors(tensors_path=sam_h_weights)
+    sam_h.load_from_safetensors(tensors_path=sam_h_weights_path)
     return sam_h
 
 
 @pytest.fixture(scope="module")
-def sam_h_single_output(sam_h_weights: Path, test_device: torch.device) -> SegmentAnythingH:
+def sam_h_single_output(sam_h_weights_path: Path, test_device: torch.device) -> SegmentAnythingH:
     sam_h = SegmentAnythingH(multimask_output=False, device=test_device)
-    sam_h.load_from_safetensors(tensors_path=sam_h_weights)
+    sam_h.load_from_safetensors(tensors_path=sam_h_weights_path)
     return sam_h
 
 
@@ -469,7 +459,10 @@ def test_predictor_resized_single_output(
 
 
 def test_mask_encoder(
-    facebook_sam_h_predictor: FacebookSAMPredictor, sam_h: SegmentAnythingH, truck: Image.Image, one_prompt: SAMPrompt
+    facebook_sam_h_predictor: FacebookSAMPredictor,
+    sam_h: SegmentAnythingH,
+    truck: Image.Image,
+    one_prompt: SAMPrompt,
 ) -> None:
     predictor = facebook_sam_h_predictor
     predictor.set_image(np.array(truck))

@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, nn
 
 import refiners.fluxion.layers as fl
-from refiners.fluxion.model_converter import ConversionStage, ModelConverter
+from refiners.conversion.model_converter import ConversionStage, ModelConverter
 from refiners.fluxion.utils import manual_seed
 
 

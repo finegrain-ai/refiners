@@ -26,51 +26,6 @@ def ensure_gc():
     gc.collect()
 
 
-@pytest.fixture
-def sdxl_lda_fp16_fix_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_unet_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-unet.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_lcm_unet_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-lcm-unet.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_text_encoder_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "DoubleCLIPTextEncoder.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_lcm_lora_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-lcm-lora.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
 @pytest.fixture(scope="module")
 def ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_lcm_ref"
@@ -94,9 +49,9 @@ def expected_lcm_lora_1_2(ref_path: Path) -> Image.Image:
 @no_grad()
 def test_lcm_base(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_lcm_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_lcm_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
     expected_lcm_base: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
@@ -111,9 +66,9 @@ def test_lcm_base(
     # not in the diffusion loop.
     SDXLLcmAdapter(sdxl.unet, condition_scale=8.0).inject()
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(sdxl_lcm_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(sdxl_unet_lcm_weights_path)
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_base
@@ -141,10 +96,10 @@ def test_lcm_base(
 @pytest.mark.parametrize("condition_scale", [1.0, 1.2])
 def test_lcm_lora_with_guidance(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
-    sdxl_lcm_lora_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
+    lora_sdxl_lcm_weights_path: Path,
     expected_lcm_lora_1_0: Image.Image,
     expected_lcm_lora_1_2: Image.Image,
     condition_scale: float,
@@ -156,12 +111,12 @@ def test_lcm_lora_with_guidance(
     solver = LCMSolver(num_inference_steps=4)
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16, solver=solver)
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(sdxl_unet_weights_path)
 
     manager = SDLoraManager(sdxl)
-    add_lcm_lora(manager, load_from_safetensors(sdxl_lcm_lora_weights))
+    add_lcm_lora(manager, load_from_safetensors(lora_sdxl_lcm_weights_path))
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0 if condition_scale == 1.0 else expected_lcm_lora_1_2
@@ -191,10 +146,10 @@ def test_lcm_lora_with_guidance(
 @no_grad()
 def test_lcm_lora_without_guidance(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
-    sdxl_lcm_lora_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
+    lora_sdxl_lcm_weights_path: Path,
     expected_lcm_lora_1_0: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
@@ -205,12 +160,12 @@ def test_lcm_lora_without_guidance(
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16, solver=solver)
     sdxl.classifier_free_guidance = False
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(sdxl_unet_weights_path)
 
     manager = SDLoraManager(sdxl)
-    add_lcm_lora(manager, load_from_safetensors(sdxl_lcm_lora_weights))
+    add_lcm_lora(manager, load_from_safetensors(lora_sdxl_lcm_weights_path))
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
     expected_image = expected_lcm_lora_1_0

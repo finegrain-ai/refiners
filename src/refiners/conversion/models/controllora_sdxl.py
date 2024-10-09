@@ -1,12 +1,12 @@
-import argparse
 import logging
-from logging import info
-from pathlib import Path
 
+import requests
+import torch
 from huggingface_hub import hf_hub_download  # type: ignore
 from torch import Tensor
 from torch.nn import Parameter as TorchParameter
 
+from refiners.conversion.utils import Conversion, Hub
 from refiners.fluxion.adapters.lora import Lora, LoraAdapter, auto_attach_loras
 from refiners.fluxion.layers import Conv2d
 from refiners.fluxion.layers.linear import Linear
@@ -251,98 +251,95 @@ def convert_condition_encoder(
     refiners_state_dict.update(state_dict)
 
 
-def convert(
-    name: str,
-    state_dict_path: Path,
-    output_path: Path,
-) -> None:
-    sdxl = StableDiffusion_XL()
-    info("Stable Diffusion XL model initialized")
+class ControlLoraConversion(Conversion):
+    def __init__(
+        self,
+        original: Hub,
+        converted: Hub,
+        dtype: torch.dtype = torch.float32,
+    ) -> None:
+        """Initialize the weight structure.
 
-    fooocus_state_dict = load_from_safetensors(state_dict_path)
-    info(f"Fooocus weights loaded from: {state_dict_path}")
+        Args:
+            original_weight_hub: A HubPath object representing the original weight.
+            converted_weight_hub: A HubPath object representing the converted weight.
+        """
+        self.original = original
+        self.converted = converted
+        self.dtype = dtype
 
-    control_lora_adapter = ControlLoraAdapter(target=sdxl.unet, name=name).inject()
-    control_lora = control_lora_adapter.control_lora
-    info("ControlLoraAdapter initialized")
-
-    lora_layers = load_lora_layers(name, fooocus_state_dict, control_lora)
-    info("LoRA layers loaded")
-
-    load_zero_convolutions(fooocus_state_dict, control_lora)
-    info("ZeroConvolution layers loaded")
-
-    load_condition_encoder(fooocus_state_dict, control_lora)
-    info("ConditionEncoder loaded")
-
-    refiners_state_dict: dict[str, Tensor] = {}
-    convert_lora_layers(lora_layers, control_lora, refiners_state_dict)
-    info("LoRA layers converted to refiners format")
-
-    convert_zero_convolutions(control_lora, refiners_state_dict)
-    info("ZeroConvolution layers converted to refiners format")
-
-    convert_condition_encoder(control_lora, refiners_state_dict)
-    info("ConditionEncoder converted to refiners format")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    save_to_safetensors(path=output_path, tensors=refiners_state_dict)
-    info(f"Converted ControlLora state dict saved to disk at: {output_path}")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Convert ControlLora (from Fooocus) weights to refiners.",
-    )
-
-    parser.add_argument(
-        "--from",
-        type=Path,
-        dest="source_path",
-        default="lllyasviel/misc:control-lora-canny-rank128.safetensors",
-        help="Path to the state_dict of the ControlLora, or a Hugging Face model ID.",
-    )
-
-    parser.add_argument(
-        "--to",
-        type=Path,
-        dest="output_path",
-        help=(
-            "Path to save the converted model (extension will be .safetensors)."
-            "If not specified, the output path will be the source path with the extension changed to .safetensors."
-        ),
-    )
-
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        dest="verbose",
-        default=False,
-        help="Use this flag to print verbose output during conversion.",
-    )
-
-    args = parser.parse_args()
-
-    if args.verbose:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(levelname)s: %(message)s",
+    def convert(self) -> None:
+        """Convert the weights from the original to the converted weights."""
+        logging.info(
+            f"Converting {self.original.repo_id}/{self.original.filename} to {self.converted.repo_id}/{self.converted.filename}"
         )
 
-    if not args.source_path.exists():
-        repo_id, filename = str(args.source_path).split(":")
-        args.source_path = Path(
-            hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-            )
-        )
+        # check if the converted file already exists
+        if self.converted.local_path.is_file():
+            logging.warning(f"{self.converted.local_path} already exists")
+            if self.converted.check_local_hash():
+                try:
+                    assert self.converted.check_remote_hash()
+                except requests.exceptions.HTTPError:
+                    logging.error(f"{self.converted.local_path} couldn't verify remote hash")
+                return
 
-    if args.output_path is None:
-        args.output_path = Path(f"refiners_{args.source_path.stem}.safetensors")
+        # get the original state_dict
+        self.original.download()
 
-    convert(
-        name=args.source_path.stem,
-        state_dict_path=args.source_path,
-        output_path=args.output_path,
-    )
+        # load the original state_dict
+        original_state_dict = load_from_safetensors(self.original.local_path)
+
+        # convert the state_dict
+        sdxl = StableDiffusion_XL()
+        name = self.original.local_path.stem
+        control_lora_adapter = ControlLoraAdapter(target=sdxl.unet, name=name).inject()
+        control_lora = control_lora_adapter.control_lora
+        lora_layers = load_lora_layers(name, original_state_dict, control_lora)
+        load_zero_convolutions(original_state_dict, control_lora)
+        load_condition_encoder(original_state_dict, control_lora)
+
+        converted_state_dict: dict[str, Tensor] = {}
+        convert_lora_layers(lora_layers, control_lora, converted_state_dict)
+        convert_zero_convolutions(control_lora, converted_state_dict)
+        convert_condition_encoder(control_lora, converted_state_dict)
+
+        # save the converted state_dict
+        self.converted.local_path.parent.mkdir(parents=True, exist_ok=True)
+        save_to_safetensors(self.converted.local_path, converted_state_dict)
+
+        # check the converted state_dict
+        assert self.converted.check_local_hash()
+        try:
+            assert self.converted.check_remote_hash()
+        except requests.exceptions.HTTPError:
+            logging.warning(f"{self.converted.local_path} couldn't verify remote hash")
+
+
+canny = ControlLoraConversion(
+    original=Hub(
+        repo_id="lllyasviel/misc",
+        filename="control-lora-canny-rank128.safetensors",
+        revision="71f7a66a7affe631c64af469fe647217d422cac0",
+        expected_sha256="56389dbb245ca44de91d662529bd4298abc55ce2318f60bc19454fb72ff68247",
+    ),
+    converted=Hub(
+        repo_id="refiners/sdxl.controllora.canny",
+        filename="model.safetensors",
+        expected_sha256="6edfa742e2b5191ce357fb559e236652b004feea490c4f1277b30abc9804321f",
+    ),
+)
+
+cpds = ControlLoraConversion(
+    original=Hub(
+        repo_id="lllyasviel/misc",
+        filename="fooocus_xl_cpds_128.safetensors",
+        revision="71f7a66a7affe631c64af469fe647217d422cac0",
+        expected_sha256="eec3fd8209a65b41341ea9f415de66909c97b30fb4d20965b3304e8e5251c2f1",
+    ),
+    converted=Hub(
+        repo_id="refiners/sdxl.controllora.cpds",
+        filename="model.safetensors",
+        expected_sha256="9a3b2a86f32e4747e98531b0af8b59a804391b538949a0dd85263722b6e64db0",
+    ),
+)
