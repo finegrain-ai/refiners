@@ -29,19 +29,10 @@ def expected_cactus_mask(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_cactus_mask.png")
 
 
-@pytest.fixture(scope="module")
-def mvanet_weights(test_weights_path: Path) -> Path:
-    weights = test_weights_path / "mvanet" / "mvanet.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {test_weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return weights
-
-
 @pytest.fixture
-def mvanet_model(mvanet_weights: Path, test_device: torch.device) -> MVANet:
+def mvanet_model(mvanet_weights_path: Path, test_device: torch.device) -> MVANet:
     model = MVANet(device=test_device).eval()  # .eval() is important!
-    model.load_from_safetensors(mvanet_weights)
+    model.load_from_safetensors(mvanet_weights_path)
     return model
 
 
@@ -61,7 +52,7 @@ def test_mvanet(
 
 @no_grad()
 def test_mvanet_to(
-    mvanet_weights: Path,
+    mvanet_weights_path: Path,
     ref_cactus: Image.Image,
     expected_cactus_mask: Image.Image,
     test_device: torch.device,
@@ -71,7 +62,7 @@ def test_mvanet_to(
         pytest.skip()
 
     model = MVANet(device=torch.device("cpu")).eval()
-    model.load_from_safetensors(mvanet_weights)
+    model.load_from_safetensors(mvanet_weights_path)
     model.to(test_device)
 
     in_t = image_to_tensor(ref_cactus.resize((1024, 1024), Image.Resampling.BILINEAR)).squeeze()

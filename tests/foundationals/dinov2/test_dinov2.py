@@ -4,6 +4,7 @@ from warnings import warn
 
 import pytest
 import torch
+from huggingface_hub import hf_hub_download  # type: ignore
 
 from refiners.fluxion.utils import load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.dinov2.dinov2 import (
@@ -18,7 +19,7 @@ from refiners.foundationals.dinov2.dinov2 import (
 )
 from refiners.foundationals.dinov2.vit import ViT
 
-FLAVORS_MAP = {
+FLAVORS_MAP_REFINERS = {
     "dinov2_vits14": DINOv2_small,
     "dinov2_vits14_reg": DINOv2_small_reg,
     "dinov2_vitb14": DINOv2_base,
@@ -28,6 +29,27 @@ FLAVORS_MAP = {
     "dinov2_vitg14": DINOv2_giant,
     "dinov2_vitg14_reg": DINOv2_giant_reg,
 }
+FLAVORS_MAP_HUB = {
+    "dinov2_vits14": "refiners/dinov2.small.patch_14",
+    "dinov2_vits14_reg": "refiners/dinov2.small.patch_14.reg_4",
+    "dinov2_vitb14": "refiners/dinov2.base.patch_14",
+    "dinov2_vitb14_reg": "refiners/dinov2.base.patch_14.reg_4",
+    "dinov2_vitl14": "refiners/dinov2.large.patch_14",
+    "dinov2_vitl14_reg": "refiners/dinov2.large.patch_14.reg_4",
+    "dinov2_vitg14": "refiners/dinov2.giant.patch_14",
+    "dinov2_vitg14_reg": "refiners/dinov2.giant.patch_14.reg_4",
+}
+
+
+@pytest.fixture(scope="module", params=["float16", "bfloat16"])
+def dtype(request: pytest.FixtureRequest) -> torch.dtype:
+    match request.param:
+        case "float16":
+            return torch.float16
+        case "bfloat16":
+            return torch.bfloat16
+        case _ as dtype:
+            raise ValueError(f"unsupported dtype: {dtype}")
 
 
 @pytest.fixture(scope="module", params=[224, 518])
@@ -35,7 +57,7 @@ def resolution(request: pytest.FixtureRequest) -> int:
     return request.param
 
 
-@pytest.fixture(scope="module", params=FLAVORS_MAP.keys())
+@pytest.fixture(scope="module", params=FLAVORS_MAP_REFINERS.keys())
 def flavor(request: pytest.FixtureRequest) -> str:
     return request.param
 
@@ -53,7 +75,14 @@ def dinov2_repo_path(test_repos_path: Path) -> Path:
 def ref_model(
     flavor: str,
     dinov2_repo_path: Path,
-    test_weights_path: Path,
+    dinov2_small_unconverted_weights_path: Path,
+    dinov2_small_reg4_unconverted_weights_path: Path,
+    dinov2_base_unconverted_weights_path: Path,
+    dinov2_base_reg4_unconverted_weights_path: Path,
+    dinov2_large_unconverted_weights_path: Path,
+    dinov2_large_reg4_unconverted_weights_path: Path,
+    dinov2_giant_unconverted_weights_path: Path,
+    dinov2_giant_reg4_unconverted_weights_path: Path,
     test_device: torch.device,
 ) -> torch.nn.Module:
     kwargs: dict[str, Any] = {}
@@ -69,34 +98,51 @@ def ref_model(
     )
     model = model.to(device=test_device)
 
-    flavor = flavor.replace("_reg", "_reg4")
-    weights = test_weights_path / f"{flavor}_pretrain.pth"
-    if not weights.is_file():
-        warn(f"could not find weights at {weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    model.load_state_dict(load_tensors(weights, device=test_device))
+    weight_map = {
+        "dinov2_vits14": dinov2_small_unconverted_weights_path,
+        "dinov2_vits14_reg": dinov2_small_reg4_unconverted_weights_path,
+        "dinov2_vitb14": dinov2_base_unconverted_weights_path,
+        "dinov2_vitb14_reg": dinov2_base_reg4_unconverted_weights_path,
+        "dinov2_vitl14": dinov2_large_unconverted_weights_path,
+        "dinov2_vitl14_reg": dinov2_large_reg4_unconverted_weights_path,
+        "dinov2_vitg14": dinov2_giant_unconverted_weights_path,
+        "dinov2_vitg14_reg": dinov2_giant_reg4_unconverted_weights_path,
+    }
+    weights_path = weight_map[flavor]
 
+    model.load_state_dict(load_tensors(weights_path, device=test_device))
     assert isinstance(model, torch.nn.Module)
     return model
 
 
 @pytest.fixture(scope="module")
 def our_model(
-    test_weights_path: Path,
     flavor: str,
+    dinov2_small_weights_path: Path,
+    dinov2_small_reg4_weights_path: Path,
+    dinov2_base_weights_path: Path,
+    dinov2_base_reg4_weights_path: Path,
+    dinov2_large_weights_path: Path,
+    dinov2_large_reg4_weights_path: Path,
+    dinov2_giant_weights_path: Path,
+    dinov2_giant_reg4_weights_path: Path,
     test_device: torch.device,
 ) -> ViT:
-    model = FLAVORS_MAP[flavor](device=test_device)
+    weight_map = {
+        "dinov2_vits14": dinov2_small_weights_path,
+        "dinov2_vits14_reg": dinov2_small_reg4_weights_path,
+        "dinov2_vitb14": dinov2_base_weights_path,
+        "dinov2_vitb14_reg": dinov2_base_reg4_weights_path,
+        "dinov2_vitl14": dinov2_large_weights_path,
+        "dinov2_vitl14_reg": dinov2_large_reg4_weights_path,
+        "dinov2_vitg14": dinov2_giant_weights_path,
+        "dinov2_vitg14_reg": dinov2_giant_reg4_weights_path,
+    }
+    weights_path = weight_map[flavor]
 
-    flavor = flavor.replace("_reg", "_reg4")
-    weights = test_weights_path / f"{flavor}_pretrain.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {weights}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    tensors = load_from_safetensors(weights)
+    model = FLAVORS_MAP_REFINERS[flavor](device=test_device)
+    tensors = load_from_safetensors(weights_path)
     model.load_state_dict(tensors)
-
     return model
 
 

@@ -9,6 +9,8 @@ import torch
 from PIL import Image
 from tests.utils import T5TextEmbedder, ensure_similar_images
 
+from refiners.conversion import controllora_sdxl
+from refiners.conversion.utils import Hub
 from refiners.fluxion.layers.attentions import ScaledDotProductAttention
 from refiners.fluxion.utils import image_to_tensor, load_from_safetensors, load_tensors, manual_seed, no_grad
 from refiners.foundationals.clip.concepts import ConceptExtender
@@ -44,6 +46,8 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_1.multi_upscaler i
 )
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 from refiners.foundationals.latent_diffusion.style_aligned import StyleAlignedAdapter
+
+from ..weight_paths import get_path
 
 
 def _img_open(path: Path) -> Image.Image:
@@ -194,69 +198,85 @@ def expected_style_aligned(ref_path: Path) -> Image.Image:
 
 @pytest.fixture(scope="module", params=["canny", "depth", "lineart", "normals", "sam"])
 def controlnet_data(
-    ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
+    ref_path: Path,
+    controlnet_depth_weights_path: Path,
+    controlnet_canny_weights_path: Path,
+    controlnet_lineart_weights_path: Path,
+    controlnet_normals_weights_path: Path,
+    controlnet_sam_weights_path: Path,
+    request: pytest.FixtureRequest,
 ) -> Iterator[tuple[str, Image.Image, Image.Image, Path]]:
     cn_name: str = request.param
     condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
-    weights_fn = {
-        "depth": "lllyasviel_control_v11f1p_sd15_depth",
-        "canny": "lllyasviel_control_v11p_sd15_canny",
-        "lineart": "lllyasviel_control_v11p_sd15_lineart",
-        "normals": "lllyasviel_control_v11p_sd15_normalbae",
-        "sam": "mfidabel_controlnet-segment-anything",
-    }
 
-    weights_path = test_weights_path / "controlnet" / f"{weights_fn[cn_name]}.safetensors"
-    yield (cn_name, condition_image, expected_image, weights_path)
+    weights_fn = {
+        "depth": controlnet_depth_weights_path,
+        "canny": controlnet_canny_weights_path,
+        "lineart": controlnet_lineart_weights_path,
+        "normals": controlnet_normals_weights_path,
+        "sam": controlnet_sam_weights_path,
+    }
+    weights_path = weights_fn[cn_name]
+
+    yield cn_name, condition_image, expected_image, weights_path
 
 
 @pytest.fixture(scope="module", params=["canny"])
 def controlnet_data_scale_decay(
-    ref_path: Path, test_weights_path: Path, request: pytest.FixtureRequest
+    ref_path: Path,
+    controlnet_canny_weights_path: Path,
+    request: pytest.FixtureRequest,
 ) -> Iterator[tuple[str, Image.Image, Image.Image, Path]]:
     cn_name: str = request.param
     condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}_scale_decay.png").convert("RGB")
-    weights_fn = {
-        "canny": "lllyasviel_control_v11p_sd15_canny",
-    }
 
-    weights_path = test_weights_path / "controlnet" / f"{weights_fn[cn_name]}.safetensors"
+    weights_fn = {
+        "canny": controlnet_canny_weights_path,
+    }
+    weights_path = weights_fn[cn_name]
+
     yield (cn_name, condition_image, expected_image, weights_path)
 
 
 @pytest.fixture(scope="module")
-def controlnet_data_tile(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, Image.Image, Path]:
+def controlnet_data_tile(
+    ref_path: Path,
+    controlnet_tiles_weights_path: Path,
+) -> tuple[Image.Image, Image.Image, Path]:
     condition_image = _img_open(ref_path / f"low_res_dog.png").convert("RGB").resize((1024, 1024))  # type: ignore
     expected_image = _img_open(ref_path / f"expected_controlnet_tile.png").convert("RGB")
-    weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1e_sd15_tile.safetensors"
-    return condition_image, expected_image, weights_path
+    return condition_image, expected_image, controlnet_tiles_weights_path
 
 
 @pytest.fixture(scope="module")
-def controlnet_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+def controlnet_data_canny(
+    ref_path: Path,
+    controlnet_canny_weights_path: Path,
+) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "canny"
     condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
-    weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11p_sd15_canny.safetensors"
-    return cn_name, condition_image, expected_image, weights_path
+    return cn_name, condition_image, expected_image, controlnet_canny_weights_path
 
 
 @pytest.fixture(scope="module")
-def controlnet_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+def controlnet_data_depth(
+    ref_path: Path,
+    controlnet_depth_weights_path: Path,
+) -> tuple[str, Image.Image, Image.Image, Path]:
     cn_name = "depth"
     condition_image = _img_open(ref_path / f"cutecat_guide_{cn_name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_controlnet_{cn_name}.png").convert("RGB")
-    weights_path = test_weights_path / "controlnet" / "lllyasviel_control_v11f1p_sd15_depth.safetensors"
-    return cn_name, condition_image, expected_image, weights_path
+    return cn_name, condition_image, expected_image, controlnet_depth_weights_path
 
 
 @dataclass
 class ControlLoraConfig:
     scale: float
     condition_path: str
-    weights_path: str
+    weights: Hub
 
 
 @dataclass
@@ -271,38 +291,38 @@ CONTROL_LORA_CONFIGS: dict[str, dict[str, ControlLoraConfig]] = {
         "PyraCanny": ControlLoraConfig(
             scale=1.0,
             condition_path="cutecat_guide_PyraCanny.png",
-            weights_path="refiners_control-lora-canny-rank128.safetensors",
+            weights=controllora_sdxl.canny.converted,
         ),
     },
     "expected_controllora_CPDS.png": {
         "CPDS": ControlLoraConfig(
             scale=1.0,
             condition_path="cutecat_guide_CPDS.png",
-            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+            weights=controllora_sdxl.cpds.converted,
         ),
     },
     "expected_controllora_PyraCanny+CPDS.png": {
         "PyraCanny": ControlLoraConfig(
             scale=0.55,
             condition_path="cutecat_guide_PyraCanny.png",
-            weights_path="refiners_control-lora-canny-rank128.safetensors",
+            weights=controllora_sdxl.canny.converted,
         ),
         "CPDS": ControlLoraConfig(
             scale=0.55,
             condition_path="cutecat_guide_CPDS.png",
-            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+            weights=controllora_sdxl.cpds.converted,
         ),
     },
     "expected_controllora_disabled.png": {
         "PyraCanny": ControlLoraConfig(
             scale=0.0,
             condition_path="cutecat_guide_PyraCanny.png",
-            weights_path="refiners_control-lora-canny-rank128.safetensors",
+            weights=controllora_sdxl.canny.converted,
         ),
         "CPDS": ControlLoraConfig(
             scale=0.0,
             condition_path="cutecat_guide_CPDS.png",
-            weights_path="refiners_fooocus_xl_cpds_128.safetensors",
+            weights=controllora_sdxl.cpds.converted,
         ),
     },
 }
@@ -311,8 +331,8 @@ CONTROL_LORA_CONFIGS: dict[str, dict[str, ControlLoraConfig]] = {
 @pytest.fixture(params=CONTROL_LORA_CONFIGS.items())
 def controllora_sdxl_config(
     request: pytest.FixtureRequest,
+    use_local_weights: bool,
     ref_path: Path,
-    test_weights_path: Path,
 ) -> tuple[Image.Image, dict[str, ControlLoraResolvedConfig]]:
     name: str = request.param[0]
     configs: dict[str, ControlLoraConfig] = request.param[1]
@@ -322,7 +342,7 @@ def controllora_sdxl_config(
         config_name: ControlLoraResolvedConfig(
             scale=config.scale,
             condition_image=_img_open(ref_path / config.condition_path).convert("RGB"),
-            weights_path=test_weights_path / "control-loras" / config.weights_path,
+            weights_path=get_path(config.weights, use_local_weights),
         )
         for config_name, config in configs.items()
     }
@@ -331,66 +351,57 @@ def controllora_sdxl_config(
 
 
 @pytest.fixture(scope="module")
-def t2i_adapter_data_depth(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+def t2i_adapter_data_depth(
+    ref_path: Path,
+    t2i_depth_weights_path: Path,
+) -> tuple[str, Image.Image, Image.Image, Path]:
     name = "depth"
     condition_image = _img_open(ref_path / f"cutecat_guide_{name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_t2i_adapter_{name}.png").convert("RGB")
-    weights_path = test_weights_path / "T2I-Adapter" / "t2iadapter_depth_sd15v2.safetensors"
-    return name, condition_image, expected_image, weights_path
+    return name, condition_image, expected_image, t2i_depth_weights_path
 
 
 @pytest.fixture(scope="module")
-def t2i_adapter_xl_data_canny(ref_path: Path, test_weights_path: Path) -> tuple[str, Image.Image, Image.Image, Path]:
+def t2i_adapter_xl_data_canny(
+    ref_path: Path,
+    t2i_sdxl_canny_weights_path: Path,
+) -> tuple[str, Image.Image, Image.Image, Path]:
     name = "canny"
     condition_image = _img_open(ref_path / f"fairy_guide_{name}.png").convert("RGB")
     expected_image = _img_open(ref_path / f"expected_t2i_adapter_xl_{name}.png").convert("RGB")
-    weights_path = test_weights_path / "T2I-Adapter" / "t2i-adapter-canny-sdxl-1.0.safetensors"
-
-    if not weights_path.is_file():
-        warn(f"could not find weights at {weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    return name, condition_image, expected_image, weights_path
+    return name, condition_image, expected_image, t2i_sdxl_canny_weights_path
 
 
 @pytest.fixture(scope="module")
-def lora_data_pokemon(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
+def lora_data_pokemon(
+    ref_path: Path,
+    lora_pokemon_weights_path: Path,
+) -> tuple[Image.Image, dict[str, torch.Tensor]]:
     expected_image = _img_open(ref_path / "expected_lora_pokemon.png").convert("RGB")
-    weights_path = test_weights_path / "loras" / "pokemon-lora" / "pytorch_lora_weights.bin"
-
-    if not weights_path.is_file():
-        warn(f"could not find weights at {weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    tensors = load_tensors(weights_path)
+    tensors = load_tensors(lora_pokemon_weights_path)
     return expected_image, tensors
 
 
 @pytest.fixture(scope="module")
-def lora_data_dpo(ref_path: Path, test_weights_path: Path) -> tuple[Image.Image, dict[str, torch.Tensor]]:
+def lora_data_dpo(
+    ref_path: Path,
+    lora_dpo_weights_path: Path,
+) -> tuple[Image.Image, dict[str, torch.Tensor]]:
     expected_image = _img_open(ref_path / "expected_sdxl_dpo_lora.png").convert("RGB")
-    weights_path = test_weights_path / "loras" / "dpo-lora" / "pytorch_lora_weights.safetensors"
-
-    if not weights_path.is_file():
-        warn(f"could not find weights at {weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    tensors = load_from_safetensors(weights_path)
+    tensors = load_from_safetensors(lora_dpo_weights_path)
     return expected_image, tensors
 
 
 @pytest.fixture(scope="module")
-def lora_sliders(test_weights_path: Path) -> tuple[dict[str, dict[str, torch.Tensor]], dict[str, float]]:
-    weights_path = test_weights_path / "loras" / "sliders"
-
-    if not weights_path.is_dir():
-        warn(f"could not find weights at {weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
+def lora_sliders(
+    lora_slider_age_weights_path: Path,
+    lora_slider_cartoon_style_weights_path: Path,
+    lora_slider_eyesize_weights_path: Path,
+) -> tuple[dict[str, dict[str, torch.Tensor]], dict[str, float]]:
     return {
-        "age": load_tensors(weights_path / "age.pt"),  # type: ignore
-        "cartoon_style": load_tensors(weights_path / "cartoon_style.pt"),  # type: ignore
-        "eyesize": load_tensors(weights_path / "eyesize.pt"),  # type: ignore
+        "age": load_tensors(lora_slider_age_weights_path),
+        "cartoon_style": load_tensors(lora_slider_cartoon_style_weights_path),
+        "eyesize": load_tensors(lora_slider_eyesize_weights_path),
     }, {
         "age": 0.3,
         "cartoon_style": -0.2,
@@ -477,122 +488,12 @@ def text_embedding_textual_inversion(test_textual_inversion_path: Path) -> torch
     return load_tensors(test_textual_inversion_path / "gta5-artwork" / "learned_embeds.bin")["<gta5-artwork>"]
 
 
-@pytest.fixture(scope="module")
-def text_encoder_weights(test_weights_path: Path) -> Path:
-    text_encoder_weights = test_weights_path / "CLIPTextEncoderL.safetensors"
-    if not text_encoder_weights.is_file():
-        warn(f"could not find weights at {text_encoder_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return text_encoder_weights
-
-
-@pytest.fixture(scope="module")
-def lda_weights(test_weights_path: Path) -> Path:
-    lda_weights = test_weights_path / "lda.safetensors"
-    if not lda_weights.is_file():
-        warn(f"could not find weights at {lda_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return lda_weights
-
-
-@pytest.fixture(scope="module")
-def unet_weights_std(test_weights_path: Path) -> Path:
-    unet_weights_std = test_weights_path / "unet.safetensors"
-    if not unet_weights_std.is_file():
-        warn(f"could not find weights at {unet_weights_std}, skipping")
-        pytest.skip(allow_module_level=True)
-    return unet_weights_std
-
-
-@pytest.fixture(scope="module")
-def unet_weights_inpainting(test_weights_path: Path) -> Path:
-    unet_weights_inpainting = test_weights_path / "inpainting" / "unet.safetensors"
-    if not unet_weights_inpainting.is_file():
-        warn(f"could not find weights at {unet_weights_inpainting}, skipping")
-        pytest.skip(allow_module_level=True)
-    return unet_weights_inpainting
-
-
-@pytest.fixture(scope="module")
-def lda_ft_mse_weights(test_weights_path: Path) -> Path:
-    lda_weights = test_weights_path / "lda_ft_mse.safetensors"
-    if not lda_weights.is_file():
-        warn(f"could not find weights at {lda_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return lda_weights
-
-
-@pytest.fixture(scope="module")
-def ella_weights(test_weights_path: Path) -> tuple[Path, Path]:
-    ella_adapter_weights = test_weights_path / "ELLA-Adapter" / "ella-sd1.5-tsc-t5xl.safetensors"
-    if not ella_adapter_weights.is_file():
-        warn(f"could not find weights at {ella_adapter_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    t5xl_weights = test_weights_path / "QQGYLab" / "T5XLFP16"
-    t5xl_files = [
-        "config.json",
-        "model.safetensors",
-        "special_tokens_map.json",
-        "spiece.model",
-        "tokenizer_config.json",
-        "tokenizer.json",
-    ]
-    for file in t5xl_files:
-        if not (t5xl_weights / file).is_file():
-            warn(f"could not find weights at {t5xl_weights / file}, skipping")
-            pytest.skip(allow_module_level=True)
-
-    return (ella_adapter_weights, t5xl_weights)
-
-
-@pytest.fixture(scope="module")
-def ip_adapter_weights(test_weights_path: Path) -> Path:
-    ip_adapter_weights = test_weights_path / "ip-adapter_sd15.safetensors"
-    if not ip_adapter_weights.is_file():
-        warn(f"could not find weights at {ip_adapter_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return ip_adapter_weights
-
-
-@pytest.fixture(scope="module")
-def ip_adapter_plus_weights(test_weights_path: Path) -> Path:
-    ip_adapter_weights = test_weights_path / "ip-adapter-plus_sd15.safetensors"
-    if not ip_adapter_weights.is_file():
-        warn(f"could not find weights at {ip_adapter_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return ip_adapter_weights
-
-
-@pytest.fixture(scope="module")
-def sdxl_ip_adapter_weights(test_weights_path: Path) -> Path:
-    ip_adapter_weights = test_weights_path / "ip-adapter_sdxl_vit-h.safetensors"
-    if not ip_adapter_weights.is_file():
-        warn(f"could not find weights at {ip_adapter_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return ip_adapter_weights
-
-
-@pytest.fixture(scope="module")
-def sdxl_ip_adapter_plus_weights(test_weights_path: Path) -> Path:
-    ip_adapter_weights = test_weights_path / "ip-adapter-plus_sdxl_vit-h.safetensors"
-    if not ip_adapter_weights.is_file():
-        warn(f"could not find weights at {ip_adapter_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return ip_adapter_weights
-
-
-@pytest.fixture(scope="module")
-def image_encoder_weights(test_weights_path: Path) -> Path:
-    image_encoder_weights = test_weights_path / "CLIPImageEncoderH.safetensors"
-    if not image_encoder_weights.is_file():
-        warn(f"could not find weights at {image_encoder_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return image_encoder_weights
-
-
 @pytest.fixture
 def sd15_std(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -600,16 +501,19 @@ def sd15_std(
 
     sd15 = StableDiffusion_1(device=test_device)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_std_sde(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -618,16 +522,19 @@ def sd15_std_sde(
     sde_solver = DPMSolver(num_inference_steps=30, last_step_first_order=True, params=SolverParams(sde_variance=1.0))
     sd15 = StableDiffusion_1(device=test_device, solver=sde_solver)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_std_float16(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -635,18 +542,18 @@ def sd15_std_float16(
 
     sd15 = StableDiffusion_1(device=test_device, dtype=torch.float16)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_std_bfloat16(
-    text_encoder_weights: Path,
-    lda_weights: Path,
-    unet_weights_std: Path,
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
     test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
@@ -655,16 +562,19 @@ def sd15_std_bfloat16(
 
     sd15 = StableDiffusion_1(device=test_device, dtype=torch.bfloat16)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_inpainting(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_inpainting: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_inpainting_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1_Inpainting:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -673,16 +583,19 @@ def sd15_inpainting(
     unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_inpainting)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_inpainting_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_inpainting_float16(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_inpainting: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_inpainting_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1_Inpainting:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -691,16 +604,19 @@ def sd15_inpainting_float16(
     unet = SD1UNet(in_channels=9)
     sd15 = StableDiffusion_1_Inpainting(unet=unet, device=test_device, dtype=torch.float16)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_inpainting)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_inpainting_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_ddim(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -709,16 +625,19 @@ def sd15_ddim(
     ddim_solver = DDIM(num_inference_steps=20)
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_ddim_karras(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -727,16 +646,18 @@ def sd15_ddim_karras(
     ddim_solver = DDIM(num_inference_steps=20, params=SolverParams(noise_schedule=NoiseSchedule.KARRAS))
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
-
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
     return sd15
 
 
 @pytest.fixture
 def sd15_euler(
-    text_encoder_weights: Path, lda_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -745,16 +666,19 @@ def sd15_euler(
     euler_solver = Euler(num_inference_steps=30)
     sd15 = StableDiffusion_1(solver=euler_solver, device=test_device)
 
-    sd15.clip_text_encoder.load_from_safetensors(text_encoder_weights)
-    sd15.lda.load_from_safetensors(lda_weights)
-    sd15.unet.load_from_safetensors(unet_weights_std)
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
 def sd15_ddim_lda_ft_mse(
-    text_encoder_weights: Path, lda_ft_mse_weights: Path, unet_weights_std: Path, test_device: torch.device
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_mse_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_1:
     if test_device.type == "cpu":
         warn("not running on CPU, skipping")
@@ -763,52 +687,19 @@ def sd15_ddim_lda_ft_mse(
     ddim_solver = DDIM(num_inference_steps=20)
     sd15 = StableDiffusion_1(solver=ddim_solver, device=test_device)
 
-    sd15.clip_text_encoder.load_state_dict(load_from_safetensors(text_encoder_weights))
-    sd15.lda.load_state_dict(load_from_safetensors(lda_ft_mse_weights))
-    sd15.unet.load_state_dict(load_from_safetensors(unet_weights_std))
+    sd15.clip_text_encoder.load_from_safetensors(sd15_text_encoder_weights_path)
+    sd15.lda.load_from_safetensors(sd15_autoencoder_mse_weights_path)
+    sd15.unet.load_from_safetensors(sd15_unet_weights_path)
 
     return sd15
 
 
 @pytest.fixture
-def sdxl_lda_weights(test_weights_path: Path) -> Path:
-    sdxl_lda_weights = test_weights_path / "sdxl-lda.safetensors"
-    if not sdxl_lda_weights.is_file():
-        warn(message=f"could not find weights at {sdxl_lda_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sdxl_lda_weights
-
-
-@pytest.fixture
-def sdxl_lda_fp16_fix_weights(test_weights_path: Path) -> Path:
-    sdxl_lda_weights = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
-    if not sdxl_lda_weights.is_file():
-        warn(message=f"could not find weights at {sdxl_lda_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sdxl_lda_weights
-
-
-@pytest.fixture
-def sdxl_unet_weights(test_weights_path: Path) -> Path:
-    sdxl_unet_weights = test_weights_path / "sdxl-unet.safetensors"
-    if not sdxl_unet_weights.is_file():
-        warn(message=f"could not find weights at {sdxl_unet_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sdxl_unet_weights
-
-
-@pytest.fixture
-def sdxl_text_encoder_weights(test_weights_path: Path) -> Path:
-    sdxl_double_text_encoder_weights = test_weights_path / "DoubleCLIPTextEncoder.safetensors"
-    if not sdxl_double_text_encoder_weights.is_file():
-        warn(message=f"could not find weights at {sdxl_double_text_encoder_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return sdxl_double_text_encoder_weights
-
-
-@pytest.fixture
 def sdxl_ddim(
-    sdxl_text_encoder_weights: Path, sdxl_lda_weights: Path, sdxl_unet_weights: Path, test_device: torch.device
+    sdxl_text_encoder_weights_path: Path,
+    sdxl_autoencoder_weights_path: Path,
+    sdxl_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_XL:
     if test_device.type == "cpu":
         warn(message="not running on CPU, skipping")
@@ -817,16 +708,19 @@ def sdxl_ddim(
     solver = DDIM(num_inference_steps=30)
     sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
-    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_weights)
-    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(tensors_path=sdxl_autoencoder_weights_path)
+    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights_path)
 
     return sdxl
 
 
 @pytest.fixture
 def sdxl_ddim_lda_fp16_fix(
-    sdxl_text_encoder_weights: Path, sdxl_lda_fp16_fix_weights: Path, sdxl_unet_weights: Path, test_device: torch.device
+    sdxl_text_encoder_weights_path: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_weights_path: Path,
+    test_device: torch.device,
 ) -> StableDiffusion_XL:
     if test_device.type == "cpu":
         warn(message="not running on CPU, skipping")
@@ -835,9 +729,9 @@ def sdxl_ddim_lda_fp16_fix(
     solver = DDIM(num_inference_steps=30)
     sdxl = StableDiffusion_XL(solver=solver, device=test_device)
 
-    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(tensors_path=sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights_path)
 
     return sdxl
 
@@ -856,23 +750,18 @@ def sdxl_euler_deterministic(sdxl_ddim: StableDiffusion_XL) -> StableDiffusion_X
 
 @pytest.fixture(scope="module")
 def multi_upscaler(
-    test_weights_path: Path,
-    unet_weights_std: Path,
-    text_encoder_weights: Path,
-    lda_ft_mse_weights: Path,
+    controlnet_tiles_weights_path: Path,
+    sd15_text_encoder_weights_path: Path,
+    sd15_autoencoder_mse_weights_path: Path,
+    sd15_unet_weights_path: Path,
     test_device: torch.device,
 ) -> MultiUpscaler:
-    controlnet_tile_weights = test_weights_path / "controlnet" / "lllyasviel_control_v11f1e_sd15_tile.safetensors"
-    if not controlnet_tile_weights.is_file():
-        warn(message=f"could not find weights at {controlnet_tile_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-
     return MultiUpscaler(
         checkpoints=UpscalerCheckpoints(
-            unet=unet_weights_std,
-            clip_text_encoder=text_encoder_weights,
-            lda=lda_ft_mse_weights,
-            controlnet_tile=controlnet_tile_weights,
+            unet=sd15_unet_weights_path,
+            clip_text_encoder=sd15_text_encoder_weights_path,
+            lda=sd15_autoencoder_mse_weights_path,
+            controlnet_tile=controlnet_tiles_weights_path,
         ),
         device=test_device,
         dtype=torch.float32,
@@ -891,7 +780,9 @@ def expected_multi_upscaler(ref_path: Path) -> Image.Image:
 
 @no_grad()
 def test_diffusion_std_random_init(
-    sd15_std: StableDiffusion_1, expected_image_std_random_init: Image.Image, test_device: torch.device
+    sd15_std: StableDiffusion_1,
+    expected_image_std_random_init: Image.Image,
+    test_device: torch.device,
 ):
     sd15 = sd15_std
 
@@ -1553,6 +1444,9 @@ def test_diffusion_sdxl_control_lora(
 
     adapters: dict[str, ControlLoraAdapter] = {}
     for config_name, config in configs.items():
+        if not config.weights_path.is_file():
+            pytest.skip(f"File not found: {config.weights_path}")
+
         adapter = ControlLoraAdapter(
             name=config_name,
             scale=config.scale,
@@ -1922,13 +1816,18 @@ def test_diffusion_textual_inversion_random_init(
 @no_grad()
 def test_diffusion_ella_adapter(
     sd15_std_float16: StableDiffusion_1,
-    ella_weights: tuple[Path, Path],
+    ella_sd15_tsc_t5xl_weights_path: Path,
+    t5xl_transformers_path: str,
     expected_image_ella_adapter: Image.Image,
     test_device: torch.device,
+    use_local_weights: bool,
 ):
     sd15 = sd15_std_float16
-    ella_adapter_weights, t5xl_weights = ella_weights
-    t5_encoder = T5TextEmbedder(pretrained_path=t5xl_weights, max_length=128).to(test_device, torch.float16)
+    t5_encoder = T5TextEmbedder(
+        pretrained_path=t5xl_transformers_path,
+        local_files_only=use_local_weights,
+        max_length=128,
+    ).to(test_device, torch.float16)
 
     prompt = "a chinese man wearing a white shirt and a checkered headscarf, holds a large falcon near his shoulder. the falcon has dark feathers with a distinctive beak. the background consists of a clear sky and a fence, suggesting an outdoor setting, possibly a desert or arid region"
     negative_prompt = ""
@@ -1938,7 +1837,7 @@ def test_diffusion_ella_adapter(
     llm_text_embedding, negative_prompt_embeds = t5_encoder(prompt), t5_encoder(negative_prompt)
     prompt_embedding = torch.cat((negative_prompt_embeds, llm_text_embedding)).to(test_device, torch.float16)
 
-    adapter = SD1ELLAAdapter(target=sd15.unet, weights=load_from_safetensors(ella_adapter_weights))
+    adapter = SD1ELLAAdapter(target=sd15.unet, weights=load_from_safetensors(ella_sd15_tsc_t5xl_weights_path))
     adapter.inject()
     sd15.set_inference_steps(50)
     manual_seed(1001)
@@ -1959,8 +1858,8 @@ def test_diffusion_ella_adapter(
 @no_grad()
 def test_diffusion_ip_adapter(
     sd15_ddim_lda_ft_mse: StableDiffusion_1,
-    ip_adapter_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sd15_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     woman_image: Image.Image,
     expected_image_ip_adapter_woman: Image.Image,
     test_device: torch.device,
@@ -1976,8 +1875,8 @@ def test_diffusion_ip_adapter(
     prompt = "best quality, high quality"
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
-    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_weights))
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_sd15_weights_path))
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
@@ -2004,8 +1903,8 @@ def test_diffusion_ip_adapter(
 @no_grad()
 def test_diffusion_ip_adapter_multi(
     sd15_ddim_lda_ft_mse: StableDiffusion_1,
-    ip_adapter_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sd15_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     woman_image: Image.Image,
     statue_image: Image.Image,
     expected_image_ip_adapter_multi: Image.Image,
@@ -2016,8 +1915,8 @@ def test_diffusion_ip_adapter_multi(
     prompt = "best quality, high quality"
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
-    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_weights))
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_sd15_weights_path))
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
@@ -2044,8 +1943,8 @@ def test_diffusion_ip_adapter_multi(
 @no_grad()
 def test_diffusion_sdxl_ip_adapter(
     sdxl_ddim: StableDiffusion_XL,
-    sdxl_ip_adapter_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sdxl_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     woman_image: Image.Image,
     expected_image_sdxl_ip_adapter_woman: Image.Image,
     test_device: torch.device,
@@ -2055,8 +1954,8 @@ def test_diffusion_sdxl_ip_adapter(
     prompt = "best quality, high quality"
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
-    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(sdxl_ip_adapter_weights))
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(ip_adapter_sdxl_weights_path))
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     with no_grad():
@@ -2093,8 +1992,8 @@ def test_diffusion_sdxl_ip_adapter(
 @no_grad()
 def test_diffusion_ip_adapter_controlnet(
     sd15_ddim: StableDiffusion_1,
-    ip_adapter_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sd15_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     lora_data_pokemon: tuple[Image.Image, Path],
     controlnet_data_depth: tuple[str, Image.Image, Image.Image, Path],
     expected_image_ip_adapter_controlnet: Image.Image,
@@ -2107,8 +2006,8 @@ def test_diffusion_ip_adapter_controlnet(
     prompt = "best quality, high quality"
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
-    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_weights))
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter = SD1IPAdapter(target=sd15.unet, weights=load_from_safetensors(ip_adapter_sd15_weights_path))
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     depth_controlnet = SD1ControlnetAdapter(
@@ -2149,8 +2048,8 @@ def test_diffusion_ip_adapter_controlnet(
 @no_grad()
 def test_diffusion_ip_adapter_plus(
     sd15_ddim_lda_ft_mse: StableDiffusion_1,
-    ip_adapter_plus_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sd15_plus_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     statue_image: Image.Image,
     expected_image_ip_adapter_plus_statue: Image.Image,
     test_device: torch.device,
@@ -2161,9 +2060,9 @@ def test_diffusion_ip_adapter_plus(
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
     ip_adapter = SD1IPAdapter(
-        target=sd15.unet, weights=load_from_safetensors(ip_adapter_plus_weights), fine_grained=True
+        target=sd15.unet, weights=load_from_safetensors(ip_adapter_sd15_plus_weights_path), fine_grained=True
     )
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     clip_text_embedding = sd15.compute_clip_text_embedding(text=prompt, negative_text=negative_prompt)
@@ -2190,8 +2089,8 @@ def test_diffusion_ip_adapter_plus(
 @no_grad()
 def test_diffusion_sdxl_ip_adapter_plus(
     sdxl_ddim: StableDiffusion_XL,
-    sdxl_ip_adapter_plus_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sdxl_plus_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     woman_image: Image.Image,
     expected_image_sdxl_ip_adapter_plus_woman: Image.Image,
     test_device: torch.device,
@@ -2202,9 +2101,9 @@ def test_diffusion_sdxl_ip_adapter_plus(
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
 
     ip_adapter = SDXLIPAdapter(
-        target=sdxl.unet, weights=load_from_safetensors(sdxl_ip_adapter_plus_weights), fine_grained=True
+        target=sdxl.unet, weights=load_from_safetensors(ip_adapter_sdxl_plus_weights_path), fine_grained=True
     )
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
@@ -2608,8 +2507,8 @@ def test_freeu(
 def test_hello_world(
     sdxl_ddim_lda_fp16_fix: StableDiffusion_XL,
     t2i_adapter_xl_data_canny: tuple[str, Image.Image, Image.Image, Path],
-    sdxl_ip_adapter_weights: Path,
-    image_encoder_weights: Path,
+    ip_adapter_sdxl_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
     hello_world_assets: tuple[Image.Image, Image.Image, Image.Image, Image.Image],
 ) -> None:
     sdxl = sdxl_ddim_lda_fp16_fix.to(dtype=torch.float16)
@@ -2622,8 +2521,8 @@ def test_hello_world(
         warn(f"could not find weights at {weights_path}, skipping")
         pytest.skip(allow_module_level=True)
 
-    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(sdxl_ip_adapter_weights))
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter = SDXLIPAdapter(target=sdxl.unet, weights=load_from_safetensors(ip_adapter_sdxl_weights_path))
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     image_embedding = ip_adapter.compute_clip_image_embedding(ip_adapter.preprocess_image(image_prompt))
@@ -2744,23 +2643,18 @@ def expected_ic_light(ref_path: Path) -> Image.Image:
 
 
 @pytest.fixture(scope="module")
-def ic_light_sd15_fc_weights(test_weights_path: Path) -> Path:
-    return test_weights_path / "iclight_sd15_fc-refiners.safetensors"
-
-
-@pytest.fixture(scope="module")
 def ic_light_sd15_fc(
-    ic_light_sd15_fc_weights: Path,
-    unet_weights_std: Path,
-    lda_weights: Path,
-    text_encoder_weights: Path,
+    ic_light_sd15_fc_weights_path: Path,
+    sd15_unet_weights_path: Path,
+    sd15_autoencoder_weights_path: Path,
+    sd15_text_encoder_weights_path: Path,
     test_device: torch.device,
 ) -> ICLight:
     return ICLight(
-        patch_weights=load_from_safetensors(ic_light_sd15_fc_weights),
-        unet=SD1UNet(in_channels=4).load_from_safetensors(unet_weights_std),
-        lda=SD1Autoencoder().load_from_safetensors(lda_weights),
-        clip_text_encoder=CLIPTextEncoderL().load_from_safetensors(text_encoder_weights),
+        patch_weights=load_from_safetensors(ic_light_sd15_fc_weights_path),
+        unet=SD1UNet(in_channels=4).load_from_safetensors(sd15_unet_weights_path),
+        lda=SD1Autoencoder().load_from_safetensors(sd15_autoencoder_weights_path),
+        clip_text_encoder=CLIPTextEncoderL().load_from_safetensors(sd15_text_encoder_weights_path),
         device=test_device,
     )
 

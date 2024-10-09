@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import warn
 
 import pytest
 import torch
@@ -31,42 +30,39 @@ PROMPTS = [
 
 @pytest.fixture(scope="module")
 def our_encoder(
-    test_weights_path: Path,
+    sd15_text_encoder_weights_path: Path,
     test_device: torch.device,
     test_dtype_fp32_fp16: torch.dtype,
 ) -> CLIPTextEncoderL:
-    weights = test_weights_path / "CLIPTextEncoderL.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    tensors = load_from_safetensors(weights)
     encoder = CLIPTextEncoderL(device=test_device, dtype=test_dtype_fp32_fp16)
+    tensors = load_from_safetensors(sd15_text_encoder_weights_path)
+
     encoder.load_state_dict(tensors)
     return encoder
 
 
 @pytest.fixture(scope="module")
-def runwayml_weights_path(test_weights_path: Path):
-    r = test_weights_path / "runwayml" / "stable-diffusion-v1-5"
-    if not r.is_dir():
-        warn(f"could not find RunwayML weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture(scope="module")
-def ref_tokenizer(runwayml_weights_path: Path) -> transformers.CLIPTokenizer:
-    return transformers.CLIPTokenizer.from_pretrained(runwayml_weights_path, subfolder="tokenizer")  # type: ignore
+def ref_tokenizer(
+    sd15_diffusers_runwayml_path: str,
+    use_local_weights: bool,
+) -> transformers.CLIPTokenizer:
+    return transformers.CLIPTokenizer.from_pretrained(  # type: ignore
+        sd15_diffusers_runwayml_path,
+        local_files_only=use_local_weights,
+        subfolder="tokenizer",
+    )
 
 
 @pytest.fixture(scope="module")
 def ref_encoder(
-    runwayml_weights_path: Path,
+    sd15_diffusers_runwayml_path: str,
     test_device: torch.device,
     test_dtype_fp32_fp16: torch.dtype,
+    use_local_weights: bool,
 ) -> transformers.CLIPTextModel:
     return transformers.CLIPTextModel.from_pretrained(  # type: ignore
-        runwayml_weights_path,
+        sd15_diffusers_runwayml_path,
+        local_files_only=use_local_weights,
         subfolder="text_encoder",
     ).to(device=test_device, dtype=test_dtype_fp32_fp16)  # type: ignore
 

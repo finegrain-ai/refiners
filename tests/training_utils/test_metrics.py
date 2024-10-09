@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import warn
 
 import pytest
 import torch
@@ -25,16 +24,11 @@ class CifarDataset(Dataset[torch.Tensor]):
 
 @pytest.fixture(scope="module")
 def dinov2_l(
-    test_weights_path: Path,
+    dinov2_large_weights_path: Path,
     test_device: torch.device,
 ) -> dinov2.DINOv2_large:
-    weights = test_weights_path / f"dinov2_vitl14_pretrain.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {weights}, skipping")
-        pytest.skip(allow_module_level=True)
-
     model = dinov2.DINOv2_large(device=test_device)
-    model.load_from_safetensors(weights)
+    model.load_from_safetensors(dinov2_large_weights_path)
     return model
 
 

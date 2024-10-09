@@ -29,74 +29,11 @@ def ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_doc_examples_ref"
 
 
-@pytest.fixture(scope="module")
-def sdxl_text_encoder_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "DoubleCLIPTextEncoder.safetensors"
-    if not path.is_file():
-        warn(message=f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture(scope="module")
-def sdxl_lda_fp16_fix_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
-    if not path.is_file():
-        warn(message=f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture(scope="module")
-def sdxl_unet_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "sdxl-unet.safetensors"
-    if not path.is_file():
-        warn(message=f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture(scope="module")
-def sdxl_ip_adapter_plus_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "ip-adapter-plus_sdxl_vit-h.safetensors"
-    if not path.is_file():
-        warn(f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture(scope="module")
-def image_encoder_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "CLIPImageEncoderH.safetensors"
-    if not path.is_file():
-        warn(f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture
-def scifi_lora_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "loras" / "Sci-fi_Environments_sdxl.safetensors"
-    if not path.is_file():
-        warn(message=f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
-@pytest.fixture
-def pixelart_lora_weights(test_weights_path: Path) -> Path:
-    path = test_weights_path / "loras" / "pixel-art-xl-v1.1.safetensors"
-    if not path.is_file():
-        warn(message=f"could not find weights at {path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return path
-
-
 @pytest.fixture
 def sdxl(
-    sdxl_text_encoder_weights: Path,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_unet_weights: Path,
+    sdxl_text_encoder_weights_path: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_weights_path: Path,
     test_device: torch.device,
 ) -> StableDiffusion_XL:
     if test_device.type == "cpu":
@@ -105,9 +42,9 @@ def sdxl(
 
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16)
 
-    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(tensors_path=sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(tensors_path=sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(tensors_path=sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(tensors_path=sdxl_unet_weights_path)
 
     return sdxl
 
@@ -180,7 +117,7 @@ def test_guide_adapting_sdxl_vanilla(
 def test_guide_adapting_sdxl_single_lora(
     test_device: torch.device,
     sdxl: StableDiffusion_XL,
-    scifi_lora_weights: Path,
+    lora_scifi_weights_path: Path,
     expected_image_guide_adapting_sdxl_single_lora: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
@@ -195,7 +132,7 @@ def test_guide_adapting_sdxl_single_lora(
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
     manager = SDLoraManager(sdxl)
-    manager.add_loras("scifi-lora", load_from_safetensors(scifi_lora_weights))
+    manager.add_loras("scifi-lora", load_from_safetensors(lora_scifi_weights_path))
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt + ", best quality, high quality",
@@ -222,8 +159,8 @@ def test_guide_adapting_sdxl_single_lora(
 def test_guide_adapting_sdxl_multiple_loras(
     test_device: torch.device,
     sdxl: StableDiffusion_XL,
-    scifi_lora_weights: Path,
-    pixelart_lora_weights: Path,
+    lora_scifi_weights_path: Path,
+    lora_pixelart_weights_path: Path,
     expected_image_guide_adapting_sdxl_multiple_loras: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
@@ -238,8 +175,8 @@ def test_guide_adapting_sdxl_multiple_loras(
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
     manager = SDLoraManager(sdxl)
-    manager.add_loras("scifi-lora", load_from_safetensors(scifi_lora_weights))
-    manager.add_loras("pixel-art-lora", load_from_safetensors(pixelart_lora_weights), scale=1.4)
+    manager.add_loras("scifi-lora", load_from_safetensors(lora_scifi_weights_path))
+    manager.add_loras("pixel-art-lora", load_from_safetensors(lora_pixelart_weights_path), scale=1.4)
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
         text=prompt + ", best quality, high quality",
@@ -266,10 +203,10 @@ def test_guide_adapting_sdxl_multiple_loras(
 def test_guide_adapting_sdxl_loras_ip_adapter(
     test_device: torch.device,
     sdxl: StableDiffusion_XL,
-    sdxl_ip_adapter_plus_weights: Path,
-    image_encoder_weights: Path,
-    scifi_lora_weights: Path,
-    pixelart_lora_weights: Path,
+    ip_adapter_sdxl_plus_weights_path: Path,
+    clip_image_encoder_huge_weights_path: Path,
+    lora_scifi_weights_path: Path,
+    lora_pixelart_weights_path: Path,
     image_prompt_german_castle: Image.Image,
     expected_image_guide_adapting_sdxl_loras_ip_adapter: Image.Image,
 ) -> None:
@@ -285,16 +222,16 @@ def test_guide_adapting_sdxl_loras_ip_adapter(
     sdxl.set_self_attention_guidance(enable=True, scale=0.75)
 
     manager = SDLoraManager(sdxl)
-    manager.add_loras("scifi-lora", load_from_safetensors(scifi_lora_weights), scale=1.5)
-    manager.add_loras("pixel-art-lora", load_from_safetensors(pixelart_lora_weights), scale=1.55)
+    manager.add_loras("scifi-lora", load_from_safetensors(lora_scifi_weights_path), scale=1.5)
+    manager.add_loras("pixel-art-lora", load_from_safetensors(lora_pixelart_weights_path), scale=1.55)
 
     ip_adapter = SDXLIPAdapter(
         target=sdxl.unet,
-        weights=load_from_safetensors(sdxl_ip_adapter_plus_weights),
+        weights=load_from_safetensors(ip_adapter_sdxl_plus_weights_path),
         scale=1.0,
         fine_grained=True,
     )
-    ip_adapter.clip_image_encoder.load_from_safetensors(image_encoder_weights)
+    ip_adapter.clip_image_encoder.load_from_safetensors(clip_image_encoder_huge_weights_path)
     ip_adapter.inject()
 
     clip_text_embedding, pooled_text_embedding = sdxl.compute_clip_text_embedding(
