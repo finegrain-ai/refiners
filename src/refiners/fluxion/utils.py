@@ -304,3 +304,13 @@ def str_to_dtype(dtype: str) -> torch.dtype:
             return torch.bool
         case _:
             raise ValueError(f"Unknown dtype: {dtype}")
+
+
+def device_has_bfloat16(device: torch.device) -> bool:
+    cuda_version = cast(str | None, torch.version.cuda)  # type: ignore
+    if cuda_version is None or int(cuda_version.split(".")[0]) < 11:
+        return False
+    try:
+        return torch.cuda.get_device_properties(device).major >= 8  # type: ignore
+    except ValueError:
+        return False
