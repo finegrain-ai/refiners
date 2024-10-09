@@ -75,13 +75,11 @@ test = [
     "transformers>=4.35.2",
     "piq>=0.8.0",
     "torchvision>=0.16.1",
-    # An unofficial Python package for Meta AI's Segment Anything Model:
-    # https://github.com/opengeos/segment-anything
+    # An unofficial Python package for Meta AI's Segment Anything Model: https://github.com/opengeos/segment-anything
     "segment-anything-py>=1.0",
-    # Official Python package for HQ-SAM
+    # Official Python package for HQ-SAM: https://github.com/SysCV/sam-hq
     "segment-anything-hq>=0.3",
-    # HQ-SAM missing dependency:
-    # https://github.com/SysCV/sam-hq/pull/59
+    # HQ-SAM missing dependency: https://github.com/SysCV/sam-hq/pull/59
     "timm>=0.5.0",
     "sentencepiece>=0.2.0",
 ]
@@ -91,7 +89,6 @@ conversion = [
     "segment-anything-py>=1.0",
     "requests>=2.26.0",
     "tqdm>=4.62.3",
-    "gdown>=5.2.0",
 ]
 doc = [
     # required by mkdocs to format the signatures
@@ -129,8 +126,7 @@ allow-direct-references = true
 [tool.rye.scripts]
 serve-docs = "mkdocs serve"
 test-cov = "coverage run -m pytest"
-# Work around for "Couldn't parse" errors due to e.g. opencv-python:
-# https://github.com/nedbat/coveragepy/issues/1653
+# Work around for "Couldn't parse" errors due to e.g. opencv-python: https://github.com/nedbat/coveragepy/issues/1653
 build-html-cov = { cmd = "coverage html", env = { PYTHONWARNINGS = "ignore:Couldn't parse::coverage.report_core" } }
 serve-cov-report = { chain = [
     "build-html-cov",
@@ -164,7 +160,7 @@ combine-as-imports = true
 black = true
 
 [tool.pyright]
-include = ["src/refiners", "tests", "scripts"]
+include = ["src/refiners", "tests"]
 strict = ["*"]
 exclude = ["**/__pycache__", "tests/weights", "tests/repos"]
 reportMissingTypeStubs = "warning"
