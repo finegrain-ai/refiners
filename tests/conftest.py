@@ -5,7 +5,7 @@ from typing import Callable
 import torch
 from pytest import FixtureRequest, fixture, skip
 
-from refiners.fluxion.utils import str_to_dtype
+from refiners.fluxion.utils import device_has_bfloat16, str_to_dtype
 
 PARENT_PATH = Path(__file__).parent
 
@@ -21,11 +21,11 @@ def test_device() -> torch.device:
     return torch.device(test_device)
 
 
-def dtype_fixture_factory(params: list[str]) -> Callable[[FixtureRequest], torch.dtype]:
+def dtype_fixture_factory(params: list[str]) -> Callable[[torch.device, FixtureRequest], torch.dtype]:
     @fixture(scope="session", params=params)
-    def dtype_fixture(request: FixtureRequest) -> torch.dtype:
+    def dtype_fixture(test_device: torch.device, request: FixtureRequest) -> torch.dtype:
         torch_dtype = str_to_dtype(request.param)
-        if torch_dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+        if torch_dtype == torch.bfloat16 and not device_has_bfloat16(test_device):
             skip("bfloat16 is not supported on this test device")
         return torch_dtype
 
