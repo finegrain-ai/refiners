@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import warn
 
 import pytest
 import torch
@@ -20,17 +19,13 @@ PROMPTS = [
 
 @pytest.fixture(scope="module")
 def our_encoder_with_new_concepts(
-    test_weights_path: Path,
+    sd15_text_encoder_weights_path: Path,
     test_device: torch.device,
     cat_embedding_textual_inversion: torch.Tensor,
     gta5_artwork_embedding_textual_inversion: torch.Tensor,
 ) -> CLIPTextEncoderL:
-    weights = test_weights_path / "CLIPTextEncoderL.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {weights}, skipping")
-        pytest.skip(allow_module_level=True)
     encoder = CLIPTextEncoderL(device=test_device)
-    tensors = load_from_safetensors(weights)
+    tensors = load_from_safetensors(sd15_text_encoder_weights_path)
     encoder.load_state_dict(tensors)
     concept_extender = ConceptExtender(encoder)
     concept_extender.add_concept("<cat-toy>", cat_embedding_textual_inversion)
@@ -41,22 +36,19 @@ def our_encoder_with_new_concepts(
 
 @pytest.fixture(scope="module")
 def ref_sd15_with_new_concepts(
-    runwayml_weights_path: Path, test_textual_inversion_path: Path, test_device: torch.device
+    sd15_diffusers_runwayml_path: str,
+    test_textual_inversion_path: Path,
+    test_device: torch.device,
+    use_local_weights: bool,
 ) -> StableDiffusionPipeline:
-    pipe = StableDiffusionPipeline.from_pretrained(runwayml_weights_path).to(test_device)  # type: ignore
+    pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore
+        sd15_diffusers_runwayml_path,
+        local_files_only=use_local_weights,
+    ).to(test_device)  # type: ignore
     assert isinstance(pipe, StableDiffusionPipeline)
     pipe.load_textual_inversion(test_textual_inversion_path / "cat-toy")  # type: ignore
     pipe.load_textual_inversion(test_textual_inversion_path / "gta5-artwork")  # type: ignore
     return pipe
-
-
-@pytest.fixture(scope="module")
-def runwayml_weights_path(test_weights_path: Path):
-    r = test_weights_path / "runwayml" / "stable-diffusion-v1-5"
-    if not r.is_dir():
-        warn(f"could not find RunwayML weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
 
 
 @pytest.fixture(scope="module")

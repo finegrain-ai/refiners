@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import warn
 
 import pytest
 import torch
@@ -38,24 +37,15 @@ def expected_box_segmenter_spray_cropped_mask(ref_path: Path) -> Image.Image:
     return _img_open(ref_path / "expected_box_segmenter_spray_cropped_mask.png")
 
 
-@pytest.fixture(scope="module")
-def box_segmenter_weights(test_weights_path: Path) -> Path:
-    weights = test_weights_path / "finegrain-box-segmenter-v0-1.safetensors"
-    if not weights.is_file():
-        warn(f"could not find weights at {test_weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-    return weights
-
-
 def test_box_segmenter(
-    box_segmenter_weights: Path,
+    box_segmenter_weights_path: Path,
     ref_shelves: Image.Image,
     expected_box_segmenter_plant_mask: Image.Image,
     expected_box_segmenter_spray_mask: Image.Image,
     expected_box_segmenter_spray_cropped_mask: Image.Image,
     test_device: torch.device,
 ):
-    segmenter = BoxSegmenter(weights=box_segmenter_weights, device=test_device)
+    segmenter = BoxSegmenter(weights=box_segmenter_weights_path, device=test_device)
 
     plant_mask = segmenter(ref_shelves, box_prompt=(504, 82, 754, 368))
     ensure_similar_images(plant_mask.convert("RGB"), expected_box_segmenter_plant_mask.convert("RGB"))

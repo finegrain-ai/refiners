@@ -25,60 +25,6 @@ def ensure_gc():
     gc.collect()
 
 
-@pytest.fixture
-def sdxl_lda_fp16_fix_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-lda-fp16-fix.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_unet_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl-unet.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_lightning_4step_unet_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl_lightning_4step_unet.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_lightning_1step_unet_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl_lightning_1step_unet_x0.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_text_encoder_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "DoubleCLIPTextEncoder.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
-@pytest.fixture
-def sdxl_lightning_4step_lora_weights(test_weights_path: Path) -> Path:
-    r = test_weights_path / "sdxl_lightning_4step_lora.safetensors"
-    if not r.is_file():
-        warn(f"could not find weights at {r}, skipping")
-        pytest.skip(allow_module_level=True)
-    return r
-
-
 @pytest.fixture(scope="module")
 def ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_lightning_ref"
@@ -102,16 +48,16 @@ def expected_lightning_lora_4step(ref_path: Path) -> Image.Image:
 @no_grad()
 def test_lightning_base_4step(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_lightning_4step_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_lightning_4step_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
     expected_lightning_base_4step: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    unet_weights = sdxl_lightning_4step_unet_weights
+    unet_weights = sdxl_unet_lightning_4step_weights_path
     expected_image = expected_lightning_base_4step
 
     solver = Euler(
@@ -125,8 +71,8 @@ def test_lightning_base_4step(
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16, solver=solver)
     sdxl.classifier_free_guidance = False
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
     sdxl.unet.load_from_safetensors(unet_weights)
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
@@ -153,16 +99,16 @@ def test_lightning_base_4step(
 @no_grad()
 def test_lightning_base_1step(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_lightning_1step_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_lightning_1step_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
     expected_lightning_base_1step: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
         warn(message="not running on CPU, skipping")
         pytest.skip()
 
-    unet_weights = sdxl_lightning_1step_unet_weights
+    unet_weights = sdxl_unet_lightning_1step_weights_path
     expected_image = expected_lightning_base_1step
 
     solver = Euler(
@@ -176,8 +122,8 @@ def test_lightning_base_1step(
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16, solver=solver)
     sdxl.classifier_free_guidance = False
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
     sdxl.unet.load_from_safetensors(unet_weights)
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
@@ -204,10 +150,10 @@ def test_lightning_base_1step(
 @no_grad()
 def test_lightning_lora_4step(
     test_device: torch.device,
-    sdxl_lda_fp16_fix_weights: Path,
-    sdxl_unet_weights: Path,
-    sdxl_text_encoder_weights: Path,
-    sdxl_lightning_4step_lora_weights: Path,
+    sdxl_autoencoder_fp16fix_weights_path: Path,
+    sdxl_unet_weights_path: Path,
+    sdxl_text_encoder_weights_path: Path,
+    lora_sdxl_lightning_4step_weights_path: Path,
     expected_lightning_lora_4step: Image.Image,
 ) -> None:
     if test_device.type == "cpu":
@@ -227,12 +173,12 @@ def test_lightning_lora_4step(
     sdxl = StableDiffusion_XL(device=test_device, dtype=torch.float16, solver=solver)
     sdxl.classifier_free_guidance = False
 
-    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights)
-    sdxl.lda.load_from_safetensors(sdxl_lda_fp16_fix_weights)
-    sdxl.unet.load_from_safetensors(sdxl_unet_weights)
+    sdxl.clip_text_encoder.load_from_safetensors(sdxl_text_encoder_weights_path)
+    sdxl.lda.load_from_safetensors(sdxl_autoencoder_fp16fix_weights_path)
+    sdxl.unet.load_from_safetensors(sdxl_unet_weights_path)
 
     manager = SDLoraManager(sdxl)
-    add_lcm_lora(manager, load_from_safetensors(sdxl_lightning_4step_lora_weights), name="lightning")
+    add_lcm_lora(manager, load_from_safetensors(lora_sdxl_lightning_4step_weights_path), name="lightning")
 
     prompt = "Self-portrait oil painting, a beautiful cyborg with golden hair, 8k"
 

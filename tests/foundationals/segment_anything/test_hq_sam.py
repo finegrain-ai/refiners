@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import cast
-from warnings import warn
 
 import numpy as np
 import pytest
@@ -36,37 +35,17 @@ def tennis(ref_path: Path) -> Image.Image:
     return Image.open(ref_path / "tennis.png").convert("RGB")  # type: ignore
 
 
-@pytest.fixture(scope="module")
-def hq_adapter_weights(test_weights_path: Path) -> Path:
-    """Path to the HQ adapter weights in Refiners format"""
-    refiners_hq_adapter_sam_weights = test_weights_path / "refiners-sam-hq-vit-h.safetensors"
-    if not refiners_hq_adapter_sam_weights.is_file():
-        warn(f"Test weights not found at {refiners_hq_adapter_sam_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return refiners_hq_adapter_sam_weights
-
-
 @pytest.fixture
-def sam_h(sam_h_weights: Path, test_device: torch.device) -> SegmentAnythingH:
+def sam_h(sam_h_weights_path: Path, test_device: torch.device) -> SegmentAnythingH:
     # HQSAMAdapter is designed to be used with single-output only, hence multimask_output=False.
     sam_h = SegmentAnythingH(multimask_output=False, device=test_device)
-    sam_h.load_from_safetensors(tensors_path=sam_h_weights)
+    sam_h.load_from_safetensors(tensors_path=sam_h_weights_path)
     return sam_h
 
 
 @pytest.fixture(scope="module")
-def reference_hq_adapter_weights(test_weights_path: Path) -> Path:
-    """Path to the HQ adapter weights in default format"""
-    reference_hq_adapter_sam_weights = test_weights_path / "sam_hq_vit_h.pth"
-    if not reference_hq_adapter_sam_weights.is_file():
-        warn(f"Test weights not found at {reference_hq_adapter_sam_weights}, skipping")
-        pytest.skip(allow_module_level=True)
-    return reference_hq_adapter_sam_weights
-
-
-@pytest.fixture(scope="module")
-def reference_sam_h(reference_hq_adapter_weights: Path, test_device: torch.device) -> FacebookSAM:
-    sam_h = cast(FacebookSAM, sam_model_registry_hq["vit_h"](checkpoint=reference_hq_adapter_weights))
+def reference_sam_h(sam_h_hq_adapter_unconverted_weights_path: Path, test_device: torch.device) -> FacebookSAM:
+    sam_h = cast(FacebookSAM, sam_model_registry_hq["vit_h"](checkpoint=sam_h_hq_adapter_unconverted_weights_path))
     return sam_h.to(device=test_device)
 
 
@@ -142,11 +121,11 @@ def test_mask_decoder_tokens_extender() -> None:
 @no_grad()
 def test_early_vit_embedding(
     sam_h: SegmentAnythingH,
-    hq_adapter_weights: Path,
+    sam_h_hq_adapter_weights_path: Path,
     reference_sam_h: FacebookSAM,
     tennis: Image.Image,
 ) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     image_tensor = image_to_tensor(image=tennis.resize(size=(1024, 1024)))  # type: ignore
 
@@ -159,8 +138,8 @@ def test_early_vit_embedding(
     assert torch.equal(early_vit_embedding, early_vit_embedding_refiners)
 
 
-def test_tokens(sam_h: SegmentAnythingH, hq_adapter_weights: Path, reference_sam_h: FacebookSAM) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+def test_tokens(sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path, reference_sam_h: FacebookSAM) -> None:
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     mask_decoder_tokens_extender = sam_h.mask_decoder.ensure_find(MaskDecoderTokensExtender)
 
@@ -175,8 +154,10 @@ def test_tokens(sam_h: SegmentAnythingH, hq_adapter_weights: Path, reference_sam
 
 
 @no_grad()
-def test_compress_vit_feat(sam_h: SegmentAnythingH, hq_adapter_weights: Path, reference_sam_h: FacebookSAM) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+def test_compress_vit_feat(
+    sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path, reference_sam_h: FacebookSAM
+) -> None:
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     early_vit_embedding = torch.randn(1, 64, 64, 1280, device=sam_h.device, dtype=sam_h.dtype)
 
@@ -189,8 +170,10 @@ def test_compress_vit_feat(sam_h: SegmentAnythingH, hq_adapter_weights: Path, re
 
 
 @no_grad()
-def test_embedding_encoder(sam_h: SegmentAnythingH, hq_adapter_weights: Path, reference_sam_h: FacebookSAM) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+def test_embedding_encoder(
+    sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path, reference_sam_h: FacebookSAM
+) -> None:
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     x = torch.randn(1, 256, 64, 64, device=sam_h.device, dtype=sam_h.dtype)
 
@@ -203,8 +186,10 @@ def test_embedding_encoder(sam_h: SegmentAnythingH, hq_adapter_weights: Path, re
 
 
 @no_grad()
-def test_hq_token_mlp(sam_h: SegmentAnythingH, hq_adapter_weights: Path, reference_sam_h: FacebookSAM) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+def test_hq_token_mlp(
+    sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path, reference_sam_h: FacebookSAM
+) -> None:
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     x = torch.randn(1, 6, 256, device=sam_h.device, dtype=sam_h.dtype)
 
@@ -217,13 +202,13 @@ def test_hq_token_mlp(sam_h: SegmentAnythingH, hq_adapter_weights: Path, referen
 @pytest.mark.parametrize("hq_mask_only", [True, False])
 def test_predictor(
     sam_h: SegmentAnythingH,
-    hq_adapter_weights: Path,
+    sam_h_hq_adapter_weights_path: Path,
     hq_mask_only: bool,
     reference_sam_h_predictor: FacebookSAMPredictorHQ,
     tennis: Image.Image,
     one_prompt: SAMPrompt,
 ) -> None:
-    adapter = HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+    adapter = HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     adapter.hq_mask_only = hq_mask_only
     assert sam_h.ensure_find(PredictionsPostProc).hq_mask_only == hq_mask_only
@@ -268,13 +253,13 @@ def test_predictor(
 @pytest.mark.parametrize("hq_mask_only", [True, False])
 def test_predictor_equal(
     sam_h: SegmentAnythingH,
-    hq_adapter_weights: Path,
+    sam_h_hq_adapter_weights_path: Path,
     hq_mask_only: bool,
     reference_sam_h_predictor: FacebookSAMPredictorHQ,
     tennis: Image.Image,
     one_prompt: SAMPrompt,
 ) -> None:
-    adapter = HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+    adapter = HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     adapter.hq_mask_only = hq_mask_only
     assert sam_h.ensure_find(PredictionsPostProc).hq_mask_only == hq_mask_only
@@ -318,8 +303,8 @@ def test_predictor_equal(
 
 
 @no_grad()
-def test_batch_mask_decoder(sam_h: SegmentAnythingH, hq_adapter_weights: Path) -> None:
-    HQSAMAdapter(sam_h, weights=load_from_safetensors(hq_adapter_weights)).inject()
+def test_batch_mask_decoder(sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path) -> None:
+    HQSAMAdapter(sam_h, weights=load_from_safetensors(sam_h_hq_adapter_weights_path)).inject()
 
     batch_size = 5
 
@@ -348,8 +333,10 @@ def test_batch_mask_decoder(sam_h: SegmentAnythingH, hq_adapter_weights: Path) -
     assert torch.equal(mask_prediction[0], mask_prediction[1])
 
 
-def test_hq_sam_load_save_weights(sam_h: SegmentAnythingH, hq_adapter_weights: Path, test_device: torch.device) -> None:
-    weights = load_from_safetensors(hq_adapter_weights, device=test_device)
+def test_hq_sam_load_save_weights(
+    sam_h: SegmentAnythingH, sam_h_hq_adapter_weights_path: Path, test_device: torch.device
+) -> None:
+    weights = load_from_safetensors(sam_h_hq_adapter_weights_path, device=test_device)
 
     hq_sam_adapter = HQSAMAdapter(sam_h)
     out_weights_init = hq_sam_adapter.weights

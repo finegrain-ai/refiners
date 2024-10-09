@@ -24,11 +24,20 @@ def ensure_similar_images(img_1: Image.Image, img_2: Image.Image, min_psnr: int 
 
 class T5TextEmbedder(nn.Module):
     def __init__(
-        self, pretrained_path: Path = Path("tests/weights/QQGYLab/T5XLFP16"), max_length: int | None = None
+        self,
+        pretrained_path: Path | str,
+        max_length: int | None = None,
+        local_files_only: bool = False,
     ) -> None:
         super().__init__()  # type: ignore[reportUnknownMemberType]
-        self.model: nn.Module = T5EncoderModel.from_pretrained(pretrained_path, local_files_only=True)  # type: ignore
-        self.tokenizer: transformers.T5Tokenizer = T5Tokenizer.from_pretrained(pretrained_path, local_files_only=True)  # type: ignore
+        self.model: nn.Module = T5EncoderModel.from_pretrained(  # type: ignore
+            pretrained_path,
+            local_files_only=local_files_only,
+        )
+        self.tokenizer: transformers.T5Tokenizer = T5Tokenizer.from_pretrained(  # type: ignore
+            pretrained_path,
+            local_files_only=local_files_only,
+        )
         self.max_length = max_length
 
     def forward(

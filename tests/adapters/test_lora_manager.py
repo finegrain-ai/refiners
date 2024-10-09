@@ -1,5 +1,4 @@
 from pathlib import Path
-from warnings import warn
 
 import pytest
 import torch
@@ -16,14 +15,8 @@ def manager() -> SDLoraManager:
 
 
 @pytest.fixture
-def weights(test_weights_path: Path) -> dict[str, torch.Tensor]:
-    weights_path = test_weights_path / "loras" / "pokemon-lora" / "pytorch_lora_weights.bin"
-
-    if not weights_path.is_file():
-        warn(f"could not find weights at {weights_path}, skipping")
-        pytest.skip(allow_module_level=True)
-
-    return load_tensors(weights_path)
+def weights(lora_pokemon_weights_path: Path) -> dict[str, torch.Tensor]:
+    return load_tensors(lora_pokemon_weights_path)
 
 
 def test_add_loras(manager: SDLoraManager, weights: dict[str, torch.Tensor]) -> None:
