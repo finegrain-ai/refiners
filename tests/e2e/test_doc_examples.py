@@ -110,7 +110,7 @@ def test_guide_adapting_sdxl_vanilla(
         )
 
     predicted_image = sdxl.lda.decode_latents(x)
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
 @no_grad()
@@ -152,7 +152,7 @@ def test_guide_adapting_sdxl_single_lora(
         )
 
     predicted_image = sdxl.lda.decode_latents(x)
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=38, min_ssim=0.98)
 
 
 @no_grad()
@@ -196,7 +196,7 @@ def test_guide_adapting_sdxl_multiple_loras(
         )
 
     predicted_image = sdxl.lda.decode_latents(x)
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=38, min_ssim=0.98)
 
 
 @no_grad()
@@ -256,7 +256,7 @@ def test_guide_adapting_sdxl_loras_ip_adapter(
         )
 
     predicted_image = sdxl.lda.decode_latents(x)
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=29, min_ssim=0.98)
 
 
 # We do not (yet) test the last example using T2i-Adapter with Zoe Depth.

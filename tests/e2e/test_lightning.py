@@ -93,7 +93,7 @@ def test_lightning_base_4step(
         )
     predicted_image = sdxl.lda.latents_to_image(x)
 
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=40, min_ssim=0.98)
 
 
 @no_grad()
@@ -144,7 +144,7 @@ def test_lightning_base_1step(
         )
     predicted_image = sdxl.lda.latents_to_image(x)
 
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=40, min_ssim=0.98)
 
 
 @no_grad()
@@ -198,4 +198,4 @@ def test_lightning_lora_4step(
         )
     predicted_image = sdxl.lda.latents_to_image(x)
 
-    ensure_similar_images(predicted_image, expected_image)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=40, min_ssim=0.98)

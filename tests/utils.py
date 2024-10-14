@@ -1,25 +1,65 @@
+from functools import cache
 from pathlib import Path
+from textwrap import dedent
 
-import numpy as np
 import piq  # type: ignore
 import torch
 import torch.nn as nn
 from PIL import Image
 from transformers import T5EncoderModel, T5Tokenizer  # type: ignore
 
+from refiners.conversion.models import dinov2
+from refiners.fluxion.utils import image_to_tensor
+from refiners.foundationals.dinov2 import DINOv2_small
 
-def compare_images(img_1: Image.Image, img_2: Image.Image) -> tuple[int, float]:
-    x1, x2 = (
-        torch.tensor(np.array(x).astype(np.float32)).permute(2, 0, 1).unsqueeze(0) / 255.0 for x in (img_1, img_2)
+
+@cache
+def get_small_dinov2_model() -> DINOv2_small:
+    model = DINOv2_small()
+    model.load_from_safetensors(
+        dinov2.small.converted.local_path
+        if dinov2.small.converted.local_path.exists()
+        else dinov2.small.converted.hf_cache_path
     )
-    return (piq.psnr(x1, x2), piq.ssim(x1, x2).item())  # type: ignore
+    return model
 
 
-def ensure_similar_images(img_1: Image.Image, img_2: Image.Image, min_psnr: int = 45, min_ssim: float = 0.99):
-    psnr, ssim = compare_images(img_1, img_2)
-    assert (psnr >= min_psnr) and (
-        ssim >= min_ssim
-    ), f"PSNR {psnr} / SSIM {ssim}, expected at least {min_psnr} / {min_ssim}"
+def compare_images(
+    img_1: Image.Image,
+    img_2: Image.Image,
+) -> tuple[float, float, float]:
+    x1 = image_to_tensor(img_1)
+    x2 = image_to_tensor(img_2)
+
+    psnr = piq.psnr(x1, x2)  # type: ignore
+    ssim = piq.ssim(x1, x2)  # type: ignore
+
+    dinov2_model = get_small_dinov2_model()
+    dinov2 = torch.nn.functional.cosine_similarity(
+        dinov2_model(x1)[:, 0],
+        dinov2_model(x2)[:, 0],
+    )
+
+    return psnr.item(), ssim.item(), dinov2.item()  # type: ignore
+
+
+def ensure_similar_images(
+    img_1: Image.Image,
+    img_2: Image.Image,
+    min_psnr: int = 45,
+    min_ssim: float = 0.99,
+    min_dinov2: float = 0.99,
+) -> None:
+    psnr, ssim, dinov2 = compare_images(img_1, img_2)
+    if (psnr < min_psnr) or (ssim < min_ssim) or (dinov2 < min_dinov2):
+        raise AssertionError(
+            dedent(f"""
+            Images are not similar enough!
+              - PSNR: {psnr:08.05f} (required at least {min_psnr:08.05f})
+              - SSIM: {ssim:08.06f} (required at least {min_ssim:08.06f})
+              - DINO: {dinov2:08.06f} (required at least {min_dinov2:08.06f})
+            """).strip()
+        )
 
 
 class T5TextEmbedder(nn.Module):

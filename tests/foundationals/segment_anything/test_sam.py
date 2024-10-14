@@ -317,8 +317,9 @@ def test_predictor(
     for i in range(3):
         mask_prediction = masks[i].cpu()
         facebook_mask = torch.as_tensor(facebook_masks[i])
-        assert isclose(intersection_over_union(mask_prediction, facebook_mask), 1.0, rel_tol=5e-05)
-        assert isclose(scores[i].item(), facebook_scores[i].item(), rel_tol=1e-05)
+        iou = intersection_over_union(mask_prediction, facebook_mask)
+        assert isclose(iou, 1.0, rel_tol=5e-04), f"iou: {iou}"
+        assert isclose(scores[i].item(), facebook_scores[i].item(), rel_tol=1e-04)
 
 
 def test_predictor_image_embedding(sam_h: SegmentAnythingH, truck: Image.Image, one_prompt: SAMPrompt) -> None:

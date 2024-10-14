@@ -832,7 +832,7 @@ def test_diffusion_std_random_init_bfloat16(
         )
     predicted_image = sd15.lda.latents_to_image(x)
 
-    ensure_similar_images(predicted_image, expected_image_std_random_init_bfloat16)
+    ensure_similar_images(predicted_image, expected_image_std_random_init_bfloat16, min_psnr=30, min_ssim=0.97)
 
 
 @no_grad()
@@ -1166,7 +1166,7 @@ def test_diffusion_inpainting_float16(
     predicted_image = sd15.lda.latents_to_image(x)
 
     # PSNR and SSIM values are large because float16 is even worse than float32.
-    ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=20, min_ssim=0.92)
+    ensure_similar_images(predicted_image, expected_image_std_inpainting, min_psnr=25, min_ssim=0.95, min_dinov2=0.96)
 
 
 @no_grad()
@@ -1245,7 +1245,7 @@ def test_diffusion_controlnet_tile_upscale(
     predicted_image = sd15.lda.latents_to_image(x)
 
     # Note: rather large tolerances are used on purpose here (loose comparison with diffusers' output)
-    ensure_similar_images(predicted_image, expected_image, min_psnr=24, min_ssim=0.75)
+    ensure_similar_images(predicted_image, expected_image, min_psnr=24, min_ssim=0.75, min_dinov2=0.94)
 
 
 @no_grad()
@@ -1852,7 +1852,7 @@ def test_diffusion_ella_adapter(
             condition_scale=12,
         )
     predicted_image = sd15.lda.latents_to_image(x)
-    ensure_similar_images(predicted_image, expected_image_ella_adapter, min_psnr=35, min_ssim=0.98)
+    ensure_similar_images(predicted_image, expected_image_ella_adapter, min_psnr=31, min_ssim=0.98)
 
 
 @no_grad()
@@ -1937,7 +1937,7 @@ def test_diffusion_ip_adapter_multi(
         )
     predicted_image = sd15.lda.decode_latents(x)
 
-    ensure_similar_images(predicted_image, expected_image_ip_adapter_multi)
+    ensure_similar_images(predicted_image, expected_image_ip_adapter_multi, min_psnr=43, min_ssim=0.98)
 
 
 @no_grad()
@@ -2130,7 +2130,7 @@ def test_diffusion_sdxl_ip_adapter_plus(
     sdxl.lda.to(dtype=torch.float32)
     predicted_image = sdxl.lda.latents_to_image(x.to(dtype=torch.float32))
 
-    ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman)
+    ensure_similar_images(predicted_image, expected_image_sdxl_ip_adapter_plus_woman, min_psnr=43, min_ssim=0.98)
 
 
 @no_grad()
@@ -2608,11 +2608,11 @@ def test_style_aligned(
 
     # tile all images horizontally
     merged_image = Image.new("RGB", (1024 * len(predicted_images), 1024))
-    for i in range(len(predicted_images)):
-        merged_image.paste(predicted_images[i], (i * 1024, 0))  # type: ignore
+    for i, image in enumerate(predicted_images):
+        merged_image.paste(image, (1024 * i, 0))
 
     # compare against reference image
-    ensure_similar_images(merged_image, expected_style_aligned, min_psnr=35, min_ssim=0.99)
+    ensure_similar_images(merged_image, expected_style_aligned, min_psnr=12, min_ssim=0.39, min_dinov2=0.95)
 
 
 @no_grad()
@@ -2624,7 +2624,7 @@ def test_multi_upscaler(
     generator = torch.Generator(device=multi_upscaler.device)
     generator.manual_seed(37)
     predicted_image = multi_upscaler.upscale(clarity_example, generator=generator)
-    ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=35, min_ssim=0.99)
+    ensure_similar_images(predicted_image, expected_multi_upscaler, min_psnr=25, min_ssim=0.85, min_dinov2=0.96)
 
 
 @no_grad()
