@@ -10,10 +10,6 @@ from refiners.fluxion.utils import image_to_tensor, no_grad, normalize, tensor_t
 from refiners.foundationals.swin.mvanet import MVANet
 
 
-def _img_open(path: Path) -> Image.Image:
-    return Image.open(path)  # type: ignore
-
-
 @pytest.fixture(scope="module")
 def ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_mvanet_ref"
@@ -21,12 +17,12 @@ def ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture(scope="module")
 def ref_cactus(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "cactus.png").convert("RGB")
+    return Image.open(ref_path / "cactus.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_cactus_mask(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_cactus_mask.png")
+    return Image.open(ref_path / "expected_cactus_mask.png")
 
 
 @pytest.fixture
