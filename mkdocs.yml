@@ -33,7 +33,7 @@ plugins:
         python:
           import:
             - https://docs.python.org/3/objects.inv
-            - https://pytorch.org/docs/master/objects.inv
+            - https://pytorch.org/docs/main/objects.inv
             - https://docs.kidger.site/jaxtyping/objects.inv
           options:
             show_bases: true
@@ -55,7 +55,7 @@ watch:
 extra_css:
   - stylesheets/extra.css
 nav:
-  - Home: 
+  - Home:
     - Welcome: index.md
     - Manifesto: home/why.md
   - Getting started:
@@ -75,9 +75,9 @@ extra:
     - icon: fontawesome/brands/discord
       link: https://discord.gg/mCmjNUVV7d
     - icon: fontawesome/brands/github
-      link: https://github.com/finegrain-ai/refiners   
+      link: https://github.com/finegrain-ai/refiners
     - icon: fontawesome/brands/twitter
-      link: https://twitter.com/finegrain_ai 
+      link: https://twitter.com/finegrain_ai
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/finegrain-ai/
 markdown_extensions:

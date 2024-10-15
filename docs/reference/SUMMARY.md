@@ -1,8 +1,7 @@
 * <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Fluxion
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Adapters](fluxion/adapters.md)
-    * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Context](fluxion/context.md)
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Layers](fluxion/layers.md)
-    * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Model Converter](fluxion/model_converter.md)
+    * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Context](fluxion/context.md)
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Utils](fluxion/utils.md)
 * <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> Foundation Models
     * [<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code> CLIP](foundationals/clip.md)
