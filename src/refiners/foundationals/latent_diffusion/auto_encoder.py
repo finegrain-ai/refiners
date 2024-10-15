@@ -369,11 +369,6 @@ class LatentDiffusionAutoencoder(Chain):
         x = 2 * x - 1
         return self.encode(x)
 
-    # backward-compatibility alias
-    # TODO: deprecate this method
-    def decode_latents(self, x: Tensor) -> Image.Image:
-        return self.latents_to_image(x)
-
     def latents_to_image(self, x: Tensor) -> Image.Image:
         """
         Decode latents to an image.

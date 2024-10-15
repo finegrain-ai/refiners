@@ -1496,7 +1496,7 @@ def test_diffusion_sdxl_control_lora(
         )
 
     # decode latent to image
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
     # ensure the predicted image is similar to the expected image
     ensure_similar_images(
@@ -1935,7 +1935,7 @@ def test_diffusion_ip_adapter_multi(
             clip_text_embedding=clip_text_embedding,
             condition_scale=7.5,
         )
-    predicted_image = sd15.lda.decode_latents(x)
+    predicted_image = sd15.lda.latents_to_image(x)
 
     ensure_similar_images(predicted_image, expected_image_ip_adapter_multi, min_psnr=43, min_ssim=0.98)
 
@@ -2245,7 +2245,7 @@ def test_diffusion_sdxl_sliced_attention(
             condition_scale=5,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
@@ -2279,7 +2279,7 @@ def test_diffusion_sdxl_euler_deterministic(
             condition_scale=5,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image)
 
 
@@ -2604,7 +2604,7 @@ def test_style_aligned(
         )
 
     # decode latents
-    predicted_images = [sdxl.lda.decode_latents(latent.unsqueeze(0)) for latent in x]
+    predicted_images = sdxl.lda.latents_to_images(x)
 
     # tile all images horizontally
     merged_image = Image.new("RGB", (1024 * len(predicted_images), 1024))

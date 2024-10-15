@@ -109,7 +109,7 @@ def test_guide_adapting_sdxl_vanilla(
             time_ids=time_ids,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image, min_psnr=35, min_ssim=0.98)
 
 
@@ -151,7 +151,7 @@ def test_guide_adapting_sdxl_single_lora(
             time_ids=time_ids,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image, min_psnr=38, min_ssim=0.98)
 
 
@@ -195,7 +195,7 @@ def test_guide_adapting_sdxl_multiple_loras(
             time_ids=time_ids,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image, min_psnr=38, min_ssim=0.98)
 
 
@@ -255,7 +255,7 @@ def test_guide_adapting_sdxl_loras_ip_adapter(
             time_ids=time_ids,
         )
 
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
     ensure_similar_images(predicted_image, expected_image, min_psnr=29, min_ssim=0.98)
 
 
