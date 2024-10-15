@@ -120,6 +120,7 @@ def main() -> None:
 
     # SDXL T2I-Adapters
     t2iadapter_sdxl.canny.convert()
+    t2iadapter_sdxl.depth_zoe.convert()
 
     # ELLA adapters
     ella.sd15_t5xl.convert()
