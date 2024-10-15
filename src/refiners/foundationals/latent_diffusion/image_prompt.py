@@ -464,25 +464,25 @@ class IPAdapter(Generic[T], fl.Chain, Adapter[T]):
 
         Args:
             image_prompt: A single image or a list of images to compute embeddings for.
-              This can be a PIL Image, a list of PIL Images, or a Tensor.
+                This can be a PIL Image, a list of PIL Images, or a Tensor.
             weights: An optional list of scaling factors for the conditional embeddings.
-              If provided, it must have the same length as the number of images in `image_prompt`.
-              Each weight scales the corresponding image's conditional embedding, allowing you to
-              adjust the influence of each image. Defaults to uniform weights of 1.0.
+                If provided, it must have the same length as the number of images in `image_prompt`.
+                Each weight scales the corresponding image's conditional embedding, allowing you to
+                adjust the influence of each image. Defaults to uniform weights of 1.0.
             concat_batches: Determines how embeddings are concatenated when multiple images are provided:
-              - If `True`, embeddings from multiple images are concatenated along the feature
-                dimension to form a longer sequence of image tokens. This is useful when you want to
-                treat multiple images as a single combined input.
-              - If `False`, embeddings are kept separate along the batch dimension, treating each image
-                independently.
+                - If `True`, embeddings from multiple images are concatenated along the feature
+                    dimension to form a longer sequence of image tokens. This is useful when you want to
+                    treat multiple images as a single combined input.
+                - If `False`, embeddings are kept separate along the batch dimension, treating each image
+                    independently.
 
         Returns:
             A Tensor containing the CLIP image embeddings.
             The structure of the returned Tensor depends on the `concat_batches` parameter:
-              - If `concat_batches` is `True` and multiple images are provided, the embeddings are
-                concatenated along the feature dimension.
-              - If `concat_batches` is `False` or a single image is provided, the embeddings are returned
-                as a batch, with one embedding per image.
+                - If `concat_batches` is `True` and multiple images are provided, the embeddings are
+                    concatenated along the feature dimension.
+                - If `concat_batches` is `False` or a single image is provided, the embeddings are returned
+                    as a batch, with one embedding per image.
         """
         if isinstance(image_prompt, Image.Image):
             image_prompt = self.preprocess_image(image_prompt)
