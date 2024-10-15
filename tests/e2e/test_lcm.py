@@ -15,10 +15,6 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl.lcm_lora import
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl.model import StableDiffusion_XL
 
 
-def _img_open(path: Path) -> Image.Image:
-    return Image.open(path)  # type: ignore
-
-
 @pytest.fixture(autouse=True)
 def ensure_gc():
     # Avoid GPU OOMs
@@ -33,17 +29,17 @@ def ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture
 def expected_lcm_base(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_lcm_base.png").convert("RGB")
+    return Image.open(ref_path / "expected_lcm_base.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_lcm_lora_1_0(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_lcm_lora_1_0.png").convert("RGB")
+    return Image.open(ref_path / "expected_lcm_lora_1_0.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_lcm_lora_1_2(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_lcm_lora_1_2.png").convert("RGB")
+    return Image.open(ref_path / "expected_lcm_lora_1_2.png").convert("RGB")
 
 
 @no_grad()

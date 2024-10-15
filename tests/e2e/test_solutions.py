@@ -8,10 +8,6 @@ from tests.utils import ensure_similar_images
 from refiners.solutions import BoxSegmenter
 
 
-def _img_open(path: Path) -> Image.Image:
-    return Image.open(path)  # type: ignore
-
-
 @pytest.fixture(scope="module")
 def ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_solutions_ref"
@@ -19,22 +15,22 @@ def ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture(scope="module")
 def ref_shelves(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "shelves.jpg").convert("RGB")
+    return Image.open(ref_path / "shelves.jpg").convert("RGB")
 
 
 @pytest.fixture
 def expected_box_segmenter_plant_mask(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_box_segmenter_plant_mask.png")
+    return Image.open(ref_path / "expected_box_segmenter_plant_mask.png")
 
 
 @pytest.fixture
 def expected_box_segmenter_spray_mask(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_box_segmenter_spray_mask.png")
+    return Image.open(ref_path / "expected_box_segmenter_spray_mask.png")
 
 
 @pytest.fixture
 def expected_box_segmenter_spray_cropped_mask(ref_path: Path) -> Image.Image:
-    return _img_open(ref_path / "expected_box_segmenter_spray_cropped_mask.png")
+    return Image.open(ref_path / "expected_box_segmenter_spray_cropped_mask.png")
 
 
 def test_box_segmenter(
