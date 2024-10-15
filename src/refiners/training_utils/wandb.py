@@ -1,18 +1,13 @@
-import warnings
 from abc import ABC
 from pathlib import Path
 from typing import Any, Literal
 
+import wandb
 from PIL import Image
 
 from refiners.training_utils.callback import Callback, CallbackConfig
 from refiners.training_utils.config import BaseConfig
 from refiners.training_utils.trainer import Trainer, register_callback
-
-with warnings.catch_warnings():
-    # TODO: remove when https://github.com/wandb/wandb/issues/6711 gets solved
-    warnings.filterwarnings("ignore", category=DeprecationWarning, message="pkg_resources is deprecated as an API")
-    import wandb
 
 number = float | int
 WandbLoggable = number | Image.Image | list[number] | dict[str, list[number]]
