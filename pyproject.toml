@@ -5,7 +5,7 @@ description = "The simplest way to train and run adapters on top of foundation m
 authors = [{ name = "The Finegrain Team", email = "bonjour@lagon.tech" }]
 license = { text = "MIT License" }
 dependencies = [
-    "torch>=2.1.1",
+    "torch>=2.4.1",
     "safetensors>=0.4.5",
     "pillow>=10.4.0",
     "jaxtyping>=0.2.23",
