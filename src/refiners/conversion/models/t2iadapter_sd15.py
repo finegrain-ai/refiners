@@ -4,27 +4,28 @@ from refiners.conversion.utils import Conversion, Hub, WeightRecipe
 
 diffusers_recipe = WeightRecipe(
     key_map={
+        # first part
         "adapter.conv_in": "Conv2d",
         "adapter.body.0.resnets.0.block1": "StatefulResidualBlocks_1.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_1",
-        "adapter.body.0.resnets.1.block1": "StatefulResidualBlocks_1.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.0.resnets.0.block2": "StatefulResidualBlocks_1.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_2",
+        "adapter.body.0.resnets.1.block1": "StatefulResidualBlocks_1.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.0.resnets.1.block2": "StatefulResidualBlocks_1.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_2",
-        "adapter.body.1.downsample": "StatefulResidualBlocks_2.ResidualBlocks.Downsample2d",
-        "adapter.body.2.downsample": "StatefulResidualBlocks_3.ResidualBlocks.Downsample2d",
-        "adapter.body.3.downsample": "StatefulResidualBlocks_4.ResidualBlocks.Downsample2d",
+        # second part
         "adapter.body.1.in_conv": "StatefulResidualBlocks_2.ResidualBlocks.Conv2d",
         "adapter.body.1.resnets.0.block1": "StatefulResidualBlocks_2.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_1",
-        "adapter.body.1.resnets.1.block1": "StatefulResidualBlocks_2.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.1.resnets.0.block2": "StatefulResidualBlocks_2.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_2",
+        "adapter.body.1.resnets.1.block1": "StatefulResidualBlocks_2.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.1.resnets.1.block2": "StatefulResidualBlocks_2.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_2",
+        # third part
         "adapter.body.2.in_conv": "StatefulResidualBlocks_3.ResidualBlocks.Conv2d",
         "adapter.body.2.resnets.0.block1": "StatefulResidualBlocks_3.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_1",
-        "adapter.body.2.resnets.1.block1": "StatefulResidualBlocks_3.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
-        "adapter.body.3.resnets.0.block1": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_1",
-        "adapter.body.3.resnets.1.block1": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.2.resnets.0.block2": "StatefulResidualBlocks_3.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_2",
+        "adapter.body.2.resnets.1.block1": "StatefulResidualBlocks_3.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.2.resnets.1.block2": "StatefulResidualBlocks_3.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_2",
+        # fourth part
+        "adapter.body.3.resnets.0.block1": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_1",
         "adapter.body.3.resnets.0.block2": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_1.Conv2d_2",
+        "adapter.body.3.resnets.1.block1": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_1",
         "adapter.body.3.resnets.1.block2": "StatefulResidualBlocks_4.ResidualBlocks.Chain.ResidualBlock_2.Conv2d_2",
     },
 )
