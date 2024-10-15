@@ -9,10 +9,6 @@ from refiners.fluxion.utils import image_to_tensor, no_grad, tensor_to_image
 from refiners.foundationals.latent_diffusion.preprocessors.informative_drawings import InformativeDrawings
 
 
-def _img_open(path: Path) -> Image.Image:
-    return Image.open(path)  # type: ignore
-
-
 @pytest.fixture(scope="module")
 def diffusion_ref_path(test_e2e_path: Path) -> Path:
     return test_e2e_path / "test_diffusion_ref"
@@ -20,12 +16,12 @@ def diffusion_ref_path(test_e2e_path: Path) -> Path:
 
 @pytest.fixture(scope="module")
 def cutecat_init(diffusion_ref_path: Path) -> Image.Image:
-    return _img_open(diffusion_ref_path / "cutecat_init.png").convert("RGB")
+    return Image.open(diffusion_ref_path / "cutecat_init.png").convert("RGB")
 
 
 @pytest.fixture
 def expected_image_informative_drawings(diffusion_ref_path: Path) -> Image.Image:
-    return _img_open(diffusion_ref_path / "cutecat_guide_lineart.png").convert("RGB")
+    return Image.open(diffusion_ref_path / "cutecat_guide_lineart.png").convert("RGB")
 
 
 @pytest.fixture
