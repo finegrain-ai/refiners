@@ -61,7 +61,7 @@ class StableDiffusion_1(LatentDiffusionModel):
         for step in sd15.steps:
             x = sd15(x, step=step, clip_text_embedding=clip_text_embedding)
 
-        predicted_image = sd15.lda.decode_latents(x)
+        predicted_image = sd15.lda.latents_to_image(x)
         predicted_image.save("output.png")
     ```
     """

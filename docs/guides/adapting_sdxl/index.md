@@ -92,7 +92,7 @@ with no_grad():  # Disable gradient calculation for memory-efficient inference
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    predicted_image = sdxl.lda.latents_to_image(x)
 
 predicted_image.save("vanilla_sdxl.png")
 
@@ -145,7 +145,7 @@ predicted_image.save("vanilla_sdxl.png")
                 pooled_text_embedding=pooled_text_embedding,
                 time_ids=time_ids,
             )
-        predicted_image = sdxl.lda.decode_latents(x)
+        predicted_image = sdxl.lda.latents_to_image(x)
 
     predicted_image.save("vanilla_sdxl.png")
 
@@ -318,7 +318,7 @@ manager.add_loras("pixel-art-lora", load_from_safetensors("pixel-art-xl-v1.1.saf
                 pooled_text_embedding=pooled_text_embedding,
                 time_ids=time_ids,
             )
-        predicted_image = sdxl.lda.decode_latents(x)
+        predicted_image = sdxl.lda.latents_to_image(x)
 
     predicted_image.save("scifi_pixel_sdxl.png")
 
@@ -453,7 +453,7 @@ with torch.no_grad():
                 pooled_text_embedding=pooled_text_embedding,
                 time_ids=time_ids,
             )
-        predicted_image = sdxl.lda.decode_latents(x)
+        predicted_image = sdxl.lda.latents_to_image(x)
 
     predicted_image.save("scifi_pixel_IP_sdxl.png")
 
@@ -591,7 +591,7 @@ with torch.no_grad():
                 pooled_text_embedding=pooled_text_embedding,
                 time_ids=time_ids,
             )
-        predicted_image = sdxl.lda.decode_latents(x)
+        predicted_image = sdxl.lda.latents_to_image(x)
 
     predicted_image.save("scifi_pixel_IP_T2I_sdxl.png")
 
