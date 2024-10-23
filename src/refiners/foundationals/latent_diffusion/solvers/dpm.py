@@ -308,7 +308,7 @@ class DPMSolver(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+        assert self.first_inference_step <= step < self.num_inference_steps, f"invalid step {step}"
 
         scale_factor = self.cumulative_scale_factors[step]
         noise_ratio = self.noise_std[step]

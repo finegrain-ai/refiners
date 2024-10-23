@@ -89,7 +89,7 @@ class Euler(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+        assert self.first_inference_step <= step < self.num_inference_steps, f"invalid step {step}"
 
         if self.params.model_prediction_type == ModelPredictionType.SAMPLE:
             x0 = predicted_noise  # the model does not actually predict the noise but x0
