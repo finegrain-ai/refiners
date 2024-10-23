@@ -65,7 +65,7 @@ class DDIM(Solver):
         Returns:
             The denoised version of the input data `x`.
         """
-        assert self.first_inference_step <= step < self.num_inference_steps, "invalid step {step}"
+        assert self.first_inference_step <= step < self.num_inference_steps, f"invalid step {step}"
 
         timestep, previous_timestep = (
             self.timesteps[step],
