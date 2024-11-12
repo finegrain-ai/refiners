@@ -205,7 +205,7 @@ class WindowSDPA(fl.Module):
 
 class WindowAttention(fl.Chain):
     """
-    Window-based Multi-head Self-Attenion (W-MSA), optionally shifted (SW-MSA).
+    Window-based Multi-head Self-Attention (W-MSA), optionally shifted (SW-MSA).
 
     It has a trainable relative position bias (RelativePositionBias).
 
