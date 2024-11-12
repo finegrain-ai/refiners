@@ -31,7 +31,7 @@ def get_path(hub: Hub, use_local_weights: bool) -> Path:
     if use_local_weights:
         path = hub.local_path
     else:
-        if hub.override_download_url is not None:
+        if hub.download_url is not None:
             pytest.skip(f"{hub.filename} is not available on Hugging Face Hub")
 
         try:
