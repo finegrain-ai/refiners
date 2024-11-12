@@ -80,7 +80,7 @@ class SegmentAnything(fl.Chain):
 
     @no_grad()
     def compute_image_embedding(self, image: Image.Image) -> ImageEmbedding:
-        """Compute the emmbedding of an image.
+        """Compute the embedding of an image.
 
         Args:
             image: The image to compute the embedding of.
