@@ -68,6 +68,7 @@ nav:
   - Guides:
     - Adapting SDXL: guides/adapting_sdxl/index.md
     - Training 101: guides/training_101/index.md
+    - ComfyUI Refiners: guides/comfyui_refiners/index.md
   - API Reference:
       - Refiners: reference/
 extra:

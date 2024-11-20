@@ -19,6 +19,7 @@ icon: material/water-outline
   [![Discord](https://img.shields.io/discord/1179456777406922913?logo=discord&logoColor=white&color=%235765F2)](https://discord.gg/mCmjNUVV7d)
   [![HuggingFace - Refiners](https://img.shields.io/badge/refiners-ffd21e?logo=huggingface&labelColor=555)](https://huggingface.co/refiners)
   [![HuggingFace - Finegrain](https://img.shields.io/badge/finegrain-ffd21e?logo=huggingface&labelColor=555)](https://huggingface.co/finegrain)
+  [![ComfyUI Registry](https://img.shields.io/badge/ComfyUI_Registry-comfyui--refiners-1a56db)](https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners)
 
   At the era of foundation models, adaptation is quickly rising at the method of choice for bridging the last mile quality gap.
   We couldn't find a framework with first class citizen APIs for foundation model adaptation, so we created one.
