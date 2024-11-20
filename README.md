@@ -60,6 +60,7 @@ Refiners comes with a MkDocs-based documentation website available at https://re
 - [Visoid](https://www.visoid.com/): AI-powered architectural visualization
 - [brycedrennan/imaginAIry](https://github.com/brycedrennan/imaginAIry): Pythonic AI generation of images and videos
 - [chloedia/layerdiffuse](https://github.com/chloedia/layerdiffuse): an implementation of [LayerDiffuse](https://arxiv.org/abs/2402.17113v3) (foreground generation only)
+- [Pinokio](https://pinokio.computer/): a browser for running AI apps locally (see [Clarity Refiners UI](https://pinokio.computer/item?uri=https://github.com/pinokiofactory/clarity-refiners-ui) and [announcement](https://x.com/cocktailpeanut/status/1858938348955443475))
 
 ## Awesome Adaptation Papers
 
