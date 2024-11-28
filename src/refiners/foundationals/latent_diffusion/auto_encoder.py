@@ -415,8 +415,8 @@ class LatentDiffusionAutoencoder(Chain):
         """
         tiles: list[_Tile] = []
 
-        for x in range(0, size.width, tile_size.width - overlap):
-            for y in range(0, size.height, tile_size.height - overlap):
+        for x in range(0, max(size.width - overlap, 1), tile_size.width - overlap):
+            for y in range(0, max(size.height - overlap, 1), tile_size.height - overlap):
                 tile = _Tile(
                     top=max(0, y),
                     left=max(0, x),

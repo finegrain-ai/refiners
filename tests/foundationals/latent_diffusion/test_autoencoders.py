@@ -107,6 +107,28 @@ def test_tiled_autoencoder_rectangular_image(autoencoder: LatentDiffusionAutoenc
     ensure_similar_images(sample_image, result, min_psnr=37, min_ssim=0.985)
 
 
+@no_grad()
+@pytest.mark.parametrize("img_width", [960, 968, 976, 1016, 1024, 1032])
+def test_tiled_autoencoder_pathologic_sizes(
+    refiners_sd15_autoencoder: SD1Autoencoder,
+    sample_image: Image.Image,
+    test_device: torch.device,
+    img_width: int,
+):
+    # 968 is the pathologic case, just larger than (tile size - overlap): (128 - 8 + 1) * 8 = 968
+
+    autoencoder = refiners_sd15_autoencoder.to(device=test_device, dtype=torch.float32)
+
+    sample_image = sample_image.crop((0, 0, img_width // 4, 400))
+    sample_image = sample_image.resize((sample_image.width * 4, sample_image.height * 4))
+
+    with autoencoder.tiled_inference(sample_image, tile_size=(1024, 1024)):
+        encoded = autoencoder.tiled_image_to_latents(sample_image)
+        result = autoencoder.tiled_latents_to_image(encoded)
+
+    ensure_similar_images(sample_image, result, min_psnr=37, min_ssim=0.985)
+
+
 def test_value_error_tile_encode_no_context(autoencoder: LatentDiffusionAutoencoder, sample_image: Image.Image) -> None:
     with pytest.raises(ValueError):
         autoencoder.tiled_image_to_latents(sample_image)
