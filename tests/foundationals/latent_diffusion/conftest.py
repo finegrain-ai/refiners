@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl import StableDiffusionXLPipeline
@@ -91,25 +90,6 @@ def refiners_sdxl(
         unet=refiners_sdxl_unet,
         clip_text_encoder=refiners_sd15_text_encoder,
     )
-
-
-@pytest.fixture(scope="module", params=["SD1.5", "SDXL"])
-def refiners_autoencoder(
-    request: pytest.FixtureRequest,
-    refiners_sd15_autoencoder: SD1Autoencoder,
-    refiners_sdxl_autoencoder: SDXLAutoencoder,
-    test_dtype_fp32_bf16_fp16: torch.dtype,
-) -> SD1Autoencoder | SDXLAutoencoder:
-    model_version = request.param
-    match (model_version, test_dtype_fp32_bf16_fp16):
-        case ("SD1.5", _):
-            return refiners_sd15_autoencoder
-        case ("SDXL", torch.float16):
-            return refiners_sdxl_autoencoder
-        case ("SDXL", _):
-            return refiners_sdxl_autoencoder
-        case _:
-            raise ValueError(f"Unknown model version: {model_version}")
 
 
 @pytest.fixture(scope="module")
