@@ -70,7 +70,8 @@ class scoped_seed:
         self.random_state = random.getstate()
         self.numpy_state = np.random.get_state()
         self.torch_state = torch.get_rng_state()
-        self.cuda_torch_state = cuda.get_rng_state()
+        if torch.cuda.is_available():
+            self.cuda_torch_state = cuda.get_rng_state()
         seed_everything(seed)
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
@@ -78,7 +79,8 @@ class scoped_seed:
         random.setstate(self.random_state)
         np.random.set_state(self.numpy_state)
         torch.set_rng_state(self.torch_state)
-        cuda.set_rng_state(self.cuda_torch_state)
+        if torch.cuda.is_available():
+            cuda.set_rng_state(self.cuda_torch_state)
 
 
 @dataclass
