@@ -205,7 +205,6 @@ def training_clock() -> TrainingClock:
     return TrainingClock(
         training_duration=Epoch(5),
         gradient_accumulation=Step(1),
-        lr_scheduler_interval=Epoch(1),
     )
 
 

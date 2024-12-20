@@ -139,7 +139,6 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         return TrainingClock(
             training_duration=self.config.training.duration,
             gradient_accumulation=self.config.training.gradient_accumulation,
-            lr_scheduler_interval=self.config.lr_scheduler.update_interval,
             verbose=config.verbose,
         )
 
