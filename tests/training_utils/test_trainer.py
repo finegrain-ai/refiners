@@ -280,7 +280,7 @@ def test_warmup_lr(warmup_scheduler: WarmupScheduler) -> None:
         warnings.filterwarnings(
             "ignore",
             category=UserWarning,
-            message=r"Detected call of `lr_scheduler.step\(\)` before `optimizer.step\(\)`",
+            message=r"Detected call of `lr_scheduler\.step\(\)` before `optimizer\.step\(\)`",
         )
         for _ in range(102):
             warmup_scheduler.step()

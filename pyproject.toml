@@ -197,6 +197,11 @@ imaginAIry = "imaginAIry"
 filterwarnings = [
     "ignore::UserWarning:segment_anything_hq.modeling.tiny_vit_sam.*",
     "ignore::DeprecationWarning:timm.models.layers.*",
-    "ignore::DeprecationWarning:timm.models.registry.*"
+    "ignore::DeprecationWarning:timm.models.registry.*",
+    "ignore::FutureWarning:timm.models.layers.*",
+    "ignore::FutureWarning:timm.models.registry.*",
+    "ignore:jsonschema.RefResolver is deprecated:DeprecationWarning",
+    # https://github.com/pytorch/pytorch/issues/136264
+    "ignore:__array__ implementation doesn't accept a copy keyword:DeprecationWarning",
 ]
 addopts = "--import-mode=importlib"
