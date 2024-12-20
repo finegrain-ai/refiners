@@ -130,6 +130,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
         self._load_models()
         self._call_callbacks(event_name="on_init_end")
 
+        # Ensure the lr_scheduler is initialized before calling `step` on the optimizer.
+        # See `patch_track_step_called` in LRScheduler constructor.
+        assert self.lr_scheduler
+
     @register_callback()
     def clock(self, config: ClockConfig) -> TrainingClock:
         return TrainingClock(
@@ -299,10 +303,10 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.optimizer.step()
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
-        if self.clock.is_due(self.config.lr_scheduler.update_interval):
-            self._call_callbacks(event_name="on_lr_scheduler_step_begin")
-            self.lr_scheduler.step()
-            self._call_callbacks(event_name="on_lr_scheduler_step_end")
+            if self.clock.is_due(self.config.lr_scheduler.update_interval):
+                self._call_callbacks(event_name="on_lr_scheduler_step_begin")
+                self.lr_scheduler.step()
+                self._call_callbacks(event_name="on_lr_scheduler_step_end")
 
     def step(self, batch: Batch) -> None:
         """Perform a single training step."""

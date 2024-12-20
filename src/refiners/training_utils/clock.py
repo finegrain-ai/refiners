@@ -22,7 +22,7 @@ class TrainingClock(Callback["Trainer[BaseConfig, Any]"]):
         self,
         training_duration: TimeValue,
         gradient_accumulation: Step,
-        lr_scheduler_interval: TimeValue,
+        lr_scheduler_interval: Iteration | Epoch,
         verbose: bool = True,
     ) -> None:
         self.training_duration = training_duration
