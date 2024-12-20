@@ -304,6 +304,9 @@ class Trainer(Generic[ConfigType, Batch], ABC):
             self.optimizer.zero_grad()
             self._call_callbacks(event_name="on_optimizer_step_end")
             if self.clock.is_due(self.config.lr_scheduler.update_interval):
+                # TODO: if the update interval is in Epochs, this will be called
+                # at every optimizer step during targeted epochs. It should probably
+                # only be called once instead.
                 self._call_callbacks(event_name="on_lr_scheduler_step_begin")
                 self.lr_scheduler.step()
                 self._call_callbacks(event_name="on_lr_scheduler_step_end")
