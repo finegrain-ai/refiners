@@ -12,7 +12,7 @@
 [**Docs**](https://refine.rs) |
 [**Guides**](https://refine.rs/guides/adapting_sdxl/) |
 [**Discussions**](https://github.com/finegrain-ai/refiners/discussions) |
-[**Discord**](https://discord.gg/mCmjNUVV7d)
+[**Discord**](https://discord.gg/a4w4jXJ6)
 
 </div>
 
