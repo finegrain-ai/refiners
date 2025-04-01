@@ -850,10 +850,10 @@ juggernaut_aftermath = Conversion(
     converted=Hub(
         repo_id="refiners/sd15.juggernaut.aftermath.unet",
         filename="model.safetensors",
-        expected_sha256="5882c517eac0670df60755cb9eb762081a1d6a37431d3f7f9a3a6d8dfe764d86",
+        expected_sha256="60312c91cb1807f9e1e1801b0686d9492fcea2b54835c7934b7aa433db0878e2",
     ),
     recipe=civitai_recipe,
-    dtype=torch.float32,
+    dtype=torch.float16,
 )
 juggernaut_aftermath_inpainting = Conversion(
     original=Hub(
@@ -865,10 +865,10 @@ juggernaut_aftermath_inpainting = Conversion(
     converted=Hub(
         repo_id="refiners/sd15.juggernaut.aftermath.unet_inpainting",
         filename="model.safetensors",
-        expected_sha256="c00a85060de351d617cc3a3be6865cf3493a0557f1f32303cb8a385c6368b9a8",
+        expected_sha256="6fc035c3cb865ec1efe72005ff7a70d8605616c64ca68466e161c8a570bdab87",
     ),
     recipe=civitai_recipe,
-    dtype=torch.float32,
+    dtype=torch.float16,
 )
 realistic_stock_photo_v3 = Conversion(
     original=Hub(

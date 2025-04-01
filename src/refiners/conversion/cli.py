@@ -76,6 +76,7 @@ def main() -> None:
     unet_sd15.runwayml_inpainting.convert()
     unet_sd15.juggernaut_reborn.convert()
     unet_sd15.juggernaut_aftermath.convert()
+    unet_sd15.juggernaut_aftermath_inpainting.convert()
     unet_sd15.realistic_stock_photo_v3.convert()
     unet_sd15.realistic_vision_v5.convert()
 
