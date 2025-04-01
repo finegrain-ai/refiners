@@ -337,10 +337,10 @@ juggernaut_aftermath = Conversion(
     converted=Hub(
         repo_id="refiners/sd15.juggernaut.aftermath.autoencoder",
         filename="model.safetensors",
-        expected_sha256="fa7ef415e1854907aa46d81ed403bd1f6b0fd2f06c885545ab689f9f78fa7989",
+        expected_sha256="83d147dd0d25231e49ba35820f7dd7f0902ba6e93237d00b6caee0599f010618",
     ),
     recipe=civitai_recipe,
-    dtype=torch.float32,
+    dtype=torch.float16,
 )
 # autoencoder wise, juggernaut_aftermath = juggernaut_aftermath_inpainting
 realistic_stock_photo_v3 = Conversion(
