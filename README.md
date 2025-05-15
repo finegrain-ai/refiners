@@ -8,9 +8,9 @@
 
 **The simplest way to train and run adapters on top of foundation models**
 
-[**Manifesto**](https://refine.rs/home/why/) |
-[**Docs**](https://refine.rs) |
-[**Guides**](https://refine.rs/guides/adapting_sdxl/) |
+[**Manifesto**](https://finegrain-ai.github.io/refiners/home/why/) |
+[**Docs**](https://finegrain-ai.github.io/refiners/) |
+[**Guides**](https://finegrain-ai.github.io/refiners/guides/adapting_sdxl/) |
 [**Discussions**](https://github.com/finegrain-ai/refiners/discussions) |
 [**Discord**](https://discord.gg/a4w4jXJ6)
 
@@ -52,7 +52,7 @@ rye sync --all-features
 
 ## Documentation
 
-Refiners comes with a MkDocs-based documentation website available at https://refine.rs. You will find there a [quick start guide](https://refine.rs/getting-started/recommended/), a description of the [key concepts](https://refine.rs/concepts/chain/), as well as in-depth foundation model adaptation [guides](https://refine.rs/guides/adapting_sdxl/).
+Refiners comes with a [MkDocs-based documentation website](https://finegrain-ai.github.io/refiners/). You will find there a [quick start guide](https://finegrain-ai.github.io/refiners/getting-started/recommended/), a description of the [key concepts](https://finegrain-ai.github.io/refiners/concepts/chain/), as well as in-depth foundation model adaptation [guides](https://finegrain-ai.github.io/refiners/guides/adapting_sdxl/).
 
 ## Projects using Refiners
 

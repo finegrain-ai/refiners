@@ -438,7 +438,7 @@ In our example, we would like to guide the diffusion process to align with this 
 You can easily download the above image by doing:
 
 ```bash
-curl -O https://refine.rs/guides/adapting_sdxl/german-castle.jpg
+curl -O https://finegrain-ai.github.io/refiners/guides/adapting_sdxl/german-castle.jpg
 ```
 
 Instantiate a [`SDXLIPAdapter`][refiners.foundationals.latent_diffusion.stable_diffusion_xl.image_prompt.SDXLIPAdapter] targeting our `sdxl.unet`, and inject it using a simple `.inject()` call:
@@ -616,7 +616,7 @@ In this section, we will compose our previous example with the [Depth-Zoe Adapte
 You can easily download the above image by doing:
 
 ```bash
-curl -O https://refine.rs/guides/adapting_sdxl/zoe-depth-map-german-castle.png
+curl -O https://finegrain-ai.github.io/refiners/guides/adapting_sdxl/zoe-depth-map-german-castle.png
 ```
 
 Then, just inject it as usual:
