@@ -8,9 +8,9 @@
 
 **The simplest way to train and run adapters on top of foundation models**
 
-[**Manifesto**](https://refine.rs/home/why/) |
-[**Docs**](https://refine.rs) |
-[**Guides**](https://refine.rs/guides/adapting_sdxl/) |
+[**Manifesto**](https://finegrain-ai.github.io/refiners/home/why/) |
+[**Docs**](https://finegrain-ai.github.io/refiners/) |
+[**Guides**](https://finegrain-ai.github.io/refiners/guides/adapting_sdxl/) |
 [**Discussions**](https://github.com/finegrain-ai/refiners/discussions) |
 [**Discord**](https://discord.gg/a4w4jXJ6)
 
@@ -18,7 +18,7 @@
 
 ## Installation
 
-The nodes are published at https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners. See our [installation guide](https://refine.rs/guides/comfyui_refiners/) for more details.
+The nodes are published at https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners. See our [installation guide](https://finegrain-ai.github.io/refiners/guides/comfyui_refiners/) for more details.
 
 ## Example Workflows
 

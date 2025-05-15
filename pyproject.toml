@@ -51,8 +51,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://refine.rs/"
-Documentation = "https://refine.rs/"
+Homepage = "https://finegrain-ai.github.io/refiners/"
+Documentation = "https://finegrain-ai.github.io/refiners/"
 Repository = "https://github.com/finegrain-ai/refiners"
 Issues = "https://github.com/finegrain-ai/refiners/issues"
 
