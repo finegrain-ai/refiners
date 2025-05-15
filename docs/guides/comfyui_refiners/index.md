@@ -98,7 +98,7 @@ The nodes are published at <https://registry.comfy.org/publishers/finegrain/node
 
 To manually install the nodes, you may alternatively do the following:
 
-1. Download an archive of the nodes by cliking the "Download Latest" button at <https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners>, or by running the following command:
+1. Download an archive of the nodes by clicking the "Download Latest" button at <https://registry.comfy.org/publishers/finegrain/nodes/comfyui-refiners>, or by running the following command:
 ```shell
 curl -o comfyui-refiners.zip https://storage.googleapis.com/comfy-registry/finegrain/comfyui-refiners/1.0.4/node.tar.gz
 ```
