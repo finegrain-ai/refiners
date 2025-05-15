@@ -133,4 +133,4 @@ rye add refiners[conversion]@git+https://github.com/finegrain-ai/refiners
 
 ## What's next?
 
-We suggest you check out the [guides](/guides/) section to dive into the usage of Refiners, of the [Key Concepts](/concepts/chain/) section for a better understanding of how the framework works.
+We suggest you check out the [guides](../guides/adapting_sdxl/index.md) section to dive into the usage of Refiners, of the [Key Concepts](../concepts/chain.md) section for a better understanding of how the framework works.

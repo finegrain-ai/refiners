@@ -11,7 +11,7 @@ Our use case will be the generation of an image with "a futuristic castle surrou
 
 ## Baseline
 
-Make sure that Refiners is installed in your local environment (see [Getting started](/getting-started/recommended/)),
+Make sure that Refiners is installed in your local environment (see [Getting started](../../getting-started/recommended.md)),
 and that you have access to a decent GPU (~24 GB VRAM should be enough).
 
 Before diving into the adapters themselves, let's establish a baseline by simply prompting SDXL with Refiners.

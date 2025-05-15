@@ -28,7 +28,7 @@ As believers in adaptation, none of those approaches was appealing to us, so we 
 
 ## What's next?
 
-Now you know *why* we wrote a declarative framework, you can check out [*how*](/concepts/chain/). It's not that complicated, we promise!
+Now you know *why* we wrote a declarative framework, you can check out [*how*](../concepts/chain.md). It's not that complicated, we promise!
 
 [^1]: Paszke et al., 2019. PyTorch: An Imperative Style, High-Performance Deep Learning Library.
 [^2]: Hu et al., 2022. LoRA: Low-Rank Adaptation of Large Language Models.
