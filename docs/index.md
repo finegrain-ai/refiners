@@ -3,11 +3,11 @@ title: A PyTorch microframework for foundation model adaptation
 icon: material/water-outline
 ---
 
-![Refiners logo](/assets/logo_light.png){: style="display: block; margin-left: auto; margin-right: auto; width: 400px;"}
+![Refiners logo](assets/logo_light.png){: style="display: block; margin-left: auto; margin-right: auto; width: 400px;"}
 
-<center>
+<div style="text-align: center;" markdown="1">
 
-  **The simplest way to train and run [adapters](/concepts/adapter/) on top of foundation models.**
+  **The simplest way to train and run [adapters](concepts/adapter/index.md) on top of foundation models.**
 
   [![dependencies - Rye](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/rye/main/artwork/badge.json)](https://rye.astral.sh)
   [![linting - Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -24,6 +24,6 @@ icon: material/water-outline
   At the era of foundation models, adaptation is quickly rising at the method of choice for bridging the last mile quality gap.
   We couldn't find a framework with first class citizen APIs for foundation model adaptation, so we created one.
   It's called Refiners, and we're building it on top of PyTorch, in the open, under the MIT License.
-  [Read our manifesto](/home/why/).
+  [Read our manifesto](home/why.md).
 
-</center>
+</div>

@@ -1,3 +1,4 @@
+site_url: https://finegrain-ai.github.io/refiners/
 site_name: Refiners
 site_description: A micro framework on top of PyTorch with first class citizen APIs for foundation model adaptation
 repo_name: Refiners
@@ -82,6 +83,7 @@ extra:
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/finegrain-ai/
 markdown_extensions:
+  - md_in_html
   - admonition
   - attr_list
   - footnotes
